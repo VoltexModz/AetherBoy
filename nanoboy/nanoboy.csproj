@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>nanoboy</RootNamespace>
+    <AssemblyName>AetherBoy</AssemblyName>
+    <Product>AetherBoy</Product>
+    <Title>AetherBoy</Title>
+    <Description>Experimental Game Boy and Game Boy Color emulator for Windows.</Description>
+    <Authors>Frédéric Meyer; AetherBoy contributors</Authors>
+    <Company>AetherBoy contributors</Company>
+    <Copyright>Copyright © 2014 Frédéric Meyer and contributors</Copyright>
+    <Version>4.0.0-alpha.1</Version>
+    <AssemblyVersion>4.0.0.0</AssemblyVersion>
+    <FileVersion>4.0.0.0</FileVersion>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <NeutralLanguage>de</NeutralLanguage>
+    <ApplicationIcon>qwdwqdwqdqwdwqdqwdqwdqwd_3fT_icon.ico</ApplicationIcon>
+    <Nullable>annotations</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="OpenTK" Version="3.3.3" />
+    <PackageReference Include="OpenTK.GLControl" Version="3.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The legacy OpenAL backend uses unsupported Thread.Abort lifecycle code. -->
+    <Compile Remove="Core\Audio\Backend\OpenAL\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\CHANGELOG.md" Link="CHANGELOG.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\THIRD_PARTY_NOTICES.md" Link="THIRD_PARTY_NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

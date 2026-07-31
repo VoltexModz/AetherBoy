@@ -1,0 +1,45 @@
+# Build outputs
+**/bin/
+**/obj/
+artifacts/
+Release_*/
+
+# IDE and user state
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Legacy package restore folders
+packages/
+
+# Logs, dumps, and local profiling data
+*.log
+*.dmp
+*.trace
+
+# User-provided firmware, games, and save data
+.local-assets/
+ROMs/
+**/GB Emu/
+*.gb
+*.gbc
+*.sav
+*.rtc
+*.ss[1-5]
+*.wav
+dmg_boot.bin
+gbc_boot.bin
+
+# Generated release artifacts and symbols
+*.pdb
+*.nupkg
+*.snupkg
+
+# OS metadata
+Thumbs.db
+Desktop.ini
+.DS_Store
