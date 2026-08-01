@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>AetherBoy.Runtime</RootNamespace>
+    <AssemblyName>AetherBoy.Runtime</AssemblyName>
+    <Description>Thread-owned orchestration and immutable snapshots for AetherBoy.</Description>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Core\AetherBoy.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>AetherBoy.RuntimeTests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

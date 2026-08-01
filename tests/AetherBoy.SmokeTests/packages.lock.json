@@ -125,7 +125,18 @@
       "AetherBoy": {
         "type": "Project",
         "dependencies": {
+          "AetherBoy.Core": "[1.0.0, )",
+          "AetherBoy.Runtime": "[1.0.0, )",
           "NAudio.WinMM": "[2.3.0, )"
+        }
+      },
+      "aetherboy.core": {
+        "type": "Project"
+      },
+      "aetherboy.runtime": {
+        "type": "Project",
+        "dependencies": {
+          "AetherBoy.Core": "[1.0.0, )"
         }
       }
     }

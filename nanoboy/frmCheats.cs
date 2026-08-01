@@ -1,18 +1,20 @@
 using System;
 using System.Windows.Forms;
-using nanoboy.Core;
+using AetherBoy.Runtime;
 
 namespace nanoboy
 {
     public partial class frmCheats : Form
     {
-        private CheatEngine cheatEngine;
+        private readonly EmulationSession session;
 
-        public frmCheats(CheatEngine engine)
+        public frmCheats(EmulationSession session)
         {
+            ArgumentNullException.ThrowIfNull(session);
+
             InitializeComponent();
             Text = $"GameShark-Cheats (experimentell) – {ProductInfo.DisplayName}";
-            cheatEngine = engine;
+            this.session = session;
             RefreshCheatList();
             DarkTheme.Apply(this);
         }
@@ -20,16 +22,9 @@ namespace nanoboy
         private void RefreshCheatList()
         {
             lstCheats.Items.Clear();
-            if (cheatEngine == null) return;
 
-            foreach (var cheat in cheatEngine.Cheats)
+            foreach (CheatSnapshot cheat in session.LatestSnapshot.Cheats)
             {
-                if (cheat.IsGameGenie)
-                {
-                    cheat.Enabled = false;
-                    continue;
-                }
-
                 var item = new ListViewItem(new string[] {
                     cheat.Enabled ? "An" : "Aus",
                     cheat.Name,
@@ -41,7 +36,7 @@ namespace nanoboy
             }
         }
 
-        private void btnAdd_Click(object sender, EventArgs e)
+        private async void btnAdd_Click(object sender, EventArgs e)
         {
             string name = txtName.Text.Trim();
             string code = txtCode.Text.Trim();
@@ -62,16 +57,47 @@ namespace nanoboy
                 return;
             }
 
-            if (cheatEngine != null && cheatEngine.AddCheat(name, code))
+            if (!CanModifyCheats())
             {
+                return;
+            }
+
+            btnAdd.Enabled = false;
+            try
+            {
+                await session.AddCheatAsync(name, code).ConfigureAwait(true);
+                if (IsDisposed)
+                {
+                    return;
+                }
+
                 txtName.Clear();
                 txtCode.Clear();
                 RefreshCheatList();
-                MessageBox.Show("Experimenteller GameShark-RAM-Code hinzugefügt.", "GameShark Cheat Manager", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    "Experimenteller GameShark-RAM-Code hinzugefügt.",
+                    "GameShark Cheat Manager",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
             }
-            else
+            catch (FormatException)
             {
-                MessageBox.Show("Der GameShark-Code konnte nicht hinzugefügt werden.", "Fehler", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowCheatError("Der GameShark-Code konnte nicht hinzugefügt werden.");
+            }
+            catch (InvalidOperationException) when (!CanAcceptCommands())
+            {
+                ShowSessionUnavailable();
+            }
+            catch (Exception)
+            {
+                ShowCheatError("Der GameShark-Code konnte nicht hinzugefügt werden.");
+            }
+            finally
+            {
+                if (!IsDisposed)
+                {
+                    btnAdd.Enabled = true;
+                }
             }
         }
 
@@ -94,24 +120,139 @@ namespace nanoboy
             return true;
         }
 
-        private void btnRemove_Click(object sender, EventArgs e)
+        private async void btnRemove_Click(object sender, EventArgs e)
         {
-            if (lstCheats.SelectedItems.Count > 0)
+            CheatSnapshot? selectedCheat = GetSelectedCheat();
+            if (selectedCheat == null || !CanModifyCheats())
             {
-                var cheat = (CheatItem)lstCheats.SelectedItems[0].Tag;
-                cheatEngine.Cheats.Remove(cheat);
+                return;
+            }
+
+            btnRemove.Enabled = false;
+            try
+            {
+                bool removed = await session.RemoveCheatAsync(selectedCheat.Id).ConfigureAwait(true);
+                if (IsDisposed)
+                {
+                    return;
+                }
+
                 RefreshCheatList();
+                if (!removed)
+                {
+                    MessageBox.Show(
+                        "Der ausgewählte Cheat ist nicht mehr vorhanden.",
+                        "Cheat Manager",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+            }
+            catch (InvalidOperationException) when (!CanAcceptCommands())
+            {
+                ShowSessionUnavailable();
+            }
+            catch (Exception)
+            {
+                ShowCheatError("Der ausgewählte Cheat konnte nicht gelöscht werden.");
+            }
+            finally
+            {
+                if (!IsDisposed)
+                {
+                    btnRemove.Enabled = true;
+                }
             }
         }
 
-        private void btnToggle_Click(object sender, EventArgs e)
+        private async void btnToggle_Click(object sender, EventArgs e)
         {
-            if (lstCheats.SelectedItems.Count > 0)
+            CheatSnapshot? selectedCheat = GetSelectedCheat();
+            if (selectedCheat == null || !CanModifyCheats())
             {
-                var cheat = (CheatItem)lstCheats.SelectedItems[0].Tag;
-                cheat.Enabled = !cheat.Enabled;
-                RefreshCheatList();
+                return;
             }
+
+            btnToggle.Enabled = false;
+            try
+            {
+                await session.ToggleCheatAsync(selectedCheat.Id).ConfigureAwait(true);
+                if (!IsDisposed)
+                {
+                    RefreshCheatList();
+                }
+            }
+            catch (InvalidOperationException) when (!CanAcceptCommands())
+            {
+                ShowSessionUnavailable();
+            }
+            catch (Exception)
+            {
+                ShowCheatError("Der ausgewählte Cheat konnte nicht umgeschaltet werden.");
+            }
+            finally
+            {
+                if (!IsDisposed)
+                {
+                    btnToggle.Enabled = true;
+                }
+            }
+        }
+
+        private CheatSnapshot? GetSelectedCheat()
+        {
+            if (lstCheats.SelectedItems.Count == 0)
+            {
+                return null;
+            }
+
+            return lstCheats.SelectedItems[0].Tag as CheatSnapshot;
+        }
+
+        private bool CanModifyCheats()
+        {
+            if (CanAcceptCommands())
+            {
+                return true;
+            }
+
+            ShowSessionUnavailable();
+            return false;
+        }
+
+        private bool CanAcceptCommands()
+        {
+            return session.State is SessionState.Starting or SessionState.Running or SessionState.Paused;
+        }
+
+        private void ShowSessionUnavailable()
+        {
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            string message = session.State == SessionState.Faulted
+                ? "Die Emulationssitzung wurde wegen eines Fehlers beendet. Cheats können nicht mehr geändert werden."
+                : "Das Spiel wird gerade beendet oder ist bereits geschlossen. Cheats können nicht mehr geändert werden.";
+            MessageBox.Show(
+                message,
+                "Cheat Manager nicht verfügbar",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
+
+        private void ShowCheatError(string message)
+        {
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            MessageBox.Show(
+                message,
+                "Fehler",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
         }
     }
 }

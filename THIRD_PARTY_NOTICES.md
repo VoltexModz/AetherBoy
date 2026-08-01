@@ -1,12 +1,12 @@
 # Third-Party Notices
 
-This file records direct package dependencies declared by the repository as inspected on 2026-07-31. It does not relicense those components or replace their upstream license files.
+This file records direct package dependencies declared by the repository as inspected on 2026-08-01. It does not relicense those components or replace their upstream license files.
 
 ## Direct dependencies
 
 | Scope | Package | Version | Declared license | Upstream |
 | --- | --- | ---: | --- | --- |
-| Runtime | NAudio.WinMM | 2.3.0 | MIT | <https://github.com/naudio/NAudio> |
+| Windows frontend | NAudio.WinMM | 2.3.0 | MIT | <https://github.com/naudio/NAudio> |
 | Test/build | MSTest.Sdk | 4.3.2 | MIT | <https://github.com/microsoft/testfx> |
 
 `NAudio.WinMM` depends on `NAudio.Core`. `MSTest.Sdk` brings the Microsoft Testing Platform and its test-host dependencies. The committed `packages.lock.json` files are the authoritative record of the complete resolved dependency graph for each project.

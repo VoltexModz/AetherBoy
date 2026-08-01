@@ -1,117 +1,372 @@
 using System;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
-using nanoboy.Core;
-using nanoboy.Core.Audio;
+using AetherBoy.Runtime;
+using AetherBoy.Runtime.Audio;
 
 namespace nanoboy
 {
     public partial class frmAudioTool : Form
     {
-        public Nanoboy Nanoboy;
-        private WavRecorder recorder = new WavRecorder();
+        private static readonly int[] SweepClockTable =
+        {
+            0, 32_768, 65_536, 98_304,
+            131_072, 163_840, 196_608, 229_376
+        };
+
+        private static readonly float[] WaveDutyTable =
+        {
+            0.125f, 0.25f, 0.5f, 0.75f
+        };
+
+        private readonly WavRecorder recorder = new WavRecorder();
+        private EmulationSession? session;
+        private EmulationSession? recordingSession;
+        private Task recordingStartTask = Task.CompletedTask;
+        private Task<bool> recordingStopTask = Task.FromResult(true);
+        private bool isClosing;
 
         public frmAudioTool()
         {
             InitializeComponent();
-            Text = $"Audio Inspector – {ProductInfo.DisplayName}";
+            Text = $"Audio Inspector \u2013 {ProductInfo.DisplayName}";
             FormClosing += frmAudioTool_FormClosing;
             DarkTheme.Apply(this);
         }
 
-        private void OnAudioAvailable(object sender, AudioAvailableEventArgs e)
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public EmulationSession? Session
         {
-            if (recorder.IsRecording && e?.Buffer != null)
+            get => Volatile.Read(ref session);
+            set
             {
-                recorder.AddSamples(e.Buffer);
-            }
-        }
-
-        private void btnRecordWav_Click(object sender, EventArgs e)
-        {
-            if (recorder.IsRecording)
-            {
-                recorder.Stop();
-                btnRecordWav.Text = "Audio aufnehmen (.wav)";
-                MessageBox.Show("Aufnahme gestoppt und WAV-Datei gespeichert!", "Audio Recorder", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            else
-            {
-                if (Nanoboy == null || Nanoboy.Memory?.Audio == null)
+                if (ReferenceEquals(Volatile.Read(ref session), value))
                 {
-                    MessageBox.Show("Kein Spiel oder Audio aktiv.", "Audio Recorder", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                using (var sfd = new SaveFileDialog())
+                DetachSession();
+                Volatile.Write(ref session, value);
+                if (value != null)
                 {
-                    sfd.Filter = "WAV Audio (*.wav)|*.wav";
-                    sfd.FileName = "nanoboy_audio.wav";
-                    if (sfd.ShowDialog() == DialogResult.OK)
-                    {
-                        Nanoboy.Memory.Audio.AudioAvailable -= OnAudioAvailable;
-                        Nanoboy.Memory.Audio.AudioAvailable += OnAudioAvailable;
+                    value.AudioSamplesAvailable += OnAudioSamplesAvailable;
+                }
+            }
+        }
 
-                        recorder.Start(sfd.FileName, Nanoboy.Memory.Audio.SampleRate);
-                        btnRecordWav.Text = "Aufnahme stoppen";
+        private void OnAudioSamplesAvailable(
+            object? sender,
+            AudioSamplesAvailableEventArgs eventArgs)
+        {
+            EmulationSession? sourceSession = Volatile.Read(ref recordingSession);
+            if (!ReferenceEquals(sender, sourceSession) || !recorder.IsRecording)
+            {
+                return;
+            }
+
+            try
+            {
+                recorder.AddSamples(eventArgs.GetSamplesCopy());
+            }
+            catch (Exception exception)
+            {
+                Volatile.Write(ref recordingSession, null);
+                Debug.WriteLine($"WAV recording failed while writing samples: {exception}");
+                TryPostToUi(() =>
+                {
+                    SetRecorderIdleControls();
+                    if (!Volatile.Read(ref isClosing))
+                    {
+                        MessageBox.Show(
+                            $"Die WAV-Aufnahme wurde wegen eines Schreibfehlers beendet.\n\n{exception.Message}",
+                            "Audio Recorder",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
                     }
+                });
+            }
+        }
+
+        private async void btnRecordWav_Click(object sender, EventArgs e)
+        {
+            if (recorder.IsRecording)
+            {
+                if (await BeginStopRecordingAsync(showErrors: true).ConfigureAwait(true) &&
+                    !Volatile.Read(ref isClosing) &&
+                    !IsDisposed)
+                {
+                    MessageBox.Show(
+                        "Aufnahme gestoppt und WAV-Datei gespeichert!",
+                        "Audio Recorder",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+
+                return;
+            }
+
+            if (!recordingStartTask.IsCompleted || !recordingStopTask.IsCompleted)
+            {
+                return;
+            }
+
+            EmulationSession? currentSession = Volatile.Read(ref session);
+            AudioSnapshot? audio = currentSession?.LatestSnapshot.Audio;
+            if (audio == null)
+            {
+                MessageBox.Show(
+                    "Kein Spiel oder Audio aktiv.",
+                    "Audio Recorder",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            using (var sfd = new SaveFileDialog())
+            {
+                sfd.Filter = "WAV Audio (*.wav)|*.wav";
+                sfd.FileName = "nanoboy_audio.wav";
+                if (sfd.ShowDialog() == DialogResult.OK)
+                {
+                    await StartRecordingAsync(
+                        sfd.FileName,
+                        audio.SampleRate,
+                        currentSession).ConfigureAwait(true);
                 }
             }
         }
 
         private void frmAudioTool_FormClosing(object sender, FormClosingEventArgs e)
         {
-            if (Nanoboy != null && Nanoboy.Memory?.Audio != null)
-            {
-                Nanoboy.Memory.Audio.AudioAvailable -= OnAudioAvailable;
-            }
-            recorder?.Stop();
+            Volatile.Write(ref isClosing, true);
+            DetachSession();
+            _ = recordingStopTask.ContinueWith(
+                _ =>
+                {
+                    try
+                    {
+                        recorder.Dispose();
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.WriteLine($"WAV recorder cleanup failed: {exception}");
+                    }
+                },
+                CancellationToken.None,
+                TaskContinuationOptions.None,
+                TaskScheduler.Default);
         }
 
         private void timer1_Tick(object sender, EventArgs e)
         {
-            Audio audio;
-
-            if (Nanoboy != null) {
-                audio = Nanoboy.Memory.Audio;
-
-                levelDisplayControl1.Level = (int)(audio.Channel1.CurrentVolume / 16f * levelDisplayControl1.Height);
-                levelDisplayControl2.Level = (int)(audio.Channel2.CurrentVolume / 16f * levelDisplayControl2.Height);
-                levelDisplayControl3.Level = audio.Channel3.OutputLevel * levelDisplayControl3.Height;
-                levelDisplayControl4.Level = (int)(audio.Channel4.CurrentVolume / 16f * levelDisplayControl4.Height);
-
-                labelQ1Freq.Text = audio.Channel1.CurrentFrequency.ToString() + "Hz";
-                labelQ1SweepCycles.Text = QuadChannel.SweepClockTable[audio.Channel1.SweepTime].ToString();
-                labelQ1SweepShift.Text = audio.Channel1.SweepShift.ToString();
-                labelQ1SweepDirection.Text = audio.Channel1.SweepDirection == SweepMode.Addition ? "Up" : "Down";
-                labelQ1EnvelSweep.Text = audio.Channel1.EnvelopeSweep.ToString();
-                labelQ1EnvelDirection.Text = audio.Channel1.EnvelopeDirection == EnvelopeMode.Increase ? "Up" : "Down";
-                labelQ1SoundLength.Text = audio.Channel1.SoundLength.ToString() + (!audio.Channel1.StopOnLengthExpired ? " (ignored)" : "");
-                labelQ1WaveDuty.Text = QuadChannel.WaveDutyTable[audio.Channel1.WavePatternDuty].ToString();
-
-                labelQ2Freq.Text = audio.Channel2.CurrentFrequency.ToString() + "Hz";
-                labelQ2EnvelSweep.Text = audio.Channel2.EnvelopeSweep.ToString();
-                labelQ2EnvelDirection.Text = audio.Channel2.EnvelopeDirection == EnvelopeMode.Increase ? "Up" : "Down";
-                labelQ2SoundLength.Text = audio.Channel2.SoundLength.ToString() + (!audio.Channel2.StopOnLengthExpired ? " (ignored)" : "");
-                labelQ2WaveDuty.Text = QuadChannel.WaveDutyTable[audio.Channel2.WavePatternDuty].ToString();
-
-                labelWFreq.Text = audio.Channel3.Frequency.ToString() + "Hz";
-                labelWSoundLength.Text = audio.Channel3.SoundLength.ToString() + (!audio.Channel3.StopOnLengthExpired ? " (ignored)" : "");
-                waveDataControl1.WaveForm = audio.Channel3.WaveRAM;
-
-                labelNClockFreq.Text = audio.Channel4.ClockFrequency.ToString();
-                labelNDividingRatio.Text = audio.Channel4.DividingRatio.ToString();
-                labelNCounterBits.Text = audio.Channel4.CounterStep ? "7 bits" : "15 bits";
-                labelNCounter.Text = audio.Channel4.Counter.ToString();
-                labelNResultFreq.Text = audio.Channel4.ResultFrequency.ToString();
-                labelNEnvelSweep.Text = audio.Channel4.EnvelopeSweep.ToString();
-                labelNEnvelDirection.Text = audio.Channel4.EnvelopeDirection == EnvelopeMode.Increase ? "Up" : "Down";
-                labelNSoundLength.Text = audio.Channel4.SoundLength.ToString() + (!audio.Channel4.StopOnLengthExpired ? " (ignored)" : "");
+            AudioSnapshot? audio = Volatile.Read(ref session)?.LatestSnapshot.Audio;
+            if (audio == null)
+            {
+                return;
             }
+
+            PulseChannelSnapshot channel1 = audio.Channel1;
+            PulseChannelSnapshot channel2 = audio.Channel2;
+            WaveChannelSnapshot channel3 = audio.Channel3;
+            NoiseChannelSnapshot channel4 = audio.Channel4;
+
+            levelDisplayControl1.Level =
+                (int)(channel1.Volume / 16f * levelDisplayControl1.Height);
+            levelDisplayControl2.Level =
+                (int)(channel2.Volume / 16f * levelDisplayControl2.Height);
+            levelDisplayControl3.Level =
+                channel3.OutputLevel * levelDisplayControl3.Height;
+            levelDisplayControl4.Level =
+                (int)(channel4.Volume / 16f * levelDisplayControl4.Height);
+
+            labelQ1Freq.Text = channel1.Frequency + "Hz";
+            labelQ1SweepCycles.Text = SweepClockTable[channel1.SweepTime].ToString();
+            labelQ1SweepShift.Text = channel1.SweepShift.ToString();
+            labelQ1SweepDirection.Text = channel1.SweepIncreasing ? "Up" : "Down";
+            labelQ1EnvelSweep.Text = channel1.EnvelopeSweep.ToString();
+            labelQ1EnvelDirection.Text = channel1.EnvelopeIncreasing ? "Up" : "Down";
+            labelQ1SoundLength.Text =
+                channel1.SoundLength +
+                (!channel1.StopsWhenLengthExpires ? " (ignored)" : "");
+            labelQ1WaveDuty.Text =
+                WaveDutyTable[channel1.WavePatternDuty].ToString();
+
+            labelQ2Freq.Text = channel2.Frequency + "Hz";
+            labelQ2EnvelSweep.Text = channel2.EnvelopeSweep.ToString();
+            labelQ2EnvelDirection.Text = channel2.EnvelopeIncreasing ? "Up" : "Down";
+            labelQ2SoundLength.Text =
+                channel2.SoundLength +
+                (!channel2.StopsWhenLengthExpires ? " (ignored)" : "");
+            labelQ2WaveDuty.Text =
+                WaveDutyTable[channel2.WavePatternDuty].ToString();
+
+            labelWFreq.Text = channel3.Frequency + "Hz";
+            labelWSoundLength.Text =
+                channel3.SoundLength +
+                (!channel3.StopsWhenLengthExpires ? " (ignored)" : "");
+            waveDataControl1.WaveForm = channel3.GetWaveRamCopy();
+
+            labelNClockFreq.Text = channel4.ClockFrequency.ToString();
+            labelNDividingRatio.Text = channel4.DividingRatio.ToString();
+            labelNCounterBits.Text = channel4.UsesSevenBitCounter ? "7 bits" : "15 bits";
+            labelNCounter.Text = channel4.Counter.ToString();
+            labelNResultFreq.Text = channel4.Frequency.ToString();
+            labelNEnvelSweep.Text = channel4.EnvelopeSweep.ToString();
+            labelNEnvelDirection.Text = channel4.EnvelopeIncreasing ? "Up" : "Down";
+            labelNSoundLength.Text =
+                channel4.SoundLength +
+                (!channel4.StopsWhenLengthExpires ? " (ignored)" : "");
         }
 
         private void checkBox1_CheckedChanged(object sender, EventArgs e)
         {
             timer1.Enabled = checkBox1.Checked;
+        }
+
+        private void DetachSession()
+        {
+            EmulationSession? previousSession = Interlocked.Exchange(ref session, null);
+            if (previousSession != null)
+            {
+                previousSession.AudioSamplesAvailable -= OnAudioSamplesAvailable;
+            }
+
+            _ = BeginStopRecordingAsync(showErrors: !Volatile.Read(ref isClosing));
+        }
+
+        private Task<bool> BeginStopRecordingAsync(bool showErrors)
+        {
+            Volatile.Write(ref recordingSession, null);
+            if (!recordingStopTask.IsCompleted)
+            {
+                return recordingStopTask;
+            }
+
+            Task currentStartTask = recordingStartTask;
+            if (currentStartTask.IsCompleted && !recorder.IsRecording)
+            {
+                SetRecorderIdleControls();
+                return Task.FromResult(true);
+            }
+
+            btnRecordWav.Enabled = false;
+            btnRecordWav.Text = "Aufnahme wird gespeichert…";
+            recordingStopTask = StopRecorderCoreAsync(currentStartTask, showErrors);
+            return recordingStopTask;
+        }
+
+        private async Task<bool> StopRecorderCoreAsync(Task startTask, bool showErrors)
+        {
+            try
+            {
+                try
+                {
+                    await startTask.ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Start reports its own error on the UI thread. Stop still cleans up any partial state.
+                }
+
+                await Task.Run(recorder.Stop).ConfigureAwait(false);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine($"WAV recording could not be finalized: {exception}");
+                if (showErrors)
+                {
+                    TryPostToUi(() =>
+                    {
+                        if (!Volatile.Read(ref isClosing))
+                        {
+                            MessageBox.Show(
+                                $"Die WAV-Datei konnte nicht vollständig gespeichert werden.\n\n{exception.Message}",
+                                "Audio Recorder",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
+                        }
+                    });
+                }
+
+                return false;
+            }
+            finally
+            {
+                TryPostToUi(SetRecorderIdleControls);
+            }
+        }
+
+        private async Task StartRecordingAsync(
+            string filePath,
+            int sampleRate,
+            EmulationSession sourceSession)
+        {
+            Volatile.Write(ref recordingSession, null);
+            btnRecordWav.Enabled = false;
+            btnRecordWav.Text = "Aufnahme wird gestartet…";
+
+            recordingStartTask = Task.Run(() => recorder.Start(filePath, sampleRate));
+            try
+            {
+                await recordingStartTask.ConfigureAwait(true);
+                if (Volatile.Read(ref isClosing) ||
+                    !ReferenceEquals(sourceSession, Volatile.Read(ref session)))
+                {
+                    _ = BeginStopRecordingAsync(showErrors: false);
+                    return;
+                }
+
+                Volatile.Write(ref recordingSession, sourceSession);
+                btnRecordWav.Enabled = true;
+                btnRecordWav.Text = "Aufnahme stoppen";
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine($"WAV recording could not be started: {exception}");
+                SetRecorderIdleControls();
+                if (!Volatile.Read(ref isClosing) &&
+                    ReferenceEquals(sourceSession, Volatile.Read(ref session)))
+                {
+                    MessageBox.Show(
+                        $"Die WAV-Datei konnte nicht angelegt werden.\n\n{exception.Message}",
+                        "Audio Recorder",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                }
+            }
+        }
+
+        private void SetRecorderIdleControls()
+        {
+            if (IsDisposed || !IsHandleCreated)
+            {
+                return;
+            }
+
+            btnRecordWav.Enabled = !Volatile.Read(ref isClosing);
+            btnRecordWav.Text = "Audio aufnehmen (.wav)";
+        }
+
+        private void TryPostToUi(Action action)
+        {
+            if (IsDisposed || !IsHandleCreated)
+            {
+                return;
+            }
+
+            try
+            {
+                BeginInvoke(action);
+            }
+            catch (InvalidOperationException exception)
+            {
+                Debug.WriteLine($"Audio recorder UI notification was skipped: {exception.Message}");
+            }
         }
     }
 }

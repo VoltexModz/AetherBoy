@@ -639,7 +639,7 @@ namespace nanoboy
             this.MainMenuStrip = this.menuStrip;
             this.Name = "frmNano";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "AetherBoy 4.1.0-alpha.1 (Alpha)";
+            this.Text = "AetherBoy 4.2.0-alpha.1 (Alpha)";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.frmNano_FormClosing);
             this.menuStrip.ResumeLayout(false);
             this.menuStrip.PerformLayout();

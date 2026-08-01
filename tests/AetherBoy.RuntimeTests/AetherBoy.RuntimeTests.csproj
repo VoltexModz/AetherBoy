@@ -5,11 +5,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
-    <AssemblyName>AetherBoy.CoreTests</AssemblyName>
+    <AssemblyName>AetherBoy.RuntimeTests</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\nanoboy\Core\AetherBoy.Core.csproj" />
+    <ProjectReference Include="..\..\nanoboy\Runtime\AetherBoy.Runtime.csproj" />
   </ItemGroup>
 
 </Project>

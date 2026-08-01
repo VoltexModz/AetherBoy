@@ -3,15 +3,15 @@ using System.Collections.Concurrent;
 using System.Threading;
 using NAudio.Wave;
 
-namespace nanoboy.Core.Audio.Backend.NAudio
+namespace nanoboy.Platform.Audio
 {
-    internal sealed class GameboyWaveProvider : WaveProvider32
+    internal sealed class GameBoyWaveProvider : WaveProvider32
     {
         private readonly ConcurrentQueue<float> samples = new ConcurrentQueue<float>();
         private readonly int maximumBufferedSamples;
         private int queuedSamples;
 
-        public GameboyWaveProvider(int sampleRate)
+        public GameBoyWaveProvider(int sampleRate)
         {
             SetWaveFormat(sampleRate, 1);
             maximumBufferedSamples = Math.Max(sampleRate / 10, 1);
@@ -25,7 +25,8 @@ namespace nanoboy.Core.Audio.Backend.NAudio
                 Interlocked.Increment(ref queuedSamples);
             }
 
-            while (Volatile.Read(ref queuedSamples) > maximumBufferedSamples && samples.TryDequeue(out _))
+            while (Volatile.Read(ref queuedSamples) > maximumBufferedSamples &&
+                   samples.TryDequeue(out _))
             {
                 Interlocked.Decrement(ref queuedSamples);
             }
@@ -50,23 +51,26 @@ namespace nanoboy.Core.Audio.Backend.NAudio
         }
     }
 
-    public sealed class NAudioSoundOut : SoundOut
+    public sealed class NAudioSoundOut : IDisposable
     {
         private readonly object sync = new object();
         private WaveOutEvent waveOut;
-        private GameboyWaveProvider wave;
+        private GameBoyWaveProvider wave;
         private int currentSampleRate;
         private bool disposed;
 
-        public NAudioSoundOut(Audio audio)
-            : base(audio)
+        public NAudioSoundOut(int sampleRate)
         {
-            Initialize(audio.SampleRate);
-            audio.AudioAvailable += OnAudioAvailable;
+            Initialize(sampleRate);
         }
 
-        private void OnAudioAvailable(object sender, AudioAvailableEventArgs e)
+        public void Submit(float[] buffer, int sampleRate)
         {
+            if (buffer == null)
+            {
+                throw new ArgumentNullException(nameof(buffer));
+            }
+
             lock (sync)
             {
                 if (disposed)
@@ -74,13 +78,18 @@ namespace nanoboy.Core.Audio.Backend.NAudio
                     return;
                 }
 
-                if (e.SampleRate != currentSampleRate)
-                {
-                    Initialize(e.SampleRate);
-                }
-
-                wave.Enqueue(e.Buffer);
+                SubmitCore(buffer, sampleRate);
             }
+        }
+
+        private void SubmitCore(float[] buffer, int sampleRate)
+        {
+            if (sampleRate != currentSampleRate)
+            {
+                Initialize(sampleRate);
+            }
+
+            wave.Enqueue(buffer);
         }
 
         private void Initialize(int sampleRate)
@@ -89,7 +98,7 @@ namespace nanoboy.Core.Audio.Backend.NAudio
             waveOut?.Dispose();
 
             currentSampleRate = sampleRate;
-            wave = new GameboyWaveProvider(sampleRate);
+            wave = new GameBoyWaveProvider(sampleRate);
             waveOut = new WaveOutEvent
             {
                 DesiredLatency = 100,
@@ -99,7 +108,7 @@ namespace nanoboy.Core.Audio.Backend.NAudio
             waveOut.Play();
         }
 
-        public override void Dispose()
+        public void Dispose()
         {
             lock (sync)
             {
@@ -109,7 +118,6 @@ namespace nanoboy.Core.Audio.Backend.NAudio
                 }
 
                 disposed = true;
-                Audio.AudioAvailable -= OnAudioAvailable;
                 waveOut?.Stop();
                 waveOut?.Dispose();
                 waveOut = null;

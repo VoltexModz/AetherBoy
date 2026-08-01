@@ -1,10 +1,9 @@
 using System;
-using nanoboy.Core;
 using System.Windows.Forms;
 
 namespace nanoboy
 {
-    public sealed class NanoboySettings : IEmulatorSettings
+    public sealed class NanoboySettings
     {
         public bool AudioEnable
         {

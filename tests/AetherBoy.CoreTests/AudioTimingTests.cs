@@ -27,7 +27,7 @@ public sealed class AudioTimingTests
     [TestMethod]
     public void AudioEvent_ContainsExactlyConfiguredBufferSize()
     {
-        using var audio = new Audio(SoundOutMode.None)
+        using var audio = new Audio()
         {
             Enabled = false,
             SampleRate = 192_000,

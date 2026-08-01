@@ -18,7 +18,7 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
   DOTNET_NOLOGO: "1"
   NUGET_XMLDOC_MODE: skip
-  NUGET_PACKAGES: ${{ github.workspace }}\.nuget\packages
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
 jobs:
   verify:
@@ -39,8 +39,11 @@ jobs:
           cache: true
           cache-dependency-path: |
             nanoboy/packages.lock.json
+            nanoboy/Core/packages.lock.json
+            nanoboy/Runtime/packages.lock.json
             tests/AetherBoy.SmokeTests/packages.lock.json
             tests/AetherBoy.CoreTests/packages.lock.json
+            tests/AetherBoy.RuntimeTests/packages.lock.json
 
       - name: Restore locked dependencies
         run: dotnet restore .\nanoboy.sln --locked-mode --configfile .\NuGet.config
@@ -49,4 +52,44 @@ jobs:
         run: dotnet build .\nanoboy.sln --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Test
-        run: dotnet test .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 1
+        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 59
+
+  portable:
+    name: Linux / portable Core + Runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            nanoboy/Core/packages.lock.json
+            nanoboy/Runtime/packages.lock.json
+            tests/AetherBoy.CoreTests/packages.lock.json
+            tests/AetherBoy.RuntimeTests/packages.lock.json
+
+      - name: Restore Core tests
+        run: dotnet restore ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --locked-mode --configfile ./NuGet.config
+
+      - name: Restore Runtime tests
+        run: dotnet restore ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --locked-mode --configfile ./NuGet.config
+
+      - name: Build Core tests
+        run: dotnet build ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+
+      - name: Build Runtime tests
+        run: dotnet build ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+
+      - name: Test Core
+        run: dotnet test --project ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 36
+
+      - name: Test Runtime
+        run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 15

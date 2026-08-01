@@ -12,9 +12,9 @@
     <Authors>Frédéric Meyer; AetherBoy contributors</Authors>
     <Company>AetherBoy contributors</Company>
     <Copyright>Copyright © 2014 Frédéric Meyer and contributors</Copyright>
-    <Version>4.1.0-alpha.1</Version>
-    <AssemblyVersion>4.1.0.0</AssemblyVersion>
-    <FileVersion>4.1.0.0</FileVersion>
+    <Version>4.2.0-alpha.1</Version>
+    <AssemblyVersion>4.2.0.0</AssemblyVersion>
+    <FileVersion>4.2.0.0</FileVersion>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <NeutralLanguage>de</NeutralLanguage>
     <ApplicationIcon>qwdwqdwqdqwdwqdqwdqwdqwd_3fT_icon.ico</ApplicationIcon>
@@ -29,9 +29,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>AetherBoy.CoreTests</_Parameter1>
-    </AssemblyAttribute>
+    <Compile Remove="Core\**\*.cs" />
+    <Compile Remove="Runtime\**\*.cs" />
+    <ProjectReference Include="Core\AetherBoy.Core.csproj" />
+    <ProjectReference Include="Runtime\AetherBoy.Runtime.csproj" />
   </ItemGroup>
 
   <ItemGroup>

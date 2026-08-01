@@ -1,7 +1,4 @@
 using System;
-using System.Drawing;
-using System.Windows.Forms;
-using nanoboy.Core.Audio;
 
 namespace nanoboy.Core
 {
@@ -9,9 +6,6 @@ namespace nanoboy.Core
     {
         public CPU Cpu;
         public Memory Memory;
-        private static int[] samplerates = new int[] {
-            8192, 16384, 32768, 44100
-        };
         private int dotOvershoot;
         private int doubleSpeedCpuPhase;
 
@@ -159,21 +153,31 @@ namespace nanoboy.Core
             }
         }
 
-        public bool SetSettings(IEmulatorSettings settings)
+        public void Configure(EmulatorConfiguration configuration)
         {
-            // Phase 1 uses one device-safe format. Lower legacy rates remain disabled
-            // in the UI until a proper resampler is introduced.
-            Memory.Audio.SampleRate = 44_100;
-            Memory.Audio.Channel1.Enabled = settings.Channel1Enable;
-            Memory.Audio.Channel2.Enabled = settings.Channel2Enable;
-            Memory.Audio.Channel3.Enabled = settings.Channel3Enable;
-            Memory.Audio.Channel4.Enabled = settings.Channel4Enable;
-            bool audioOutputReady = Memory.Audio.TrySetSoundOutMode(
-                settings.AudioEnable ? SoundOutMode.NAudio : SoundOutMode.None);
-            Memory.Audio.Enabled = settings.AudioEnable && audioOutputReady;
-            Memory.Video.Frameskip = settings.Frameskip;
-            Memory.Joypad.Settings = settings;
-            return audioOutputReady;
+            if (configuration.Frameskip < 0 || configuration.Frameskip > 60)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(configuration),
+                    configuration.Frameskip,
+                    "Frameskip must be between 0 and 60.");
+            }
+
+            if (configuration.SampleRate < 8_000 || configuration.SampleRate > 192_000)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(configuration),
+                    configuration.SampleRate,
+                    "The sample rate must be between 8 kHz and 192 kHz.");
+            }
+
+            Memory.Audio.SampleRate = configuration.SampleRate;
+            Memory.Audio.Enabled = configuration.AudioEnabled;
+            Memory.Audio.Channel1.Enabled = configuration.Channel1Enabled;
+            Memory.Audio.Channel2.Enabled = configuration.Channel2Enabled;
+            Memory.Audio.Channel3.Enabled = configuration.Channel3Enabled;
+            Memory.Audio.Channel4.Enabled = configuration.Channel4Enabled;
+            Memory.Video.Frameskip = configuration.Frameskip;
         }
 
         public Subscription<CPUStatusUpdate> Debug(IObserver<CPUStatusUpdate> debugger)
@@ -181,14 +185,14 @@ namespace nanoboy.Core
             return (Subscription<CPUStatusUpdate>)Cpu.Subscribe(debugger);
         }
 
-        public void SetKey(Keys key)
+        public void SetButtons(GameBoyButtons buttons, bool active)
         {
-            Memory.Joypad.Set(key, false);
+            Memory.Joypad.SetButtons(buttons, active);
         }
 
-        public void UnsetKey(Keys key)
+        public void SetButtons(GameBoyButtons pressedButtons)
         {
-            Memory.Joypad.Set(key, true);
+            Memory.Joypad.SetButtons(pressedButtons);
         }
 
         public void Dispose()

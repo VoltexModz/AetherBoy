@@ -1,0 +1,76 @@
+using System;
+using System.Diagnostics;
+using System.Threading;
+using nanoboy.Core;
+
+namespace AetherBoy.Runtime
+{
+    internal interface IEmulationMachineFactory
+    {
+        IEmulationMachine Create();
+    }
+
+    internal interface IEmulationMachine : IDisposable
+    {
+        event EventHandler<AudioSamplesAvailableEventArgs>? AudioSamplesAvailable;
+
+        void RunFrame();
+        void SetButtons(GameBoyButtons pressedButtons);
+        void Configure(EmulatorConfiguration configuration);
+        void SetPalette(int paletteIndex);
+        void Reset();
+        CheatSnapshot AddCheat(string name, string code);
+        bool RemoveCheat(Guid id);
+        bool ToggleCheat(Guid id);
+        bool TryCopyVideoFrame(int[] destination, ref long sequence);
+        EmulationSnapshot CaptureSnapshot(
+            SessionState state,
+            bool isPaused,
+            bool isTurboEnabled,
+            long emulatedFrameCount,
+            long videoFrameSequence);
+    }
+
+    internal interface IFramePacer
+    {
+        void Reset();
+        void WaitForNextFrame(CancellationToken cancellationToken);
+    }
+
+    internal sealed class RealTimeFramePacer : IFramePacer
+    {
+        private static readonly long FrameTicks = Math.Max(
+            1,
+            (long)Math.Round(Stopwatch.Frequency * EmulationClock.FrameSeconds));
+
+        private long nextFrameTimestamp;
+
+        public void Reset()
+        {
+            nextFrameTimestamp = 0;
+        }
+
+        public void WaitForNextFrame(CancellationToken cancellationToken)
+        {
+            long now = Stopwatch.GetTimestamp();
+            if (nextFrameTimestamp == 0)
+            {
+                nextFrameTimestamp = now + FrameTicks;
+            }
+
+            long remaining = nextFrameTimestamp - now;
+            if (remaining > 0)
+            {
+                TimeSpan delay = TimeSpan.FromSeconds((double)remaining / Stopwatch.Frequency);
+                cancellationToken.WaitHandle.WaitOne(delay);
+            }
+
+            now = Stopwatch.GetTimestamp();
+            nextFrameTimestamp += FrameTicks;
+            if (now - nextFrameTimestamp > FrameTicks)
+            {
+                nextFrameTimestamp = now + FrameTicks;
+            }
+        }
+    }
+}

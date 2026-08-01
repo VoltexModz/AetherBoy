@@ -2,22 +2,22 @@
 
 > **Status: Alpha / experimentell.** AetherBoy ist eine laufende Modernisierung und noch kein verlässlicher Emulator-Release. Save States, Rewind und Link-Kabel bleiben bewusst deaktiviert, bis ihr Zustand vollständig und reproduzierbar getestet ist.
 
-AetherBoy ist ein Windows-Emulator für Game Boy und Game Boy Color in C#. Das Projekt begann 2014 als `nanoboy` und wurde später als **ChiiBoy Color** weitergeführt. Produkt und Assembly heißen jetzt einheitlich **AetherBoy 4.1.0-alpha.1**; der historische Namespace und Projektordner `nanoboy` bleiben vorerst erhalten.
+AetherBoy ist ein Windows-Emulator für Game Boy und Game Boy Color in C#. Das Projekt begann 2014 als `nanoboy` und wurde später als **ChiiBoy Color** weitergeführt. Produkt und Assembly heißen jetzt einheitlich **AetherBoy 4.2.0-alpha.1**; der historische Namespace und Projektordner `nanoboy` bleiben vorerst erhalten.
 
 AetherBoy ist weder von Nintendo autorisiert noch mit Nintendo verbunden. Game Boy, Game Boy Color und zugehörige Produktnamen sind Marken ihrer jeweiligen Rechteinhaber.
 
 ## Technischer Stand
 
 - Windows-Forms-Anwendung auf **.NET 10 LTS**
-- LR35902-/Game-Boy-Core mit DMG- und CGB-Codepfaden
+- plattformneutraler `AetherBoy.Core` auf `net10.0` mit DMG- und CGB-Codepfaden
+- exklusiver Emulations-Owner-Thread mit typisierten Befehlen und unveränderlichen Snapshots
 - verwaltete WinForms-Bildausgabe mit Sharp-, Smooth- und LCD-Grid-Filter
-- thread-sichere, kopierte Framesnapshots ohne dauerhaft gepinnten Speicher
-- NAudio-WinMM-Ausgabe mit begrenztem Puffer
-- Tastatur- und XInput-Gamepad-Eingabe
-- deterministische Tests für Hardwaretakt, Timer, Interrupts, CPU-Steuerbefehle und Audio-Sampling
-- reproduzierbarer NuGet-Restore über Lockfiles sowie GitHub Actions und Dependabot
+- NAudio-WinMM-Ausgabe als Windows-Adapter außerhalb des Emulator-Cores
+- zusammengeführte Tastatur- und XInput-Eingabe ohne gegenseitiges Freigeben gehaltener Tasten
+- 59 deterministische Tests einschließlich Owner-Thread-, Frame-Austausch-, Audio-Dispatch-, WAV- und generierten ROM-End-to-End-Gates
+- reproduzierbarer NuGet-Restore sowie Windows- und Linux-Gates in GitHub Actions
 
-Phase 1 hat die alten OpenTK-3-Abhängigkeiten vollständig entfernt. Der Core verwendet nun getrennte CPU- und Dot-Taktdomänen, ein driftarmes 59,7275-Hz-Frame-Pacing und einen timergetriebenen Interruptpfad an Instruktionsgrenzen. Das ist eine belastbare Grundlage, aber noch keine vollständige Hardware-Conformance.
+Phase 2 trennt Core, Runtime und Windows-Frontend. Nur der Owner-Thread erzeugt, verändert und entsorgt den Emulatorzustand; WinForms kommuniziert über eine geordnete Command-Queue, liest unveränderliche ROM-, Audio- und Cheat-Snapshots und übernimmt Bilder aus einem synchronisierten, vorallokierten Frame-Austausch. Das beseitigt die bekannten UI/Core-Races und laufende Large-Object-Heap-Allokationen im Bildpfad, ist aber noch keine vollständige Hardware-Conformance.
 
 ## Funktionsstatus
 
@@ -32,7 +32,7 @@ Phase 1 hat die alten OpenTK-3-Abhängigkeiten vollständig entfernt. Der Core v
 | MBC1/MBC3 | teilweise implementiert | RTC- und Persistenzverhalten sind nicht vollständig verifiziert. |
 | MBC2/MBC4/MBC5 und weitere Mapper | nicht freigegeben | MBC5 wird aktuell fälschlich über den MBC3-Pfad behandelt; andere Mapper fehlen. |
 | NAudio-Ausgabe | verbessert, experimentell | Masterclock, Sample-Akkumulator, Puffergröße und Kanal-Längenzähler wurden korrigiert; der APU-Frame-Sequencer ist noch nicht vollständig hardwaregetreu. |
-| WAV-Aufnahme | experimentell | Aufnahme und Stop benötigen noch einen vollständig synchronisierten Fehler- und Thread-Lifecycle. |
+| WAV-Aufnahme | verbessert, experimentell | Schreiben und Header-Finalisierung sind synchronisiert und getestet; Datei-I/O und Stop laufen außerhalb des UI- und Emulations-Threads. Lange Aufnahmen und Gerätefehler benötigen noch breitere Praxistests. |
 | Save States | nicht freigegeben | Das v1-Binärformat bildet keinen vollständigen deterministischen Emulatorzustand ab. |
 | Rewind | nicht freigegeben | Baut auf demselben unzuverlässigen Save-State-Format auf. |
 | GameShark | teilweise implementiert | Einfache RAM-Writes sind vorhanden; Validierung und Nebenwirkungsgrenzen fehlen. |
@@ -53,11 +53,11 @@ Im Repository-Root:
 ```powershell
 dotnet restore ./nanoboy.sln --locked-mode --configfile ./NuGet.config
 dotnet build ./nanoboy.sln -c Release --no-restore
-dotnet test ./nanoboy.sln -c Release --no-build --no-restore
+dotnet test --solution ./nanoboy.sln -c Release --no-build --no-restore
 dotnet run --project ./nanoboy/nanoboy.csproj -c Release --no-build
 ```
 
-`global.json` pinnt das SDK, `packages.lock.json` pinnt den aufgelösten Paketgraphen. Der CI-Workflow führt denselben Restore-, Build- und Testpfad auf Windows aus.
+`global.json` pinnt das SDK, `packages.lock.json` pinnt den aufgelösten Paketgraphen. Der CI-Workflow prüft die gesamte Anwendung auf Windows und Core plus Runtime zusätzlich auf Linux.
 
 ## ROMs, Boot-ROMs und Spielstände
 
@@ -69,7 +69,7 @@ Boot-ROM-Dateien wie `dmg_boot.bin` oder `gbc_boot.bin` sind zum Bauen nicht erf
 
 ## Repository-Hygiene
 
-Die verbindlichen Abhängigkeiten stehen in den Projektdateien, ihre Auflösung in den Lockfiles. Buildausgaben, IDE-Zustand, lokale SDK-Werkzeuge, ROMs, Boot-ROMs, Save-Dateien, Logs und Symbole sind ausgeschlossen. Phase 1 ergänzt einen eingeschränkten NuGet-Feed, Vulnerability-Audit, GitHub Actions und automatisierte Abhängigkeitsupdates.
+Die verbindlichen Abhängigkeiten stehen in den Projektdateien, ihre Auflösung in den Lockfiles. Buildausgaben, IDE-Zustand, lokale SDK-Werkzeuge, ROMs, Boot-ROMs, Save-Dateien, Logs und Symbole sind ausgeschlossen. Der eingeschränkte NuGet-Feed, Vulnerability-Audit, gepinnte GitHub Actions, Linux-Portabilitätsgate und automatische Abhängigkeitsupdates sichern diese Grenzen ab.
 
 ## Lizenz und Herkunft
 

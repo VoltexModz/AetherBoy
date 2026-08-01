@@ -1,50 +1,54 @@
-using System.Windows.Forms;
+using System;
 
 namespace nanoboy.Core
 {
-
-    public class Joypad
+    [Flags]
+    public enum GameBoyButtons : byte
     {
-        public IEmulatorSettings Settings;
+        None = 0,
+        Right = 1 << 0,
+        Left = 1 << 1,
+        Up = 1 << 2,
+        Down = 1 << 3,
+        A = 1 << 4,
+        B = 1 << 5,
+        Select = 1 << 6,
+        Start = 1 << 7,
+        All = Right | Left | Up | Down | A | B | Select | Start
+    }
+
+    public sealed class Joypad
+    {
+        private readonly Interrupt interrupt;
+        private GameBoyButtons pressedButtons;
+
         public bool SelectButtonKeys;
         public bool SelectDirectionKeys;
-        public bool KeyDown;
-        public bool KeyUp;
-        public bool KeyLeft;
-        public bool KeyRight;
-        public bool KeyA;
-        public bool KeyB;
-        public bool KeyStart;
-        public bool KeySelect;
-        private Interrupt interrupt;
 
         public Joypad(Interrupt interrupt)
         {
-            this.interrupt = interrupt;
-            KeyDown = true;
-            KeyUp = true;
-            KeyLeft = true;
-            KeyRight = true;
-            KeyA = true;
-            KeyB = true;
-            KeyStart = true;
-            KeySelect = true;
+            this.interrupt = interrupt ?? throw new ArgumentNullException(nameof(interrupt));
         }
+
+        public GameBoyButtons PressedButtons => pressedButtons;
 
         internal byte ReadRegister()
         {
             int lowNibble = 0x0F;
-            if (SelectButtonKeys) {
-                if (!KeyA) lowNibble &= ~0x01;
-                if (!KeyB) lowNibble &= ~0x02;
-                if (!KeySelect) lowNibble &= ~0x04;
-                if (!KeyStart) lowNibble &= ~0x08;
+            if (SelectButtonKeys)
+            {
+                if (pressedButtons.HasFlag(GameBoyButtons.A)) lowNibble &= ~0x01;
+                if (pressedButtons.HasFlag(GameBoyButtons.B)) lowNibble &= ~0x02;
+                if (pressedButtons.HasFlag(GameBoyButtons.Select)) lowNibble &= ~0x04;
+                if (pressedButtons.HasFlag(GameBoyButtons.Start)) lowNibble &= ~0x08;
             }
-            if (SelectDirectionKeys) {
-                if (!KeyRight) lowNibble &= ~0x01;
-                if (!KeyLeft) lowNibble &= ~0x02;
-                if (!KeyUp) lowNibble &= ~0x04;
-                if (!KeyDown) lowNibble &= ~0x08;
+
+            if (SelectDirectionKeys)
+            {
+                if (pressedButtons.HasFlag(GameBoyButtons.Right)) lowNibble &= ~0x01;
+                if (pressedButtons.HasFlag(GameBoyButtons.Left)) lowNibble &= ~0x02;
+                if (pressedButtons.HasFlag(GameBoyButtons.Up)) lowNibble &= ~0x04;
+                if (pressedButtons.HasFlag(GameBoyButtons.Down)) lowNibble &= ~0x08;
             }
 
             int selection = (SelectButtonKeys ? 0 : 0x20) |
@@ -57,58 +61,39 @@ namespace nanoboy.Core
             int previousLines = ReadRegister() & 0x0F;
             SelectButtonKeys = (value & 0x20) == 0;
             SelectDirectionKeys = (value & 0x10) == 0;
-            int currentLines = ReadRegister() & 0x0F;
-            if ((previousLines & ~currentLines & 0x0F) != 0) {
-                interrupt.Request(16);
-            }
+            RequestInterruptForFallingLines(previousLines);
         }
 
-        public void Set(Keys key, bool status)
+        public void SetButtons(GameBoyButtons buttons, bool active)
         {
-            if (Settings == null) {
-                return;
-            }
-
-            bool changed = false;
-            bool selected = false;
-            if (key == Settings.KeyA) {
-                selected = SelectButtonKeys;
-                changed = KeyA != status;
-                KeyA = status;
-            } else if (key == Settings.KeyB) {
-                selected = SelectButtonKeys;
-                changed = KeyB != status;
-                KeyB = status;
-            } else if (key == Settings.KeyStart) {
-                selected = SelectButtonKeys;
-                changed = KeyStart != status;
-                KeyStart = status;
-            } else if (key == Settings.KeySelect) {
-                selected = SelectButtonKeys;
-                changed = KeySelect != status;
-                KeySelect = status;
-            } else if (key == Settings.KeyUp) {
-                selected = SelectDirectionKeys;
-                changed = KeyUp != status;
-                KeyUp = status;
-            } else if (key == Settings.KeyDown) {
-                selected = SelectDirectionKeys;
-                changed = KeyDown != status;
-                KeyDown = status;
-            } else if (key == Settings.KeyLeft) {
-                selected = SelectDirectionKeys;
-                changed = KeyLeft != status;
-                KeyLeft = status;
-            } else if (key == Settings.KeyRight) {
-                selected = SelectDirectionKeys;
-                changed = KeyRight != status;
-                KeyRight = status;
-            }
-
-            if (changed && !status && selected) {
-                interrupt.Request(16);
-            }
+            GameBoyButtons nextButtons = active
+                ? pressedButtons | buttons
+                : pressedButtons & ~buttons;
+            SetButtons(nextButtons);
         }
 
+        public void SetButtons(GameBoyButtons pressedButtons)
+        {
+            if ((pressedButtons & ~GameBoyButtons.All) != 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(pressedButtons),
+                    pressedButtons,
+                    "The button mask contains unsupported bits.");
+            }
+
+            int previousLines = ReadRegister() & 0x0F;
+            this.pressedButtons = pressedButtons;
+            RequestInterruptForFallingLines(previousLines);
+        }
+
+        private void RequestInterruptForFallingLines(int previousLines)
+        {
+            int currentLines = ReadRegister() & 0x0F;
+            if ((previousLines & ~currentLines & 0x0F) != 0)
+            {
+                interrupt.Request(0x10);
+            }
+        }
     }
 }

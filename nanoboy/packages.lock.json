@@ -15,6 +15,15 @@
         "type": "Transitive",
         "resolved": "2.3.0",
         "contentHash": "jMd7r6dB6tAtXhOYL58ntPqwERNm1/Rhw5MKOIYvsnXzuX+PTGsa2VMam6n0npZYSwlSidKa4GAm4bFcXFUlcg=="
+      },
+      "aetherboy.core": {
+        "type": "Project"
+      },
+      "aetherboy.runtime": {
+        "type": "Project",
+        "dependencies": {
+          "AetherBoy.Core": "[1.0.0, )"
+        }
       }
     }
   }

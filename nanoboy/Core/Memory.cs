@@ -1,6 +1,5 @@
 using System;
 using nanoboy.Core.Audio;
-using nanoboy.Core.Audio.Backend;
 
 namespace nanoboy.Core
 {
@@ -39,10 +38,10 @@ namespace nanoboy.Core
             wram = new byte[8, 0x1000];
             wrambank = 1;
             hram = new byte[0x7F];
-            Audio = new Audio.Audio(SoundOutMode.None);
+            Audio = new Audio.Audio();
             serial = new SerialConsole();
             Interrupt = new Interrupt(cpu);
-            Video = new Video(Interrupt, hdma, rom);
+            Video = new Video(Interrupt, hdma, rom.HasColorFeatures);
             Joypad = new Joypad(Interrupt);
             Timer = new Timer(Interrupt);
         }

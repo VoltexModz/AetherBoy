@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Runtime.CompilerServices;
 
 namespace nanoboy.Core
@@ -56,11 +55,11 @@ namespace nanoboy.Core
         private byte[] pram1;
         private byte[] pram2;
 
-        private ROM rom;
+        private readonly bool hasColorFeatures;
         private Interrupt interrupt;
         private HDMA hdma;
         private int clock;
-        private Color[] monochromepalette;
+        private uint[] monochromepalette;
         private uint[] frame;
         private readonly uint[] publishedFrame;
         private readonly object framePublishLock = new object();
@@ -79,46 +78,56 @@ namespace nanoboy.Core
             switch (paletteIndex)
             {
                 case 1: // Pea Green (Original DMG)
-                    monochromepalette = new Color[] {
-                        Color.FromArgb(155, 188, 15),
-                        Color.FromArgb(139, 172, 15),
-                        Color.FromArgb(48, 98, 48),
-                        Color.FromArgb(15, 56, 15)
+                    monochromepalette = new uint[] {
+                        0xFF9BBC0Fu,
+                        0xFF8BAC0Fu,
+                        0xFF306230u,
+                        0xFF0F380Fu
                     };
                     break;
                 case 2: // Game Boy Light (Teal)
-                    monochromepalette = new Color[] {
-                        Color.FromArgb(0, 255, 205),
-                        Color.FromArgb(0, 165, 151),
-                        Color.FromArgb(0, 102, 94),
-                        Color.FromArgb(0, 51, 47)
+                    monochromepalette = new uint[] {
+                        0xFF00FFCDu,
+                        0xFF00A597u,
+                        0xFF00665Eu,
+                        0xFF00332Fu
                     };
                     break;
                 case 3: // Sepia
-                    monochromepalette = new Color[] {
-                        Color.FromArgb(245, 234, 140),
-                        Color.FromArgb(212, 176, 85),
-                        Color.FromArgb(140, 86, 32),
-                        Color.FromArgb(56, 25, 0)
+                    monochromepalette = new uint[] {
+                        0xFFF5EA8Cu,
+                        0xFFD4B055u,
+                        0xFF8C5620u,
+                        0xFF381900u
                     };
                     break;
                 case 4: // Cyberpunk
-                    monochromepalette = new Color[] {
-                        Color.FromArgb(0, 255, 255),
-                        Color.FromArgb(255, 0, 255),
-                        Color.FromArgb(128, 0, 128),
-                        Color.FromArgb(0, 0, 64)
+                    monochromepalette = new uint[] {
+                        0xFF00FFFFu,
+                        0xFFFF00FFu,
+                        0xFF800080u,
+                        0xFF000040u
                     };
                     break;
                 default: // Game Boy Pocket (Gray)
-                    monochromepalette = new Color[] {
-                        Color.WhiteSmoke,
-                        Color.FromArgb(160, 160, 160),
-                        Color.FromArgb(80, 80, 80),
-                        Color.Black
+                    monochromepalette = new uint[] {
+                        0xFFF5F5F5u,
+                        0xFFA0A0A0u,
+                        0xFF505050u,
+                        0xFF000000u
                     };
                     break;
             }
+        }
+
+        internal uint ReadMonochromePaletteColor(int index)
+        {
+            if ((uint)index >= monochromepalette.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
+
+            return monochromepalette[index];
         }
 
         private struct SpriteEntry
@@ -130,9 +139,9 @@ namespace nanoboy.Core
             public int TableIndex;
         }
 
-        public Video(Interrupt interrupt, HDMA hdma, ROM rom)
+        public Video(Interrupt interrupt, HDMA hdma, bool hasColorFeatures)
         {
-            this.rom = rom;
+            this.hasColorFeatures = hasColorFeatures;
             this.interrupt = interrupt;
             this.hdma = hdma;
             vram = new byte[2, 0x2000];
@@ -140,11 +149,11 @@ namespace nanoboy.Core
             pram1 = new byte[0x40];
             pram2 = new byte[0x40];
             clock = 0;
-            monochromepalette = new Color[] {
-                Color.WhiteSmoke,
-                Color.FromArgb(102, 102, 102),
-                Color.FromArgb(68, 68, 68),
-                Color.Black
+            monochromepalette = new uint[] {
+                0xFFF5F5F5u,
+                0xFF666666u,
+                0xFF444444u,
+                0xFF000000u
             };
             frame = new uint[FramePixelCount];
             publishedFrame = new uint[FramePixelCount];
@@ -334,7 +343,7 @@ namespace nanoboy.Core
                     sbyte signedindex = (sbyte)tileindex;
                     tileaddress = 0x1000 + signedindex * 16;
                 }
-                if (rom.HasColorFeatures) {
+                if (hasColorFeatures) {
                     int tileattributes = vram[1, address];
                     tiledata = ReadTileLineColor(tileaddress, displacement, tileattributes, pram1);
                 } else {
@@ -387,7 +396,7 @@ namespace nanoboy.Core
                 if (flipy) {
                     displacementy = 7 - displacementy;
                 }
-                if (rom.HasColorFeatures) {
+                if (hasColorFeatures) {
                     int attributes = colorpalette | (tilebank << 3);
                     tileline = ReadTileLineColor(tilenumber * 16, displacementy, attributes, pram2, true);
                 } else {
@@ -455,7 +464,7 @@ namespace nanoboy.Core
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private uint GetPaletteEntry(int index, int palette)
         {
-            return (uint)monochromepalette[(palette >> (index * 2)) & 3].ToArgb();
+            return monochromepalette[(palette >> (index * 2)) & 3];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

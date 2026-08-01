@@ -111,6 +111,12 @@
       },
       "aetherboy.core": {
         "type": "Project"
+      },
+      "aetherboy.runtime": {
+        "type": "Project",
+        "dependencies": {
+          "AetherBoy.Core": "[1.0.0, )"
+        }
       }
     }
   }

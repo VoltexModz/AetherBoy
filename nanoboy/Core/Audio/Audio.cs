@@ -1,8 +1,5 @@
 using System;
 using System.Collections.Generic;
-using NAudio;
-using nanoboy.Core.Audio.Backend;
-using nanoboy.Core.Audio.Backend.NAudio;
 
 namespace nanoboy.Core.Audio
 {
@@ -18,22 +15,16 @@ namespace nanoboy.Core.Audio
         Increase = 1
     }
 
-    public enum SoundOutMode
-    {
-        None = 0,
-        NAudio = 1
-    }
-
     public sealed class AudioAvailableEventArgs : EventArgs
     {
+        public AudioAvailableEventArgs(float[] buffer, int sampleRate)
+        {
+            Buffer = buffer ?? throw new ArgumentNullException(nameof(buffer));
+            SampleRate = sampleRate;
+        }
+
         public float[] Buffer { get; }
         public int SampleRate { get; }
-
-        public AudioAvailableEventArgs(float[] buffer, int rate)
-        {
-            Buffer = buffer;
-            SampleRate = rate;
-        }
     }
 
     internal sealed class AudioSampleClock
@@ -60,21 +51,32 @@ namespace nanoboy.Core.Audio
 
     public sealed class Audio : IDisposable
     {
-        public event EventHandler<AudioAvailableEventArgs> AudioAvailable;
-
-        public QuadChannel Channel1;
-        public QuadChannel Channel2;
-        public WaveChannel Channel3;
-        public NoiseChannel Channel4;
-        public int BufferSize;
-        public bool Enabled;
-
         private readonly AudioSampleClock sampleClock;
         private readonly List<float> sampleBuffer;
-        private SoundOut soundOut;
-        private SoundOutMode soundOutMode;
         private int sampleRate;
         private bool disposed;
+
+        public Audio()
+        {
+            Channel1 = new QuadChannel();
+            Channel2 = new QuadChannel();
+            Channel3 = new WaveChannel();
+            Channel4 = new NoiseChannel();
+            sampleClock = new AudioSampleClock();
+            sampleBuffer = new List<float>(1_024);
+            SampleRate = 44_100;
+            BufferSize = 1_024;
+            Enabled = true;
+        }
+
+        public event EventHandler<AudioAvailableEventArgs> AudioAvailable;
+
+        public QuadChannel Channel1 { get; }
+        public QuadChannel Channel2 { get; }
+        public WaveChannel Channel3 { get; }
+        public NoiseChannel Channel4 { get; }
+        public int BufferSize { get; set; }
+        public bool Enabled { get; set; }
 
         public int SampleRate
         {
@@ -83,7 +85,10 @@ namespace nanoboy.Core.Audio
             {
                 if (value < 8_000 || value > 192_000)
                 {
-                    throw new ArgumentOutOfRangeException(nameof(value), value, "Die Abtastrate muss zwischen 8 kHz und 192 kHz liegen.");
+                    throw new ArgumentOutOfRangeException(
+                        nameof(value),
+                        value,
+                        "The sample rate must be between 8 kHz and 192 kHz.");
                 }
 
                 if (sampleRate == value)
@@ -92,64 +97,18 @@ namespace nanoboy.Core.Audio
                 }
 
                 sampleRate = value;
-                sampleClock?.Reset();
-                sampleBuffer?.Clear();
+                sampleClock.Reset();
+                sampleBuffer.Clear();
             }
         }
 
-        public SoundOutMode SoundOutMode => soundOutMode;
-
-        public Audio(SoundOutMode mode = SoundOutMode.None)
-        {
-            Channel1 = new QuadChannel();
-            Channel2 = new QuadChannel();
-            Channel3 = new WaveChannel();
-            Channel4 = new NoiseChannel();
-            SampleRate = 44_100;
-            BufferSize = 1_024;
-            Enabled = true;
-            sampleClock = new AudioSampleClock();
-            sampleBuffer = new List<float>(BufferSize);
-
-            soundOut = CreateSoundOut(mode);
-            soundOutMode = mode;
-        }
-
-        public bool TrySetSoundOutMode(SoundOutMode mode)
+        public void Tick()
         {
             if (disposed)
             {
                 throw new ObjectDisposedException(nameof(Audio));
             }
 
-            if (mode == soundOutMode)
-            {
-                return true;
-            }
-
-            SoundOut replacement;
-            try
-            {
-                replacement = CreateSoundOut(mode);
-            }
-            catch (Exception exception) when (
-                exception is InvalidOperationException ||
-                exception is MmException ||
-                exception is PlatformNotSupportedException)
-            {
-                System.Diagnostics.Debug.WriteLine($"Audio output is unavailable: {exception.Message}");
-                return false;
-            }
-
-            SoundOut previous = soundOut;
-            soundOut = replacement;
-            soundOutMode = mode;
-            previous.Dispose();
-            return true;
-        }
-
-        public void Tick()
-        {
             Channel1.Tick();
             Channel2.Tick();
             Channel3.Tick();
@@ -176,7 +135,9 @@ namespace nanoboy.Core.Audio
                 return;
             }
 
-            AudioAvailable?.Invoke(this, new AudioAvailableEventArgs(sampleBuffer.ToArray(), SampleRate));
+            AudioAvailable?.Invoke(
+                this,
+                new AudioAvailableEventArgs(sampleBuffer.ToArray(), SampleRate));
             sampleBuffer.Clear();
         }
 
@@ -199,18 +160,8 @@ namespace nanoboy.Core.Audio
             }
 
             disposed = true;
-            soundOut.Dispose();
+            AudioAvailable = null;
             sampleBuffer.Clear();
-        }
-
-        private SoundOut CreateSoundOut(SoundOutMode mode)
-        {
-            return mode switch
-            {
-                SoundOutMode.None => new NullSoundOut(this),
-                SoundOutMode.NAudio => new NAudioSoundOut(this),
-                _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Dieses Audio-Backend ist nicht freigegeben.")
-            };
         }
     }
 }
