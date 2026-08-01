@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
+    <AssemblyName>AetherBoy.CoreTests</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>

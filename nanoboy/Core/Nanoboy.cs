@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using nanoboy.Core.Audio;
 
 namespace nanoboy.Core
 {
@@ -11,6 +12,8 @@ namespace nanoboy.Core
         private static int[] samplerates = new int[] {
             8192, 16384, 32768, 44100
         };
+        private int dotOvershoot;
+        private int doubleSpeedCpuPhase;
 
         public Nanoboy(ROM rom, byte[] bootRom = null)
         {
@@ -27,30 +30,70 @@ namespace nanoboy.Core
 
         public void Frame()
         {
-            bool doublespeed = Cpu.IsDoubleSpeed;
-            int cycles_per_frame = doublespeed ? 140448 : 70224;
+            int dotBudget = EmulationClock.DotsPerFrame - dotOvershoot;
+            int dotsExecuted = 0;
 
-            for (int i = 0; i < cycles_per_frame; i++) {
-                int cycles = Cpu.Tick();
-
-                if (doublespeed)
-                    cycles >>= 1;
-
-                for (int j = 0; j < cycles; j++) {
-                    Memory.Interrupt.Tick();
-                    Memory.Video.Tick();
-                    Memory.Audio.Tick();
-                    Memory.Timer.Tick(doublespeed);
+            while (dotsExecuted < dotBudget)
+            {
+                // A speed switch takes effect after STOP. The instruction itself still
+                // belongs to the clock domain that was active when it started.
+                bool doubleSpeed = Cpu.IsDoubleSpeed;
+                int cpuCycles = Memory.Interrupt.ServicePending();
+                if (cpuCycles == 0)
+                {
+                    cpuCycles = Cpu.Tick();
                 }
 
-                i += cycles - 1;
+                if (cpuCycles <= 0)
+                {
+                    throw new InvalidOperationException("The CPU returned a non-positive cycle count.");
+                }
+
+                for (int cpuCycle = 0; cpuCycle < cpuCycles; cpuCycle++)
+                {
+                    // DIV/TIMA are driven by the CPU clock and therefore continue to
+                    // receive every T-cycle in CGB double-speed mode.
+                    Memory.Timer.Tick();
+
+                    if (doubleSpeed)
+                    {
+                        doubleSpeedCpuPhase++;
+                        if (doubleSpeedCpuPhase < 2)
+                        {
+                            continue;
+                        }
+
+                        doubleSpeedCpuPhase = 0;
+                    }
+                    else
+                    {
+                        doubleSpeedCpuPhase = 0;
+                    }
+
+                    Memory.Video.Tick();
+                    Memory.Audio.Tick();
+                    dotsExecuted++;
+                }
             }
+
+            // Instructions are atomic in the current CPU. Carry their small dot
+            // overshoot into the next call instead of accumulating frame-rate drift.
+            dotOvershoot = dotsExecuted - dotBudget;
 
             Memory.Video.FrameReady = false;
         }
 
         public void Reset()
         {
+            dotOvershoot = 0;
+            doubleSpeedCpuPhase = 0;
+            Cpu.ResetExecutionState();
+            Memory.Interrupt.IE = 0;
+            Memory.Interrupt.IF = 0;
+            Memory.Timer.Reset();
+            Memory.Video.ResetTiming();
+            Memory.Audio.ResetTiming();
+
             if (Memory.BootROMEnabled && Memory.BootROM != null)
             {
                 Cpu.A = 0x00;
@@ -116,16 +159,21 @@ namespace nanoboy.Core
             }
         }
 
-        public void SetSettings(IEmulatorSettings settings)
+        public bool SetSettings(IEmulatorSettings settings)
         {
-            Memory.Audio.SampleRate = samplerates[settings.SampleRate];
+            // Phase 1 uses one device-safe format. Lower legacy rates remain disabled
+            // in the UI until a proper resampler is introduced.
+            Memory.Audio.SampleRate = 44_100;
             Memory.Audio.Channel1.Enabled = settings.Channel1Enable;
             Memory.Audio.Channel2.Enabled = settings.Channel2Enable;
             Memory.Audio.Channel3.Enabled = settings.Channel3Enable;
             Memory.Audio.Channel4.Enabled = settings.Channel4Enable;
-            Memory.Audio.Enabled = settings.AudioEnable;
+            bool audioOutputReady = Memory.Audio.TrySetSoundOutMode(
+                settings.AudioEnable ? SoundOutMode.NAudio : SoundOutMode.None);
+            Memory.Audio.Enabled = settings.AudioEnable && audioOutputReady;
             Memory.Video.Frameskip = settings.Frameskip;
             Memory.Joypad.Settings = settings;
+            return audioOutputReady;
         }
 
         public Subscription<CPUStatusUpdate> Debug(IObserver<CPUStatusUpdate> debugger)

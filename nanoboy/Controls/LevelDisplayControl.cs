@@ -1,11 +1,14 @@
 using System.Windows.Forms;
 using System.Drawing;
+using System.ComponentModel;
 
 namespace nanoboy.Controls
 {
     public class LevelDisplayControl : Control
     {
 
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public int Level {
             get {
                 return level;

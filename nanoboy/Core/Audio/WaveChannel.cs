@@ -1,5 +1,4 @@
 using System;
-using nanoboy.Core.Audio.Backend;
 
 namespace nanoboy.Core.Audio
 {
@@ -21,7 +20,7 @@ namespace nanoboy.Core.Audio
 
         public int SoundLength {
             get {
-                return (256 - SoundLengthRaw) * (1 / 256) * 4194304;
+                return (256 - (SoundLengthRaw & 0xFF)) * (EmulationClock.CpuClockHz / 256);
             }
         }
         public int SoundLengthRaw;
@@ -41,7 +40,7 @@ namespace nanoboy.Core.Audio
 
         public float Next(int samplerate)
         {
-            if (On && (!StopOnLengthExpired || soundlengthcycles <= SoundLength)) {
+            if (On && (!StopOnLengthExpired || soundlengthcycles < SoundLength)) {
                 float index = (float)((5.093108 * Math.PI * sample * Audio.ConvertFrequency(FrequencyRaw)) / samplerate) % WaveRAM.Length;
                 float value = (float)WaveRAM[(int)index] / 16f;
                 if (++sample >= samplerate) {

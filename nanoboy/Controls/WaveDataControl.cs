@@ -1,11 +1,14 @@
 using System.Windows.Forms;
 using System.Drawing;
+using System.ComponentModel;
 
 namespace nanoboy.Controls
 {
     public class WaveDataControl : Control
     {
 
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public byte[] WaveForm {
             get {
                 return waveform;

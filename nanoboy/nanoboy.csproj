@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>nanoboy</RootNamespace>
     <AssemblyName>AetherBoy</AssemblyName>
@@ -12,28 +12,26 @@
     <Authors>Frédéric Meyer; AetherBoy contributors</Authors>
     <Company>AetherBoy contributors</Company>
     <Copyright>Copyright © 2014 Frédéric Meyer and contributors</Copyright>
-    <Version>4.0.0-alpha.1</Version>
-    <AssemblyVersion>4.0.0.0</AssemblyVersion>
-    <FileVersion>4.0.0.0</FileVersion>
+    <Version>4.1.0-alpha.1</Version>
+    <AssemblyVersion>4.1.0.0</AssemblyVersion>
+    <FileVersion>4.1.0.0</FileVersion>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <NeutralLanguage>de</NeutralLanguage>
     <ApplicationIcon>qwdwqdwqdqwdwqdqwdqwdqwd_3fT_icon.ico</ApplicationIcon>
     <Nullable>annotations</Nullable>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
     <ImplicitUsings>disable</ImplicitUsings>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NAudio" Version="2.2.1" />
-    <PackageReference Include="OpenTK" Version="3.3.3" />
-    <PackageReference Include="OpenTK.GLControl" Version="3.1.0" />
+    <PackageReference Include="NAudio.WinMM" Version="2.3.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The legacy OpenAL backend uses unsupported Thread.Abort lifecycle code. -->
-    <Compile Remove="Core\Audio\Backend\OpenAL\**\*.cs" />
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>AetherBoy.CoreTests</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
   <ItemGroup>

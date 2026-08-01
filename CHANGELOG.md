@@ -2,6 +2,47 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## 4.1.0-alpha.1 – Phase 1 (2026-07-31)
+
+### Plattform und Build
+
+- Zielplattform von .NET 8 auf **.NET 10 LTS** aktualisiert und SDK `10.0.302` über `global.json` festgelegt.
+- OpenTK 3 und GLControl vollständig entfernt; damit entfällt der .NET-Framework-Kompatibilitätsfallback.
+- NAudio auf das kleinere Laufzeitpaket `NAudio.WinMM 2.3.0` aktualisiert.
+- Reproduzierbaren Restore über `NuGet.config` und drei `packages.lock.json` eingeführt.
+- GitHub Actions mit eingeschränkten Rechten, gepinnten Action-SHAs, Release-Build und Tests ergänzt.
+- Dependabot für NuGet- und Actions-Aktualisierungen eingerichtet.
+
+### Core und Timing
+
+- Zentrale Hardwaretaktdaten mit 4.194.304 Hz, 456 Dots pro Scanline und 70.224 Dots pro Frame eingeführt.
+- Normal- und Double-Speed-Taktdomänen getrennt; PPU/APU laufen nicht mehr mit doppelter Framezahl.
+- Interrupts werden an Instruktionsgrenzen priorisiert, benötigen 20 CPU-Ticks und wecken HALT auch bei gelöschtem IME.
+- EI-Verzögerung, DI-Abbruch, RETI, HALT-Bug und CGB-STOP-Speed-Toggle korrigiert.
+- Timer auf einen 16-Bit-Divider mit TAC-Falling-Edges und verzögertem TIMA-Reload umgestellt.
+- Driftarmes Frame-Pacing auf die tatsächlichen rund 59,7275 Hz statt pauschaler 16 ms umgestellt.
+
+### Bild, Eingabe und Audio
+
+- OpenGL-Immediate-Mode durch einen verwalteten WinForms-Renderer mit Seitenverhältnis, Letterboxing und drei Filtern ersetzt.
+- Framebuffer als kopierten, sequenzierten Snapshot veröffentlicht; das frühere GCHandle-Leak und gleichzeitiges Lesen/Schreiben entfallen.
+- Gamepad-Eingabe über die Windows-Systemkomponente XInput angebunden; Disconnect setzt Controllerzustände zurück.
+- Audio-Sampling auf einen rationalen 4.194.304-Hz-Akkumulator umgestellt.
+- Puffergröße von versehentlichen 1025 auf exakt 1024 Samples korrigiert und NAudio-Queue begrenzt.
+- Pulse-, Wave- und Noise-Längenzähler sowie Noise-LFSR-Periode korrigiert.
+- Headless-Audiobackend für deterministische Tests ergänzt; veralteten OpenAL-/Thread-Abort-Code entfernt.
+
+### Tests
+
+- Den bisherigen Console-Smoke-Test in ein echtes MSTest-/Microsoft-Testing-Platform-Projekt umgewandelt.
+- Neues Core-Testprojekt für Hardwaretakt, Timerfrequenzen und -overflow, Interruptpriorität, HALT-Wakeup und -Bug, EI/DI/STOP, PPU-Framegrenzen sowie Audio-Samplezahl und Kanal-Längen ergänzt.
+
+### Weiterhin offen
+
+- T-Zyklus-genaue Buszugriffe, vollständiger STOP-Ruhemodus, vollständige PPU/STAT-/DMA-Prioritäten und APU-Frame-Sequencer.
+- Plattformneutrale Trennung des Emulator-Cores vom Windows-Frontend.
+- Vollständiger Owner-Thread/Command-Queue-Vertrag für alle UI-Mutationen.
+
 ## 4.0.0-alpha.1 – Phase 0 (2026-07-31)
 
 ### Geändert
@@ -56,4 +97,4 @@ GameShark-RAM-Codes bleiben als **experimentelle** Funktion sichtbar. Das ist ke
 
 ## Nächster Meilenstein
 
-Phase 1 trennt einen plattformneutralen Core vom Windows-Frontend und führt einen deterministischen Scheduler, einen klaren Thread-Besitzvertrag sowie erste automatisierte Core-Tests ein.
+Phase 2 trennt den Emulator-Core vom Windows-Frontend, führt einen vollständigen Owner-Thread/Command-Queue-Vertrag ein und baut ROM-basierte Hardware-Conformance-Gates aus.

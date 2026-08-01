@@ -114,6 +114,8 @@ namespace nanoboy.Core
 
         public bool IME;
         public bool WaitForInterrupt;
+        private int imeEnableDelay;
+        private bool haltBug;
 
 
         public IMemoryDevice Memory;
@@ -502,9 +504,10 @@ namespace nanoboy.Core
                     };
                 opcode[0x10] = delegate() { // STOP 0
                     if (PrepareSpeedSwitch) {
-                        IsDoubleSpeed = true;
+                        IsDoubleSpeed = !IsDoubleSpeed;
+                        PrepareSpeedSwitch = false;
                     }
-                    pc++;
+                    pc += 2;
                     };
                 opcode[0x11] = delegate() { // LD DE, D16
                     OP_LD_R16_D16(ref d, ref e);
@@ -2018,24 +2021,37 @@ namespace nanoboy.Core
 
         public int Tick()
         {
-            byte op;
+            if (!Running || WaitForInterrupt) {
+                return 4;
+            }
+
+            pc &= 0xFFFF;
             CPUStatusUpdate update = new CPUStatusUpdate();
             update.Reason = CPUStatusUpdate.UpdateReason.Execution;
             update.Offset = pc;
             update.CPU = this;
             Notify(update);
-            op = ReadByte(pc);
-            cycleamountext = 0;
-            wroteflagreg = false;
             if (!Running || WaitForInterrupt) {
                 return 4;
             }
+
+            byte op = ReadByte(pc);
+            if (!Running || WaitForInterrupt) {
+                return 4;
+            }
+
+            if (haltBug) {
+                pc = (pc - 1) & 0xFFFF;
+                haltBug = false;
+            }
+
+            cycleamountext = 0;
+            wroteflagreg = false;
             f = (FlagZ ? 0x80 : 0) |
                 (FlagN ? 0x40 : 0) |
                 (FlagH ? 0x20 : 0) |
                 (FlagC ? 0x10 : 0);
             branched = false;
-            pc &= 0xFFFF;
             opcode[op]();
             if (wroteflagreg) {
                 FlagZ = ((f >> 7) & 1) == 1;
@@ -2043,6 +2059,7 @@ namespace nanoboy.Core
                 FlagH = ((f >> 5) & 1) == 1;
                 FlagC = ((f >> 4) & 1) == 1;
             }
+            AdvanceImeEnableDelay();
             if (cycleamountext == 0) {
                 return branched ? cyclesbranched[op] : cycles[op];
             } else {
@@ -2081,6 +2098,7 @@ namespace nanoboy.Core
         {
             WaitForInterrupt = false;
             IME = false;
+            imeEnableDelay = 0;
             Push(pc);
             pc = address;
         }
@@ -2089,12 +2107,13 @@ namespace nanoboy.Core
         private byte ReadByte(int address)
         {
             CPUStatusUpdate update = new CPUStatusUpdate();
+            byte value = Memory.ReadByte(address);
             update.Reason = CPUStatusUpdate.UpdateReason.MemoryRead;
             update.Offset = address;
-            update.Value = Memory.ReadByte(address);
+            update.Value = value;
             update.CPU = this;
             Notify(update);
-            return Memory.ReadByte(address);
+            return value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2130,13 +2149,17 @@ namespace nanoboy.Core
         private void OP_RETI()
         {
             IME = true;
+            imeEnableDelay = 0;
             pc = Pop();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OP_EI()
         {
-            IME = true;
+            if (!IME && imeEnableDelay == 0)
+            {
+                imeEnableDelay = 2;
+            }
             pc++;
         }
 
@@ -2144,7 +2167,34 @@ namespace nanoboy.Core
         private void OP_DI()
         {
             IME = false;
+            imeEnableDelay = 0;
             pc++;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void AdvanceImeEnableDelay()
+        {
+            if (imeEnableDelay == 0)
+            {
+                return;
+            }
+
+            imeEnableDelay--;
+            if (imeEnableDelay == 0)
+            {
+                IME = true;
+            }
+        }
+
+        internal void ResetExecutionState()
+        {
+            Running = true;
+            IME = false;
+            WaitForInterrupt = false;
+            imeEnableDelay = 0;
+            haltBug = false;
+            PrepareSpeedSwitch = false;
+            IsDoubleSpeed = false;
         }
 
         #endregion
@@ -2384,7 +2434,12 @@ namespace nanoboy.Core
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OP_HALT()
         {
-            WaitForInterrupt = true;
+            int pendingInterrupts = Memory.ReadByte(0xFFFF) & Memory.ReadByte(0xFF0F) & 0x1F;
+            if (!IME && pendingInterrupts != 0) {
+                haltBug = true;
+            } else {
+                WaitForInterrupt = true;
+            }
             pc++;
         }
 

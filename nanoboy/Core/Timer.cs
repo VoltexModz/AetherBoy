@@ -4,51 +4,142 @@ namespace nanoboy.Core
 {
     public sealed class Timer
     {
-        public int DIV;
-        public int TIMA;
-        public int TMA;
-        public int TAC;
-        private Interrupt interrupt;
-        private int divcycles;
-        private int timacycles;
+        private readonly Interrupt interrupt;
+        private ushort dividerCounter;
+        private byte tima;
+        private byte tma;
+        private byte tac;
+        private int reloadDelay;
+
+        public int DIV
+        {
+            get { return dividerCounter >> 8; }
+            set { dividerCounter = (ushort)((value & 0xFF) << 8); }
+        }
+
+        public int TIMA
+        {
+            get { return tima; }
+            set { WriteTima((byte)value); }
+        }
+
+        public int TMA
+        {
+            get { return tma; }
+            set { WriteTma((byte)value); }
+        }
+
+        public int TAC
+        {
+            get { return tac; }
+            set { WriteTac((byte)value); }
+        }
 
         public Timer(Interrupt interrupt)
         {
             this.interrupt = interrupt;
         }
 
-        public void Tick(bool doublespeed)
+        internal void Reset()
         {
-            int divclock = doublespeed ? 128 : 256;
-            int timaclock = 0;
+            dividerCounter = 0;
+            tima = 0;
+            tma = 0;
+            tac = 0;
+            reloadDelay = 0;
+        }
 
-            divcycles++;
-            timacycles++;
-
-            if (divcycles == divclock) {
-                divcycles = 0;
-                DIV = (DIV + 1) % 256;
+        public void Tick()
+        {
+            if (reloadDelay > 0)
+            {
+                reloadDelay--;
+                if (reloadDelay == 0)
+                {
+                    tima = tma;
+                    interrupt.Request(4);
+                }
             }
 
-            if ((TAC & 0x4) == 0x4) {
-                switch (TAC & 3)
-                {
-                    case 0: timaclock = 1024; break;
-                    case 1: timaclock = 16; break;
-                    case 2: timaclock = 64; break;
-                    case 3: timaclock = 256; break;
-                }
+            bool oldSignal = GetTimerSignal(dividerCounter, tac);
+            dividerCounter++;
+            bool newSignal = GetTimerSignal(dividerCounter, tac);
+            IncrementOnFallingEdge(oldSignal, newSignal);
+        }
 
-                if (timacycles == timaclock) {
-                    timacycles = 0;
-                    TIMA++;
-                    if (TIMA > 256) {
-                        TIMA = TMA;
-                        interrupt.IF |= 4;
-                    }
-                }
+        public void WriteDiv()
+        {
+            bool oldSignal = GetTimerSignal(dividerCounter, tac);
+            dividerCounter = 0;
+            bool newSignal = GetTimerSignal(dividerCounter, tac);
+            IncrementOnFallingEdge(oldSignal, newSignal);
+        }
+
+        public void WriteTima(byte value)
+        {
+            tima = value;
+            if (reloadDelay > 0)
+            {
+                reloadDelay = 0;
             }
         }
 
+        public void WriteTma(byte value)
+        {
+            tma = value;
+        }
+
+        public void WriteTac(byte value)
+        {
+            bool oldSignal = GetTimerSignal(dividerCounter, tac);
+            tac = (byte)(value & 0x07);
+            bool newSignal = GetTimerSignal(dividerCounter, tac);
+            IncrementOnFallingEdge(oldSignal, newSignal);
+        }
+
+        private static bool GetTimerSignal(ushort divider, byte control)
+        {
+            if ((control & 0x04) == 0)
+            {
+                return false;
+            }
+
+            int dividerBit;
+            switch (control & 0x03)
+            {
+                case 0: dividerBit = 9; break;
+                case 1: dividerBit = 3; break;
+                case 2: dividerBit = 5; break;
+                default: dividerBit = 7; break;
+            }
+
+            return ((divider >> dividerBit) & 1) != 0;
+        }
+
+        private void IncrementOnFallingEdge(bool oldSignal, bool newSignal)
+        {
+            if (oldSignal && !newSignal)
+            {
+                IncrementTima();
+            }
+        }
+
+        private void IncrementTima()
+        {
+            // Further timer edges are ignored during the overflow/reload window.
+            if (reloadDelay > 0)
+            {
+                return;
+            }
+
+            if (tima == 0xFF)
+            {
+                tima = 0;
+                reloadDelay = 4;
+                return;
+            }
+
+            tima++;
+        }
     }
 }

@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "nanoboy", "nanoboy\nanoboy.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AetherBoy.SmokeTests", "tests\AetherBoy.SmokeTests\AetherBoy.SmokeTests.csproj", "{8D51C589-7E0D-40AE-B1D3-E0BC38A05824}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AetherBoy.CoreTests", "tests\AetherBoy.CoreTests\AetherBoy.CoreTests.csproj", "{B73B1EA6-6DF2-4D24-B19D-9C52741B5D73}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{8D51C589-7E0D-40AE-B1D3-E0BC38A05824}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8D51C589-7E0D-40AE-B1D3-E0BC38A05824}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8D51C589-7E0D-40AE-B1D3-E0BC38A05824}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B73B1EA6-6DF2-4D24-B19D-9C52741B5D73}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B73B1EA6-6DF2-4D24-B19D-9C52741B5D73}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B73B1EA6-6DF2-4D24-B19D-9C52741B5D73}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B73B1EA6-6DF2-4D24-B19D-9C52741B5D73}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

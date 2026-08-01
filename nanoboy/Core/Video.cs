@@ -1,23 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 
 namespace nanoboy.Core
 {
     public sealed class Video
     {
-
-        public IntPtr Screen
-        {
-            get
-            {
-                GCHandle handle = GCHandle.Alloc(frame, GCHandleType.Pinned);
-                IntPtr pointer = Marshal.UnsafeAddrOfPinnedArrayElement(frame, 0);
-                return pointer;
-            }
-        }
+        public const int FrameWidth = 160;
+        public const int FrameHeight = 144;
+        public const int FramePixelCount = FrameWidth * FrameHeight;
+        private const int FrameByteCount = FramePixelCount * sizeof(uint);
 
         public bool FrameReady;
         public int Frameskip;
@@ -69,6 +62,9 @@ namespace nanoboy.Core
         private int clock;
         private Color[] monochromepalette;
         private uint[] frame;
+        private readonly uint[] publishedFrame;
+        private readonly object framePublishLock = new object();
+        private long publishedFrameSequence;
         private bool coincidenceinterrupttriggered;
         private int framecounter;
         private bool updaterequired;
@@ -150,16 +146,56 @@ namespace nanoboy.Core
                 Color.FromArgb(68, 68, 68),
                 Color.Black
             };
-            frame = new uint[160 * 144];
+            frame = new uint[FramePixelCount];
+            publishedFrame = new uint[FramePixelCount];
             ModeFlag = 2;
             VRAMBank = 0;
+        }
+
+        public bool TryCopyPublishedFrame(int[] destination, ref long sequence)
+        {
+            if (destination == null)
+            {
+                throw new ArgumentNullException(nameof(destination));
+            }
+
+            if (destination.Length != FramePixelCount)
+            {
+                throw new ArgumentException(
+                    $"A frame snapshot must contain exactly {FramePixelCount} pixels.",
+                    nameof(destination));
+            }
+
+            lock (framePublishLock)
+            {
+                if (sequence == publishedFrameSequence)
+                {
+                    return false;
+                }
+
+                Buffer.BlockCopy(publishedFrame, 0, destination, 0, FrameByteCount);
+                sequence = publishedFrameSequence;
+                return true;
+            }
+        }
+
+        internal void ResetTiming()
+        {
+            clock = 0;
+            LY = 0;
+            ModeFlag = 2;
+            FrameReady = false;
+            CoincidenceFlag = false;
+            coincidenceinterrupttriggered = false;
+            framecounter = 0;
+            updaterequired = false;
         }
 
         public void Tick()
         {
             CoincidenceFlag = LY == LYC;
             if (CoincidenceInterrupt && CoincidenceFlag && !coincidenceinterrupttriggered) {
-                interrupt.IF |= 2;
+                interrupt.Request(2);
                 coincidenceinterrupttriggered = true;
             }
             clock++;
@@ -200,8 +236,12 @@ namespace nanoboy.Core
                         if (LY == 144) {
 
                             ModeFlag = 1;
+                            interrupt.Request(1);
 
                             FrameReady = updaterequired;
+                            if (updaterequired) {
+                                PublishFrame();
+                            }
                             framecounter = (framecounter + 1) % (Frameskip + 1);
                         } else {
 
@@ -215,10 +255,6 @@ namespace nanoboy.Core
                         clock = 0;
                         LY++;
                         coincidenceinterrupttriggered = false;
-                        if (LY == 145) {
-
-                            interrupt.IF |= 1;
-                        }
                         if (LY > 153) {
 
                             ModeFlag = 2;
@@ -226,6 +262,15 @@ namespace nanoboy.Core
                         }
                     }
                     break;
+            }
+        }
+
+        private void PublishFrame()
+        {
+            lock (framePublishLock)
+            {
+                Buffer.BlockCopy(frame, 0, publishedFrame, 0, FrameByteCount);
+                publishedFrameSequence++;
             }
         }
 

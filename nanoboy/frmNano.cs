@@ -1,14 +1,12 @@
 using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Windows.Forms;
-using System.IO;
-using nanoboy.Core;
-
-using System.Threading;
 using System.Diagnostics;
-
-using OpenTK.Graphics.OpenGL;
+using System.Drawing;
+using System.IO;
+using System.Threading;
+using System.Windows.Forms;
+using nanoboy.Controls;
+using nanoboy.Core;
+using nanoboy.Input;
 
 namespace nanoboy
 {
@@ -20,18 +18,19 @@ namespace nanoboy
         private Thread gamethread;
         private CancellationTokenSource gameCts;
         private frmAudioTool audiotoolwindow;
-        private bool loadedgl;
-        private int textureid = -1;
-        private bool speedup = false;
-        private bool glerror = false;
+        private volatile bool speedup;
         private string currentRomPath;
         private RewindManager rewindManager = new RewindManager();
         private CheatEngine cheatEngine = new CheatEngine();
         private LinkCable linkCable = new LinkCable();
-        private bool isRewinding = false;
+        private volatile bool isRewinding;
+        private readonly int[] displayFrame = new int[Video.FramePixelCount];
+        private long displayedFrameSequence;
+        private XInputGamepadState lastPadState;
         private static readonly bool SaveStatesAvailable = false;
         private static readonly bool RewindAvailable = false;
         private static readonly bool LinkCableAvailable = false;
+        private static readonly TimeSpan GameThreadJoinTimeout = TimeSpan.FromSeconds(2);
 
         public frmNano()
         {
@@ -46,16 +45,107 @@ namespace nanoboy
             DarkTheme.Apply(this);
         }
 
-        private void StopGameThread()
+        private bool StopGameThread()
         {
-            if (gameCts != null)
+            speedup = false;
+            isRewinding = false;
+            rewindManager.IsRewinding = false;
+
+            CancellationTokenSource cancellation = gameCts;
+            Thread thread = gamethread;
+
+            if (cancellation == null)
             {
-                gameCts.Cancel();
-                gamethread?.Join(500);
-                gameCts.Dispose();
+                gamethread = null;
+                return true;
+            }
+
+            cancellation.Cancel();
+
+            if (thread != null && thread.IsAlive && !thread.Join(GameThreadJoinTimeout))
+            {
+                Debug.WriteLine("The emulation thread did not stop within two seconds.");
+                return false;
+            }
+
+            if (ReferenceEquals(gameCts, cancellation))
+            {
                 gameCts = null;
                 gamethread = null;
             }
+
+            cancellation.Dispose();
+            return true;
+        }
+
+        private void RunGameLoop(Nanoboy emulator, CancellationToken token)
+        {
+            var clock = Stopwatch.StartNew();
+            double frameTicks = EmulationClock.FrameDuration.TotalSeconds * Stopwatch.Frequency;
+            double nextDeadline = clock.ElapsedTicks + frameTicks;
+
+            while (!token.IsCancellationRequested)
+            {
+                if (RewindAvailable && isRewinding)
+                {
+                    rewindManager.Rewind(emulator);
+                }
+                else
+                {
+                    emulator.Frame();
+                    if (RewindAvailable)
+                    {
+                        rewindManager.CaptureFrame(emulator);
+                    }
+                    cheatEngine.ApplyCheats(emulator.Memory);
+                }
+
+                if (token.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                if (speedup)
+                {
+                    nextDeadline = clock.ElapsedTicks + frameTicks;
+                    continue;
+                }
+
+                if (!WaitUntilDeadline(clock, nextDeadline, token))
+                {
+                    break;
+                }
+
+                nextDeadline += frameTicks;
+                if (clock.ElapsedTicks - nextDeadline > frameTicks * 4)
+                {
+                    nextDeadline = clock.ElapsedTicks + frameTicks;
+                }
+            }
+        }
+
+        private static bool WaitUntilDeadline(
+            Stopwatch clock,
+            double deadline,
+            CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                double remainingTicks = deadline - clock.ElapsedTicks;
+                if (remainingTicks <= 0)
+                {
+                    return true;
+                }
+
+                TimeSpan remaining = TimeSpan.FromSeconds(
+                    remainingTicks / Stopwatch.Frequency);
+                if (cancellationToken.WaitHandle.WaitOne(remaining))
+                {
+                    return false;
+                }
+            }
+
+            return false;
         }
 
         private byte[] LoadBootROM(bool isColor)
@@ -64,11 +154,25 @@ namespace nanoboy
             string localPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, bootFileName);
             if (File.Exists(bootFileName))
             {
-                try { return File.ReadAllBytes(bootFileName); } catch { }
+                try
+                {
+                    return File.ReadAllBytes(bootFileName);
+                }
+                catch (Exception exception)
+                {
+                    Debug.WriteLine($"Could not load boot ROM '{bootFileName}': {exception}");
+                }
             }
             if (File.Exists(localPath))
             {
-                try { return File.ReadAllBytes(localPath); } catch { }
+                try
+                {
+                    return File.ReadAllBytes(localPath);
+                }
+                catch (Exception exception)
+                {
+                    Debug.WriteLine($"Could not load boot ROM '{localPath}': {exception}");
+                }
             }
             return null;
         }
@@ -86,12 +190,23 @@ namespace nanoboy
         {
             if (!File.Exists(path)) return;
 
+            updateTimer.Stop();
+            if (!StopGameThread())
+            {
+                updateTimer.Start();
+                MessageBox.Show(
+                    "Der laufende Emulator konnte nicht sicher beendet werden. Die neue ROM wurde nicht geladen.",
+                    "Emulator beschäftigt",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            nano?.Dispose();
+            nano = null;
+
             currentRomPath = path;
             AddRecentFile(path);
-
-            updateTimer.Stop();
-            StopGameThread();
-            nano?.Dispose();
 
             if (RewindAvailable)
             {
@@ -101,8 +216,11 @@ namespace nanoboy
             byte[] bootRom = LoadBootROM(rom.HasColorFeatures);
 
             nano = new Nanoboy(rom, bootRom);
-            nano.SetSettings(settings);
+            ApplyEmulatorSettings(nano);
             nano.Memory.Video.SetMonochromePalette(settings.PaletteIndex);
+            displayedFrameSequence = 0;
+            lastPadState = XInputGamepadState.Disconnected;
+            gameView.ClearFrame();
 
             if (audiotoolwindow != null) {
                 audiotoolwindow.Nanoboy = nano;
@@ -110,33 +228,14 @@ namespace nanoboy
 
             gameCts = new CancellationTokenSource();
             var token = gameCts.Token;
+            Nanoboy emulator = nano;
 
-            gamethread = new Thread(() => {
-                Stopwatch stopwatch = new Stopwatch();
-                while (!token.IsCancellationRequested) {
-                    stopwatch.Restart();
-                    if (RewindAvailable && isRewinding)
-                    {
-                        rewindManager.Rewind(nano);
-                    }
-                    else
-                    {
-                        nano.Frame();
-                        if (RewindAvailable)
-                        {
-                            rewindManager.CaptureFrame(nano);
-                        }
-                        cheatEngine.ApplyCheats(nano.Memory);
-                    }
-                    stopwatch.Stop();
-                    if (stopwatch.ElapsedMilliseconds < 16 && !speedup) {
-                        int sleepMs = 16 - (int)stopwatch.ElapsedMilliseconds;
-                        if (sleepMs > 0)
-                            Thread.Sleep(sleepMs);
-                    }
-                }
-            });
-            gamethread.Priority = ThreadPriority.Highest;
+            gamethread = new Thread(() => RunGameLoop(emulator, token))
+            {
+                IsBackground = true,
+                Name = "AetherBoy emulation",
+                Priority = ThreadPriority.Normal
+            };
             gamethread.Start();
             updateTimer.Start();
         }
@@ -254,10 +353,21 @@ namespace nanoboy
 
         private void SetDisplayFilter(int index)
         {
+            if (index < 0 || index > 2)
+            {
+                index = 0;
+            }
+
             settings.DisplayFilterIndex = index;
             menuFilterSharp.Checked = index == 0;
             menuFilterSmooth.Checked = index == 1;
             menuFilterLCDGrid.Checked = index == 2;
+            gameView.Filter = index switch
+            {
+                1 => GameDisplayFilter.Smooth,
+                2 => GameDisplayFilter.LcdGrid,
+                _ => GameDisplayFilter.Sharp
+            };
         }
 
         private void menuCheats_Click(object sender, EventArgs e) => new frmCheats(cheatEngine).ShowDialog();
@@ -462,203 +572,107 @@ namespace nanoboy
         #endregion
 
         #region "Update"
-        private Image ResizeImage(Image image, Size size, bool preserveAspectRatio = true)
-        {
-            int newWidth;
-            int newHeight;
-            if (preserveAspectRatio)
-            {
-                int originalWidth = image.Width;
-                int originalHeight = image.Height;
-                float percentWidth = (float)size.Width / (float)originalWidth;
-                float percentHeight = (float)size.Height / (float)originalHeight;
-                float percent = percentHeight < percentWidth ? percentHeight : percentWidth;
-                newWidth = (int)(originalWidth * percent);
-                newHeight = (int)(originalHeight * percent);
-            }
-            else
-            {
-                newWidth = size.Width;
-                newHeight = size.Height;
-            }
-            Image newImage = new Bitmap(newWidth, newHeight);
-            using (Graphics graphicsHandle = Graphics.FromImage(newImage))
-            {
-                graphicsHandle.InterpolationMode = InterpolationMode.NearestNeighbor;
-                graphicsHandle.DrawImage(image, 0, 0, newWidth, newHeight);
-            }
-            return newImage;
-        }
-
-        private void gameView_Load(object sender, EventArgs e)
-        {
-            loadedgl = true;
-            GL.ClearColor(Color.Black);
-            GL.Enable(EnableCap.Texture2D);
-            SetupViewport();
-        }
-
-        private void SetupViewport()
-        {
-            int width = gameView.Width;
-            int height = gameView.Height;
-            GL.MatrixMode(MatrixMode.Projection);
-            GL.LoadIdentity();
-            GL.Ortho(0, width, height, 0, -1, 1);
-            GL.Viewport(0, 0, width, height);
-        }
-
         private void updateTimer_Tick(object sender, EventArgs e)
         {
             PollGamepad();
-            gameView.Refresh();
-        }
 
-        private OpenTK.Input.GamePadState lastPadState;
-        private bool isKeyboardRewinding = false;
+            Nanoboy emulator = nano;
+            if (emulator != null && emulator.Memory.Video.TryCopyPublishedFrame(
+                    displayFrame,
+                    ref displayedFrameSequence))
+            {
+                gameView.Present(displayFrame);
+            }
+        }
 
         private void PollGamepad()
         {
-            if (nano == null) return;
-
-            try
+            Nanoboy emulator = nano;
+            if (emulator == null)
             {
-                var padState = OpenTK.Input.GamePad.GetState(0);
-                if (!padState.IsConnected) return;
+                lastPadState = XInputGamepadState.Disconnected;
+                return;
+            }
 
-                // GamePad Buttons
-                SetOrUnsetKey(padState.Buttons.A == OpenTK.Input.ButtonState.Pressed, settings.KeyA);
-                SetOrUnsetKey(padState.Buttons.B == OpenTK.Input.ButtonState.Pressed || padState.Buttons.X == OpenTK.Input.ButtonState.Pressed, settings.KeyB);
-                SetOrUnsetKey(padState.Buttons.Start == OpenTK.Input.ButtonState.Pressed, settings.KeyStart);
-                SetOrUnsetKey(padState.Buttons.Back == OpenTK.Input.ButtonState.Pressed, settings.KeySelect);
-
-                // DPad & Left Thumbstick
-                bool up = padState.DPad.Up == OpenTK.Input.ButtonState.Pressed || padState.ThumbSticks.Left.Y > 0.5f;
-                bool down = padState.DPad.Down == OpenTK.Input.ButtonState.Pressed || padState.ThumbSticks.Left.Y < -0.5f;
-                bool left = padState.DPad.Left == OpenTK.Input.ButtonState.Pressed || padState.ThumbSticks.Left.X < -0.5f;
-                bool right = padState.DPad.Right == OpenTK.Input.ButtonState.Pressed || padState.ThumbSticks.Left.X > 0.5f;
-
-                SetOrUnsetKey(up, settings.KeyUp);
-                SetOrUnsetKey(down, settings.KeyDown);
-                SetOrUnsetKey(left, settings.KeyLeft);
-                SetOrUnsetKey(right, settings.KeyRight);
-
-                // Rewind bleibt bis zur Korrektur des Save-State-Unterbaus deaktiviert.
-                if (RewindAvailable && padState.Triggers.Left > 0.5f)
+            XInputGamepadState padState = XInputGamepad.GetState();
+            if (!padState.IsConnected)
+            {
+                if (lastPadState.IsConnected)
                 {
-                    isRewinding = true;
-                    rewindManager.IsRewinding = true;
-                }
-                else if (!RewindAvailable || !isKeyboardRewinding)
-                {
-                    isRewinding = false;
-                    rewindManager.IsRewinding = false;
-                }
-
-                // Save-State-Shortcuts bleiben deaktiviert, bis vollständige Zustände sicher sind.
-                if (SaveStatesAvailable && padState.Buttons.RightShoulder == OpenTK.Input.ButtonState.Pressed && lastPadState.Buttons.RightShoulder == OpenTK.Input.ButtonState.Released)
-                {
-                    QuickSave();
-                }
-                if (SaveStatesAvailable && padState.Buttons.LeftShoulder == OpenTK.Input.ButtonState.Pressed && lastPadState.Buttons.LeftShoulder == OpenTK.Input.ButtonState.Released)
-                {
-                    QuickLoad();
+                    ReleaseGamepadInput(emulator);
                 }
 
                 lastPadState = padState;
+                return;
             }
-            catch { }
+
+            SetOrUnsetKey(emulator, padState.IsButtonDown(XInputButtons.A), settings.KeyA);
+            SetOrUnsetKey(
+                emulator,
+                padState.IsButtonDown(XInputButtons.B) || padState.IsButtonDown(XInputButtons.X),
+                settings.KeyB);
+            SetOrUnsetKey(emulator, padState.IsButtonDown(XInputButtons.Start), settings.KeyStart);
+            SetOrUnsetKey(emulator, padState.IsButtonDown(XInputButtons.Back), settings.KeySelect);
+
+            bool up = padState.IsButtonDown(XInputButtons.DPadUp) || padState.LeftThumbY > 0.5f;
+            bool down = padState.IsButtonDown(XInputButtons.DPadDown) || padState.LeftThumbY < -0.5f;
+            bool left = padState.IsButtonDown(XInputButtons.DPadLeft) || padState.LeftThumbX < -0.5f;
+            bool right = padState.IsButtonDown(XInputButtons.DPadRight) || padState.LeftThumbX > 0.5f;
+
+            SetOrUnsetKey(emulator, up, settings.KeyUp);
+            SetOrUnsetKey(emulator, down, settings.KeyDown);
+            SetOrUnsetKey(emulator, left, settings.KeyLeft);
+            SetOrUnsetKey(emulator, right, settings.KeyRight);
+
+            // Rewind bleibt bis zur Korrektur des Save-State-Unterbaus deaktiviert.
+            bool controllerRewind = RewindAvailable && padState.LeftTrigger > 0.5f;
+            isRewinding = controllerRewind;
+            rewindManager.IsRewinding = controllerRewind;
+
+            // Save-State-Shortcuts bleiben deaktiviert, bis vollständige Zustände sicher sind.
+            if (SaveStatesAvailable &&
+                padState.IsButtonDown(XInputButtons.RightShoulder) &&
+                !lastPadState.IsButtonDown(XInputButtons.RightShoulder))
+            {
+                QuickSave();
+            }
+
+            if (SaveStatesAvailable &&
+                padState.IsButtonDown(XInputButtons.LeftShoulder) &&
+                !lastPadState.IsButtonDown(XInputButtons.LeftShoulder))
+            {
+                QuickLoad();
+            }
+
+            lastPadState = padState;
         }
 
-        private void SetOrUnsetKey(bool isPressed, Keys key)
+        private void ReleaseGamepadInput(Nanoboy emulator)
         {
-            if (isPressed) nano.SetKey(key);
-            else nano.UnsetKey(key);
+            SetOrUnsetKey(emulator, false, settings.KeyA);
+            SetOrUnsetKey(emulator, false, settings.KeyB);
+            SetOrUnsetKey(emulator, false, settings.KeyStart);
+            SetOrUnsetKey(emulator, false, settings.KeySelect);
+            SetOrUnsetKey(emulator, false, settings.KeyUp);
+            SetOrUnsetKey(emulator, false, settings.KeyDown);
+            SetOrUnsetKey(emulator, false, settings.KeyLeft);
+            SetOrUnsetKey(emulator, false, settings.KeyRight);
+            isRewinding = false;
+            rewindManager.IsRewinding = false;
         }
 
-        private void gameView_Paint(object sender, PaintEventArgs e)
+        private static void SetOrUnsetKey(Nanoboy emulator, bool isPressed, Keys key)
         {
-            if (loadedgl && nano != null) {
-                if (!glerror) {
-                    GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-
-                    GL.MatrixMode(MatrixMode.Modelview);
-                    GL.LoadIdentity();
-                    textureid = TextureFromArray(nano.Memory.Video.Screen, textureid);
-                    GL.BindTexture(TextureTarget.Texture2D, textureid);
-                    GL.Begin(PrimitiveType.Quads);
-                    {
-                        GL.TexCoord2(0f, 0f);
-                        GL.Vertex2(0f, 0f);
-                        GL.TexCoord2(1f, 0f);
-                        GL.Vertex2(gameView.Width, 0f);
-                        GL.TexCoord2(1f, 1f);
-                        GL.Vertex2(gameView.Width, gameView.Height);
-                        GL.TexCoord2(0f, 1f);
-                        GL.Vertex2(0f, gameView.Height);
-                    }
-                    GL.End();
-
-                    // Render LCD Grid lines overlay if LCD Grid filter is enabled
-                    if (settings.DisplayFilterIndex == 2)
-                    {
-                        GL.Enable(EnableCap.Blend);
-                        GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-                        GL.BindTexture(TextureTarget.Texture2D, 0);
-
-                        GL.Color4(0.0f, 0.0f, 0.0f, 0.20f);
-                        GL.Begin(PrimitiveType.Lines);
-
-                        float colStep = (float)gameView.Width / 160f;
-                        for (int x = 0; x <= 160; x++)
-                        {
-                            float posX = x * colStep;
-                            GL.Vertex2(posX, 0f);
-                            GL.Vertex2(posX, gameView.Height);
-                        }
-
-                        float rowStep = (float)gameView.Height / 144f;
-                        for (int y = 0; y <= 144; y++)
-                        {
-                            float posY = y * rowStep;
-                            GL.Vertex2(0f, posY);
-                            GL.Vertex2(gameView.Width, posY);
-                        }
-
-                        GL.End();
-                        GL.Color4(1.0f, 1.0f, 1.0f, 1.0f);
-                        GL.Disable(EnableCap.Blend);
-                    }
-
-                    gameView.SwapBuffers();
-                } else {
-                    Bitmap screen_original = new Bitmap(160, 140, 160 * 4, System.Drawing.Imaging.PixelFormat.Format32bppArgb, nano.Memory.Video.Screen);
-                    Image screen_resized = ResizeImage(screen_original, new Size(gameView.Width, gameView.Height), false);
-                    e.Graphics.DrawImage(screen_resized, new Point(0, 0));
-                }
+            if (isPressed)
+            {
+                emulator.SetKey(key);
+            }
+            else
+            {
+                emulator.UnsetKey(key);
             }
         }
 
-        public int TextureFromArray(IntPtr arrayptr, int texturexid = -1)
-        {
-            int id = texturexid == -1 ? GL.GenTexture() : texturexid;
-            GL.BindTexture(TextureTarget.Texture2D, id);
-
-            var filterMode = settings.DisplayFilterIndex == 1 ? TextureMagFilter.Linear : TextureMagFilter.Nearest;
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)filterMode);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)filterMode);
-            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, 160, 144, 0, OpenTK.Graphics.OpenGL.PixelFormat.Bgra, PixelType.UnsignedByte, arrayptr);
-
-            if (GL.GetError() != ErrorCode.NoError) {
-                glerror = true;
-            }
-            return id;
-        }
-
-        private void gameView_Resize(object sender, EventArgs e)
-        {
-            SetupViewport();
-        }
         #endregion
 
         #region Joypad
@@ -701,32 +715,42 @@ namespace nanoboy
         private void frmNano_FormClosing(object sender, FormClosingEventArgs e)
         {
             updateTimer.Stop();
-            StopGameThread();
-            if (nano != null) {
+            if (StopGameThread() && nano != null) {
                 nano.Dispose();
+                nano = null;
             }
         }
 
         private void ResizeWindow(int size)
         {
             if (size <= 0) size = 2;
-            int diffwidth = Math.Max(16, this.Width - gameView.Width);
-            int diffheight = Math.Max(60, this.Height - gameView.Height);
-            this.Size = new Size(160 * size + diffwidth, 144 * size + diffheight);
+            if (FormBorderStyle == FormBorderStyle.None)
+            {
+                FormBorderStyle = FormBorderStyle.Sizable;
+            }
+
+            ClientSize = new Size(
+                GameDisplayControl.FrameWidth * size,
+                menuStrip.Height + GameDisplayControl.FrameHeight * size);
             settings.VideoScaleFactor = size;
             UpdateEmulatorSettings();
         }
 
         private void LoadConfiguration()
         {
+            settings.SampleRate = 3;
+            menuAudioQ1.Enabled = false;
+            menuAudioQ2.Enabled = false;
+            menuAudioQ3.Enabled = false;
+            menuAudioQ4.Enabled = true;
             menuAudioC1.Checked = settings.Channel1Enable;
             menuAudioC2.Checked = settings.Channel2Enable;
             menuAudioC3.Checked = settings.Channel3Enable;
             menuAudioC4.Checked = settings.Channel4Enable;
-            menuAudioQ1.Checked = settings.SampleRate == 0;
-            menuAudioQ2.Checked = settings.SampleRate == 1;
-            menuAudioQ3.Checked = settings.SampleRate == 2;
-            menuAudioQ4.Checked = settings.SampleRate == 3;
+            menuAudioQ1.Checked = false;
+            menuAudioQ2.Checked = false;
+            menuAudioQ3.Checked = false;
+            menuAudioQ4.Checked = true;
             menuAudioOn.Checked = settings.AudioEnable;
             menuSize1.Checked = settings.VideoScaleFactor == 1;
             menuSize2.Checked = settings.VideoScaleFactor == 2;
@@ -742,7 +766,27 @@ namespace nanoboy
 
         private void UpdateEmulatorSettings()
         {
-            nano?.SetSettings(settings);
+            if (nano != null)
+            {
+                ApplyEmulatorSettings(nano);
+            }
+        }
+
+        private void ApplyEmulatorSettings(Nanoboy emulator)
+        {
+            if (emulator.SetSettings(settings))
+            {
+                return;
+            }
+
+            settings.AudioEnable = false;
+            menuAudioOn.Checked = false;
+            emulator.SetSettings(settings);
+            MessageBox.Show(
+                "Das Windows-Audiogerät konnte nicht geöffnet werden. AetherBoy läuft stumm weiter.",
+                "Audio nicht verfügbar",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
         }
 
     }

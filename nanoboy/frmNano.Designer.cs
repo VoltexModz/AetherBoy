@@ -95,7 +95,7 @@ namespace nanoboy
             this.menuLinkCable = new System.Windows.Forms.ToolStripMenuItem();
             this.menuChangelog = new System.Windows.Forms.ToolStripMenuItem();
             this.updateTimer = new System.Windows.Forms.Timer(this.components);
-            this.gameView = new OpenTK.GLControl();
+            this.gameView = new nanoboy.Controls.GameDisplayControl();
             this.menuStrip.SuspendLayout();
             this.SuspendLayout();
             //
@@ -623,12 +623,8 @@ namespace nanoboy
             this.gameView.Dock = System.Windows.Forms.DockStyle.Fill;
             this.gameView.Location = new System.Drawing.Point(0, 24);
             this.gameView.Name = "gameView";
-            this.gameView.Size = new System.Drawing.Size(320, 204);
+            this.gameView.Size = new System.Drawing.Size(320, 288);
             this.gameView.TabIndex = 1;
-            this.gameView.VSync = false;
-            this.gameView.Load += new System.EventHandler(this.gameView_Load);
-            this.gameView.Paint += new System.Windows.Forms.PaintEventHandler(this.gameView_Paint);
-            this.gameView.Resize += new System.EventHandler(this.gameView_Resize);
             this.gameView.PreviewKeyDown += new System.Windows.Forms.PreviewKeyDownEventHandler(this.gameView_PreviewKeyDown);
             this.gameView.KeyUp += new System.Windows.Forms.KeyEventHandler(this.gameView_KeyUp);
             //
@@ -636,14 +632,14 @@ namespace nanoboy
             //
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(320, 228);
+            this.ClientSize = new System.Drawing.Size(320, 312);
             this.Controls.Add(this.gameView);
             this.Controls.Add(this.menuStrip);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MainMenuStrip = this.menuStrip;
             this.Name = "frmNano";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "AetherBoy 4.0.0-alpha.1 (Alpha)";
+            this.Text = "AetherBoy 4.1.0-alpha.1 (Alpha)";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.frmNano_FormClosing);
             this.menuStrip.ResumeLayout(false);
             this.menuStrip.PerformLayout();
@@ -698,7 +694,7 @@ namespace nanoboy
         private System.Windows.Forms.ToolStripMenuItem menuSize3;
         private System.Windows.Forms.ToolStripMenuItem menuSize4;
         private System.Windows.Forms.ToolStripMenuItem menuSizeFull;
-        private OpenTK.GLControl gameView;
+        private nanoboy.Controls.GameDisplayControl gameView;
         private System.Windows.Forms.ToolStripMenuItem menuItem21;
         private System.Windows.Forms.ToolStripMenuItem menuAudioQ1;
         private System.Windows.Forms.ToolStripMenuItem menuAudioQ2;

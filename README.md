@@ -1,78 +1,78 @@
 # AetherBoy
 
-> **Status: Alpha / experimentell.** Dieses Repository ist eine Modernisierungsbaustelle und kein verlässlicher Emulator-Release. Mehrere sichtbare Funktionen sind noch nicht freigegeben oder nachweislich fehlerhaft. Nutze insbesondere Save States und Rewind nicht für unersetzliche Spielstände.
+> **Status: Alpha / experimentell.** AetherBoy ist eine laufende Modernisierung und noch kein verlässlicher Emulator-Release. Save States, Rewind und Link-Kabel bleiben bewusst deaktiviert, bis ihr Zustand vollständig und reproduzierbar getestet ist.
 
-AetherBoy ist ein Windows-Emulator für Game Boy und Game Boy Color in C#. Das Projekt begann 2014 unter dem Namen `nanoboy` und wurde später als **ChiiBoy Color** weitergeführt. Produkt und Assembly heißen jetzt einheitlich **AetherBoy 4.0.0-alpha.1**; der historische C#-Namespace und Projektordner `nanoboy` bleiben bis zur späteren Architekturtrennung bestehen.
+AetherBoy ist ein Windows-Emulator für Game Boy und Game Boy Color in C#. Das Projekt begann 2014 als `nanoboy` und wurde später als **ChiiBoy Color** weitergeführt. Produkt und Assembly heißen jetzt einheitlich **AetherBoy 4.1.0-alpha.1**; der historische Namespace und Projektordner `nanoboy` bleiben vorerst erhalten.
 
 AetherBoy ist weder von Nintendo autorisiert noch mit Nintendo verbunden. Game Boy, Game Boy Color und zugehörige Produktnamen sind Marken ihrer jeweiligen Rechteinhaber.
 
 ## Technischer Stand
 
-- Windows Forms-Anwendung auf `net8.0-windows`
+- Windows-Forms-Anwendung auf **.NET 10 LTS**
 - LR35902-/Game-Boy-Core mit DMG- und CGB-Codepfaden
-- OpenGL-Ausgabe über OpenTK/GLControl
-- Standard-Audioausgabe über NAudio
-- Cartridge-Codepfade für No-MBC, MBC1 und MBC3; weitere Mapper sind nicht verlässlich implementiert
-- optionale, vom Benutzer bereitzustellende DMG-/CGB-Boot-ROMs
-- Tastatur- und OpenTK-Gamepad-Eingabe
+- verwaltete WinForms-Bildausgabe mit Sharp-, Smooth- und LCD-Grid-Filter
+- thread-sichere, kopierte Framesnapshots ohne dauerhaft gepinnten Speicher
+- NAudio-WinMM-Ausgabe mit begrenztem Puffer
+- Tastatur- und XInput-Gamepad-Eingabe
+- deterministische Tests für Hardwaretakt, Timer, Interrupts, CPU-Steuerbefehle und Audio-Sampling
+- reproduzierbarer NuGet-Restore über Lockfiles sowie GitHub Actions und Dependabot
 
-Die Solution enthält seit Phase 0 einen kleinen automatisierten Smoke-Test für den rekonstruierten Audio Inspector. Eine vollständige Core-, Timing- oder Hardware-Conformance-Testsuite fehlt weiterhin; Kompatibilität und Genauigkeit sind daher noch nicht reproduzierbar belegt.
+Phase 1 hat die alten OpenTK-3-Abhängigkeiten vollständig entfernt. Der Core verwendet nun getrennte CPU- und Dot-Taktdomänen, ein driftarmes 59,7275-Hz-Frame-Pacing und einen timergetriebenen Interruptpfad an Instruktionsgrenzen. Das ist eine belastbare Grundlage, aber noch keine vollständige Hardware-Conformance.
 
 ## Funktionsstatus
 
-„Nicht freigegeben“ bedeutet hier: Der Code oder ein Menüeintrag kann vorhanden sein, die Funktion sollte aber bis zu einer Korrektur und Verifikation als deaktiviert beziehungsweise unzuverlässig behandelt werden.
+„Nicht freigegeben“ bedeutet: Code kann vorhanden sein, die Funktion ist aber bis zu einer Korrektur und Verifikation deaktiviert oder unzuverlässig.
 
 | Bereich | Status | Bekannte Einschränkung |
 | --- | --- | --- |
-| CPU und Basisgrafik | experimentell | Keine Conformance- oder Regressionstests; Hardwaregenauigkeit nicht belegt. |
+| CPU und Scheduler | experimentell | Double-Speed, EI/DI, Interruptkosten, HALT-Wakeup und HALT-Bug besitzen Regressionstests; Buszugriffe sind noch nicht T-Zyklus-genau und der vollständige STOP-Ruhemodus fehlt. |
+| Timer | verbessert, experimentell | 16-Bit-Divider, TAC-Flanken und verzögerter Overflow sind getestet; seltene Schreibkollisionen im Reload-Takt bleiben angenähert. |
+| Bildausgabe | experimentell | Verwalteter Renderer und Snapshots sind GPU-unabhängig; PPU-, STAT-, DMA- und Pixel-Prioritätsgenauigkeit sind noch nicht vollständig belegt. |
 | DMG/CGB-ROM-Laden | experimentell | Nur mit legal beschafften ROM-Dumps testen; Mapper- und CGB-Abdeckung ist unvollständig. |
 | MBC1/MBC3 | teilweise implementiert | RTC- und Persistenzverhalten sind nicht vollständig verifiziert. |
 | MBC2/MBC4/MBC5 und weitere Mapper | nicht freigegeben | MBC5 wird aktuell fälschlich über den MBC3-Pfad behandelt; andere Mapper fehlen. |
-| NAudio-Ausgabe | experimentell | APU-Timing, Kanal-Längenzähler, Noise-Erzeugung, Sample-Rate-Wechsel und Puffergrenzen benötigen Korrekturen. |
-| OpenAL-Ausgabe | nicht freigegeben | Nicht Standardbackend; veralteter Thread-Abbruch und unsicherer Ressourcen-/Queue-Lifecycle. |
-| WAV-Aufnahme | experimentell | Aufnahme und Stop können aus verschiedenen Threads auf denselben Writer zugreifen; Fehler werden nicht zuverlässig gemeldet. |
-| Save States | nicht freigegeben | Das aktuelle v1-Binärformat besitzt einen Feldbreitenfehler und erfasst keinen vollständigen deterministischen Emulatorzustand. Laden kann einen teilweise veränderten Zustand hinterlassen. |
+| NAudio-Ausgabe | verbessert, experimentell | Masterclock, Sample-Akkumulator, Puffergröße und Kanal-Längenzähler wurden korrigiert; der APU-Frame-Sequencer ist noch nicht vollständig hardwaregetreu. |
+| WAV-Aufnahme | experimentell | Aufnahme und Stop benötigen noch einen vollständig synchronisierten Fehler- und Thread-Lifecycle. |
+| Save States | nicht freigegeben | Das v1-Binärformat bildet keinen vollständigen deterministischen Emulatorzustand ab. |
 | Rewind | nicht freigegeben | Baut auf demselben unzuverlässigen Save-State-Format auf. |
 | GameShark | teilweise implementiert | Einfache RAM-Writes sind vorhanden; Validierung und Nebenwirkungsgrenzen fehlen. |
-| Game Genie | deaktiviert | Der Core-Parser kann Codes erkennen, wendet sie aber nicht im ROM-Lesepfad an; die UI weist sie deshalb zurück. |
-| Link-Kabel/Netplay | nicht funktionsfähig | TCP-Dialog vorhanden, aber nicht mit der emulierten seriellen Schnittstelle verbunden; keine sichere oder taktgenaue Übertragung. |
-| Debugger/Disassembler | intern/experimentell | Nicht in einen vollständigen Pause-/Step-Workflow integriert; mehrere Operand- und Grenzfallfehler. |
+| Game Genie | deaktiviert | Codes werden noch nicht im ROM-Lesepfad angewendet. |
+| Link-Kabel/Netplay | nicht funktionsfähig | TCP-Oberfläche und emulierte serielle Hardware sind nicht taktgenau verbunden. |
+| Debugger/Disassembler | intern/experimentell | Kein vollständiger Pause-/Step-Workflow; mehrere Grenzfälle sind ungeprüft. |
 
-## Bauen und starten
+## Bauen, testen und starten
 
 Voraussetzungen:
 
 - Windows
-- .NET 8 SDK
-- eine funktionierende OpenGL- und Audio-Umgebung
+- .NET SDK **10.0.302** oder ein kompatiblerer Patch derselben Feature-Band
+- für Audioausgabe ein funktionierendes Windows-WinMM-Gerät
 
 Im Repository-Root:
 
 ```powershell
-dotnet restore .\nanoboy.sln
-dotnet build .\nanoboy.sln -c Debug
-dotnet run --project .\nanoboy\nanoboy.csproj
-dotnet run --project .\tests\AetherBoy.SmokeTests\AetherBoy.SmokeTests.csproj -c Release
+dotnet restore ./nanoboy.sln --locked-mode --configfile ./NuGet.config
+dotnet build ./nanoboy.sln -c Release --no-restore
+dotnet test ./nanoboy.sln -c Release --no-build --no-restore
+dotnet run --project ./nanoboy/nanoboy.csproj -c Release --no-build
 ```
 
-Diese Befehle folgen ausschließlich dem aktuellen SDK-Projekt. Historische Build-, Paket- und DLL-Kopien wurden in Phase 0 entfernt.
+`global.json` pinnt das SDK, `packages.lock.json` pinnt den aufgelösten Paketgraphen. Der CI-Workflow führt denselben Restore-, Build- und Testpfad auf Windows aus.
 
 ## ROMs, Boot-ROMs und Spielstände
 
-Dieses Projekt erteilt **keine** Rechte an kommerziellen Spielen, Nintendo-Firmware, Boot-ROMs, Marken, Grafiken oder sonstigen Drittinhalten. Verwende nur ROM- und Firmware-Dumps, die du nach dem für dich geltenden Recht selbst verwenden darfst. Verbreite keine ROMs oder Boot-ROMs zusammen mit Quellcode oder Builds. Die Rechtslage unterscheidet sich je nach Land; diese Hinweise sind keine Rechtsberatung.
+Dieses Projekt erteilt **keine** Rechte an kommerziellen Spielen, Nintendo-Firmware, Boot-ROMs, Marken, Grafiken oder sonstigen Drittinhalten. Verwende nur ROM- und Firmware-Dumps, die du nach dem für dich geltenden Recht selbst verwenden darfst. Verbreite keine ROMs oder Boot-ROMs zusammen mit Quellcode oder Builds. Diese Hinweise sind keine Rechtsberatung.
 
-Historische `.gb`-/`.gbc`-Dateien und ein persönlicher `.sav` wurden in Phase 0 aus dem veröffentlichbaren Quellbaum entfernt. Diese lokale Arbeitskopie bewahrt sie ausschließlich unter dem durch `.gitignore` ausgeschlossenen Pfad `.local-assets/roms` auf. Für diese Dateien ist keine Weiterverbreitungslizenz dokumentiert; sie sind **nicht** von der GPL des Emulatorcodes umfasst und dürfen nicht zum Repository oder zu einem Release hinzugefügt werden.
+Historische `.gb`-/`.gbc`-Dateien und ein persönlicher `.sav` wurden in Phase 0 aus dem veröffentlichbaren Quellbaum entfernt. Die lokale Arbeitskopie bewahrt sie ausschließlich im ignorierten Verzeichnis `.local-assets/roms` auf. Sie sind **nicht** von der GPL des Emulatorcodes umfasst und dürfen nicht zum Repository oder zu einem Release hinzugefügt werden.
 
-Boot-ROM-Dateien wie `dmg_boot.bin` oder `gbc_boot.bin` werden nicht benötigt, um das Projekt zu bauen, und müssen – sofern ihre Nutzung legal ist – vom Benutzer selbst bereitgestellt werden.
+Boot-ROM-Dateien wie `dmg_boot.bin` oder `gbc_boot.bin` sind zum Bauen nicht erforderlich und müssen – sofern ihre Nutzung legal ist – vom Benutzer selbst bereitgestellt werden.
 
 ## Repository-Hygiene
 
-Die verbindliche Abhängigkeitsliste für neue Builds steht in `nanoboy/nanoboy.csproj`. Phase 0 hat `Release_v4.0`, den alten `packages.config`-Bestand, manuell kopierte OpenTK-DLLs, IDE-Zustand und Buildausgaben aus dem veröffentlichbaren Quellbaum entfernt. `.gitignore` schließt diese Artefakte sowie ROMs, Boot-ROMs, Save-Dateien, Logs und PDBs dauerhaft aus.
+Die verbindlichen Abhängigkeiten stehen in den Projektdateien, ihre Auflösung in den Lockfiles. Buildausgaben, IDE-Zustand, lokale SDK-Werkzeuge, ROMs, Boot-ROMs, Save-Dateien, Logs und Symbole sind ausgeschlossen. Phase 1 ergänzt einen eingeschränkten NuGet-Feed, Vulnerability-Audit, GitHub Actions und automatisierte Abhängigkeitsupdates.
 
 ## Lizenz und Herkunft
 
-Der Emulatorcode wird als **GNU General Public License Version 3** dokumentiert; siehe [LICENSE](LICENSE). Mangels einer ausdrücklichen „or later“-Erklärung in den aktuellen Metadaten wird hier konservativ `GPL-3.0-only` angegeben. Copyright und Urheberschaft verbleiben bei den jeweiligen ursprünglichen Autoren und späteren Beitragenden.
+Der Emulatorcode wird als **GNU General Public License Version 3** dokumentiert; siehe [LICENSE](LICENSE). Mangels einer ausdrücklichen „or later“-Erklärung wird konservativ `GPL-3.0-only` verwendet. Copyright und Urheberschaft verbleiben bei den jeweiligen ursprünglichen Autoren und späteren Beitragenden.
 
-Die Projektchronik nennt Frédéric Meyer als ursprünglichen Entwickler (2014) und dokumentiert spätere ChiiBoy-/AetherBoy-Modifikationen. Die genaue Rechte- und Beitragshistorie sollte weiterhin anhand der ursprünglichen Quelle verifiziert werden.
-
-Drittanbieterkomponenten haben eigene Lizenzen. Die aktuell direkt referenzierten Pakete und ihre Hinweise stehen in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Die Projektchronik nennt Frédéric Meyer als ursprünglichen Entwickler (2014) und dokumentiert spätere ChiiBoy-/AetherBoy-Modifikationen. Drittanbieterkomponenten besitzen eigene Lizenzen; direkte Pakete und Hinweise stehen in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

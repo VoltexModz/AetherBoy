@@ -1,48 +1,81 @@
 using System;
+using System.Threading;
 
 namespace nanoboy.Core
 {
     public sealed class Interrupt
     {
         public int IE;
-        public int IF;
+        private int interruptFlags;
         private CPU cpu;
+
+        public int IF
+        {
+            get => Volatile.Read(ref interruptFlags);
+            set => Volatile.Write(ref interruptFlags, value);
+        }
 
         public Interrupt(CPU cpu)
         {
             this.cpu = cpu;
         }
 
+        public int ServicePending()
+        {
+            int masked = IE & IF & 0x1F;
+            if (masked == 0)
+            {
+                return 0;
+            }
+
+            // A pending enabled interrupt releases HALT even while IME is clear.
+            cpu.WaitForInterrupt = false;
+            if (!cpu.IME)
+            {
+                return 0;
+            }
+
+            int interruptMask;
+            int vector;
+            if ((masked & 1) != 0)
+            {
+                interruptMask = 1;
+                vector = 0x40;
+            }
+            else if ((masked & 2) != 0)
+            {
+                interruptMask = 2;
+                vector = 0x48;
+            }
+            else if ((masked & 4) != 0)
+            {
+                interruptMask = 4;
+                vector = 0x50;
+            }
+            else if ((masked & 8) != 0)
+            {
+                interruptMask = 8;
+                vector = 0x58;
+            }
+            else
+            {
+                interruptMask = 16;
+                vector = 0x60;
+            }
+
+            Interlocked.And(ref interruptFlags, ~interruptMask);
+            cpu.Interrupt(vector);
+            return 20;
+        }
+
+        internal void Request(int mask)
+        {
+            Interlocked.Or(ref interruptFlags, mask & 0x1F);
+        }
+
         public void Tick()
         {
-            if (cpu.IME) {
-                int masked = IE & IF;
-                if ((masked & 1) == 1) {
-                    cpu.Interrupt(0x40);
-                    IF &= ~1;
-                    return;
-                }
-                if ((masked & 2) == 2) {
-                    cpu.Interrupt(0x48);
-                    IF &= ~2;
-                    return;
-                }
-                if ((masked & 4) == 4) {
-                    cpu.Interrupt(0x50);
-                    IF &= ~4;
-                    return;
-                }
-                if ((masked & 8) == 8) {
-                    cpu.Interrupt(0x58);
-                    IF &= ~8;
-                    return;
-                }
-                if ((masked & 16) == 16) {
-                    cpu.Interrupt(0x60);
-                    IF &= ~16;
-                    return;
-                }
-            }
+            ServicePending();
         }
 
     }

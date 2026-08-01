@@ -1,5 +1,4 @@
 using System;
-using nanoboy.Core.Audio.Backend;
 
 namespace nanoboy.Core.Audio
 {
@@ -74,7 +73,7 @@ namespace nanoboy.Core.Audio
 
         public int SoundLength {
             get {
-                return (64 - SoundLengthRaw) * (1 / 256) * 4194304;
+                return (64 - (SoundLengthRaw & 0x3F)) * (EmulationClock.CpuClockHz / 256);
             }
         }
         public int SoundLengthRaw;
@@ -97,7 +96,7 @@ namespace nanoboy.Core.Audio
 
         public float Next(int samplerate)
         {
-            if (!StopOnLengthExpired || soundlengthcycles <= SoundLength) {
+            if (!StopOnLengthExpired || soundlengthcycles < SoundLength) {
                 float amplitude = (float)currentvolume * (1f / 16f);
                 float value = (float)(amplitude * Generate((float)((2 * Math.PI * sample *
                     Audio.ConvertFrequency(currentfrequency)) / samplerate), WaveDutyTable[WavePatternDuty]));

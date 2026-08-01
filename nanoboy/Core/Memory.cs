@@ -39,7 +39,7 @@ namespace nanoboy.Core
             wram = new byte[8, 0x1000];
             wrambank = 1;
             hram = new byte[0x7F];
-            Audio = new Audio.Audio(SoundOutMode.NAudio);
+            Audio = new Audio.Audio(SoundOutMode.None);
             serial = new SerialConsole();
             Interrupt = new Interrupt(cpu);
             Video = new Video(Interrupt, hdma, rom);
@@ -81,23 +81,7 @@ namespace nanoboy.Core
                 switch (address - 0xFF00)
                 {
                     case 0x00:
-                        value = Joypad.SelectButtonKeys ?  0x00 : 0x20;
-                        value += Joypad.SelectDirectionKeys ? 0x00 : 0x10;
-                        if (Joypad.SelectButtonKeys) {
-                            value += Joypad.KeyB ? 0x02 : 0x00;
-                            value += Joypad.KeyA ? 0x01 : 0x00;
-                        } else {
-                            value += Joypad.KeyLeft ? 0x02 : 0x00;
-                            value += Joypad.KeyRight ? 0x01 : 0x00;
-                        }
-                        if (Joypad.SelectDirectionKeys) {
-                            value += Joypad.KeyDown ? 0x08 : 0x00;
-                            value += Joypad.KeyUp ? 0x04 : 0x00;
-                        } else {
-                            value += Joypad.KeyStart ? 0x08 : 0x00;
-                            value += Joypad.KeySelect ? 0x04 : 0x00;
-                        }
-                        return (byte)value;
+                        return Joypad.ReadRegister();
                     case 0x01:
                         return serial.Read();
                     case 0x04:
@@ -205,7 +189,10 @@ namespace nanoboy.Core
                     case 0x4B:
                         return (byte)Video.WX;
                     case 0x4D:
-                        value = cpu.IsDoubleSpeed ? 0x80 : 0x00;
+                        if (!rom.HasColorFeatures) {
+                            return 0xFF;
+                        }
+                        value = 0x7E | (cpu.IsDoubleSpeed ? 0x80 : 0x00);
                         value |= cpu.PrepareSpeedSwitch ? 1 : 0;
                         return (byte)value;
                     case 0x4F:
@@ -270,8 +257,7 @@ namespace nanoboy.Core
             } else if (address <= 0xFF7F) {
                 switch (address - 0xFF00) {
                     case 0x00:
-                        Joypad.SelectButtonKeys = ((value >> 5) & 1) == 0;
-                        Joypad.SelectDirectionKeys = ((value >> 4) & 1) == 0;
+                        Joypad.WriteSelection(value);
                         break;
                     case 0x01:
                         serial.Write(value);
@@ -282,16 +268,16 @@ namespace nanoboy.Core
                         }
                         break;
                     case 0x04:
-                        Timer.DIV = 0;
+                        Timer.WriteDiv();
                         break;
                     case 0x05:
-                        Timer.TIMA = value;
+                        Timer.WriteTima(value);
                         break;
                     case 0x06:
-                        Timer.TMA = value;
+                        Timer.WriteTma(value);
                         break;
                     case 0x07:
-                        Timer.TAC = value;
+                        Timer.WriteTac(value);
                         break;
                     case 0x0F:
                         Interrupt.IF = value;
@@ -359,7 +345,7 @@ namespace nanoboy.Core
                         }
                         break;
                     case 0x20:
-                        Audio.Channel4.SoundLengthRaw = value;
+                        Audio.Channel4.SoundLengthRaw = value & 0x3F;
                         break;
                     case 0x21:
                         Audio.Channel4.EnvelopeSweep = value & 7;
@@ -447,7 +433,9 @@ namespace nanoboy.Core
                         Video.WX = value;
                         break;
                     case 0x4D:
-                        cpu.PrepareSpeedSwitch = (value & 1) == 1;
+                        if (rom.HasColorFeatures) {
+                            cpu.PrepareSpeedSwitch = (value & 1) == 1;
+                        }
                         break;
                     case 0x4F:
                         if (rom.HasColorFeatures) {
