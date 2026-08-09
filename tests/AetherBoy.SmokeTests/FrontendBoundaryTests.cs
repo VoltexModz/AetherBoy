@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Windows.Forms;
 using AetherBoy.Runtime;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using nanoboy;
@@ -47,5 +48,40 @@ public sealed class FrontendBoundaryTests
         ConstructorInfo? cheatConstructor = typeof(frmCheats).GetConstructor(
             new[] { typeof(EmulationSession) });
         Assert.IsNotNull(cheatConstructor);
+    }
+
+    [STATestMethod]
+    public void MainWindow_ExposesVerifiedSaveStateAndRewindControls()
+    {
+        using var form = new frmNano();
+        Type formType = form.GetType();
+        string[] menuNames =
+        {
+            "menuSaveState",
+            "menuSaveStateQuickSave",
+            "menuSaveStateQuickLoad",
+            "menuSaveSlot1",
+            "menuSaveSlot2",
+            "menuSaveSlot3",
+            "menuSaveSlot4",
+            "menuSaveSlot5",
+            "menuRewind"
+        };
+
+        foreach (string menuName in menuNames)
+        {
+            ToolStripMenuItem menu = formType
+                .GetField(menuName, BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.GetValue(form) as ToolStripMenuItem
+                ?? throw new AssertFailedException($"Missing menu item: {menuName}");
+            Assert.IsTrue(menu.Enabled, $"Verified feature is unexpectedly disabled: {menuName}");
+            Assert.IsFalse(
+                menu.Text?.Contains("deaktiviert", StringComparison.OrdinalIgnoreCase) == true,
+                $"Verified feature still advertises itself as disabled: {menuName}");
+        }
+
+        Assert.IsNotNull(formType.GetMethod(
+            "menuRewind_Click",
+            BindingFlags.Instance | BindingFlags.NonPublic));
     }
 }

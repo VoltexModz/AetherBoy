@@ -78,5 +78,25 @@ namespace nanoboy.Core
             ServicePending();
         }
 
+        internal byte[] CaptureStatePayload()
+        {
+            return StatePayload.Write(writer => {
+                writer.Write((byte)IE);
+                writer.Write((byte)IF);
+            });
+        }
+
+        internal Action PrepareStateRestore(byte[] payload)
+        {
+            return StatePayload.Read(payload, reader => {
+                int nextIe = reader.ReadByte();
+                int nextIf = reader.ReadByte();
+                return (Action)(() => {
+                    IE = nextIe;
+                    IF = nextIf;
+                });
+            });
+        }
+
     }
 }

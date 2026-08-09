@@ -95,5 +95,32 @@ namespace nanoboy.Core
                 interrupt.Request(0x10);
             }
         }
+
+        internal byte[] CaptureStatePayload()
+        {
+            return StatePayload.Write(writer => {
+                writer.Write((byte)pressedButtons);
+                writer.Write(SelectButtonKeys);
+                writer.Write(SelectDirectionKeys);
+            });
+        }
+
+        internal Action PrepareStateRestore(byte[] payload)
+        {
+            return StatePayload.Read(payload, reader => {
+                var nextPressedButtons = (GameBoyButtons)reader.ReadByte();
+                bool nextSelectButtonKeys = StatePayload.ReadBoolean(reader);
+                bool nextSelectDirectionKeys = StatePayload.ReadBoolean(reader);
+                if ((nextPressedButtons & ~GameBoyButtons.All) != 0) {
+                    throw new InvalidOperationException("Joypad state contains unsupported buttons.");
+                }
+
+                return (Action)(() => {
+                    pressedButtons = nextPressedButtons;
+                    SelectButtonKeys = nextSelectButtonKeys;
+                    SelectDirectionKeys = nextSelectDirectionKeys;
+                });
+            });
+        }
     }
 }

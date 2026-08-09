@@ -124,5 +124,74 @@ namespace nanoboy.Core.Audio
             currentVolume = lastWrittenVolume;
             Counter = 0x7FFF;
         }
+
+        internal byte[] CaptureStatePayload()
+        {
+            return StatePayload.Write(writer => {
+                writer.Write(Enabled);
+                writer.Write(ClockFrequency);
+                writer.Write(CounterStep);
+                writer.Write(DividingRatio);
+                writer.Write(Counter);
+                writer.Write((byte)EnvelopeDirection);
+                writer.Write(envelopeSweep);
+                writer.Write(lastWrittenVolume);
+                writer.Write(currentVolume);
+                writer.Write(SoundLengthRaw);
+                writer.Write(StopOnLengthExpired);
+                writer.Write(envelopeCycles);
+                writer.Write(soundLengthCycles);
+                writer.Write(frequencyCycles);
+            });
+        }
+
+        internal Action PrepareStateRestore(byte[] payload)
+        {
+            return StatePayload.Read(payload, reader => {
+                bool nextEnabled = StatePayload.ReadBoolean(reader);
+                int nextClockFrequency = reader.ReadInt32();
+                bool nextCounterStep = StatePayload.ReadBoolean(reader);
+                int nextDividingRatio = reader.ReadInt32();
+                int nextCounter = reader.ReadInt32();
+                var nextEnvelopeDirection = (EnvelopeMode)reader.ReadByte();
+                int nextEnvelopeSweep = reader.ReadInt32();
+                int nextLastWrittenVolume = reader.ReadInt32();
+                int nextCurrentVolume = reader.ReadInt32();
+                int nextSoundLengthRaw = reader.ReadInt32();
+                bool nextStopOnLengthExpired = StatePayload.ReadBoolean(reader);
+                int nextEnvelopeCycles = reader.ReadInt32();
+                int nextSoundLengthCycles = reader.ReadInt32();
+                int nextFrequencyCycles = reader.ReadInt32();
+
+                StatePayload.RequireRange(nextClockFrequency, 0, 15, nameof(ClockFrequency));
+                StatePayload.RequireRange(nextDividingRatio, 0, 7, nameof(DividingRatio));
+                StatePayload.RequireRange(nextCounter, 0, 0x7FFF, nameof(Counter));
+                StatePayload.RequireRange((int)nextEnvelopeDirection, 0, 1, nameof(EnvelopeDirection));
+                StatePayload.RequireRange(nextEnvelopeSweep, 0, 7, nameof(envelopeSweep));
+                StatePayload.RequireRange(nextLastWrittenVolume, 0, 15, nameof(lastWrittenVolume));
+                StatePayload.RequireRange(nextCurrentVolume, 0, 15, nameof(currentVolume));
+                StatePayload.RequireRange(nextSoundLengthRaw, 0, 63, nameof(SoundLengthRaw));
+                if (nextEnvelopeCycles < 0 || nextSoundLengthCycles < 0 || nextFrequencyCycles < 0) {
+                    throw new InvalidOperationException("Noise-channel phase counters cannot be negative.");
+                }
+
+                return (Action)(() => {
+                    Enabled = nextEnabled;
+                    ClockFrequency = nextClockFrequency;
+                    CounterStep = nextCounterStep;
+                    DividingRatio = nextDividingRatio;
+                    Counter = nextCounter;
+                    EnvelopeDirection = nextEnvelopeDirection;
+                    envelopeSweep = nextEnvelopeSweep;
+                    lastWrittenVolume = nextLastWrittenVolume;
+                    currentVolume = nextCurrentVolume;
+                    SoundLengthRaw = nextSoundLengthRaw;
+                    StopOnLengthExpired = nextStopOnLengthExpired;
+                    envelopeCycles = nextEnvelopeCycles;
+                    soundLengthCycles = nextSoundLengthCycles;
+                    frequencyCycles = nextFrequencyCycles;
+                });
+            });
+        }
     }
 }

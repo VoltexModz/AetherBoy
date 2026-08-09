@@ -115,6 +115,50 @@ public sealed class EmulationSessionTests
     }
 
     [TestMethod]
+    public async Task StateAndRewindCommandsStayOnOwnerThreadAndDefensivelyCopyBuffers()
+    {
+        var factory = new RecordingMachineFactory();
+        using var pacer = new ManualFramePacer();
+        await using var session = new EmulationSession(factory, pacer);
+
+        RecordingMachine machine = await factory.Created.Task.WaitAsync(DeadlockTimeout);
+        pacer.WaitForWaitCount(1, DeadlockTimeout);
+
+        Task pause = session.SetPausedAsync(true);
+        pacer.ReleaseOneFrame();
+        await pause.WaitAsync(DeadlockTimeout);
+
+        byte[] firstCapture = await session.CaptureStateAsync().WaitAsync(DeadlockTimeout);
+        firstCapture[0] = byte.MaxValue;
+        CollectionAssert.AreEqual(
+            new byte[] { 1, 2, 3 },
+            await session.CaptureStateAsync().WaitAsync(DeadlockTimeout));
+
+        int[] frame = new int[EmulationSnapshot.FramePixelCount];
+        long frameSequence = 0;
+        Assert.IsTrue(session.TryCopyLatestFrame(frame, ref frameSequence));
+        long sequenceBeforeRestore = frameSequence;
+
+        byte[] restoreInput = { 4, 5, 6 };
+        Task restore = session.RestoreStateAsync(restoreInput);
+        restoreInput[0] = byte.MaxValue;
+        await restore.WaitAsync(DeadlockTimeout);
+        CollectionAssert.AreEqual(
+            new byte[] { 4, 5, 6 },
+            await session.CaptureStateAsync().WaitAsync(DeadlockTimeout));
+        Assert.IsTrue(session.TryCopyLatestFrame(frame, ref frameSequence));
+        Assert.IsTrue(frameSequence > sequenceBeforeRestore);
+
+        Assert.IsTrue(await session.RewindAsync().WaitAsync(DeadlockTimeout));
+        Assert.IsTrue(machine.Operations.Contains("CaptureState"));
+        Assert.IsTrue(machine.Operations.Contains("RestoreState:4,5,6"));
+        Assert.IsTrue(machine.Operations.Contains("Rewind"));
+        Assert.IsTrue(machine.ThreadIds.All(threadId => threadId == session.OwnerThreadId));
+
+        await session.ShutdownAsync().WaitAsync(DeadlockTimeout);
+    }
+
+    [TestMethod]
     public async Task FrameExchangeAndWaveRamRemainImmutableAcrossLaterCaptures()
     {
         var factory = new RecordingMachineFactory();
@@ -317,6 +361,7 @@ internal sealed class RecordingMachine : IEmulationMachine
     private readonly int[] frame = new int[EmulationSnapshot.FramePixelCount];
     private readonly byte[] waveRam = new byte[32];
     private readonly List<CheatSnapshot> cheats = new();
+    private byte[] state = { 1, 2, 3 };
     private int disposeCount;
     private int runFrameCount;
     private long videoFrameSequence = 1;
@@ -378,6 +423,24 @@ internal sealed class RecordingMachine : IEmulationMachine
     }
 
     public void Reset() => Record("Reset");
+
+    public byte[] CaptureState()
+    {
+        Record("CaptureState");
+        return (byte[])state.Clone();
+    }
+
+    public void RestoreState(byte[] restoredState)
+    {
+        state = (byte[])restoredState.Clone();
+        Record($"RestoreState:{string.Join(',', state)}");
+    }
+
+    public bool Rewind()
+    {
+        Record("Rewind");
+        return true;
+    }
 
     public CheatSnapshot AddCheat(string name, string code)
     {

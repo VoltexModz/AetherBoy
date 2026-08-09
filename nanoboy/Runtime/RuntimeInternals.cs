@@ -19,6 +19,9 @@ namespace AetherBoy.Runtime
         void Configure(EmulatorConfiguration configuration);
         void SetPalette(int paletteIndex);
         void Reset();
+        byte[] CaptureState();
+        void RestoreState(byte[] state);
+        bool Rewind();
         CheatSnapshot AddCheat(string name, string code);
         bool RemoveCheat(Guid id);
         bool ToggleCheat(Guid id);

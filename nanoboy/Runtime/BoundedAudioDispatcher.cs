@@ -6,18 +6,23 @@ namespace AetherBoy.Runtime
 {
     internal sealed class BoundedAudioDispatcher
     {
+        private readonly record struct QueuedAudio(
+            int Generation,
+            AudioSamplesAvailableEventArgs EventArgs);
+
         private const int Capacity = 4;
 
-        private readonly Channel<AudioSamplesAvailableEventArgs> channel;
+        private readonly Channel<QueuedAudio> channel;
         private readonly Action<AudioSamplesAvailableEventArgs> dispatch;
         private readonly Thread thread;
         private int stopped;
         private int threadId;
+        private int generation;
 
         public BoundedAudioDispatcher(Action<AudioSamplesAvailableEventArgs> dispatch)
         {
             this.dispatch = dispatch ?? throw new ArgumentNullException(nameof(dispatch));
-            channel = Channel.CreateBounded<AudioSamplesAvailableEventArgs>(
+            channel = Channel.CreateBounded<QueuedAudio>(
                 new BoundedChannelOptions(Capacity)
                 {
                     SingleReader = true,
@@ -40,8 +45,15 @@ namespace AetherBoy.Runtime
             ArgumentNullException.ThrowIfNull(eventArgs);
             if (Volatile.Read(ref stopped) == 0)
             {
-                channel.Writer.TryWrite(eventArgs);
+                channel.Writer.TryWrite(new QueuedAudio(
+                    Volatile.Read(ref generation),
+                    eventArgs));
             }
+        }
+
+        public void DiscardPending()
+        {
+            Interlocked.Increment(ref generation);
         }
 
         public void StopWithoutWaiting()
@@ -55,13 +67,16 @@ namespace AetherBoy.Runtime
         private void DispatchLoop()
         {
             Volatile.Write(ref threadId, Environment.CurrentManagedThreadId);
-            ChannelReader<AudioSamplesAvailableEventArgs> reader = channel.Reader;
+            ChannelReader<QueuedAudio> reader = channel.Reader;
             while (Volatile.Read(ref stopped) == 0 &&
                    reader.WaitToReadAsync().AsTask().GetAwaiter().GetResult())
             {
-                while (Volatile.Read(ref stopped) == 0 && reader.TryRead(out var eventArgs))
+                while (Volatile.Read(ref stopped) == 0 && reader.TryRead(out QueuedAudio queued))
                 {
-                    dispatch(eventArgs);
+                    if (queued.Generation == Volatile.Read(ref generation))
+                    {
+                        dispatch(queued.EventArgs);
+                    }
                 }
             }
         }

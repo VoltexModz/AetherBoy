@@ -151,7 +151,7 @@ namespace nanoboy.Core
         private const int DigestLength = 32;
         private const int MaximumSectionCount = 64;
         private const int MaximumSectionLength = 64 * 1024 * 1024;
-        private const int MaximumDocumentLength = 128 * 1024 * 1024;
+        public const int MaximumDocumentLength = 128 * 1024 * 1024;
 
         public static byte[] Serialize(EmulatorStateDocument document)
         {

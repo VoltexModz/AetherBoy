@@ -195,6 +195,28 @@ namespace nanoboy.Core
             Memory.Joypad.SetButtons(pressedButtons);
         }
 
+        internal byte[] CaptureClockStatePayload()
+        {
+            return StatePayload.Write(writer => {
+                writer.Write(dotOvershoot);
+                writer.Write(doubleSpeedCpuPhase);
+            });
+        }
+
+        internal Action PrepareClockStateRestore(byte[] payload)
+        {
+            return StatePayload.Read(payload, reader => {
+                int nextDotOvershoot = reader.ReadInt32();
+                int nextDoubleSpeedCpuPhase = reader.ReadInt32();
+                StatePayload.RequireRange(nextDotOvershoot, 0, 23, nameof(dotOvershoot));
+                StatePayload.RequireRange(nextDoubleSpeedCpuPhase, 0, 1, nameof(doubleSpeedCpuPhase));
+                return (Action)(() => {
+                    dotOvershoot = nextDotOvershoot;
+                    doubleSpeedCpuPhase = nextDoubleSpeedCpuPhase;
+                });
+            });
+        }
+
         public void Dispose()
         {
             Memory.Dispose();

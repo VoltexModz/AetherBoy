@@ -156,25 +156,22 @@ namespace nanoboy
             this.menuSaveSlot4,
             this.menuSaveSlot5});
             this.menuSaveState.Name = "menuSaveState";
-            this.menuSaveState.Enabled = false;
             this.menuSaveState.Size = new System.Drawing.Size(180, 22);
-            this.menuSaveState.Text = "Save States (experimentell/deaktiviert)";
-            this.menuSaveState.ToolTipText = "Deaktiviert, bis CPU-, Timer-, DMA- und Mapper-Zustände vollständig und sicher gespeichert werden.";
+            this.menuSaveState.Text = "Save States";
+            this.menuSaveState.ToolTipText = "ROM-gebundene, integritätsgeprüfte Spielstände in fünf Slots.";
             //
             // menuSaveStateQuickSave
             //
             this.menuSaveStateQuickSave.Name = "menuSaveStateQuickSave";
-            this.menuSaveStateQuickSave.Enabled = false;
             this.menuSaveStateQuickSave.Size = new System.Drawing.Size(201, 22);
-            this.menuSaveStateQuickSave.Text = "Schnellspeichern (deaktiviert)";
+            this.menuSaveStateQuickSave.Text = "Schnellspeichern (F5)";
             this.menuSaveStateQuickSave.Click += new System.EventHandler(this.menuSaveStateQuickSave_Click);
             //
             // menuSaveStateQuickLoad
             //
             this.menuSaveStateQuickLoad.Name = "menuSaveStateQuickLoad";
-            this.menuSaveStateQuickLoad.Enabled = false;
             this.menuSaveStateQuickLoad.Size = new System.Drawing.Size(201, 22);
-            this.menuSaveStateQuickLoad.Text = "Schnellladen (deaktiviert)";
+            this.menuSaveStateQuickLoad.Text = "Schnellladen (F8)";
             this.menuSaveStateQuickLoad.Click += new System.EventHandler(this.menuSaveStateQuickLoad_Click);
             //
             // toolStripSeparatorSave
@@ -185,7 +182,6 @@ namespace nanoboy
             // menuSaveSlot1
             //
             this.menuSaveSlot1.Name = "menuSaveSlot1";
-            this.menuSaveSlot1.Enabled = false;
             this.menuSaveSlot1.Size = new System.Drawing.Size(201, 22);
             this.menuSaveSlot1.Text = "Slot 1 (Aktiv)";
             this.menuSaveSlot1.Click += new System.EventHandler(this.menuSaveSlot1_Click);
@@ -193,7 +189,6 @@ namespace nanoboy
             // menuSaveSlot2
             //
             this.menuSaveSlot2.Name = "menuSaveSlot2";
-            this.menuSaveSlot2.Enabled = false;
             this.menuSaveSlot2.Size = new System.Drawing.Size(201, 22);
             this.menuSaveSlot2.Text = "Slot 2";
             this.menuSaveSlot2.Click += new System.EventHandler(this.menuSaveSlot2_Click);
@@ -201,7 +196,6 @@ namespace nanoboy
             // menuSaveSlot3
             //
             this.menuSaveSlot3.Name = "menuSaveSlot3";
-            this.menuSaveSlot3.Enabled = false;
             this.menuSaveSlot3.Size = new System.Drawing.Size(201, 22);
             this.menuSaveSlot3.Text = "Slot 3";
             this.menuSaveSlot3.Click += new System.EventHandler(this.menuSaveSlot3_Click);
@@ -209,7 +203,6 @@ namespace nanoboy
             // menuSaveSlot4
             //
             this.menuSaveSlot4.Name = "menuSaveSlot4";
-            this.menuSaveSlot4.Enabled = false;
             this.menuSaveSlot4.Size = new System.Drawing.Size(201, 22);
             this.menuSaveSlot4.Text = "Slot 4";
             this.menuSaveSlot4.Click += new System.EventHandler(this.menuSaveSlot4_Click);
@@ -217,7 +210,6 @@ namespace nanoboy
             // menuSaveSlot5
             //
             this.menuSaveSlot5.Name = "menuSaveSlot5";
-            this.menuSaveSlot5.Enabled = false;
             this.menuSaveSlot5.Size = new System.Drawing.Size(201, 22);
             this.menuSaveSlot5.Text = "Slot 5";
             this.menuSaveSlot5.Click += new System.EventHandler(this.menuSaveSlot5_Click);
@@ -556,11 +548,11 @@ namespace nanoboy
             //
             // menuRewind
             //
-            this.menuRewind.Enabled = false;
             this.menuRewind.Name = "menuRewind";
             this.menuRewind.Size = new System.Drawing.Size(250, 22);
-            this.menuRewind.Text = "Zurückspulen (experimentell/deaktiviert)";
-            this.menuRewind.ToolTipText = "Deaktiviert, solange Save States keinen vollständigen Core-Zustand abbilden.";
+            this.menuRewind.Text = "Zurückspulen";
+            this.menuRewind.ToolTipText = "Springt zum vorherigen Zustand im begrenzten Rewind-Puffer.";
+            this.menuRewind.Click += new System.EventHandler(this.menuRewind_Click);
             //
             // menuLinkCable
             //
@@ -639,7 +631,7 @@ namespace nanoboy
             this.MainMenuStrip = this.menuStrip;
             this.Name = "frmNano";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "AetherBoy 4.2.0-alpha.1 (Alpha)";
+            this.Text = "AetherBoy 4.4.0-alpha.1 (Alpha)";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.frmNano_FormClosing);
             this.menuStrip.ResumeLayout(false);
             this.menuStrip.PerformLayout();

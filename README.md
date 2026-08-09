@@ -1,8 +1,8 @@
 # AetherBoy
 
-> **Status: Alpha / experimentell.** AetherBoy ist eine laufende Modernisierung und noch kein verlässlicher Emulator-Release. Save States, Rewind und Link-Kabel bleiben bewusst deaktiviert, bis ihr Zustand vollständig und reproduzierbar getestet ist.
+> **Status: Alpha / experimentell.** AetherBoy ist eine laufende Modernisierung und noch kein verlässlicher Emulator-Release. ROM-gebundene Save States und ein begrenzter Rewind-Puffer sind seit Phase 4 aktiviert; Link-Kabel und mehrere Hardware-Randfälle bleiben offen.
 
-AetherBoy ist ein Windows-Emulator für Game Boy und Game Boy Color in C#. Das Projekt begann 2014 als `nanoboy` und wurde später als **ChiiBoy Color** weitergeführt. Produkt und Assembly heißen jetzt einheitlich **AetherBoy 4.3.0-alpha.1**; der historische Namespace und Projektordner `nanoboy` bleiben vorerst erhalten.
+AetherBoy ist ein Windows-Emulator für Game Boy und Game Boy Color in C#. Das Projekt begann 2014 als `nanoboy` und wurde später als **ChiiBoy Color** weitergeführt. Produkt und Assembly heißen jetzt einheitlich **AetherBoy 4.4.0-alpha.1**; der historische Namespace und Projektordner `nanoboy` bleiben vorerst erhalten.
 
 AetherBoy ist weder von Nintendo autorisiert noch mit Nintendo verbunden. Game Boy, Game Boy Color und zugehörige Produktnamen sind Marken ihrer jeweiligen Rechteinhaber.
 
@@ -14,10 +14,10 @@ AetherBoy ist weder von Nintendo autorisiert noch mit Nintendo verbunden. Game B
 - verwaltete WinForms-Bildausgabe mit Sharp-, Smooth- und LCD-Grid-Filter
 - NAudio-WinMM-Ausgabe als Windows-Adapter außerhalb des Emulator-Cores
 - zusammengeführte Tastatur- und XInput-Eingabe ohne gegenseitiges Freigeben gehaltener Tasten
-- 83 deterministische Tests einschließlich Mapper-, RTC-, STAT-, DMA-, Zustandsvertrag-, Owner-Thread-, WAV- und generierten ROM-End-to-End-Gates
+- 94 deterministische Tests einschließlich Mapper-, RTC-, STAT-, DMA-, Save-State-, Rewind-, Owner-Thread-, WAV-, UI- und generierten ROM-End-to-End-Gates
 - reproduzierbarer NuGet-Restore sowie Windows- und Linux-Gates in GitHub Actions
 
-Phase 3 erweitert die Hardware-Conformance: Der Cartridge-Pfad validiert Header und ROM-Größen, identifiziert ROMs per SHA-256 und implementiert getrennte MBC1-, MBC2-, MBC3- und MBC5-Mapper mit atomarer Battery-RAM-Persistenz. STAT-Flanken, LCD-Speicherzugriffe, OAM-/CGB-DMA und mehrere PPU-/APU-Randfälle besitzen Regressionstests. Ein deterministischer, versionierter und integritätsgeschützter Zustandsvertrag bildet die Grundlage für neue Save States; die alte unvollständige Save-State-Funktion bleibt weiterhin deaktiviert.
+Phase 4 vervollständigt den deterministischen Zustandsvertrag: CPU-Transienten, Scheduler, Speicher, Timer, Interrupts, PPU-Puffer und -Paletten, APU-Oszillatoren und -Puffer, Mapper-RAM/RTC, DMA, Joypad und Serial-Zustand werden in versionierten Pflichtsektionen erfasst. Ein Load validiert Integrität, exakte ROM-Identität, Hardwaremodell und sämtliche Komponenten, bevor irgendein laufender Zustand verändert wird. Save/Load/Rewind laufen als geordnete Owner-Thread-Befehle; Dateizugriffe bleiben asynchron außerhalb der Emulation.
 
 ## Funktionsstatus
 
@@ -34,8 +34,8 @@ Phase 3 erweitert die Hardware-Conformance: Der Cartridge-Pfad validiert Header 
 | MBC4 und weitere Spezialmapper | nicht freigegeben | MMM01, MBC4, Pocket Camera, HuC1/HuC3 und weitere Spezialhardware werden mit klarer Fehlermeldung abgelehnt. |
 | NAudio-Ausgabe | verbessert, experimentell | Masterclock, Sample-Akkumulator, Puffergröße und Kanal-Längenzähler wurden korrigiert; der APU-Frame-Sequencer ist noch nicht vollständig hardwaregetreu. |
 | WAV-Aufnahme | verbessert, experimentell | Schreiben und Header-Finalisierung sind synchronisiert und getestet; Datei-I/O und Stop laufen außerhalb des UI- und Emulations-Threads. Lange Aufnahmen und Gerätefehler benötigen noch breitere Praxistests. |
-| Save States | nicht freigegeben | Der neue Vertrag definiert ROM-Bindung, Hardwaremodell, versionierte Pflichtsektionen, Größenlimits und SHA-256-Integrität; vollständige Komponenten-Payloads und UI-Aktivierung folgen erst in Phase 4. |
-| Rewind | nicht freigegeben | Baut auf demselben unzuverlässigen Save-State-Format auf. |
+| Save States | implementiert, experimentell | Fünf Slots (`.ss1` bis `.ss5`), F5/F8 und Controller-Shortcuts sind aktiv. Zustände sind SHA-256-geschützt und an die exakte ROM sowie DMG/CGB gebunden; eine spätere Schema-Version kann eine Migration erfordern. |
+| Rewind | implementiert, experimentell | Erfasst alle vier Frames und hält höchstens 150 Zustände (rund zehn Sekunden). Der Puffer ist sitzungsgebunden und wird bei Reset oder geladenem Save State neu begonnen. |
 | GameShark | teilweise implementiert | Einfache RAM-Writes sind vorhanden; Validierung und Nebenwirkungsgrenzen fehlen. |
 | Game Genie | deaktiviert | Codes werden noch nicht im ROM-Lesepfad angewendet. |
 | Link-Kabel/Netplay | nicht funktionsfähig | TCP-Oberfläche und emulierte serielle Hardware sind nicht taktgenau verbunden. |
@@ -67,6 +67,8 @@ Dieses Projekt erteilt **keine** Rechte an kommerziellen Spielen, Nintendo-Firmw
 Historische `.gb`-/`.gbc`-Dateien und ein persönlicher `.sav` wurden in Phase 0 aus dem veröffentlichbaren Quellbaum entfernt. Die lokale Arbeitskopie bewahrt sie ausschließlich im ignorierten Verzeichnis `.local-assets/roms` auf. Sie sind **nicht** von der GPL des Emulatorcodes umfasst und dürfen nicht zum Repository oder zu einem Release hinzugefügt werden.
 
 Boot-ROM-Dateien wie `dmg_boot.bin` oder `gbc_boot.bin` sind zum Bauen nicht erforderlich und müssen – sofern ihre Nutzung legal ist – vom Benutzer selbst bereitgestellt werden.
+
+Save States werden neben der geladenen ROM als `.ss1` bis `.ss5` abgelegt. Sie enthalten keine ROM- oder Boot-ROM-Daten, sondern deren Identitätsbindung; ein Zustand lässt sich deshalb nicht versehentlich in eine andere ROM-Sitzung laden.
 
 ## Repository-Hygiene
 

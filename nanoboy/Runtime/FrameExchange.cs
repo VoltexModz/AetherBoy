@@ -23,12 +23,14 @@ namespace AetherBoy.Runtime
             }
         }
 
-        public void Publish(long sequence)
+        public void Publish()
         {
             lock (sync)
             {
                 (publishedBuffer, writeBuffer) = (writeBuffer, publishedBuffer);
-                publishedSequence = sequence;
+                publishedSequence = publishedSequence == long.MaxValue
+                    ? 1
+                    : publishedSequence + 1;
                 hasPublishedFrame = true;
             }
         }

@@ -40,6 +40,7 @@ namespace AetherBoy.Runtime
         private readonly Nanoboy emulator;
         private readonly CheatEngine cheatEngine = new();
         private readonly List<ManagedCheat> cheats = new();
+        private readonly RewindManager rewindManager = new();
         private readonly RomSnapshot romSnapshot;
         private bool disposed;
 
@@ -74,6 +75,7 @@ namespace AetherBoy.Runtime
                 rom.HasColorFeatures,
                 rom.HasSGBFeatures,
                 rom.Japanese);
+            rewindManager.Initialize(emulator);
         }
 
         public event EventHandler<AudioSamplesAvailableEventArgs>? AudioSamplesAvailable;
@@ -83,6 +85,7 @@ namespace AetherBoy.Runtime
             ThrowIfDisposed();
             emulator.Frame();
             cheatEngine.ApplyCheats(emulator.Memory);
+            rewindManager.CaptureFrame(emulator);
         }
 
         public void SetButtons(GameBoyButtons pressedButtons)
@@ -107,6 +110,26 @@ namespace AetherBoy.Runtime
         {
             ThrowIfDisposed();
             emulator.Reset();
+            rewindManager.Initialize(emulator);
+        }
+
+        public byte[] CaptureState()
+        {
+            ThrowIfDisposed();
+            return SaveState.Capture(emulator);
+        }
+
+        public void RestoreState(byte[] state)
+        {
+            ThrowIfDisposed();
+            SaveState.Restore(emulator, state);
+            rewindManager.Initialize(emulator);
+        }
+
+        public bool Rewind()
+        {
+            ThrowIfDisposed();
+            return rewindManager.Rewind(emulator);
         }
 
         public CheatSnapshot AddCheat(string name, string code)

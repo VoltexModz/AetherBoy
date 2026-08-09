@@ -1,4 +1,7 @@
 using System;
+using System.Configuration;
+using System.Diagnostics;
+using System.IO;
 using System.Windows.Forms;
 
 namespace nanoboy
@@ -130,7 +133,17 @@ namespace nanoboy
 
         private void PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            nanoboy.Properties.Settings.Default.Save();
+            try
+            {
+                nanoboy.Properties.Settings.Default.Save();
+            }
+            catch (Exception exception) when (
+                exception is ConfigurationErrorsException ||
+                exception is UnauthorizedAccessException ||
+                exception is IOException)
+            {
+                Debug.WriteLine($"Could not persist UI setting '{e.PropertyName}': {exception}");
+            }
         }
 
         public NanoboySettings()

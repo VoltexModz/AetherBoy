@@ -3408,6 +3408,96 @@ namespace nanoboy.Core
             WriteByte(address, v);
         }
 
+        internal byte[] CaptureStatePayload()
+        {
+            return StatePayload.Write(writer => {
+                writer.Write((byte)a);
+                writer.Write((byte)f);
+                writer.Write((byte)b);
+                writer.Write((byte)c);
+                writer.Write((byte)d);
+                writer.Write((byte)e);
+                writer.Write((byte)h);
+                writer.Write((byte)l);
+                writer.Write((ushort)sp);
+                writer.Write((ushort)pc);
+                writer.Write(Running);
+                writer.Write(FlagZ);
+                writer.Write(FlagN);
+                writer.Write(FlagH);
+                writer.Write(FlagC);
+                writer.Write(wroteflagreg);
+                writer.Write(IME);
+                writer.Write(WaitForInterrupt);
+                writer.Write(imeEnableDelay);
+                writer.Write(haltBug);
+                writer.Write(branched);
+                writer.Write(cycleamountext);
+                writer.Write(PrepareSpeedSwitch);
+                writer.Write(IsDoubleSpeed);
+            });
+        }
+
+        internal Action PrepareStateRestore(byte[] payload)
+        {
+            return StatePayload.Read(payload, reader => {
+                int nextA = reader.ReadByte();
+                int nextF = reader.ReadByte() & 0xF0;
+                int nextB = reader.ReadByte();
+                int nextC = reader.ReadByte();
+                int nextD = reader.ReadByte();
+                int nextE = reader.ReadByte();
+                int nextH = reader.ReadByte();
+                int nextL = reader.ReadByte();
+                int nextSp = reader.ReadUInt16();
+                int nextPc = reader.ReadUInt16();
+                bool nextRunning = StatePayload.ReadBoolean(reader);
+                bool nextFlagZ = StatePayload.ReadBoolean(reader);
+                bool nextFlagN = StatePayload.ReadBoolean(reader);
+                bool nextFlagH = StatePayload.ReadBoolean(reader);
+                bool nextFlagC = StatePayload.ReadBoolean(reader);
+                bool nextWroteFlagRegister = StatePayload.ReadBoolean(reader);
+                bool nextIme = StatePayload.ReadBoolean(reader);
+                bool nextWaitForInterrupt = StatePayload.ReadBoolean(reader);
+                int nextImeEnableDelay = reader.ReadInt32();
+                bool nextHaltBug = StatePayload.ReadBoolean(reader);
+                bool nextBranched = StatePayload.ReadBoolean(reader);
+                int nextExtendedCycles = reader.ReadInt32();
+                bool nextPrepareSpeedSwitch = StatePayload.ReadBoolean(reader);
+                bool nextDoubleSpeed = StatePayload.ReadBoolean(reader);
+
+                StatePayload.RequireRange(nextImeEnableDelay, 0, 2, nameof(imeEnableDelay));
+                StatePayload.RequireRange(nextExtendedCycles, 0, 24, nameof(cycleamountext));
+
+                return (Action)(() => {
+                    a = nextA;
+                    f = nextF;
+                    b = nextB;
+                    c = nextC;
+                    d = nextD;
+                    e = nextE;
+                    h = nextH;
+                    l = nextL;
+                    sp = nextSp;
+                    pc = nextPc;
+                    Running = nextRunning;
+                    FlagZ = nextFlagZ;
+                    FlagN = nextFlagN;
+                    FlagH = nextFlagH;
+                    FlagC = nextFlagC;
+                    wroteflagreg = nextWroteFlagRegister;
+                    IME = nextIme;
+                    WaitForInterrupt = nextWaitForInterrupt;
+                    imeEnableDelay = nextImeEnableDelay;
+                    haltBug = nextHaltBug;
+                    branched = nextBranched;
+                    cycleamountext = nextExtendedCycles;
+                    PrepareSpeedSwitch = nextPrepareSpeedSwitch;
+                    IsDoubleSpeed = nextDoubleSpeed;
+                });
+            });
+        }
+
         #endregion
 
         #endregion

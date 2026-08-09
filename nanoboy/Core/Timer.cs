@@ -141,5 +141,37 @@ namespace nanoboy.Core
 
             tima++;
         }
+
+        internal byte[] CaptureStatePayload()
+        {
+            return StatePayload.Write(writer => {
+                writer.Write(dividerCounter);
+                writer.Write(tima);
+                writer.Write(tma);
+                writer.Write(tac);
+                writer.Write(reloadDelay);
+            });
+        }
+
+        internal Action PrepareStateRestore(byte[] payload)
+        {
+            return StatePayload.Read(payload, reader => {
+                ushort nextDivider = reader.ReadUInt16();
+                byte nextTima = reader.ReadByte();
+                byte nextTma = reader.ReadByte();
+                byte nextTac = reader.ReadByte();
+                int nextReloadDelay = reader.ReadInt32();
+                StatePayload.RequireRange(nextTac, 0, 7, nameof(tac));
+                StatePayload.RequireRange(nextReloadDelay, 0, 4, nameof(reloadDelay));
+
+                return (Action)(() => {
+                    dividerCounter = nextDivider;
+                    tima = nextTima;
+                    tma = nextTma;
+                    tac = nextTac;
+                    reloadDelay = nextReloadDelay;
+                });
+            });
+        }
     }
 }

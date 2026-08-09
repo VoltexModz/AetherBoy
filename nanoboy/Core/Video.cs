@@ -575,6 +575,205 @@ namespace nanoboy.Core
             return value;
         }
 
+        internal byte[] CaptureStatePayload()
+        {
+            lock (framePublishLock) {
+                return StatePayload.Write(writer => {
+                    writer.Write(hasColorFeatures);
+                    writer.Write(FrameReady);
+                    writer.Write(Frameskip);
+                    writer.Write(LCDEnable);
+                    writer.Write(WindowTileMapSelect);
+                    writer.Write(WindowEnable);
+                    writer.Write(TileDataSelect);
+                    writer.Write(BackgroundTileMapSelect);
+                    writer.Write(ObjectSize);
+                    writer.Write(ObjectEnable);
+                    writer.Write(BackgroundEnable);
+                    writer.Write(CoincidenceInterrupt);
+                    writer.Write(OAMInterrupt);
+                    writer.Write(VBlankInterrupt);
+                    writer.Write(HBlankInterrupt);
+                    writer.Write(CoincidenceFlag);
+                    writer.Write(ModeFlag);
+                    writer.Write(SCY);
+                    writer.Write(SCX);
+                    writer.Write(LY);
+                    writer.Write(LYC);
+                    writer.Write(WY);
+                    writer.Write(WX);
+                    writer.Write(BGP);
+                    writer.Write(OBP0);
+                    writer.Write(OBP1);
+                    writer.Write(BackgroundPaletteAI);
+                    writer.Write(BackgroundPaletteIndex);
+                    writer.Write(ObjectPaletteAI);
+                    writer.Write(ObjectPaletteIndex);
+                    writer.Write(VRAMBank);
+                    writer.Write(clock);
+                    writer.Write(publishedFrameSequence);
+                    writer.Write(statInterruptLine);
+                    writer.Write(framecounter);
+                    writer.Write(updaterequired);
+
+                    for (int bank = 0; bank < 2; bank++) {
+                        for (int offset = 0; offset < 0x2000; offset++) {
+                            writer.Write(vram[bank, offset]);
+                        }
+                    }
+                    writer.Write(oam);
+                    writer.Write(pram1);
+                    writer.Write(pram2);
+                    WriteUInt32Array(writer, monochromepalette);
+                    WriteUInt32Array(writer, frame);
+                    WriteUInt32Array(writer, publishedFrame);
+                });
+            }
+        }
+
+        internal Action PrepareStateRestore(byte[] payload)
+        {
+            return StatePayload.Read(payload, reader => {
+                bool stateHasColorFeatures = StatePayload.ReadBoolean(reader);
+                if (stateHasColorFeatures != hasColorFeatures) {
+                    throw new InvalidOperationException("Video state targets a different hardware model.");
+                }
+
+                bool nextFrameReady = StatePayload.ReadBoolean(reader);
+                int nextFrameskip = reader.ReadInt32();
+                bool nextLcdEnable = StatePayload.ReadBoolean(reader);
+                bool nextWindowTileMapSelect = StatePayload.ReadBoolean(reader);
+                bool nextWindowEnable = StatePayload.ReadBoolean(reader);
+                bool nextTileDataSelect = StatePayload.ReadBoolean(reader);
+                bool nextBackgroundTileMapSelect = StatePayload.ReadBoolean(reader);
+                bool nextObjectSize = StatePayload.ReadBoolean(reader);
+                bool nextObjectEnable = StatePayload.ReadBoolean(reader);
+                bool nextBackgroundEnable = StatePayload.ReadBoolean(reader);
+                bool nextCoincidenceInterrupt = StatePayload.ReadBoolean(reader);
+                bool nextOamInterrupt = StatePayload.ReadBoolean(reader);
+                bool nextVBlankInterrupt = StatePayload.ReadBoolean(reader);
+                bool nextHBlankInterrupt = StatePayload.ReadBoolean(reader);
+                bool nextCoincidenceFlag = StatePayload.ReadBoolean(reader);
+                int nextModeFlag = reader.ReadInt32();
+                int nextScy = reader.ReadInt32();
+                int nextScx = reader.ReadInt32();
+                int nextLy = reader.ReadInt32();
+                int nextLyc = reader.ReadInt32();
+                int nextWy = reader.ReadInt32();
+                int nextWx = reader.ReadInt32();
+                int nextBgp = reader.ReadInt32();
+                int nextObp0 = reader.ReadInt32();
+                int nextObp1 = reader.ReadInt32();
+                bool nextBackgroundPaletteAi = StatePayload.ReadBoolean(reader);
+                int nextBackgroundPaletteIndex = reader.ReadInt32();
+                bool nextObjectPaletteAi = StatePayload.ReadBoolean(reader);
+                int nextObjectPaletteIndex = reader.ReadInt32();
+                int nextVramBank = reader.ReadInt32();
+                int nextClock = reader.ReadInt32();
+                long nextPublishedFrameSequence = reader.ReadInt64();
+                bool nextStatInterruptLine = StatePayload.ReadBoolean(reader);
+                int nextFrameCounter = reader.ReadInt32();
+                bool nextUpdateRequired = StatePayload.ReadBoolean(reader);
+
+                StatePayload.RequireRange(nextFrameskip, 0, 60, nameof(Frameskip));
+                StatePayload.RequireRange(nextModeFlag, 0, 3, nameof(ModeFlag));
+                StatePayload.RequireRange(nextScy, 0, 0xFF, nameof(SCY));
+                StatePayload.RequireRange(nextScx, 0, 0xFF, nameof(SCX));
+                StatePayload.RequireRange(nextLy, 0, 153, nameof(LY));
+                StatePayload.RequireRange(nextLyc, 0, 0xFF, nameof(LYC));
+                StatePayload.RequireRange(nextWy, 0, 0xFF, nameof(WY));
+                StatePayload.RequireRange(nextWx, 0, 0xFF, nameof(WX));
+                StatePayload.RequireRange(nextBgp, 0, 0xFF, nameof(BGP));
+                StatePayload.RequireRange(nextObp0, 0, 0xFF, nameof(OBP0));
+                StatePayload.RequireRange(nextObp1, 0, 0xFF, nameof(OBP1));
+                StatePayload.RequireRange(nextBackgroundPaletteIndex, 0, 0x3F, nameof(BackgroundPaletteIndex));
+                StatePayload.RequireRange(nextObjectPaletteIndex, 0, 0x3F, nameof(ObjectPaletteIndex));
+                StatePayload.RequireRange(nextVramBank, 0, 1, nameof(VRAMBank));
+                StatePayload.RequireRange(nextClock, 0, EmulationClock.DotsPerScanline - 1, nameof(clock));
+                if (nextPublishedFrameSequence < 0) {
+                    throw new InvalidOperationException("Video frame sequence cannot be negative.");
+                }
+                StatePayload.RequireRange(nextFrameCounter, 0, nextFrameskip, nameof(framecounter));
+
+                byte[] nextVram = StatePayload.ReadBytes(reader, 2 * 0x2000, "VRAM");
+                byte[] nextOam = StatePayload.ReadBytes(reader, 0xA0, "OAM");
+                byte[] nextPram1 = StatePayload.ReadBytes(reader, 0x40, "background palette RAM");
+                byte[] nextPram2 = StatePayload.ReadBytes(reader, 0x40, "object palette RAM");
+                uint[] nextMonochromePalette = ReadUInt32Array(reader, 4);
+                uint[] nextFrame = ReadUInt32Array(reader, FramePixelCount);
+                uint[] nextPublishedFrame = ReadUInt32Array(reader, FramePixelCount);
+
+                return (Action)(() => {
+                    FrameReady = nextFrameReady;
+                    Frameskip = nextFrameskip;
+                    LCDEnable = nextLcdEnable;
+                    WindowTileMapSelect = nextWindowTileMapSelect;
+                    WindowEnable = nextWindowEnable;
+                    TileDataSelect = nextTileDataSelect;
+                    BackgroundTileMapSelect = nextBackgroundTileMapSelect;
+                    ObjectSize = nextObjectSize;
+                    ObjectEnable = nextObjectEnable;
+                    BackgroundEnable = nextBackgroundEnable;
+                    CoincidenceInterrupt = nextCoincidenceInterrupt;
+                    OAMInterrupt = nextOamInterrupt;
+                    VBlankInterrupt = nextVBlankInterrupt;
+                    HBlankInterrupt = nextHBlankInterrupt;
+                    CoincidenceFlag = nextCoincidenceFlag;
+                    ModeFlag = nextModeFlag;
+                    SCY = nextScy;
+                    SCX = nextScx;
+                    LY = nextLy;
+                    LYC = nextLyc;
+                    WY = nextWy;
+                    WX = nextWx;
+                    BGP = nextBgp;
+                    OBP0 = nextObp0;
+                    OBP1 = nextObp1;
+                    BackgroundPaletteAI = nextBackgroundPaletteAi;
+                    BackgroundPaletteIndex = nextBackgroundPaletteIndex;
+                    ObjectPaletteAI = nextObjectPaletteAi;
+                    ObjectPaletteIndex = nextObjectPaletteIndex;
+                    VRAMBank = nextVramBank;
+                    clock = nextClock;
+                    statInterruptLine = nextStatInterruptLine;
+                    framecounter = nextFrameCounter;
+                    updaterequired = nextUpdateRequired;
+
+                    int position = 0;
+                    for (int bank = 0; bank < 2; bank++) {
+                        for (int offset = 0; offset < 0x2000; offset++) {
+                            vram[bank, offset] = nextVram[position++];
+                        }
+                    }
+                    Array.Copy(nextOam, oam, oam.Length);
+                    Array.Copy(nextPram1, pram1, pram1.Length);
+                    Array.Copy(nextPram2, pram2, pram2.Length);
+                    Array.Copy(nextMonochromePalette, monochromepalette, monochromepalette.Length);
+                    Array.Copy(nextFrame, frame, frame.Length);
+                    lock (framePublishLock) {
+                        Array.Copy(nextPublishedFrame, publishedFrame, publishedFrame.Length);
+                        publishedFrameSequence = nextPublishedFrameSequence;
+                    }
+                });
+            });
+        }
+
+        private static void WriteUInt32Array(System.IO.BinaryWriter writer, uint[] values)
+        {
+            for (int index = 0; index < values.Length; index++) {
+                writer.Write(values[index]);
+            }
+        }
+
+        private static uint[] ReadUInt32Array(System.IO.BinaryReader reader, int length)
+        {
+            var values = new uint[length];
+            for (int index = 0; index < values.Length; index++) {
+                values[index] = reader.ReadUInt32();
+            }
+            return values;
+        }
+
         public byte ReadVRAM(int address)
         {
             if (LCDEnable && ModeFlag == 3) {

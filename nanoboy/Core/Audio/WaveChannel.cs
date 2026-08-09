@@ -63,5 +63,53 @@ namespace nanoboy.Core.Audio
         {
             soundlengthcycles = 0;
         }
+
+        internal byte[] CaptureStatePayload()
+        {
+            return StatePayload.Write(writer => {
+                writer.Write(Enabled);
+                writer.Write(WaveRAM);
+                writer.Write(FrequencyRaw);
+                writer.Write(On);
+                writer.Write(SoundLengthRaw);
+                writer.Write(StopOnLengthExpired);
+                writer.Write(soundlengthcycles);
+                writer.Write(OutputLevel);
+                writer.Write(sample);
+            });
+        }
+
+        internal Action PrepareStateRestore(byte[] payload)
+        {
+            return StatePayload.Read(payload, reader => {
+                bool nextEnabled = StatePayload.ReadBoolean(reader);
+                byte[] nextWaveRam = StatePayload.ReadBytes(reader, 0x20, "wave RAM");
+                int nextFrequencyRaw = reader.ReadInt32();
+                bool nextOn = StatePayload.ReadBoolean(reader);
+                int nextSoundLengthRaw = reader.ReadInt32();
+                bool nextStopOnLengthExpired = StatePayload.ReadBoolean(reader);
+                int nextSoundLengthCycles = reader.ReadInt32();
+                int nextOutputLevel = reader.ReadInt32();
+                int nextSample = reader.ReadInt32();
+                StatePayload.RequireRange(nextFrequencyRaw, 0, 0x7FF, nameof(FrequencyRaw));
+                StatePayload.RequireRange(nextSoundLengthRaw, 0, 0xFF, nameof(SoundLengthRaw));
+                StatePayload.RequireRange(nextOutputLevel, 0, 3, nameof(OutputLevel));
+                if (nextSoundLengthCycles < 0 || nextSample < 0) {
+                    throw new InvalidOperationException("Wave-channel phase counters cannot be negative.");
+                }
+
+                return (Action)(() => {
+                    Enabled = nextEnabled;
+                    Array.Copy(nextWaveRam, WaveRAM, WaveRAM.Length);
+                    FrequencyRaw = nextFrequencyRaw;
+                    On = nextOn;
+                    SoundLengthRaw = nextSoundLengthRaw;
+                    StopOnLengthExpired = nextStopOnLengthExpired;
+                    soundlengthcycles = nextSoundLengthCycles;
+                    OutputLevel = nextOutputLevel;
+                    sample = nextSample;
+                });
+            });
+        }
     }
 }

@@ -1,48 +1,63 @@
+using System;
 using System.Collections.Generic;
 
 namespace nanoboy.Core
 {
-    public class RewindManager
+    public sealed class RewindManager
     {
-        private readonly LinkedList<byte[]> history = new LinkedList<byte[]>();
-        private const int MAX_STATES = 150; // 150 states * 4 frames = 600 frames = 10 seconds
-        private int frameCounter = 0;
+        private const int CaptureIntervalFrames = 4;
+        private const int MaximumStates = 150;
 
-        public bool IsRewinding { get; set; }
+        private readonly LinkedList<byte[]> history = new();
+        private int framesSinceCapture;
 
-        public void CaptureFrame(Nanoboy nano)
+        public int HistoryCount => history.Count;
+
+        public void Initialize(Nanoboy emulator)
         {
-            if (nano == null || IsRewinding) return;
+            ArgumentNullException.ThrowIfNull(emulator);
+            Clear();
+            history.AddLast(SaveState.Capture(emulator));
+        }
 
-            if (++frameCounter % 4 == 0)
-            {
-                byte[] stateData = SaveState.SaveToBuffer(nano);
-                if (stateData != null)
-                {
-                    history.AddLast(stateData);
-                    if (history.Count > MAX_STATES)
-                    {
-                        history.RemoveFirst();
-                    }
-                }
+        public void CaptureFrame(Nanoboy emulator)
+        {
+            ArgumentNullException.ThrowIfNull(emulator);
+            framesSinceCapture++;
+            if (framesSinceCapture < CaptureIntervalFrames) {
+                return;
+            }
+
+            framesSinceCapture = 0;
+            history.AddLast(SaveState.Capture(emulator));
+            if (history.Count > MaximumStates) {
+                history.RemoveFirst();
             }
         }
 
-        public bool Rewind(Nanoboy nano)
+        public bool Rewind(Nanoboy emulator)
         {
-            if (nano == null || history.Count == 0) return false;
+            ArgumentNullException.ThrowIfNull(emulator);
+            if (history.Count == 0) {
+                return false;
+            }
 
-            byte[] lastState = history.Last.Value;
-            history.RemoveLast();
+            if (framesSinceCapture == 0) {
+                if (history.Count == 1) {
+                    return false;
+                }
+                history.RemoveLast();
+            }
 
-            return SaveState.LoadFromBuffer(nano, lastState);
+            SaveState.Restore(emulator, history.Last!.Value);
+            framesSinceCapture = 0;
+            return true;
         }
 
         public void Clear()
         {
             history.Clear();
-            frameCounter = 0;
-            IsRewinding = false;
+            framesSinceCapture = 0;
         }
     }
 }

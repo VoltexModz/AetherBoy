@@ -129,6 +129,31 @@ namespace AetherBoy.Runtime
             return EnqueueAsync(new ResetCommand(), cancellationToken);
         }
 
+        public Task<byte[]> CaptureStateAsync(CancellationToken cancellationToken = default)
+        {
+            return EnqueueAsync(new CaptureStateCommand(), cancellationToken);
+        }
+
+        public Task RestoreStateAsync(
+            byte[] state,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(state);
+            if (state.Length == 0 || state.Length > EmulatorStateCodec.MaximumDocumentLength)
+            {
+                throw new ArgumentException(
+                    $"State data must contain between 1 and {EmulatorStateCodec.MaximumDocumentLength} bytes.",
+                    nameof(state));
+            }
+
+            return EnqueueAsync(new RestoreStateCommand(state), cancellationToken);
+        }
+
+        public Task<bool> RewindAsync(CancellationToken cancellationToken = default)
+        {
+            return EnqueueAsync(new RewindCommand(), cancellationToken);
+        }
+
         public Task<CheatSnapshot> AddCheatAsync(
             string name,
             string code,
@@ -305,10 +330,19 @@ namespace AetherBoy.Runtime
                     bool previousPausedState = context.IsPaused;
                     bool previousTurboState = context.IsTurboEnabled;
                     List<EmulationCommand> appliedCommands = DrainCommands(context);
+                    bool timelineChanged = context.TimelineChanged;
+                    context.TimelineChanged = false;
                     if (previousPausedState != context.IsPaused ||
-                        previousTurboState != context.IsTurboEnabled)
+                        previousTurboState != context.IsTurboEnabled ||
+                        timelineChanged)
                     {
                         framePacer.Reset();
+                    }
+
+                    if (timelineChanged)
+                    {
+                        audioDispatcher.DiscardPending();
+                        machineVideoFrameSequence = long.MinValue;
                     }
 
                     if (appliedCommands.Count > 0)
@@ -452,7 +486,7 @@ namespace AetherBoy.Runtime
                     ref nextVideoFrameSequence))
             {
                 machineVideoFrameSequence = nextVideoFrameSequence;
-                frameExchange.Publish(nextVideoFrameSequence);
+                frameExchange.Publish();
             }
 
             EmulationSnapshot snapshot = context.Machine.CaptureSnapshot(

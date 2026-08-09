@@ -7,6 +7,7 @@ namespace nanoboy.Core
     {
         Mbc CartridgeType { get; }
         CartridgeMapperState CaptureState();
+        void ValidateState(CartridgeMapperState state);
         void RestoreState(CartridgeMapperState state);
         void FlushPersistentState();
     }
@@ -177,6 +178,7 @@ namespace nanoboy.Core
         public abstract byte ReadByte(int address);
         public abstract void WriteByte(int address, byte value);
         public abstract CartridgeMapperState CaptureState();
+        public abstract void ValidateState(CartridgeMapperState state);
         public abstract void RestoreState(CartridgeMapperState state);
 
         public virtual void FlushPersistentState() => Ram.Flush();
@@ -273,9 +275,12 @@ namespace nanoboy.Core
         public override CartridgeMapperState CaptureState() =>
             new CartridgeMapperState(CartridgeType, Array.Empty<byte>(), Ram.Capture());
 
+        public override void ValidateState(CartridgeMapperState state) =>
+            ValidateState(state, CartridgeType, 0, Ram.Length);
+
         public override void RestoreState(CartridgeMapperState state)
         {
-            ValidateState(state, CartridgeType, 0, Ram.Length);
+            ValidateState(state);
             Ram.Restore(state.CopyRam());
         }
     }
@@ -378,9 +383,21 @@ namespace nanoboy.Core
                 new[] { (byte)romBankLow, (byte)bankHigh, (byte)mode, ramEnabled ? (byte)1 : (byte)0 },
                 Ram.Capture());
 
-        public override void RestoreState(CartridgeMapperState state)
+        public override void ValidateState(CartridgeMapperState state)
         {
             ValidateState(state, CartridgeType, 4, Ram.Length);
+            byte[] registers = state.CopyRegisters();
+            if (registers[0] < 1 || registers[0] > 0x1F ||
+                registers[1] > 0x03 ||
+                registers[2] > 1 ||
+                registers[3] > 1) {
+                throw new InvalidDataException("MBC1 state contains invalid register values.");
+            }
+        }
+
+        public override void RestoreState(CartridgeMapperState state)
+        {
+            ValidateState(state);
             byte[] registers = state.CopyRegisters();
             romBankLow = registers[0] & 0x1F;
             if (romBankLow == 0) {
@@ -447,9 +464,25 @@ namespace nanoboy.Core
                 new[] { (byte)romBank, ramEnabled ? (byte)1 : (byte)0 },
                 Ram.Capture());
 
-        public override void RestoreState(CartridgeMapperState state)
+        public override void ValidateState(CartridgeMapperState state)
         {
             ValidateState(state, CartridgeType, 2, Ram.Length);
+            byte[] registers = state.CopyRegisters();
+            if (registers[0] < 1 || registers[0] > 0x0F || registers[1] > 1) {
+                throw new InvalidDataException("MBC2 state contains invalid register values.");
+            }
+
+            byte[] ram = state.CopyRam();
+            for (int index = 0; index < ram.Length; index++) {
+                if (ram[index] > 0x0F) {
+                    throw new InvalidDataException("MBC2 state contains non-nibble RAM data.");
+                }
+            }
+        }
+
+        public override void RestoreState(CartridgeMapperState state)
+        {
+            ValidateState(state);
             byte[] registers = state.CopyRegisters();
             romBank = registers[0] & 0x0F;
             if (romBank == 0) {
@@ -618,9 +651,25 @@ namespace nanoboy.Core
             return new CartridgeMapperState(CartridgeType, registers, Ram.Capture());
         }
 
-        public override void RestoreState(CartridgeMapperState state)
+        public override void ValidateState(CartridgeMapperState state)
         {
             ValidateState(state, CartridgeType, 15, Ram.Length);
+            byte[] registers = state.CopyRegisters();
+            if (registers[0] < 1 || registers[0] > 0x7F ||
+                registers[1] > 0x0F ||
+                registers[2] > 1 ||
+                registers[3] > 1 ||
+                registers[4] > 1) {
+                throw new InvalidDataException("MBC3 state contains invalid mapper register values.");
+            }
+
+            ValidateRtcRegisters(registers, 5);
+            ValidateRtcRegisters(registers, 10);
+        }
+
+        public override void RestoreState(CartridgeMapperState state)
+        {
+            ValidateState(state);
             byte[] registers = state.CopyRegisters();
             romBank = registers[0] & 0x7F;
             if (romBank == 0) {
@@ -634,6 +683,16 @@ namespace nanoboy.Core
             Array.Copy(registers, 10, latchedRtcRegisters, 0, latchedRtcRegisters.Length);
             rtcUpdatedAt = timeProvider.GetUtcNow();
             Ram.Restore(state.CopyRam());
+        }
+
+        private static void ValidateRtcRegisters(byte[] registers, int offset)
+        {
+            if (registers[offset] > 59 ||
+                registers[offset + 1] > 59 ||
+                registers[offset + 2] > 23 ||
+                (registers[offset + 4] & ~0xC1) != 0) {
+                throw new InvalidDataException("MBC3 state contains invalid RTC register values.");
+            }
         }
 
         public override void FlushPersistentState()
@@ -821,9 +880,23 @@ namespace nanoboy.Core
                 },
                 Ram.Capture());
 
-        public override void RestoreState(CartridgeMapperState state)
+        public override void ValidateState(CartridgeMapperState state)
         {
             ValidateState(state, CartridgeType, 5, Ram.Length);
+            byte[] registers = state.CopyRegisters();
+            int maximumRamBank = hasRumble ? 0x07 : 0x0F;
+            if (registers[1] > 1 ||
+                registers[2] > maximumRamBank ||
+                registers[3] > 1 ||
+                registers[4] > 1 ||
+                (!hasRumble && registers[4] != 0)) {
+                throw new InvalidDataException("MBC5 state contains invalid register values.");
+            }
+        }
+
+        public override void RestoreState(CartridgeMapperState state)
+        {
+            ValidateState(state);
             byte[] registers = state.CopyRegisters();
             romBank = registers[0] | ((registers[1] & 0x01) << 8);
             ramBank = registers[2] & (hasRumble ? 0x07 : 0x0F);

@@ -15,6 +15,7 @@ namespace AetherBoy.Runtime
         public bool IsPaused { get; set; }
         public bool IsTurboEnabled { get; set; }
         public bool StopRequested { get; set; }
+        public bool TimelineChanged { get; set; }
     }
 
     internal abstract class EmulationCommand
@@ -79,7 +80,49 @@ namespace AetherBoy.Runtime
 
     internal sealed class ResetCommand : EmulationCommand
     {
-        public override void Apply(SessionOwnerContext context) => context.Machine.Reset();
+        public override void Apply(SessionOwnerContext context)
+        {
+            context.Machine.Reset();
+            context.TimelineChanged = true;
+        }
+    }
+
+    internal sealed class CaptureStateCommand : EmulationCommand<byte[]>
+    {
+        public override void Apply(SessionOwnerContext context) =>
+            SetResult(context.Machine.CaptureState());
+    }
+
+    internal sealed class RestoreStateCommand : EmulationCommand
+    {
+        private readonly byte[] state;
+
+        public RestoreStateCommand(byte[] state)
+        {
+            this.state = state == null
+                ? throw new ArgumentNullException(nameof(state))
+                : (byte[])state.Clone();
+        }
+
+        public override void Apply(SessionOwnerContext context)
+        {
+            context.Machine.RestoreState(state);
+            context.TimelineChanged = true;
+        }
+    }
+
+    internal sealed class RewindCommand : EmulationCommand<bool>
+    {
+        public override void Apply(SessionOwnerContext context)
+        {
+            bool rewound = context.Machine.Rewind();
+            if (rewound)
+            {
+                context.TimelineChanged = true;
+            }
+
+            SetResult(rewound);
+        }
     }
 
     internal sealed class AddCheatCommand : EmulationCommand<CheatSnapshot>

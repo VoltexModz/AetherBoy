@@ -26,7 +26,8 @@ namespace nanoboy
         private readonly int[] displayFrame = new int[EmulationSnapshot.FramePixelCount];
         private long displayedFrameSequence;
         private XInputGamepadState lastPadState;
-        private static readonly bool SaveStatesAvailable = false;
+        private string currentRomPath;
+        private bool stateOperationInProgress;
         private static readonly TimeSpan SessionShutdownTimeout = TimeSpan.FromSeconds(2);
 
         public frmNano()
@@ -51,6 +52,7 @@ namespace nanoboy
             EmulationSession previousSession = session;
             if (previousSession == null)
             {
+                currentRomPath = null;
                 DisposeAudioOutput(null);
                 return true;
             }
@@ -85,6 +87,7 @@ namespace nanoboy
             if (ReferenceEquals(session, previousSession))
             {
                 session = null;
+                currentRomPath = null;
             }
 
             return true;
@@ -202,6 +205,7 @@ namespace nanoboy
                     bootRom,
                     configuration,
                     settings.PaletteIndex);
+                currentRomPath = Path.GetFullPath(path);
             }
             catch (Exception exception)
             {
@@ -340,16 +344,185 @@ namespace nanoboy
             menuSaveSlot3.Checked = slot == 3;
             menuSaveSlot4.Checked = slot == 4;
             menuSaveSlot5.Checked = slot == 5;
+            menuSaveSlot1.Text = slot == 1 ? "Slot 1 (Aktiv)" : "Slot 1";
+            menuSaveSlot2.Text = slot == 2 ? "Slot 2 (Aktiv)" : "Slot 2";
+            menuSaveSlot3.Text = slot == 3 ? "Slot 3 (Aktiv)" : "Slot 3";
+            menuSaveSlot4.Text = slot == 4 ? "Slot 4 (Aktiv)" : "Slot 4";
+            menuSaveSlot5.Text = slot == 5 ? "Slot 5 (Aktiv)" : "Slot 5";
         }
 
-        private void QuickSave()
+        private async void QuickSave()
         {
-            ShowUnavailableFeature("Save States");
+            EmulationSession currentSession = session;
+            string romPath = currentRomPath;
+            if (currentSession == null || string.IsNullOrEmpty(romPath) || stateOperationInProgress)
+            {
+                return;
+            }
+
+            stateOperationInProgress = true;
+            try
+            {
+                byte[] state = await currentSession.CaptureStateAsync().ConfigureAwait(true);
+                if (!ReferenceEquals(session, currentSession))
+                {
+                    return;
+                }
+
+                await WriteStateFileAtomicAsync(GetStatePath(romPath, settings.SaveSlot), state)
+                    .ConfigureAwait(true);
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine($"Could not save state: {exception}");
+                MessageBox.Show(
+                    $"Der Spielstand konnte nicht gespeichert werden.\n\n{exception.Message}",
+                    "Save State fehlgeschlagen",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            finally
+            {
+                stateOperationInProgress = false;
+            }
         }
 
-        private void QuickLoad()
+        private async void QuickLoad()
         {
-            ShowUnavailableFeature("Save States");
+            EmulationSession currentSession = session;
+            string romPath = currentRomPath;
+            if (currentSession == null || string.IsNullOrEmpty(romPath) || stateOperationInProgress)
+            {
+                return;
+            }
+
+            string statePath = GetStatePath(romPath, settings.SaveSlot);
+            if (!File.Exists(statePath))
+            {
+                MessageBox.Show(
+                    $"In Slot {settings.SaveSlot} ist noch kein Spielstand vorhanden.",
+                    "Kein Save State",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            stateOperationInProgress = true;
+            try
+            {
+                byte[] state = await ReadStateFileAsync(statePath).ConfigureAwait(true);
+                if (!ReferenceEquals(session, currentSession))
+                {
+                    return;
+                }
+
+                await currentSession.RestoreStateAsync(state).ConfigureAwait(true);
+                displayedFrameSequence = 0;
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine($"Could not load state: {exception}");
+                MessageBox.Show(
+                    $"Der Spielstand konnte nicht geladen werden. Der laufende Zustand blieb unverändert.\n\n{exception.Message}",
+                    "Save State ungültig",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            finally
+            {
+                stateOperationInProgress = false;
+            }
+        }
+
+        private static string GetStatePath(string romPath, int slot) =>
+            Path.ChangeExtension(romPath, $"ss{slot}");
+
+        private static async Task<byte[]> ReadStateFileAsync(string path)
+        {
+            using FileStream stream = new(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                64 * 1024,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            if (stream.Length <= 0 || stream.Length > EmulatorStateCodec.MaximumDocumentLength)
+            {
+                throw new InvalidDataException(
+                    $"Die Datei muss zwischen 1 und {EmulatorStateCodec.MaximumDocumentLength} Bytes groß sein.");
+            }
+
+            byte[] state = new byte[(int)stream.Length];
+            await stream.ReadExactlyAsync(state).ConfigureAwait(false);
+            return state;
+        }
+
+        private static async Task WriteStateFileAtomicAsync(string path, byte[] state)
+        {
+            string fullPath = Path.GetFullPath(path);
+            string temporaryPath = fullPath + ".tmp";
+            try
+            {
+                using (FileStream stream = new(
+                    temporaryPath,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None,
+                    64 * 1024,
+                    FileOptions.Asynchronous | FileOptions.WriteThrough))
+                {
+                    await stream.WriteAsync(state).ConfigureAwait(false);
+                    await stream.FlushAsync().ConfigureAwait(false);
+                }
+
+                File.Move(temporaryPath, fullPath, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
+            }
+        }
+
+        private async void menuRewind_Click(object sender, EventArgs e)
+        {
+            EmulationSession currentSession = session;
+            if (currentSession == null || stateOperationInProgress)
+            {
+                return;
+            }
+
+            stateOperationInProgress = true;
+            try
+            {
+                if (!await currentSession.RewindAsync().ConfigureAwait(true))
+                {
+                    MessageBox.Show(
+                        "Es ist noch kein früherer Zustand im Rewind-Puffer vorhanden.",
+                        "Rewind",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+                else
+                {
+                    displayedFrameSequence = 0;
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.WriteLine($"Could not rewind: {exception}");
+                MessageBox.Show(
+                    $"Zurückspulen ist fehlgeschlagen.\n\n{exception.Message}",
+                    "Rewind fehlgeschlagen",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            finally
+            {
+                stateOperationInProgress = false;
+            }
         }
 
         private void menuPalettePocket_Click(object sender, EventArgs e) => SetPalette(0);
@@ -681,16 +854,13 @@ namespace nanoboy
                 PostInputState();
             }
 
-            // Save-State-Shortcuts bleiben deaktiviert, bis vollständige Zustände sicher sind.
-            if (SaveStatesAvailable &&
-                padState.IsButtonDown(XInputButtons.RightShoulder) &&
+            if (padState.IsButtonDown(XInputButtons.RightShoulder) &&
                 !lastPadState.IsButtonDown(XInputButtons.RightShoulder))
             {
                 QuickSave();
             }
 
-            if (SaveStatesAvailable &&
-                padState.IsButtonDown(XInputButtons.LeftShoulder) &&
+            if (padState.IsButtonDown(XInputButtons.LeftShoulder) &&
                 !lastPadState.IsButtonDown(XInputButtons.LeftShoulder))
             {
                 QuickLoad();
@@ -712,17 +882,17 @@ namespace nanoboy
         #region Joypad
         private void gameView_PreviewKeyDown(object sender, PreviewKeyDownEventArgs e)
         {
-            if (SaveStatesAvailable && e.KeyCode == Keys.F5)
+            if (e.KeyCode == Keys.F5)
             {
                 QuickSave();
                 return;
             }
-            if (SaveStatesAvailable && e.KeyCode == Keys.F8)
+            if (e.KeyCode == Keys.F8)
             {
                 QuickLoad();
                 return;
             }
-            if (SaveStatesAvailable && e.KeyCode >= Keys.D1 && e.KeyCode <= Keys.D5)
+            if (e.KeyCode >= Keys.D1 && e.KeyCode <= Keys.D5)
             {
                 SelectSaveSlot(e.KeyCode - Keys.D1 + 1);
                 return;
@@ -835,13 +1005,15 @@ namespace nanoboy
             ClientSize = new Size(
                 GameDisplayControl.FrameWidth * size,
                 menuStrip.Height + GameDisplayControl.FrameHeight * size);
-            settings.VideoScaleFactor = size;
+            if (settings.VideoScaleFactor != size)
+            {
+                settings.VideoScaleFactor = size;
+            }
             UpdateEmulatorSettings();
         }
 
         private void LoadConfiguration()
         {
-            settings.SampleRate = 3;
             menuAudioQ1.Enabled = false;
             menuAudioQ2.Enabled = false;
             menuAudioQ3.Enabled = false;

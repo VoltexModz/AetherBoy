@@ -2,6 +2,37 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## 4.4.0-alpha.1 – Phase 4 (2026-08-09)
+
+### Vollständige Save States
+
+- Sämtliche für eine deterministische Fortsetzung relevanten Zustände von CPU, Scheduler, Hauptspeicher, Timer, Interrupts, Video, Audio, Cartridge, DMA, Joypad und Serial in einzeln versionierten `AETHSTAT`-Pflichtsektionen erfasst.
+- CPU-Transienten wie EI-Verzögerung, HALT-Bug und Double-Speed-Phase sowie PPU-Arbeits-/Ausgabeframes, APU-Oszillatorphasen, Sample-Akkumulator und noch nicht ausgegebene Samples aufgenommen.
+- Boot-ROM-Nutzung per Länge und SHA-256 gebunden, ohne Firmware- oder ROM-Inhalte in Zustandsdateien einzubetten.
+- Alle Abschnitte, Mapperregister und Wertebereiche werden vorbereitet und validiert, bevor die erste Komponente verändert wird; falsche ROMs, beschädigte Dateien und semantisch ungültige Payloads lassen die laufende Sitzung unverändert.
+- Zustandsdateien besitzen harte Größenlimits, eine Dokument-SHA-256 und werden über eine temporäre Datei atomar ersetzt.
+
+### Runtime und Bedienung
+
+- Capture, Restore und Rewind als typisierte FIFO-Befehle auf dem exklusiven Emulations-Owner-Thread ergänzt.
+- Nach Reset, Restore oder Rewind alte Audioereignisse verworfen, Frame-Pacing zurückgesetzt und eine neue monotone Bildgeneration veröffentlicht.
+- Fünf Save-Slots neben der ROM (`.ss1` bis `.ss5`), F5/F8 und XInput-Schultertasten aktiviert; Datei-I/O blockiert weder UI noch Emulations-Thread.
+- Rewind auf denselben vollständigen Zustandsvertrag migriert, alle vier Frames erfasst und strikt auf 150 Zustände beziehungsweise ungefähr zehn Sekunden begrenzt.
+- Das Hauptfenster schreibt beim Start keine unveränderten Einstellungen mehr; fehlende Schreibrechte für die UI-Konfiguration verhindern nicht länger den Programmstart.
+
+### Tests und CI
+
+- Byte-identische Capture/Restore/Capture-Roundtrips und identische zukünftige Ausführung nach Restore verifiziert.
+- Falsche ROM, neu signierte aber semantisch ungültige Komponenten, atomare Dateiablage, Rewind-Timeline und Rewind-Kapazität als Regressionstests ergänzt.
+- Owner-Thread-Zugriff, defensive Pufferkopien, Frame-Neuveröffentlichung, Audio-Generationswechsel und aktivierte WinForms-Menüs abgesichert.
+- Gesamtsuite auf **94 Tests** erweitert: 68 Core-, 17 Runtime- und 9 Windows-Smoke-Tests; CI-Mindestzahlen entsprechend angehoben.
+
+### Weiterhin offen
+
+- Save States sind absichtlich an die exakte ROM und das jeweilige Komponentenschema gebunden; eine automatische Migration künftiger inkompatibler Schemata ist noch nicht vorhanden.
+- Rewind ist ein speicherresidenter Sitzungspuffer ohne Kompression oder Vorschau-Timeline.
+- Link-Kabel, Game Genie, Spezialmapper und die in Phase 3 genannten Timing-/Hardware-Randfälle bleiben offen.
+
 ## 4.3.0-alpha.1 – Phase 3 (2026-08-09)
 
 ### Cartridge und Mapper
@@ -177,4 +208,4 @@ GameShark-RAM-Codes bleiben als **experimentelle** Funktion sichtbar. Das ist ke
 
 ## Nächster Meilenstein
 
-Phase 4 implementiert vollständige Payloads für den neuen Zustandsvertrag, verifiziert deterministische Roundtrips und aktiviert Save States sowie Rewind erst nach ROM-gebundenen Kompatibilitäts- und Belastungstests.
+Phase 5 konzentriert sich auf breitere ROM-basierte Conformance, T-Zyklus-genauere Bus- und DMA-Effekte, PPU-Prioritäten, APU-Sequenzierung sowie messbare Performance- und Langzeitstabilität.

@@ -78,5 +78,41 @@ namespace nanoboy.Core
             DestinationAddress = (DestinationAddress + 0x10) & 0x1FF0;
             remainingBlocks--;
         }
+
+        internal byte[] CaptureStatePayload()
+        {
+            return StatePayload.Write(writer => {
+                writer.Write(SourceAddress);
+                writer.Write(DestinationAddress);
+                writer.Write(remainingBlocks);
+                writer.Write(transferActive);
+                writer.Write(transferCancelled);
+            });
+        }
+
+        internal Action PrepareStateRestore(byte[] payload)
+        {
+            return StatePayload.Read(payload, reader => {
+                int nextSourceAddress = reader.ReadInt32();
+                int nextDestinationAddress = reader.ReadInt32();
+                int nextRemainingBlocks = reader.ReadInt32();
+                bool nextTransferActive = StatePayload.ReadBoolean(reader);
+                bool nextTransferCancelled = StatePayload.ReadBoolean(reader);
+                StatePayload.RequireRange(nextSourceAddress, 0, 0xFFF0, nameof(SourceAddress));
+                StatePayload.RequireRange(nextDestinationAddress, 0, 0x1FF0, nameof(DestinationAddress));
+                StatePayload.RequireRange(nextRemainingBlocks, 0, 0x80, nameof(remainingBlocks));
+                if (nextTransferActive && (nextTransferCancelled || nextRemainingBlocks == 0)) {
+                    throw new InvalidOperationException("HDMA state contains contradictory transfer flags.");
+                }
+
+                return (Action)(() => {
+                    SourceAddress = nextSourceAddress;
+                    DestinationAddress = nextDestinationAddress;
+                    remainingBlocks = nextRemainingBlocks;
+                    transferActive = nextTransferActive;
+                    transferCancelled = nextTransferCancelled;
+                });
+            });
+        }
     }
 }

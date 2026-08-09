@@ -1,322 +1,157 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace nanoboy.Core
 {
     public static class SaveState
     {
-        private const uint SAVE_STATE_MAGIC = 0x4E414E4F; // "NANO"
-        private const ushort SAVE_STATE_VERSION = 1;
+        private const ushort ComponentSchemaVersion = 1;
 
-        public static byte[] SaveToBuffer(Nanoboy nano)
+        public static byte[] Capture(Nanoboy emulator)
         {
-            if (nano == null) return null;
-            try
-            {
-                using (var ms = new MemoryStream())
-                {
-                    if (SaveToStream(nano, ms))
-                        return ms.ToArray();
-                }
+            ArgumentNullException.ThrowIfNull(emulator);
+            Memory memory = emulator.Memory ?? throw new InvalidOperationException("Emulator memory is unavailable.");
+            CPU cpu = emulator.Cpu ?? throw new InvalidOperationException("Emulator CPU is unavailable.");
+            if (memory.MBC is not ICartridgeMapper mapper) {
+                throw new NotSupportedException("The active cartridge mapper does not expose deterministic state.");
             }
-            catch { }
-            return null;
+
+            var sections = new[] {
+                CreateSection(CoreStateSection.Cpu, cpu.CaptureStatePayload()),
+                CreateSection(CoreStateSection.Memory, memory.CaptureStatePayload()),
+                CreateSection(CoreStateSection.Timer, memory.Timer.CaptureStatePayload()),
+                CreateSection(CoreStateSection.Interrupts, memory.Interrupt.CaptureStatePayload()),
+                CreateSection(CoreStateSection.Video, memory.Video.CaptureStatePayload()),
+                CreateSection(CoreStateSection.Audio, memory.Audio.CaptureStatePayload()),
+                CreateSection(
+                    CoreStateSection.Cartridge,
+                    CartridgeStateCodec.Serialize(mapper.CaptureState())),
+                CreateSection(CoreStateSection.Clock, emulator.CaptureClockStatePayload()),
+                CreateSection(CoreStateSection.Dma, memory.HDMA.CaptureStatePayload()),
+                CreateSection(CoreStateSection.Joypad, memory.Joypad.CaptureStatePayload()),
+                CreateSection(CoreStateSection.Serial, memory.CaptureSerialStatePayload())
+            };
+            var document = new EmulatorStateDocument(
+                memory.ROM.RomSha256,
+                memory.ROM.HasColorFeatures ? StateHardwareModel.Cgb : StateHardwareModel.Dmg,
+                sections);
+            return EmulatorStateCodec.Serialize(document);
         }
 
-        public static bool LoadFromBuffer(Nanoboy nano, byte[] buffer)
+        public static void Restore(Nanoboy emulator, byte[] data)
         {
-            if (nano == null || buffer == null) return false;
-            try
-            {
-                using (var ms = new MemoryStream(buffer))
-                {
-                    return LoadFromStream(nano, ms);
-                }
+            ArgumentNullException.ThrowIfNull(emulator);
+            ArgumentNullException.ThrowIfNull(data);
+            Memory memory = emulator.Memory ?? throw new InvalidOperationException("Emulator memory is unavailable.");
+            CPU cpu = emulator.Cpu ?? throw new InvalidOperationException("Emulator CPU is unavailable.");
+            if (memory.MBC is not ICartridgeMapper mapper) {
+                throw new NotSupportedException("The active cartridge mapper does not expose deterministic state.");
             }
-            catch { }
-            return false;
+
+            EmulatorStateDocument document = EmulatorStateCodec.Deserialize(data);
+            document.EnsureCompatibleWith(memory.ROM);
+            IReadOnlyDictionary<ushort, EmulatorStateSection> sections = IndexSections(document);
+
+            Action restoreCpu = cpu.PrepareStateRestore(GetPayload(sections, CoreStateSection.Cpu));
+            Action restoreMemory = memory.PrepareStateRestore(GetPayload(sections, CoreStateSection.Memory));
+            Action restoreTimer = memory.Timer.PrepareStateRestore(GetPayload(sections, CoreStateSection.Timer));
+            Action restoreInterrupts = memory.Interrupt.PrepareStateRestore(
+                GetPayload(sections, CoreStateSection.Interrupts));
+            Action restoreVideo = memory.Video.PrepareStateRestore(GetPayload(sections, CoreStateSection.Video));
+            Action restoreAudio = memory.Audio.PrepareStateRestore(GetPayload(sections, CoreStateSection.Audio));
+            CartridgeMapperState mapperState = CartridgeStateCodec.Deserialize(
+                GetPayload(sections, CoreStateSection.Cartridge));
+            mapper.ValidateState(mapperState);
+            Action restoreClock = emulator.PrepareClockStateRestore(GetPayload(sections, CoreStateSection.Clock));
+            Action restoreDma = memory.HDMA.PrepareStateRestore(GetPayload(sections, CoreStateSection.Dma));
+            Action restoreJoypad = memory.Joypad.PrepareStateRestore(GetPayload(sections, CoreStateSection.Joypad));
+            Action restoreSerial = memory.PrepareSerialStateRestore(GetPayload(sections, CoreStateSection.Serial));
+
+            restoreCpu();
+            restoreMemory();
+            restoreTimer();
+            restoreInterrupts();
+            restoreVideo();
+            restoreAudio();
+            mapper.RestoreState(mapperState);
+            restoreClock();
+            restoreDma();
+            restoreJoypad();
+            restoreSerial();
         }
 
-        public static bool Save(Nanoboy nano, string filePath)
+        public static void SaveToFile(Nanoboy emulator, string filePath)
         {
-            if (nano == null || nano.Memory == null || nano.Cpu == null)
-                return false;
+            ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+            byte[] data = Capture(emulator);
+            string fullPath = Path.GetFullPath(filePath);
+            string directory = Path.GetDirectoryName(fullPath) ??
+                throw new InvalidOperationException("Save-state path has no parent directory.");
+            Directory.CreateDirectory(directory);
+            string temporaryPath = fullPath + ".tmp";
 
-            try
-            {
-                using (var fs = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None))
-                {
-                    return SaveToStream(nano, fs);
+            try {
+                using (var stream = new FileStream(
+                    temporaryPath,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None,
+                    bufferSize: 64 * 1024,
+                    FileOptions.WriteThrough)) {
+                    stream.Write(data, 0, data.Length);
+                    stream.Flush(flushToDisk: true);
                 }
-            }
-            catch { return false; }
-        }
-
-        public static bool Load(Nanoboy nano, string filePath)
-        {
-            if (nano == null || nano.Memory == null || nano.Cpu == null || !File.Exists(filePath))
-                return false;
-
-            try
-            {
-                using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
-                {
-                    return LoadFromStream(nano, fs);
+                File.Move(temporaryPath, fullPath, overwrite: true);
+            } finally {
+                if (File.Exists(temporaryPath)) {
+                    File.Delete(temporaryPath);
                 }
-            }
-            catch { return false; }
-        }
-
-        public static bool SaveToStream(Nanoboy nano, Stream stream)
-        {
-            if (nano == null || nano.Memory == null || nano.Cpu == null || stream == null)
-                return false;
-
-            try
-            {
-                var writer = new BinaryWriter(stream);
-
-                // Header
-                writer.Write(SAVE_STATE_MAGIC);
-                writer.Write(SAVE_STATE_VERSION);
-
-                // CPU State
-                var cpu = nano.Cpu;
-                writer.Write(cpu.A);
-                writer.Write(cpu.B);
-                writer.Write(cpu.C);
-                writer.Write(cpu.D);
-                writer.Write(cpu.E);
-                writer.Write(cpu.H);
-                writer.Write(cpu.L);
-                writer.Write(cpu.SP);
-                writer.Write(cpu.PC);
-                writer.Write(cpu.FlagZ);
-                writer.Write(cpu.FlagN);
-                writer.Write(cpu.FlagH);
-                writer.Write(cpu.FlagC);
-                writer.Write(cpu.IME);
-                writer.Write(cpu.Halt);
-                writer.Write(cpu.IsDoubleSpeed);
-                writer.Write(cpu.PrepareSpeedSwitch);
-
-                // Memory & Interrupt State
-                var mem = nano.Memory;
-                writer.Write(mem.Interrupt.IF);
-                writer.Write(mem.Interrupt.IE);
-                writer.Write(mem.Timer.DIV);
-                writer.Write(mem.Timer.TIMA);
-                writer.Write(mem.Timer.TMA);
-                writer.Write(mem.Timer.TAC);
-                writer.Write(mem.BootROMEnabled);
-
-                // WRAM & HRAM
-                for (int b = 0; b < 8; b++)
-                {
-                    for (int i = 0; i < 0x1000; i++)
-                    {
-                        writer.Write(mem.ReadWRAMDirect(b, i));
-                    }
-                }
-                writer.Write(mem.WRAMBank);
-
-                for (int i = 0; i < 0x7F; i++)
-                {
-                    writer.Write(mem.ReadHRAMDirect(i));
-                }
-
-                // Video State
-                var video = mem.Video;
-                writer.Write(video.SCY);
-                writer.Write(video.SCX);
-                writer.Write(video.LY);
-                writer.Write(video.LYC);
-                writer.Write(video.WY);
-                writer.Write(video.WX);
-                writer.Write((byte)video.BGP);
-                writer.Write((byte)video.OBP0);
-                writer.Write((byte)video.OBP1);
-                writer.Write(video.LCDEnable);
-                writer.Write(video.WindowTileMapSelect);
-                writer.Write(video.WindowEnable);
-                writer.Write(video.TileDataSelect);
-                writer.Write(video.BackgroundTileMapSelect);
-                writer.Write(video.ObjectSize);
-                writer.Write(video.ObjectEnable);
-                writer.Write(video.BackgroundEnable);
-                writer.Write(video.CoincidenceInterrupt);
-                writer.Write(video.OAMInterrupt);
-                writer.Write(video.VBlankInterrupt);
-                writer.Write(video.HBlankInterrupt);
-                writer.Write(video.CoincidenceFlag);
-                writer.Write(video.ModeFlag);
-                writer.Write(video.VRAMBank);
-
-                for (int b = 0; b < 2; b++)
-                {
-                    for (int i = 0; i < 0x2000; i++)
-                    {
-                        writer.Write(video.ReadVRAMDirect(b, i));
-                    }
-                }
-
-                for (int i = 0; i < 0xA0; i++)
-                {
-                    writer.Write(video.ReadOAMDirect(i));
-                }
-
-                // MBC State
-                var mbc = mem.MBC;
-                if (mbc is Mbc1 mbc1)
-                {
-                    writer.Write((byte)1);
-                    writer.Write(mbc1.CurrentROMBank);
-                    writer.Write(mbc1.CurrentRAMBank);
-                    writer.Write(mbc1.RAMEnable);
-                    writer.Write(mbc1.Mode);
-                }
-                else if (mbc is Mbc3 mbc3)
-                {
-                    writer.Write((byte)3);
-                    writer.Write(mbc3.CurrentROMBank);
-                    writer.Write(mbc3.CurrentRAMBank);
-                    writer.Write(mbc3.RAMEnable);
-                }
-                else
-                {
-                    writer.Write((byte)0);
-                }
-
-                return true;
-            }
-            catch (Exception)
-            {
-                return false;
             }
         }
 
-        public static bool LoadFromStream(Nanoboy nano, Stream stream)
+        public static void LoadFromFile(Nanoboy emulator, string filePath)
         {
-            if (nano == null || nano.Memory == null || nano.Cpu == null || stream == null)
-                return false;
-
-            try
-            {
-                var reader = new BinaryReader(stream);
-                uint magic = reader.ReadUInt32();
-                ushort version = reader.ReadUInt16();
-
-                if (magic != SAVE_STATE_MAGIC || version != SAVE_STATE_VERSION)
-                    return false;
-
-                // CPU State
-                var cpu = nano.Cpu;
-                cpu.A = reader.ReadByte();
-                cpu.B = reader.ReadByte();
-                cpu.C = reader.ReadByte();
-                cpu.D = reader.ReadByte();
-                cpu.E = reader.ReadByte();
-                cpu.H = reader.ReadByte();
-                cpu.L = reader.ReadByte();
-                cpu.SP = reader.ReadUInt16();
-                cpu.PC = reader.ReadUInt16();
-                cpu.FlagZ = reader.ReadBoolean();
-                cpu.FlagN = reader.ReadBoolean();
-                cpu.FlagH = reader.ReadBoolean();
-                cpu.FlagC = reader.ReadBoolean();
-                cpu.IME = reader.ReadBoolean();
-                cpu.Halt = reader.ReadBoolean();
-                cpu.IsDoubleSpeed = reader.ReadBoolean();
-                cpu.PrepareSpeedSwitch = reader.ReadBoolean();
-
-                // Memory & Interrupt State
-                var mem = nano.Memory;
-                mem.Interrupt.IF = reader.ReadByte();
-                mem.Interrupt.IE = reader.ReadByte();
-                mem.Timer.DIV = reader.ReadInt32();
-                mem.Timer.TIMA = reader.ReadInt32();
-                mem.Timer.TMA = reader.ReadInt32();
-                mem.Timer.TAC = reader.ReadInt32();
-                mem.BootROMEnabled = reader.ReadBoolean();
-
-                // WRAM & HRAM
-                for (int b = 0; b < 8; b++)
-                {
-                    for (int i = 0; i < 0x1000; i++)
-                    {
-                        mem.WriteWRAMDirect(b, i, reader.ReadByte());
-                    }
-                }
-                mem.WRAMBank = reader.ReadInt32();
-
-                for (int i = 0; i < 0x7F; i++)
-                {
-                    mem.WriteHRAMDirect(i, reader.ReadByte());
-                }
-
-                // Video State
-                var video = mem.Video;
-                video.SCY = reader.ReadInt32();
-                video.SCX = reader.ReadInt32();
-                video.LY = reader.ReadInt32();
-                video.LYC = reader.ReadInt32();
-                video.WY = reader.ReadInt32();
-                video.WX = reader.ReadInt32();
-                video.BGP = reader.ReadByte();
-                video.OBP0 = reader.ReadByte();
-                video.OBP1 = reader.ReadByte();
-                video.LCDEnable = reader.ReadBoolean();
-                video.WindowTileMapSelect = reader.ReadBoolean();
-                video.WindowEnable = reader.ReadBoolean();
-                video.TileDataSelect = reader.ReadBoolean();
-                video.BackgroundTileMapSelect = reader.ReadBoolean();
-                video.ObjectSize = reader.ReadBoolean();
-                video.ObjectEnable = reader.ReadBoolean();
-                video.BackgroundEnable = reader.ReadBoolean();
-                video.CoincidenceInterrupt = reader.ReadBoolean();
-                video.OAMInterrupt = reader.ReadBoolean();
-                video.VBlankInterrupt = reader.ReadBoolean();
-                video.HBlankInterrupt = reader.ReadBoolean();
-                video.CoincidenceFlag = reader.ReadBoolean();
-                video.ModeFlag = reader.ReadInt32();
-                video.VRAMBank = reader.ReadInt32();
-
-                for (int b = 0; b < 2; b++)
-                {
-                    for (int i = 0; i < 0x2000; i++)
-                    {
-                        video.WriteVRAMDirect(b, i, reader.ReadByte());
-                    }
-                }
-
-                for (int i = 0; i < 0xA0; i++)
-                {
-                    video.WriteOAMDirect(i, reader.ReadByte());
-                }
-
-                // MBC State
-                byte mbcType = reader.ReadByte();
-                var mbc = mem.MBC;
-                if (mbcType == 1 && mbc is Mbc1 mbc1)
-                {
-                    mbc1.CurrentROMBank = reader.ReadInt32();
-                    mbc1.CurrentRAMBank = reader.ReadInt32();
-                    mbc1.RAMEnable = reader.ReadBoolean();
-                    mbc1.Mode = reader.ReadInt32();
-                }
-                else if (mbcType == 3 && mbc is Mbc3 mbc3)
-                {
-                    mbc3.CurrentROMBank = reader.ReadInt32();
-                    mbc3.CurrentRAMBank = reader.ReadInt32();
-                    mbc3.RAMEnable = reader.ReadBoolean();
-                }
-
-                return true;
+            ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+            var file = new FileInfo(filePath);
+            if (!file.Exists) {
+                throw new FileNotFoundException("Save-state file does not exist.", file.FullName);
             }
-            catch (Exception)
-            {
-                return false;
+            if (file.Length > EmulatorStateCodec.MaximumDocumentLength) {
+                throw new InvalidDataException("Save-state file exceeds the size limit.");
             }
+            Restore(emulator, File.ReadAllBytes(file.FullName));
+        }
+
+        private static EmulatorStateSection CreateSection(CoreStateSection id, byte[] payload)
+        {
+            return new EmulatorStateSection(
+                (ushort)id,
+                ComponentSchemaVersion,
+                required: true,
+                payload);
+        }
+
+        private static IReadOnlyDictionary<ushort, EmulatorStateSection> IndexSections(
+            EmulatorStateDocument document)
+        {
+            var result = new Dictionary<ushort, EmulatorStateSection>(document.Sections.Count);
+            foreach (EmulatorStateSection section in document.Sections) {
+                result.Add(section.Id, section);
+            }
+            return result;
+        }
+
+        private static byte[] GetPayload(
+            IReadOnlyDictionary<ushort, EmulatorStateSection> sections,
+            CoreStateSection id)
+        {
+            EmulatorStateSection section = sections[(ushort)id];
+            if (section.SchemaVersion != ComponentSchemaVersion) {
+                throw new NotSupportedException(
+                    $"State section {id} uses schema {section.SchemaVersion}; expected {ComponentSchemaVersion}.");
+            }
+            return section.CopyPayload();
         }
     }
 }

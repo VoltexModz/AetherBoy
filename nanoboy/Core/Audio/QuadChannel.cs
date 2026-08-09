@@ -163,5 +163,89 @@ namespace nanoboy.Core.Audio
             }
             return 0f;
         }
+
+        internal byte[] CaptureStatePayload()
+        {
+            return StatePayload.Write(writer => {
+                writer.Write(Enabled);
+                writer.Write(SweepTime);
+                writer.Write((byte)SweepDirection);
+                writer.Write(SweepShift);
+                writer.Write(lastfrequency);
+                writer.Write(currentfrequency);
+                writer.Write(sweepcycles);
+                writer.Write(initialfrequency);
+                writer.Write((byte)EnvelopeDirection);
+                writer.Write(envelopesweep);
+                writer.Write(lastwrittenvolume);
+                writer.Write(currentvolume);
+                writer.Write(envelopecycles);
+                writer.Write(SoundLengthRaw);
+                writer.Write(StopOnLengthExpired);
+                writer.Write(soundlengthcycles);
+                writer.Write(WavePatternDuty);
+                writer.Write(sample);
+            });
+        }
+
+        internal Action PrepareStateRestore(byte[] payload)
+        {
+            return StatePayload.Read(payload, reader => {
+                bool nextEnabled = StatePayload.ReadBoolean(reader);
+                int nextSweepTime = reader.ReadInt32();
+                var nextSweepDirection = (SweepMode)reader.ReadByte();
+                int nextSweepShift = reader.ReadInt32();
+                int nextLastFrequency = reader.ReadInt32();
+                int nextCurrentFrequency = reader.ReadInt32();
+                int nextSweepCycles = reader.ReadInt32();
+                int nextInitialFrequency = reader.ReadInt32();
+                var nextEnvelopeDirection = (EnvelopeMode)reader.ReadByte();
+                int nextEnvelopeSweep = reader.ReadInt32();
+                int nextLastWrittenVolume = reader.ReadInt32();
+                int nextCurrentVolume = reader.ReadInt32();
+                int nextEnvelopeCycles = reader.ReadInt32();
+                int nextSoundLengthRaw = reader.ReadInt32();
+                bool nextStopOnLengthExpired = StatePayload.ReadBoolean(reader);
+                int nextSoundLengthCycles = reader.ReadInt32();
+                int nextWavePatternDuty = reader.ReadInt32();
+                int nextSample = reader.ReadInt32();
+
+                StatePayload.RequireRange(nextSweepTime, 0, 7, nameof(SweepTime));
+                StatePayload.RequireRange((int)nextSweepDirection, 0, 1, nameof(SweepDirection));
+                StatePayload.RequireRange(nextSweepShift, 0, 7, nameof(SweepShift));
+                StatePayload.RequireRange(nextInitialFrequency, 0, 0x7FF, nameof(initialfrequency));
+                StatePayload.RequireRange((int)nextEnvelopeDirection, 0, 1, nameof(EnvelopeDirection));
+                StatePayload.RequireRange(nextEnvelopeSweep, 0, 7, nameof(envelopesweep));
+                StatePayload.RequireRange(nextLastWrittenVolume, 0, 15, nameof(lastwrittenvolume));
+                StatePayload.RequireRange(nextCurrentVolume, 0, 15, nameof(currentvolume));
+                StatePayload.RequireRange(nextSoundLengthRaw, 0, 63, nameof(SoundLengthRaw));
+                StatePayload.RequireRange(nextWavePatternDuty, 0, 3, nameof(WavePatternDuty));
+                if (nextSweepCycles < 0 || nextEnvelopeCycles < 0 ||
+                    nextSoundLengthCycles < 0 || nextSample < 0) {
+                    throw new InvalidOperationException("Pulse-channel phase counters cannot be negative.");
+                }
+
+                return (Action)(() => {
+                    Enabled = nextEnabled;
+                    SweepTime = nextSweepTime;
+                    SweepDirection = nextSweepDirection;
+                    SweepShift = nextSweepShift;
+                    lastfrequency = nextLastFrequency;
+                    currentfrequency = nextCurrentFrequency;
+                    sweepcycles = nextSweepCycles;
+                    initialfrequency = nextInitialFrequency;
+                    EnvelopeDirection = nextEnvelopeDirection;
+                    envelopesweep = nextEnvelopeSweep;
+                    lastwrittenvolume = nextLastWrittenVolume;
+                    currentvolume = nextCurrentVolume;
+                    envelopecycles = nextEnvelopeCycles;
+                    SoundLengthRaw = nextSoundLengthRaw;
+                    StopOnLengthExpired = nextStopOnLengthExpired;
+                    soundlengthcycles = nextSoundLengthCycles;
+                    WavePatternDuty = nextWavePatternDuty;
+                    sample = nextSample;
+                });
+            });
+        }
     }
 }

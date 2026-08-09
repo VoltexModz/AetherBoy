@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Security.Cryptography;
 using nanoboy.Core.Audio;
 
 namespace nanoboy.Core
@@ -522,6 +524,89 @@ namespace nanoboy.Core
             } finally {
                 Audio.Dispose();
             }
+        }
+
+        internal byte[] CaptureStatePayload()
+        {
+            if (BootROMEnabled && (BootROM == null || BootROM.Length == 0)) {
+                throw new InvalidOperationException("Boot ROM is enabled but no boot image is attached.");
+            }
+
+            return StatePayload.Write(writer => {
+                writer.Write(BootROMEnabled);
+                if (BootROMEnabled) {
+                    writer.Write(BootROM.Length);
+                    writer.Write(SHA256.HashData(BootROM));
+                } else {
+                    writer.Write(0);
+                }
+                writer.Write((byte)wrambank);
+                for (int bank = 0; bank < 8; bank++) {
+                    for (int offset = 0; offset < 0x1000; offset++) {
+                        writer.Write(wram[bank, offset]);
+                    }
+                }
+                writer.Write(hram);
+            });
+        }
+
+        internal Action PrepareStateRestore(byte[] payload)
+        {
+            return StatePayload.Read(payload, reader => {
+                bool nextBootRomEnabled = StatePayload.ReadBoolean(reader);
+                int expectedBootRomLength = reader.ReadInt32();
+                if (nextBootRomEnabled) {
+                    if (expectedBootRomLength <= 0 || BootROM == null || BootROM.Length != expectedBootRomLength) {
+                        throw new InvalidDataException("State requires a different boot ROM image.");
+                    }
+                    byte[] expectedBootRomHash = StatePayload.ReadBytes(reader, 32, "BootROM SHA-256");
+                    if (!CryptographicOperations.FixedTimeEquals(
+                        expectedBootRomHash,
+                        SHA256.HashData(BootROM))) {
+                        throw new InvalidDataException("State requires a different boot ROM image.");
+                    }
+                } else if (expectedBootRomLength != 0) {
+                    throw new InvalidDataException("Disabled boot ROM state contains an invalid binding.");
+                }
+
+                int nextWramBank = reader.ReadByte();
+                StatePayload.RequireRange(nextWramBank, 1, 7, nameof(wrambank));
+                byte[] nextWram = StatePayload.ReadBytes(reader, 8 * 0x1000, "WRAM");
+                byte[] nextHram = StatePayload.ReadBytes(reader, 0x7F, "HRAM");
+
+                return (Action)(() => {
+                    BootROMEnabled = nextBootRomEnabled;
+                    wrambank = nextWramBank;
+                    int position = 0;
+                    for (int bank = 0; bank < 8; bank++) {
+                        for (int offset = 0; offset < 0x1000; offset++) {
+                            wram[bank, offset] = nextWram[position++];
+                        }
+                    }
+                    Array.Copy(nextHram, hram, hram.Length);
+                });
+            });
+        }
+
+        internal byte[] CaptureSerialStatePayload()
+        {
+            if (serial is not SerialConsole) {
+                throw new NotSupportedException(
+                    $"Serial device {serial.GetType().Name} does not expose deterministic state.");
+            }
+            return Array.Empty<byte>();
+        }
+
+        internal Action PrepareSerialStateRestore(byte[] payload)
+        {
+            if (serial is not SerialConsole) {
+                throw new NotSupportedException(
+                    $"Serial device {serial.GetType().Name} does not expose deterministic state.");
+            }
+            if (payload == null || payload.Length != 0) {
+                throw new InvalidDataException("SerialConsole state must be empty.");
+            }
+            return () => { };
         }
     }
 }

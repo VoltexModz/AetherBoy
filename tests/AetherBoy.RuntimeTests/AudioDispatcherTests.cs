@@ -53,6 +53,47 @@ public sealed class AudioDispatcherTests
         }
     }
 
+    [TestMethod]
+    public void TimelineChangeDropsQueuedAudioButAcceptsNewGeneration()
+    {
+        var received = new ConcurrentQueue<int>();
+        using var firstEntered = new ManualResetEventSlim(false);
+        using var releaseFirst = new ManualResetEventSlim(false);
+        using var currentGenerationReceived = new ManualResetEventSlim(false);
+        var dispatcher = new BoundedAudioDispatcher(eventArgs =>
+        {
+            int value = (int)eventArgs.GetSamplesCopy()[0];
+            received.Enqueue(value);
+            if (value == 0)
+            {
+                firstEntered.Set();
+                releaseFirst.Wait(DeadlockTimeout);
+            }
+            else if (value == 2)
+            {
+                currentGenerationReceived.Set();
+            }
+        });
+
+        try
+        {
+            dispatcher.TryPost(CreateBlock(0));
+            Assert.IsTrue(firstEntered.Wait(DeadlockTimeout));
+            dispatcher.TryPost(CreateBlock(1));
+            dispatcher.DiscardPending();
+            dispatcher.TryPost(CreateBlock(2));
+
+            releaseFirst.Set();
+            Assert.IsTrue(currentGenerationReceived.Wait(DeadlockTimeout));
+            CollectionAssert.AreEqual(new[] { 0, 2 }, received.ToArray());
+        }
+        finally
+        {
+            releaseFirst.Set();
+            dispatcher.StopWithoutWaiting();
+        }
+    }
+
     private static AudioSamplesAvailableEventArgs CreateBlock(int value)
     {
         return new AudioSamplesAvailableEventArgs(new[] { (float)value }, 44_100);
