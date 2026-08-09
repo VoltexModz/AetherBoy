@@ -42,17 +42,17 @@ public sealed class SaveStateRoundTripTests
     }
 
     [TestMethod]
-    public void LongRunReplay_RemainsByteIdenticalAfterThreeHundredFrames()
+    public void LongRunReplay_RemainsByteIdenticalAfterSixHundredFrames()
     {
         using var fixture = new EmulatorFixture(romMarker: 0x23);
         MutateState(fixture.Emulator);
         byte[] origin = SaveState.Capture(fixture.Emulator);
 
-        RunFrames(fixture.Emulator, 300);
+        RunFrames(fixture.Emulator, 600);
         byte[] expectedFuture = SaveState.Capture(fixture.Emulator);
 
         SaveState.Restore(fixture.Emulator, origin);
-        RunFrames(fixture.Emulator, 300);
+        RunFrames(fixture.Emulator, 600);
 
         CollectionAssert.AreEqual(expectedFuture, SaveState.Capture(fixture.Emulator));
     }
@@ -224,12 +224,27 @@ public sealed class SaveStateRoundTripTests
         memory.WriteByte(0xFF21, 0xD5);
         memory.WriteByte(0xFF22, 0x6B);
         memory.WriteByte(0xFF23, 0xC0);
+        memory.WriteByte(0xFF24, 0x65);
+        memory.WriteByte(0xFF25, 0xA5);
+        memory.WriteByte(0xFF1A, 0x80);
+        memory.WriteByte(0xFF1D, 0xFF);
+        memory.WriteByte(0xFF1E, 0x87);
+        for (int dot = 0; dot < 17; dot++) {
+            memory.Audio.Tick();
+        }
         memory.WriteByte(0xFF02, 0x01);
         memory.WriteByte(0xFF51, 0xC0);
         memory.WriteByte(0xFF52, 0x00);
         memory.WriteByte(0xFF53, 0x10);
         memory.WriteByte(0xFF54, 0x00);
         memory.WriteByte(0xFF55, 0x82);
+        memory.HDMA.PerformHBlank();
+        memory.Video.SCX = 7;
+        memory.Video.WriteOAMDirect(0, 16);
+        memory.Video.WriteOAMDirect(1, 8);
+        for (int dot = 0; dot < 80; dot++) {
+            memory.Video.Tick();
+        }
         memory.WriteByte(0xFF46, 0xC0);
     }
 

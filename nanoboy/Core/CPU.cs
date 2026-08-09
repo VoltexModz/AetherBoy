@@ -115,6 +115,7 @@ namespace nanoboy.Core
         public bool IME;
         public bool WaitForInterrupt;
         public bool IsStopped { get; private set; }
+        public bool IsLockedUp { get; private set; }
         private int imeEnableDelay;
         private bool haltBug;
 
@@ -2024,7 +2025,7 @@ namespace nanoboy.Core
 
         public int Tick()
         {
-            if (!Running || WaitForInterrupt || IsStopped) {
+            if (!Running || WaitForInterrupt || IsStopped || IsLockedUp) {
                 return 4;
             }
 
@@ -2046,6 +2047,12 @@ namespace nanoboy.Core
             if (haltBug) {
                 pc = (pc - 1) & 0xFFFF;
                 haltBug = false;
+            }
+
+            if (IsIllegalOpcode(op)) {
+                pc = (pc + 1) & 0xFFFF;
+                IsLockedUp = true;
+                return 4;
             }
 
             cycleamountext = 0;
@@ -2195,6 +2202,7 @@ namespace nanoboy.Core
             IME = false;
             WaitForInterrupt = false;
             IsStopped = false;
+            IsLockedUp = false;
             imeEnableDelay = 0;
             haltBug = false;
             PrepareSpeedSwitch = false;
@@ -2205,6 +2213,19 @@ namespace nanoboy.Core
         {
             IsStopped = false;
         }
+
+        private static bool IsIllegalOpcode(byte opcodeValue) =>
+            opcodeValue == 0xD3 ||
+            opcodeValue == 0xDB ||
+            opcodeValue == 0xDD ||
+            opcodeValue == 0xE3 ||
+            opcodeValue == 0xE4 ||
+            opcodeValue == 0xEB ||
+            opcodeValue == 0xEC ||
+            opcodeValue == 0xED ||
+            opcodeValue == 0xF4 ||
+            opcodeValue == 0xFC ||
+            opcodeValue == 0xFD;
 
         #endregion
 
@@ -3439,6 +3460,7 @@ namespace nanoboy.Core
                 writer.Write(IME);
                 writer.Write(WaitForInterrupt);
                 writer.Write(IsStopped);
+                writer.Write(IsLockedUp);
                 writer.Write(imeEnableDelay);
                 writer.Write(haltBug);
                 writer.Write(branched);
@@ -3470,6 +3492,7 @@ namespace nanoboy.Core
                 bool nextIme = StatePayload.ReadBoolean(reader);
                 bool nextWaitForInterrupt = StatePayload.ReadBoolean(reader);
                 bool nextIsStopped = StatePayload.ReadBoolean(reader);
+                bool nextIsLockedUp = StatePayload.ReadBoolean(reader);
                 int nextImeEnableDelay = reader.ReadInt32();
                 bool nextHaltBug = StatePayload.ReadBoolean(reader);
                 bool nextBranched = StatePayload.ReadBoolean(reader);
@@ -3500,6 +3523,7 @@ namespace nanoboy.Core
                     IME = nextIme;
                     WaitForInterrupt = nextWaitForInterrupt;
                     IsStopped = nextIsStopped;
+                    IsLockedUp = nextIsLockedUp;
                     imeEnableDelay = nextImeEnableDelay;
                     haltBug = nextHaltBug;
                     branched = nextBranched;

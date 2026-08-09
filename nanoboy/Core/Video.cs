@@ -58,6 +58,7 @@ namespace nanoboy.Core
         private Interrupt interrupt;
         private HDMA hdma;
         private int clock;
+        private int mode3Duration;
         private uint[] monochromepalette;
         private uint[] frame;
         private readonly uint[] publishedFrame;
@@ -71,6 +72,7 @@ namespace nanoboy.Core
         public void WriteVRAMDirect(int bank, int offset, byte value) => vram[bank, offset] = value;
         public byte ReadOAMDirect(int offset) => oam[offset];
         public void WriteOAMDirect(int offset, byte value) => oam[offset] = value;
+        public int CurrentMode3Duration => mode3Duration;
 
         public void SetMonochromePalette(int paletteIndex)
         {
@@ -157,6 +159,7 @@ namespace nanoboy.Core
             frame = new uint[FramePixelCount];
             publishedFrame = new uint[FramePixelCount];
             ModeFlag = 2;
+            mode3Duration = 172;
             VRAMBank = 0;
         }
 
@@ -192,6 +195,7 @@ namespace nanoboy.Core
             clock = 0;
             LY = 0;
             ModeFlag = 2;
+            mode3Duration = 172;
             FrameReady = false;
             CoincidenceFlag = LY == LYC;
             statInterruptLine = false;
@@ -248,6 +252,7 @@ namespace nanoboy.Core
                 clock = 0;
                 LY = 0;
                 ModeFlag = 2;
+                mode3Duration = 172;
             }
 
             UpdateCoincidence();
@@ -276,11 +281,12 @@ namespace nanoboy.Core
                     if (clock >= 80) {
                         ModeFlag = 3;
                         clock = 0;
+                        mode3Duration = CalculateMode3Duration();
                     }
                     break;
 
                 case 3:
-                    if (clock >= 172) {
+                    if (clock >= mode3Duration) {
 
                         if (hdma.IsHBlank) {
                             hdma.PerformHBlank();
@@ -298,7 +304,7 @@ namespace nanoboy.Core
                     break;
 
                 case 0:
-                    if (clock >= 204) {
+                    if (clock >= EmulationClock.DotsPerScanline - 80 - mode3Duration) {
                         clock = 0;
                         LY++;
                         if (LY == 144) {
@@ -362,6 +368,88 @@ namespace nanoboy.Core
                 Buffer.BlockCopy(frame, 0, publishedFrame, 0, FrameByteCount);
                 publishedFrameSequence++;
             }
+        }
+
+        private int CalculateMode3Duration()
+        {
+            int duration = 172 + (SCX & 7);
+            bool windowVisible =
+                WindowEnable &&
+                LY >= WY &&
+                WX <= 166 &&
+                (hasColorFeatures || BackgroundEnable);
+            if (windowVisible) {
+                duration += 6;
+                if (WX == 0 && (SCX & 7) != 0) {
+                    duration--;
+                }
+            }
+
+            if (!ObjectEnable) {
+                return duration;
+            }
+
+            Span<int> selectedX = stackalloc int[10];
+            int selectedCount = 0;
+            int spriteHeight = ObjectSize ? 16 : 8;
+            for (int tableIndex = 0; tableIndex < 40 && selectedCount < selectedX.Length; tableIndex++) {
+                int spriteY = oam[tableIndex * 4] - 16;
+                if (LY >= spriteY && LY < spriteY + spriteHeight) {
+                    selectedX[selectedCount++] = oam[tableIndex * 4 + 1];
+                }
+            }
+
+            for (int left = 0; left < selectedCount - 1; left++) {
+                for (int right = left + 1; right < selectedCount; right++) {
+                    if (selectedX[left] > selectedX[right]) {
+                        (selectedX[left], selectedX[right]) = (selectedX[right], selectedX[left]);
+                    }
+                }
+            }
+
+            Span<int> consideredTiles = stackalloc int[10];
+            consideredTiles.Fill(int.MinValue);
+            int consideredCount = 0;
+            int windowX = WX - 7;
+            for (int sprite = 0; sprite < selectedCount; sprite++) {
+                int oamX = selectedX[sprite];
+                if (oamX == 0) {
+                    duration += 11;
+                    continue;
+                }
+                if (oamX >= 168) {
+                    continue;
+                }
+
+                int screenX = oamX - 8;
+                bool usesWindow = windowVisible && screenX >= windowX;
+                int tilePosition;
+                int tileKey;
+                if (usesWindow) {
+                    int windowPixel = screenX - windowX;
+                    tilePosition = windowPixel & 7;
+                    tileKey = 0x100 | (windowPixel >> 3);
+                } else {
+                    int backgroundPixel = (screenX + SCX) & 0xFF;
+                    tilePosition = backgroundPixel & 7;
+                    tileKey = backgroundPixel >> 3;
+                }
+
+                bool firstSpriteForTile = true;
+                for (int considered = 0; considered < consideredCount; considered++) {
+                    if (consideredTiles[considered] == tileKey) {
+                        firstSpriteForTile = false;
+                        break;
+                    }
+                }
+                if (firstSpriteForTile) {
+                    consideredTiles[consideredCount++] = tileKey;
+                    duration += Math.Max(0, 5 - tilePosition);
+                }
+                duration += 6;
+            }
+
+            return Math.Min(duration, 289);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -615,6 +703,7 @@ namespace nanoboy.Core
                     writer.Write(ObjectPaletteIndex);
                     writer.Write(VRAMBank);
                     writer.Write(clock);
+                    writer.Write(mode3Duration);
                     writer.Write(publishedFrameSequence);
                     writer.Write(statInterruptLine);
                     writer.Write(framecounter);
@@ -674,6 +763,7 @@ namespace nanoboy.Core
                 int nextObjectPaletteIndex = reader.ReadInt32();
                 int nextVramBank = reader.ReadInt32();
                 int nextClock = reader.ReadInt32();
+                int nextMode3Duration = reader.ReadInt32();
                 long nextPublishedFrameSequence = reader.ReadInt64();
                 bool nextStatInterruptLine = StatePayload.ReadBoolean(reader);
                 int nextFrameCounter = reader.ReadInt32();
@@ -694,6 +784,7 @@ namespace nanoboy.Core
                 StatePayload.RequireRange(nextObjectPaletteIndex, 0, 0x3F, nameof(ObjectPaletteIndex));
                 StatePayload.RequireRange(nextVramBank, 0, 1, nameof(VRAMBank));
                 StatePayload.RequireRange(nextClock, 0, EmulationClock.DotsPerScanline - 1, nameof(clock));
+                StatePayload.RequireRange(nextMode3Duration, 172, 289, nameof(mode3Duration));
                 if (nextPublishedFrameSequence < 0) {
                     throw new InvalidOperationException("Video frame sequence cannot be negative.");
                 }
@@ -739,6 +830,7 @@ namespace nanoboy.Core
                     ObjectPaletteIndex = nextObjectPaletteIndex;
                     VRAMBank = nextVramBank;
                     clock = nextClock;
+                    mode3Duration = nextMode3Duration;
                     statInterruptLine = nextStatInterruptLine;
                     framecounter = nextFrameCounter;
                     updaterequired = nextUpdateRequired;
@@ -812,6 +904,9 @@ namespace nanoboy.Core
 
         public byte ReadPRAM(int index)
         {
+            if (LCDEnable && ModeFlag == 3) {
+                return 0xFF;
+            }
             if (index == 0) {
                 return pram1[BackgroundPaletteIndex & 0x3F];
             }
@@ -820,15 +915,20 @@ namespace nanoboy.Core
 
         public void WritePRAM(int index, byte value)
         {
+            bool writeBlocked = LCDEnable && ModeFlag == 3;
             if (index == 0) {
                 int paletteIndex = BackgroundPaletteIndex & 0x3F;
-                pram1[paletteIndex] = value;
+                if (!writeBlocked) {
+                    pram1[paletteIndex] = value;
+                }
                 if (BackgroundPaletteAI) {
                     BackgroundPaletteIndex = (paletteIndex + 1) & 0x3F;
                 }
             } else {
                 int paletteIndex = ObjectPaletteIndex & 0x3F;
-                pram2[paletteIndex] = value;
+                if (!writeBlocked) {
+                    pram2[paletteIndex] = value;
+                }
                 if (ObjectPaletteAI) {
                     ObjectPaletteIndex = (paletteIndex + 1) & 0x3F;
                 }

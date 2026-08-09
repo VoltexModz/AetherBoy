@@ -27,6 +27,7 @@ namespace nanoboy.Core
         public ROM ROM => rom;
         public IMemoryDevice MBC => mbc;
         public HDMA HDMA => hdma;
+        internal bool CpuIsHalted => cpu.WaitForInterrupt;
         public int WRAMBank { get => wrambank; set => wrambank = value; }
         public byte ReadWRAMDirect(int bank, int offset) => wram[bank, offset];
         public void WriteWRAMDirect(int bank, int offset, byte value) => wram[bank, offset] = value;
@@ -154,6 +155,12 @@ namespace nanoboy.Core
                     case 0x23:
                         return (byte)(0xBF |
                             (Audio.Channel4.StopOnLengthExpired ? 0x40 : 0x00));
+                    case 0x24:
+                        return Audio.MasterVolume;
+                    case 0x25:
+                        return Audio.OutputRouting;
+                    case 0x26:
+                        return Audio.ReadStatus();
                     case 0x30:
                     case 0x31:
                     case 0x32:
@@ -211,31 +218,34 @@ namespace nanoboy.Core
                         value |= cpu.PrepareSpeedSwitch ? 1 : 0;
                         return (byte)value;
                     case 0x4F:
-                        return (byte)Video.VRAMBank;
+                        return rom.HasColorFeatures ? (byte)(0xFE | Video.VRAMBank) : (byte)0xFF;
                     case 0x51:
-                        return (byte)(hdma.SourceAddress >> 8);
                     case 0x52:
-                        return (byte)hdma.SourceAddress;
                     case 0x53:
-                        return (byte)(hdma.DestinationAddress >> 8);
                     case 0x54:
-                        return (byte)hdma.DestinationAddress;
+                        return 0xFF;
                     case 0x55:
-                        return hdma.ReadControl();
+                        return rom.HasColorFeatures ? hdma.ReadControl() : (byte)0xFF;
                     case 0x68:
+                        if (!rom.HasColorFeatures) {
+                            return 0xFF;
+                        }
                         value = Video.BackgroundPaletteIndex;
                         value |= Video.BackgroundPaletteAI ? 0x80 : 0x00;
                         return (byte)value;
                     case 0x69:
-                        return Video.ReadPRAM(0);
+                        return rom.HasColorFeatures ? Video.ReadPRAM(0) : (byte)0xFF;
                     case 0x6A:
+                        if (!rom.HasColorFeatures) {
+                            return 0xFF;
+                        }
                         value = Video.ObjectPaletteIndex;
                         value |= Video.ObjectPaletteAI ? 0x80 : 0x00;
                         return (byte)value;
                     case 0x6B:
-                        return Video.ReadPRAM(1);
+                        return rom.HasColorFeatures ? Video.ReadPRAM(1) : (byte)0xFF;
                     case 0x70:
-                        return (byte)wrambank;
+                        return rom.HasColorFeatures ? (byte)(0xF8 | wrambank) : (byte)0xFF;
                     default:
 
                         return 0;
@@ -307,7 +317,11 @@ namespace nanoboy.Core
             } else if (address <= 0xFEFF) {
 
             } else if (address <= 0xFF7F) {
-                switch (address - 0xFF00) {
+                int ioOffset = address - 0xFF00;
+                if (ioOffset >= 0x10 && ioOffset <= 0x25 && !Audio.Powered) {
+                    return;
+                }
+                switch (ioOffset) {
                     case 0x00:
                         Joypad.WriteSelection(value);
                         break;
@@ -349,6 +363,7 @@ namespace nanoboy.Core
                         Audio.Channel1.EnvelopeSweep = value & 7;
                         Audio.Channel1.EnvelopeDirection = (EnvelopeMode)((value >> 3) & 1);
                         Audio.Channel1.Volume = (value >> 4) & 0xF;
+                        Audio.Channel1.ApplyDacState();
                         break;
                     case 0x13:
                         Audio.Channel1.Frequency = (Audio.Channel1.Frequency & 0x700) | value;
@@ -368,6 +383,7 @@ namespace nanoboy.Core
                         Audio.Channel2.EnvelopeSweep = value & 7;
                         Audio.Channel2.EnvelopeDirection = (EnvelopeMode)((value >> 3) & 1);
                         Audio.Channel2.Volume = (value >> 4) & 0xF;
+                        Audio.Channel2.ApplyDacState();
                         break;
                     case 0x18:
                         Audio.Channel2.Frequency = (Audio.Channel2.Frequency & 0x700) | value;
@@ -381,6 +397,7 @@ namespace nanoboy.Core
                         break;
                     case 0x1A:
                         Audio.Channel3.On = (value & 0x80) == 0x80;
+                        Audio.Channel3.ApplyDacState();
                         break;
                     case 0x1B:
                         Audio.Channel3.SoundLengthRaw = value;
@@ -405,6 +422,7 @@ namespace nanoboy.Core
                         Audio.Channel4.EnvelopeSweep = value & 7;
                         Audio.Channel4.EnvelopeDirection = (EnvelopeMode)((value >> 3) & 1);
                         Audio.Channel4.Volume = (value >> 4) & 0xF;
+                        Audio.Channel4.ApplyDacState();
                         break;
                     case 0x22:
                         Audio.Channel4.ClockFrequency = value >> 4;
@@ -417,6 +435,15 @@ namespace nanoboy.Core
                         if ((value & 0x80) == 0x80) {
                             Audio.Channel4.Restart();
                         }
+                        break;
+                    case 0x24:
+                        Audio.MasterVolume = value;
+                        break;
+                    case 0x25:
+                        Audio.OutputRouting = value;
+                        break;
+                    case 0x26:
+                        Audio.SetPower((value & 0x80) != 0);
                         break;
 
                     case 0x30:
@@ -487,33 +514,51 @@ namespace nanoboy.Core
                         }
                         break;
                     case 0x51:
-                        hdma.SourceAddress = hdma.SourceAddress & 0xFF | (value << 8);
+                        if (rom.HasColorFeatures) {
+                            hdma.SourceAddress = hdma.SourceAddress & 0xFF | (value << 8);
+                        }
                         break;
                     case 0x52:
-                        hdma.SourceAddress = hdma.SourceAddress & 0xFF00 | (value & 0xF0);
+                        if (rom.HasColorFeatures) {
+                            hdma.SourceAddress = hdma.SourceAddress & 0xFF00 | (value & 0xF0);
+                        }
                         break;
                     case 0x53:
-                        hdma.DestinationAddress = hdma.DestinationAddress & 0xFF | ((value & 0x1F) << 8);
+                        if (rom.HasColorFeatures) {
+                            hdma.DestinationAddress = hdma.DestinationAddress & 0xFF | ((value & 0x1F) << 8);
+                        }
                         break;
                     case 0x54:
-                        hdma.DestinationAddress = hdma.DestinationAddress & 0xFF00 | (value & 0xF0);
+                        if (rom.HasColorFeatures) {
+                            hdma.DestinationAddress = hdma.DestinationAddress & 0xFF00 | (value & 0xF0);
+                        }
                         break;
                     case 0x55:
-                        hdma.WriteControl(value);
+                        if (rom.HasColorFeatures) {
+                            hdma.WriteControl(value);
+                        }
                         break;
                     case 0x68:
-                        Video.BackgroundPaletteIndex = value & 0x3F;
-                        Video.BackgroundPaletteAI = (value & 0x80) == 0x80;
+                        if (rom.HasColorFeatures) {
+                            Video.BackgroundPaletteIndex = value & 0x3F;
+                            Video.BackgroundPaletteAI = (value & 0x80) == 0x80;
+                        }
                         break;
                     case 0x69:
-                        Video.WritePRAM(0, value);
+                        if (rom.HasColorFeatures) {
+                            Video.WritePRAM(0, value);
+                        }
                         break;
                     case 0x6A:
-                        Video.ObjectPaletteIndex = value & 0x3F;
-                        Video.ObjectPaletteAI = (value & 0x80) == 0x80;
+                        if (rom.HasColorFeatures) {
+                            Video.ObjectPaletteIndex = value & 0x3F;
+                            Video.ObjectPaletteAI = (value & 0x80) == 0x80;
+                        }
                         break;
                     case 0x6B:
-                        Video.WritePRAM(1, value);
+                        if (rom.HasColorFeatures) {
+                            Video.WritePRAM(1, value);
+                        }
                         break;
                     case 0x70:
                         if (rom.HasColorFeatures) {

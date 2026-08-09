@@ -121,8 +121,10 @@ public sealed class AudioTimingTests
     {
         using var audio = new Audio { Enabled = false };
         audio.Channel1.Volume = 15;
+        audio.Channel1.WavePatternDuty = 2;
         audio.Channel1.SoundLengthRaw = 63;
         audio.Channel1.StopOnLengthExpired = true;
+        audio.Channel1.Restart();
 
         Tick(audio, 8_191);
         Assert.IsGreaterThan(0f, audio.Channel1.Next(44_100));
@@ -170,6 +172,49 @@ public sealed class AudioTimingTests
         Assert.AreEqual(1, audio.Channel4.CurrentVolume);
         audio.Tick();
         Assert.AreEqual(2, audio.Channel4.CurrentVolume);
+    }
+
+    [TestMethod]
+    public void PulseFrequencyTimer_AdvancesDutyAfterFourDotsAtPeriod2047()
+    {
+        var pulse = new QuadChannel { Frequency = 0x7FF, Volume = 15 };
+        pulse.Restart();
+
+        for (int dot = 0; dot < 3; dot++) {
+            pulse.Tick();
+        }
+        Assert.AreEqual(0, pulse.DutyStep);
+        pulse.Tick();
+        Assert.AreEqual(1, pulse.DutyStep);
+    }
+
+    [TestMethod]
+    public void WaveFrequencyTimer_AdvancesSampleAfterTwoDotsAtPeriod2047()
+    {
+        var wave = new WaveChannel { FrequencyRaw = 0x7FF, On = true };
+        wave.Restart();
+
+        wave.Tick();
+        Assert.AreEqual(0, wave.WavePosition);
+        wave.Tick();
+        Assert.AreEqual(1, wave.WavePosition);
+    }
+
+    [TestMethod]
+    public void HardwareAudioTimers_DoNotAllocateAcrossACompleteFrame()
+    {
+        using var audio = new Audio { Enabled = false };
+        audio.Channel1.Frequency = 0x700;
+        audio.Channel1.Volume = 15;
+        audio.Channel1.Restart();
+        Tick(audio, EmulationClock.DotsPerFrame);
+
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        Tick(audio, EmulationClock.DotsPerFrame);
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.IsLessThan(1_024L, allocated,
+            $"A complete hardware-audio frame allocated {allocated} bytes.");
     }
 
     private static void Tick(Audio audio, int count)

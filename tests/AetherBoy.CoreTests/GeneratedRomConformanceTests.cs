@@ -126,6 +126,7 @@ public sealed class GeneratedRomConformanceTests
             Assert.AreEqual(ConformanceOutcome.Passed, result.Outcome);
             Assert.AreEqual("Passed", result.SerialOutput);
             Assert.AreEqual(1, result.FramesExecuted);
+            Assert.AreEqual(ConformanceProtocol.SerialText, result.Protocol);
         } finally {
             if (Directory.Exists(temporaryDirectory)) {
                 Directory.Delete(temporaryDirectory, recursive: true);
@@ -152,6 +153,87 @@ public sealed class GeneratedRomConformanceTests
             Assert.AreEqual(ConformanceOutcome.TimedOut, result.Outcome);
             Assert.AreEqual(string.Empty, result.SerialOutput);
             Assert.AreEqual(2, result.FramesExecuted);
+            Assert.AreEqual(ConformanceProtocol.None, result.Protocol);
+        } finally {
+            if (Directory.Exists(temporaryDirectory)) {
+                Directory.Delete(temporaryDirectory, recursive: true);
+            }
+        }
+    }
+
+    [TestMethod]
+    public void HeadlessRunner_RecognizesSerialFailureProtocol()
+    {
+        RunProtocolTest(
+            CreateSerialProgram("Failed"),
+            expectedOutcome: ConformanceOutcome.Failed,
+            expectedProtocol: ConformanceProtocol.SerialText,
+            expectedOutput: "Failed");
+    }
+
+    [TestMethod]
+    public void HeadlessRunner_RecognizesMooneyeRegisterSignature()
+    {
+        byte[] program =
+        {
+            0x06, 0x03, // LD B,3
+            0x0E, 0x05, // LD C,5
+            0x16, 0x08, // LD D,8
+            0x1E, 0x0D, // LD E,13
+            0x26, 0x15, // LD H,21
+            0x2E, 0x22, // LD L,34
+            0x76        // HALT
+        };
+
+        RunProtocolTest(
+            program,
+            expectedOutcome: ConformanceOutcome.Passed,
+            expectedProtocol: ConformanceProtocol.MooneyeRegisters,
+            expectedOutput: "Mooneye Fibonacci register signature");
+    }
+
+    [TestMethod]
+    public void HeadlessRunner_RecognizesBlarggMemoryProtocol()
+    {
+        var program = new List<byte>
+        {
+            0x3E, 0x0A,       // LD A,$0A
+            0xEA, 0x00, 0x00  // LD ($0000),A; enable cartridge RAM
+        };
+        AddMemoryWrite(program, 0xA001, 0xDE);
+        AddMemoryWrite(program, 0xA002, 0xB0);
+        AddMemoryWrite(program, 0xA003, 0x61);
+        int messageAddress = 0xA004;
+        foreach (byte value in Encoding.ASCII.GetBytes("Passed")) {
+            AddMemoryWrite(program, messageAddress++, value);
+        }
+        AddMemoryWrite(program, messageAddress, 0x00);
+        AddMemoryWrite(program, 0xA000, 0x00);
+        program.Add(0x76);
+
+        RunProtocolTest(
+            program.ToArray(),
+            expectedOutcome: ConformanceOutcome.Passed,
+            expectedProtocol: ConformanceProtocol.BlarggMemory,
+            expectedOutput: "Passed",
+            cartridgeType: Mbc.ROM_MBC5_RAM,
+            ramSizeCode: 0x02);
+    }
+
+    [TestMethod]
+    public void HeadlessRunner_RejectsAnUnboundedZeroFrameRun()
+    {
+        string temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"AetherBoy.InvalidConformanceTests-{Guid.NewGuid():N}");
+        string romPath = Path.Combine(temporaryDirectory, "invalid.gb");
+        Directory.CreateDirectory(temporaryDirectory);
+        try {
+            File.WriteAllBytes(romPath, CreateRom());
+            var runner = new HeadlessConformanceRunner();
+            var rom = new ROM(romPath, Path.Combine(temporaryDirectory, "invalid.sav"));
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => runner.Run(rom, maximumFrames: 0));
         } finally {
             if (Directory.Exists(temporaryDirectory)) {
                 Directory.Delete(temporaryDirectory, recursive: true);
@@ -184,7 +266,49 @@ public sealed class GeneratedRomConformanceTests
         return program.ToArray();
     }
 
-    private static byte[] CreateRom(byte[] program)
+    private static void AddMemoryWrite(List<byte> program, int address, byte value)
+    {
+        program.Add(0x3E);
+        program.Add(value);
+        program.Add(0xEA);
+        program.Add((byte)address);
+        program.Add((byte)(address >> 8));
+    }
+
+    private static void RunProtocolTest(
+        byte[] program,
+        ConformanceOutcome expectedOutcome,
+        ConformanceProtocol expectedProtocol,
+        string expectedOutput,
+        Mbc cartridgeType = Mbc.ROM_NONE,
+        byte ramSizeCode = 0)
+    {
+        string temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"AetherBoy.ProtocolTests-{Guid.NewGuid():N}");
+        string romPath = Path.Combine(temporaryDirectory, "protocol.gb");
+        string savePath = Path.Combine(temporaryDirectory, "protocol.sav");
+        Directory.CreateDirectory(temporaryDirectory);
+        try {
+            File.WriteAllBytes(romPath, CreateRom(program, cartridgeType, ramSizeCode));
+            var runner = new HeadlessConformanceRunner();
+
+            ConformanceResult result = runner.Run(new ROM(romPath, savePath), maximumFrames: 2);
+
+            Assert.AreEqual(expectedOutcome, result.Outcome);
+            Assert.AreEqual(expectedProtocol, result.Protocol);
+            Assert.AreEqual(expectedOutput, result.Output);
+        } finally {
+            if (Directory.Exists(temporaryDirectory)) {
+                Directory.Delete(temporaryDirectory, recursive: true);
+            }
+        }
+    }
+
+    private static byte[] CreateRom(
+        byte[] program,
+        Mbc cartridgeType = Mbc.ROM_NONE,
+        byte ramSizeCode = 0)
     {
         var rom = new byte[RomSize];
 
@@ -198,9 +322,9 @@ public sealed class GeneratedRomConformanceTests
         Encoding.ASCII.GetBytes("AETHERBOY E2E").CopyTo(rom, 0x0134);
         rom[0x0143] = 0x00; // DMG-compatible
         rom[0x0146] = 0x00; // no SGB features
-        rom[0x0147] = (byte)Mbc.ROM_NONE;
+        rom[0x0147] = (byte)cartridgeType;
         rom[0x0148] = 0x00; // 32 KiB ROM
-        rom[0x0149] = 0x00; // no cartridge RAM
+        rom[0x0149] = ramSizeCode;
         rom[0x014A] = 0x01; // non-Japanese destination
         rom[0x014B] = 0x00;
         rom[0x014C] = 0x00;

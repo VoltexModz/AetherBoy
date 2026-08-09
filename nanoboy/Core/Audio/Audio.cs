@@ -65,6 +65,8 @@ namespace nanoboy.Core.Audio
         private int sampleRate;
         private int frameSequencerDivider;
         private int frameSequencerStep;
+        private byte masterVolume;
+        private byte outputRouting;
         private bool disposed;
 
         public Audio()
@@ -78,6 +80,7 @@ namespace nanoboy.Core.Audio
             SampleRate = 44_100;
             BufferSize = 1_024;
             Enabled = true;
+            Powered = true;
         }
 
         public event EventHandler<AudioAvailableEventArgs> AudioAvailable;
@@ -88,6 +91,9 @@ namespace nanoboy.Core.Audio
         public NoiseChannel Channel4 { get; }
         public int BufferSize { get; set; }
         public bool Enabled { get; set; }
+        public bool Powered { get; private set; }
+        public byte MasterVolume { get => masterVolume; set => masterVolume = value; }
+        public byte OutputRouting { get => outputRouting; set => outputRouting = value; }
 
         public int SampleRate
         {
@@ -121,7 +127,13 @@ namespace nanoboy.Core.Audio
             }
 
             TickFrameSequencer();
-            Channel4.Tick();
+            if (Powered)
+            {
+                Channel1.Tick();
+                Channel2.Tick();
+                Channel3.Tick();
+                Channel4.Tick();
+            }
 
             if (!sampleClock.Tick(SampleRate))
             {
@@ -129,13 +141,25 @@ namespace nanoboy.Core.Audio
             }
 
             float sample = 0f;
-            if (Enabled)
+            if (Enabled && Powered)
             {
-                sample = (Channel1.Enabled ? Channel1.Next(SampleRate) : 0f) +
-                         (Channel2.Enabled ? Channel2.Next(SampleRate) : 0f) +
-                         (Channel3.Enabled ? Channel3.Next(SampleRate) : 0f) +
-                         (Channel4.Enabled ? Channel4.Next(SampleRate) : 0f);
-                sample = Math.Clamp(sample * 0.25f, -1f, 1f);
+                float channel1 = Channel1.Enabled ? Channel1.Next(SampleRate) : 0f;
+                float channel2 = Channel2.Enabled ? Channel2.Next(SampleRate) : 0f;
+                float channel3 = Channel3.Enabled ? Channel3.Next(SampleRate) : 0f;
+                float channel4 = Channel4.Enabled ? Channel4.Next(SampleRate) : 0f;
+                float left =
+                    ((outputRouting & 0x10) != 0 ? channel1 : 0f) +
+                    ((outputRouting & 0x20) != 0 ? channel2 : 0f) +
+                    ((outputRouting & 0x40) != 0 ? channel3 : 0f) +
+                    ((outputRouting & 0x80) != 0 ? channel4 : 0f);
+                float right =
+                    ((outputRouting & 0x01) != 0 ? channel1 : 0f) +
+                    ((outputRouting & 0x02) != 0 ? channel2 : 0f) +
+                    ((outputRouting & 0x04) != 0 ? channel3 : 0f) +
+                    ((outputRouting & 0x08) != 0 ? channel4 : 0f);
+                float leftGain = (((masterVolume >> 4) & 7) + 1) * (1f / 8f);
+                float rightGain = ((masterVolume & 7) + 1) * (1f / 8f);
+                sample = Math.Clamp((left * leftGain + right * rightGain) * 0.125f, -1f, 1f);
             }
 
             sampleBuffer.Add(sample);
@@ -158,6 +182,45 @@ namespace nanoboy.Core.Audio
             sampleBuffer.Clear();
         }
 
+        internal void ResetHardware()
+        {
+            ResetTiming();
+            Powered = true;
+            SetPower(false);
+            SetPower(true);
+        }
+
+        public void SetPower(bool powered)
+        {
+            if (Powered == powered)
+            {
+                return;
+            }
+
+            Powered = powered;
+            if (powered)
+            {
+                return;
+            }
+
+            masterVolume = 0;
+            outputRouting = 0;
+            Channel1.PowerOff();
+            Channel2.PowerOff();
+            Channel3.PowerOff();
+            Channel4.PowerOff();
+        }
+
+        public byte ReadStatus()
+        {
+            int status = Powered ? 0xF0 : 0x70;
+            status |= Channel1.IsActive ? 0x01 : 0;
+            status |= Channel2.IsActive ? 0x02 : 0;
+            status |= Channel3.IsActive ? 0x04 : 0;
+            status |= Channel4.IsActive ? 0x08 : 0;
+            return (byte)status;
+        }
+
         private void TickFrameSequencer()
         {
             frameSequencerDivider++;
@@ -167,24 +230,31 @@ namespace nanoboy.Core.Audio
             }
 
             frameSequencerDivider = 0;
+            bool clockChannels = Powered;
             if ((frameSequencerStep & 1) == 0)
             {
-                Channel1.ClockLength();
-                Channel2.ClockLength();
-                Channel3.ClockLength();
-                Channel4.ClockLength();
+                if (clockChannels) {
+                    Channel1.ClockLength();
+                    Channel2.ClockLength();
+                    Channel3.ClockLength();
+                    Channel4.ClockLength();
+                }
             }
 
             if (frameSequencerStep == 2 || frameSequencerStep == 6)
             {
-                Channel1.ClockSweep();
+                if (clockChannels) {
+                    Channel1.ClockSweep();
+                }
             }
 
             if (frameSequencerStep == 7)
             {
-                Channel1.ClockEnvelope();
-                Channel2.ClockEnvelope();
-                Channel4.ClockEnvelope();
+                if (clockChannels) {
+                    Channel1.ClockEnvelope();
+                    Channel2.ClockEnvelope();
+                    Channel4.ClockEnvelope();
+                }
             }
 
             frameSequencerStep = (frameSequencerStep + 1) & 7;
@@ -194,6 +264,9 @@ namespace nanoboy.Core.Audio
         {
             return StatePayload.Write(writer => {
                 writer.Write(Enabled);
+                writer.Write(Powered);
+                writer.Write(masterVolume);
+                writer.Write(outputRouting);
                 writer.Write(sampleRate);
                 writer.Write(BufferSize);
                 writer.Write(sampleClock.CaptureState());
@@ -214,6 +287,9 @@ namespace nanoboy.Core.Audio
         {
             return StatePayload.Read(payload, reader => {
                 bool nextEnabled = StatePayload.ReadBoolean(reader);
+                bool nextPowered = StatePayload.ReadBoolean(reader);
+                byte nextMasterVolume = reader.ReadByte();
+                byte nextOutputRouting = reader.ReadByte();
                 int nextSampleRate = reader.ReadInt32();
                 int nextBufferSize = reader.ReadInt32();
                 long nextAccumulator = reader.ReadInt64();
@@ -232,6 +308,9 @@ namespace nanoboy.Core.Audio
                     nameof(frameSequencerDivider));
                 StatePayload.RequireRange(nextFrameSequencerStep, 0, 7, nameof(frameSequencerStep));
                 StatePayload.RequireRange(nextSampleCount, 0, nextBufferSize - 1, "sampleBuffer.Count");
+                if (!nextPowered && (nextMasterVolume != 0 || nextOutputRouting != 0)) {
+                    throw new InvalidOperationException("Powered-off APU state contains live mixer registers.");
+                }
                 var nextSamples = new float[nextSampleCount];
                 for (int index = 0; index < nextSamples.Length; index++) {
                     nextSamples[index] = reader.ReadSingle();
@@ -247,6 +326,9 @@ namespace nanoboy.Core.Audio
 
                 return (Action)(() => {
                     Enabled = nextEnabled;
+                    Powered = nextPowered;
+                    masterVolume = nextMasterVolume;
+                    outputRouting = nextOutputRouting;
                     sampleRate = nextSampleRate;
                     BufferSize = nextBufferSize;
                     sampleClock.RestoreState(nextAccumulator);

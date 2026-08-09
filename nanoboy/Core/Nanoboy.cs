@@ -35,6 +35,20 @@ namespace nanoboy.Core
 
             while (dotsExecuted < dotBudget)
             {
+                if (Memory.HDMA.ConsumeCpuStallDot())
+                {
+                    int stalledCpuCycles = Cpu.IsDoubleSpeed ? 2 : 1;
+                    for (int cycle = 0; cycle < stalledCpuCycles; cycle++)
+                    {
+                        Memory.Timer.Tick();
+                        Memory.HDMA.TickOamDma();
+                    }
+                    Memory.Video.Tick();
+                    Memory.Audio.Tick();
+                    dotsExecuted++;
+                    continue;
+                }
+
                 // A speed switch takes effect after STOP. The instruction itself still
                 // belongs to the clock domain that was active when it started.
                 bool doubleSpeed = Cpu.IsDoubleSpeed;
@@ -92,8 +106,9 @@ namespace nanoboy.Core
             Memory.Interrupt.IE = 0;
             Memory.Interrupt.IF = 0;
             Memory.Timer.Reset();
+            Memory.HDMA.Reset();
             Memory.Video.ResetTiming();
-            Memory.Audio.ResetTiming();
+            Memory.Audio.ResetHardware();
 
             if (Memory.BootROMEnabled && Memory.BootROM != null)
             {

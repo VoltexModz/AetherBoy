@@ -195,6 +195,32 @@ public sealed class CpuInterruptTests
         Assert.AreEqual((ushort)2, cpu.PC);
     }
 
+    [TestMethod]
+    public void IllegalOpcode_LocksTheCpuUntilResetAndIgnoresInterrupts()
+    {
+        var memory = new TestMemory();
+        var cpu = CreateCpu(memory);
+        memory[0] = 0xD3;
+        memory[1] = 0x00;
+
+        Assert.AreEqual(4, cpu.Tick());
+        Assert.IsTrue(cpu.IsLockedUp);
+        Assert.AreEqual((ushort)1, cpu.PC);
+        Assert.AreEqual(4, cpu.Tick());
+        Assert.AreEqual((ushort)1, cpu.PC);
+
+        cpu.IME = true;
+        var interrupt = new Interrupt(cpu) { IE = 1, IF = 1 };
+        Assert.AreEqual(0, interrupt.ServicePending());
+        Assert.AreEqual((ushort)1, cpu.PC);
+
+        cpu.ResetExecutionState();
+        Assert.IsFalse(cpu.IsLockedUp);
+        cpu.PC = 1;
+        cpu.Tick();
+        Assert.AreEqual((ushort)2, cpu.PC);
+    }
+
     private static CPU CreateCpu(TestMemory memory)
     {
         var cpu = new CPU

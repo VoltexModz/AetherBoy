@@ -117,6 +117,91 @@ public sealed class VideoTimingTests
     }
 
     [TestMethod]
+    public void FineScroll_ExtendsModeThreeAndShortensHBlank()
+    {
+        Video video = CreateVideo(out _);
+        video.SCX = 7;
+
+        Tick(video, 80);
+        Assert.AreEqual(179, video.CurrentMode3Duration);
+        Tick(video, 178);
+        Assert.AreEqual(3, video.ModeFlag);
+        Tick(video, 1);
+        Assert.AreEqual(0, video.ModeFlag);
+        Tick(video, 196);
+        Assert.AreEqual(0, video.ModeFlag);
+        Tick(video, 1);
+        Assert.AreEqual(1, video.LY);
+        Assert.AreEqual(2, video.ModeFlag);
+    }
+
+    [TestMethod]
+    public void VisibleWindow_AddsTheSixDotFetcherRestart()
+    {
+        Video video = CreateVideo(out _);
+        video.WY = 0;
+        video.WX = 7;
+        video.WriteLcdc(0xB1);
+
+        Tick(video, 80);
+
+        Assert.AreEqual(178, video.CurrentMode3Duration);
+    }
+
+    [TestMethod]
+    public void SpriteFetch_AddsTileWaitAndFetchPenalties()
+    {
+        Video video = CreateVideo(out _);
+        video.WriteOAMDirect(0, 16);
+        video.WriteOAMDirect(1, 8);
+        video.WriteLcdc(0x93);
+
+        Tick(video, 80);
+
+        Assert.AreEqual(183, video.CurrentMode3Duration);
+    }
+
+    [TestMethod]
+    public void CgbPaletteRam_BlocksModeThreeDataButStillAutoIncrementsTheIndex()
+    {
+        Video video = CreateVideo(hasColorFeatures: true, out _);
+        video.BackgroundPaletteIndex = 0;
+        video.WritePRAM(0, 0x5A);
+        video.BackgroundPaletteIndex = 0;
+        video.BackgroundPaletteAI = true;
+        Tick(video, 80);
+
+        Assert.AreEqual(0xFF, video.ReadPRAM(0));
+        video.WritePRAM(0, 0xA5);
+        Assert.AreEqual(1, video.BackgroundPaletteIndex);
+        Tick(video, video.CurrentMode3Duration);
+
+        video.BackgroundPaletteAI = false;
+        video.BackgroundPaletteIndex = 0;
+        Assert.AreEqual(0x5A, video.ReadPRAM(0));
+        video.BackgroundPaletteIndex = 1;
+        Assert.AreEqual(0x00, video.ReadPRAM(0));
+    }
+
+    [TestMethod]
+    public void ModeThreeDuration_RemainsWithinTheDocumentedHardwareMaximum()
+    {
+        Video video = CreateVideo(out _);
+        video.SCX = 7;
+        video.WY = 0;
+        video.WX = 7;
+        for (int sprite = 0; sprite < 10; sprite++) {
+            video.WriteOAMDirect(sprite * 4, 16);
+            video.WriteOAMDirect(sprite * 4 + 1, 0);
+        }
+        video.WriteLcdc(0xB3);
+
+        Tick(video, 80);
+
+        Assert.AreEqual(289, video.CurrentMode3Duration);
+    }
+
+    [TestMethod]
     public void CgbBackgroundPriority_ObeysTheLcdcMasterPriorityBit()
     {
         Video priorityEnabled = CreatePriorityScene(hasColorFeatures: true, lcdc: 0x93);

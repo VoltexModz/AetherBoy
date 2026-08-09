@@ -59,6 +59,16 @@ public sealed class DmaTests
         memory.WriteByte(0xFF54, 0x00);
         memory.WriteByte(0xFF55, 0x01);
 
+        Assert.AreEqual(64, memory.HDMA.PendingCpuStallDots);
+        Assert.AreEqual(0x00, memory.Video.ReadVRAMDirect(0, 0));
+        Assert.IsTrue(memory.HDMA.ConsumeCpuStallDot());
+        Assert.AreEqual(0x00, memory.Video.ReadVRAMDirect(0, 0));
+        Assert.IsTrue(memory.HDMA.ConsumeCpuStallDot());
+        Assert.AreEqual(0x80, memory.Video.ReadVRAMDirect(0, 0));
+        for (int dot = 2; dot < 64; dot++) {
+            Assert.IsTrue(memory.HDMA.ConsumeCpuStallDot());
+        }
+
         for (int index = 0; index < 0x20; index++) {
             Assert.AreEqual(
                 (byte)(0x80 + index),
@@ -68,6 +78,7 @@ public sealed class DmaTests
         Assert.AreEqual(0xC020, memory.HDMA.SourceAddress);
         Assert.AreEqual(0x0020, memory.HDMA.DestinationAddress);
         Assert.AreEqual(0xFF, memory.ReadByte(0xFF55));
+        Assert.IsFalse(memory.HDMA.ConsumeCpuStallDot());
     }
 
     [TestMethod]
@@ -87,6 +98,12 @@ public sealed class DmaTests
         Assert.AreEqual(0x01, memory.ReadByte(0xFF55));
 
         memory.HDMA.PerformHBlank();
+        Assert.AreEqual(0x01, memory.ReadByte(0xFF55));
+        Assert.AreEqual(32, memory.HDMA.PendingCpuStallDots);
+        Assert.AreEqual(0x00, memory.Video.ReadVRAMDirect(0, 0x0F));
+        for (int dot = 0; dot < 32; dot++) {
+            Assert.IsTrue(memory.HDMA.ConsumeCpuStallDot());
+        }
         Assert.AreEqual(0x00, memory.ReadByte(0xFF55));
         Assert.AreEqual(0x10, memory.Video.ReadVRAMDirect(0, 0x0F));
         Assert.AreEqual(0x00, memory.Video.ReadVRAMDirect(0, 0x10));
@@ -94,6 +111,58 @@ public sealed class DmaTests
         memory.WriteByte(0xFF55, 0x00);
         Assert.AreEqual(0x80, memory.ReadByte(0xFF55));
         Assert.AreEqual(0x00, memory.Video.ReadVRAMDirect(0, 0x10));
+    }
+
+    [TestMethod]
+    public void HBlankDma_PausesWhileTheCpuIsHalted()
+    {
+        using var fixture = new EmulatorFixture();
+        Memory memory = fixture.Emulator.Memory;
+        memory.WriteByte(0xC000, 0xA5);
+        memory.WriteByte(0xFF51, 0xC0);
+        memory.WriteByte(0xFF52, 0x00);
+        memory.WriteByte(0xFF53, 0x00);
+        memory.WriteByte(0xFF54, 0x00);
+        memory.WriteByte(0xFF55, 0x80);
+        fixture.Emulator.Cpu.WaitForInterrupt = true;
+
+        memory.HDMA.PerformHBlank();
+
+        Assert.AreEqual(1, memory.HDMA.RemainingBlocks);
+        Assert.AreEqual(0, memory.HDMA.PendingCpuStallDots);
+        Assert.AreEqual(0, memory.Video.ReadVRAMDirect(0, 0));
+    }
+
+    [TestMethod]
+    public void DmgMode_IgnoresCgbVramDmaRegisters()
+    {
+        using var fixture = new EmulatorFixture(hasColorFeatures: false);
+        Memory memory = fixture.Emulator.Memory;
+
+        memory.WriteByte(0xFF51, 0xC0);
+        memory.WriteByte(0xFF55, 0x00);
+        memory.WriteByte(0xFF68, 0x80);
+        memory.WriteByte(0xFF69, 0xA5);
+        memory.WriteByte(0xFF70, 0x02);
+
+        Assert.AreEqual(0xFF, memory.ReadByte(0xFF51));
+        Assert.AreEqual(0xFF, memory.ReadByte(0xFF55));
+        Assert.AreEqual(0xFF, memory.ReadByte(0xFF68));
+        Assert.AreEqual(0xFF, memory.ReadByte(0xFF69));
+        Assert.AreEqual(0xFF, memory.ReadByte(0xFF70));
+        Assert.AreEqual(0, memory.HDMA.PendingCpuStallDots);
+    }
+
+    [TestMethod]
+    public void CgbWorkRamBankRegister_ReadsUnusedBitsHighAndMapsZeroToBankOne()
+    {
+        using var fixture = new EmulatorFixture();
+        Memory memory = fixture.Emulator.Memory;
+
+        memory.WriteByte(0xFF70, 0x00);
+        Assert.AreEqual(0xF9, memory.ReadByte(0xFF70));
+        memory.WriteByte(0xFF70, 0x07);
+        Assert.AreEqual(0xFF, memory.ReadByte(0xFF70));
     }
 
     [TestMethod]
@@ -116,12 +185,13 @@ public sealed class DmaTests
     {
         private readonly string directory;
 
-        public EmulatorFixture()
+        public EmulatorFixture(bool hasColorFeatures = true)
         {
             directory = Path.Combine(Path.GetTempPath(), "aetherboy-dma-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(directory);
             string romPath = Path.Combine(directory, "dma.gb");
             byte[] data = new byte[0x8000];
+            data[0x143] = hasColorFeatures ? (byte)0x80 : (byte)0x00;
             data[0x147] = (byte)Mbc.ROM_NONE;
             File.WriteAllBytes(romPath, data);
             Emulator = new Nanoboy(new ROM(romPath, Path.Combine(directory, "dma.sav")));

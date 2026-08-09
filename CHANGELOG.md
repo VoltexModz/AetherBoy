@@ -2,6 +2,39 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## 4.6.0-alpha.1 – Phase 6 (2026-08-09)
+
+### CPU, Bus und CGB-DMA
+
+- Die elf nicht belegten LR35902-Opcodes verriegeln die CPU nun nach dem Opcode-Fetch bis zum Reset; anstehende Interrupts lösen die Verriegelung nicht.
+- General-DMA und HBlank-DMA von sofortiger Blockkopie auf progressive Übertragung mit einem Byte je zwei Dots und 32 CPU-Stall-Dots pro 16-Byte-Block umgestellt.
+- HBlank-DMA startet keinen Block während CPU-HALT, bleibt blockweise abbrechbar und hält Quelle, Ziel, Restblöcke sowie Teilblockfortschritt vollständig im Save State.
+- CGB-exklusive DMA-, Palette-, VRAM-/WRAM-Bank- und Speed-Register im DMG-Modell geschlossen; unbenutzte Bits von SVBK werden auf CGB hoch gelesen.
+
+### PPU und APU
+
+- Mode 3 von einer festen Dauer auf 172 bis 289 Dots umgestellt. Fine-Scroll, sichtbarer Fensterstart und bis zu zehn ausgewählte Sprites liefern deterministische Fetch-Strafen; die feste Scanline-Dauer von 456 Dots bleibt erhalten.
+- CGB-Paletten-RAM während Mode 3 genauso wie VRAM gesperrt und die maximale Mode-3-Dauer mit einem eigenen Grenztest abgesichert.
+- NR52 als APU-Master-Power und Kanalstatus implementiert: Abschalten leert die APU-Register und Kanäle, erhält Wave-RAM und blockiert reguläre APU-Schreibzugriffe bis zum Wiedereinschalten.
+- DAC-Abschaltung beendet aktive Kanäle sofort; Längenablauf aktualisiert die NR52-Statusbits. Puls-, Wave- und Noise-Kanäle laufen über ganzzahlige Hardwareperioden statt über host-sampleratenabhängige Phasen.
+- NR50/NR51 steuern jetzt Masterlautstärke und Links-/Rechts-Routing im Mixer. Ein Vollframe-Allokationsgate schützt den APU-Hotpath.
+
+### Conformance, Langlauf und Tests
+
+- `HeadlessConformanceRunner` um Blargg-Memory-Status und Mooneye-Registersignaturen ergänzt; serielles `Passed`/`Failed`, Fehlerausgabe und Timeouts liefern nun das erkannte Protokoll zurück.
+- Neue plattformneutrale `AetherBoy.Conformance`-CLI für einzelne ROMs oder rekursive lokale Suites ergänzt, einschließlich Frame-Limit, aussagekräftiger Exitcodes und optionalem JSON-Bericht.
+- Restore/Replay-Langlauf von 300 auf 600 Frames verdoppelt und um laufende DMA-, PPU- und APU-Teilzustände erweitert.
+- Gesamtsuite auf **127 Tests** erweitert: 101 Core-, 17 Runtime- und 9 Windows-Smoke-Tests. Windows- und Linux-CI bauen die Conformance-CLI; Linux führt zusätzlich ihren Hilfe-Smoke-Test aus.
+- Deterministischen Zustandsvertrag wegen der neuen CPU-, DMA-, PPU- und APU-Felder auf Komponentenschema 3 angehoben und zusätzliche Plausibilitätsprüfungen für aktive Transfers und Audiokanäle ergänzt.
+
+### Weiterhin offen
+
+- CPU-Instruktionen und allgemeine Buszugriffe bleiben intern atomar; DMA-Quellbuskonflikte und seltene LCD-/HBlank-Umschaltkanten sind noch nicht vollständig mikrozyklusgenau.
+- Die variable Mode-3-Dauer modelliert Fetch-Strafen ohne echten Pixel-FIFO. Mid-Scanline-Registereffekte, Sprite-Fetch-Abbrüche und mehrere Grenzkombinationen bleiben angenähert.
+- Der digitale APU-Pfad besitzt noch keinen analogen Hochpassfilter; modellabhängige Power-off-Längenregister und seltene Frame-Sequencer-Schreibkanten sind offen.
+- Externe Conformance-ROMs sind aus Lizenzgründen nicht enthalten. Link-Kabel, serielles Bit-Timing, Game Genie und Spezialmapper bleiben spätere Arbeit.
+- Save States aus Komponentenschema 1 oder 2 werden bewusst abgelehnt; eine automatische Migration ist nicht vorhanden.
+
 ## 4.5.0-alpha.1 – Phase 5 (2026-08-09)
 
 ### CPU, Bus und DMA
@@ -240,4 +273,4 @@ GameShark-RAM-Codes bleiben als **experimentelle** Funktion sichtbar. Das ist ke
 
 ## Nächster Meilenstein
 
-Phase 5 konzentriert sich auf breitere ROM-basierte Conformance, T-Zyklus-genauere Bus- und DMA-Effekte, PPU-Prioritäten, APU-Sequenzierung sowie messbare Performance- und Langzeitstabilität.
+Nach Phase 6 folgt die Release-Härtung: breitere, lokal bereitgestellte Conformance-Suites, echte Pixel-FIFO- und Bus-Mikrozyklen, APU-Analogeffekte sowie Praxisvalidierung auf unterstützten Windows-Systemen.

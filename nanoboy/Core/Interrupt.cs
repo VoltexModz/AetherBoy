@@ -22,6 +22,11 @@ namespace nanoboy.Core
 
         public int ServicePending()
         {
+            if (cpu.IsLockedUp)
+            {
+                return 0;
+            }
+
             int masked = IE & IF & 0x1F;
             if (masked == 0)
             {

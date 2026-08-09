@@ -4,6 +4,7 @@ namespace nanoboy.Core.Audio
 {
     public sealed class NoiseChannel
     {
+        private static readonly int[] DivisorPeriods = { 8, 16, 32, 48, 64, 80, 96, 112 };
         public bool Enabled;
         public int ClockFrequency;
         public bool CounterStep;
@@ -14,8 +15,8 @@ namespace nanoboy.Core.Audio
         {
             get
             {
-                float ratio = DividingRatio == 0 ? 0.5f : DividingRatio;
-                return 524_288f / ratio / (float)Math.Pow(2, ClockFrequency + 1);
+                return (float)EmulationClock.CpuClockHz /
+                    (DivisorPeriods[DividingRatio] << ClockFrequency);
             }
         }
 
@@ -55,16 +56,21 @@ namespace nanoboy.Core.Audio
         private int envelopeCycles;
         private int soundLengthCycles;
         private int frequencyCycles;
+        private bool outputActive;
+
+        public bool IsActive => outputActive;
+        public bool DacEnabled => lastWrittenVolume != 0 || EnvelopeDirection == EnvelopeMode.Increase;
 
         public NoiseChannel()
         {
             Enabled = true;
             Counter = 0x7FFF;
+            outputActive = false;
         }
 
         public float Next(int sampleRate)
         {
-            if (StopOnLengthExpired && soundLengthCycles >= SoundLength)
+            if (!outputActive || (StopOnLengthExpired && soundLengthCycles >= SoundLength))
             {
                 return 0f;
             }
@@ -75,7 +81,7 @@ namespace nanoboy.Core.Audio
 
         public void Tick()
         {
-            int frequencyPeriod = Math.Max(1, (int)(EmulationClock.CpuClockHz / ResultFrequency));
+            int frequencyPeriod = DivisorPeriods[DividingRatio] << ClockFrequency;
 
             frequencyCycles++;
             if (frequencyCycles >= frequencyPeriod)
@@ -120,6 +126,18 @@ namespace nanoboy.Core.Audio
             if (StopOnLengthExpired && soundLengthCycles < SoundLength)
             {
                 soundLengthCycles += EmulationClock.CpuClockHz / 256;
+                if (soundLengthCycles >= SoundLength)
+                {
+                    outputActive = false;
+                }
+            }
+        }
+
+        internal void ApplyDacState()
+        {
+            if (!DacEnabled)
+            {
+                outputActive = false;
             }
         }
 
@@ -130,6 +148,25 @@ namespace nanoboy.Core.Audio
             frequencyCycles = 0;
             currentVolume = lastWrittenVolume;
             Counter = 0x7FFF;
+            outputActive = DacEnabled;
+        }
+
+        internal void PowerOff()
+        {
+            ClockFrequency = 0;
+            CounterStep = false;
+            DividingRatio = 0;
+            Counter = 0x7FFF;
+            EnvelopeDirection = EnvelopeMode.Decrease;
+            envelopeSweep = 0;
+            lastWrittenVolume = 0;
+            currentVolume = 0;
+            SoundLengthRaw = 0;
+            StopOnLengthExpired = false;
+            envelopeCycles = 0;
+            soundLengthCycles = 0;
+            frequencyCycles = 0;
+            outputActive = false;
         }
 
         internal byte[] CaptureStatePayload()
@@ -149,6 +186,7 @@ namespace nanoboy.Core.Audio
                 writer.Write(envelopeCycles);
                 writer.Write(soundLengthCycles);
                 writer.Write(frequencyCycles);
+                writer.Write(outputActive);
             });
         }
 
@@ -169,6 +207,7 @@ namespace nanoboy.Core.Audio
                 int nextEnvelopeCycles = reader.ReadInt32();
                 int nextSoundLengthCycles = reader.ReadInt32();
                 int nextFrequencyCycles = reader.ReadInt32();
+                bool nextOutputActive = StatePayload.ReadBoolean(reader);
 
                 StatePayload.RequireRange(nextClockFrequency, 0, 15, nameof(ClockFrequency));
                 StatePayload.RequireRange(nextDividingRatio, 0, 7, nameof(DividingRatio));
@@ -180,6 +219,15 @@ namespace nanoboy.Core.Audio
                 StatePayload.RequireRange(nextSoundLengthRaw, 0, 63, nameof(SoundLengthRaw));
                 if (nextEnvelopeCycles < 0 || nextSoundLengthCycles < 0 || nextFrequencyCycles < 0) {
                     throw new InvalidOperationException("Noise-channel phase counters cannot be negative.");
+                }
+                int nextFrequencyPeriod = DivisorPeriods[nextDividingRatio] << nextClockFrequency;
+                if (nextFrequencyCycles >= nextFrequencyPeriod) {
+                    throw new InvalidOperationException("Noise-channel frequency timer exceeds its period.");
+                }
+                bool nextDacEnabled = nextLastWrittenVolume != 0 ||
+                    nextEnvelopeDirection == EnvelopeMode.Increase;
+                if (nextOutputActive && !nextDacEnabled) {
+                    throw new InvalidOperationException("Active noise-channel state has its DAC disabled.");
                 }
 
                 return (Action)(() => {
@@ -197,6 +245,7 @@ namespace nanoboy.Core.Audio
                     envelopeCycles = nextEnvelopeCycles;
                     soundLengthCycles = nextSoundLengthCycles;
                     frequencyCycles = nextFrequencyCycles;
+                    outputActive = nextOutputActive;
                 });
             });
         }
