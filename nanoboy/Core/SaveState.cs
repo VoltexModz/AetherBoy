@@ -6,7 +6,7 @@ namespace nanoboy.Core
 {
     public static class SaveState
     {
-        private const ushort ComponentSchemaVersion = 3;
+        private const ushort ComponentSchemaVersion = 4;
 
         public static byte[] Capture(Nanoboy emulator)
         {

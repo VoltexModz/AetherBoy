@@ -14,7 +14,10 @@ namespace nanoboy.Core
         private int blockByteIndex;
         private int blockDotPhase;
         private bool oamTransferActive;
+        private bool oamStartPending;
         private int oamSourceAddress;
+        private byte oamSourceRegister;
+        private int oamStartDelay;
         private int oamByteIndex;
         private int oamCyclePhase;
         private int pendingCpuStallDots;
@@ -30,22 +33,35 @@ namespace nanoboy.Core
         public bool IsHBlank => transferActive;
         public bool IsGeneralTransferActive => generalTransferActive;
         public bool IsOamTransferActive => oamTransferActive;
+        public bool IsOamTransferPending => oamStartPending;
         public int OamBytesTransferred => oamByteIndex;
+        public byte OamSourceRegister => oamSourceRegister;
         public int PendingCpuStallDots => pendingCpuStallDots;
 
         internal bool IsCpuBusBlocked(int address) =>
-            oamTransferActive && (address < 0xFF80 || address > 0xFFFE);
+            oamTransferActive && address != 0xFF46 && (address < 0xFF80 || address > 0xFFFE);
 
         internal void StartOamDma(byte sourceHigh)
         {
-            oamTransferActive = true;
-            oamSourceAddress = sourceHigh << 8;
-            oamByteIndex = 0;
-            oamCyclePhase = 0;
+            oamSourceRegister = sourceHigh;
+            oamStartPending = true;
+            oamStartDelay = 8;
         }
 
         internal void TickOamDma()
         {
+            if (oamStartPending) {
+                oamStartDelay--;
+                if (oamStartDelay == 0) {
+                    oamStartPending = false;
+                    oamTransferActive = true;
+                    oamSourceAddress = oamSourceRegister << 8;
+                    oamByteIndex = 0;
+                    oamCyclePhase = 0;
+                    return;
+                }
+            }
+
             if (!oamTransferActive) {
                 return;
             }
@@ -101,7 +117,10 @@ namespace nanoboy.Core
             blockByteIndex = 0;
             blockDotPhase = 0;
             oamTransferActive = false;
+            oamStartPending = false;
             oamSourceAddress = 0;
+            oamSourceRegister = 0xFF;
+            oamStartDelay = 0;
             oamByteIndex = 0;
             oamCyclePhase = 0;
             pendingCpuStallDots = 0;
@@ -190,7 +209,10 @@ namespace nanoboy.Core
                 writer.Write(blockByteIndex);
                 writer.Write(blockDotPhase);
                 writer.Write(oamTransferActive);
+                writer.Write(oamStartPending);
                 writer.Write(oamSourceAddress);
+                writer.Write(oamSourceRegister);
+                writer.Write(oamStartDelay);
                 writer.Write(oamByteIndex);
                 writer.Write(oamCyclePhase);
                 writer.Write(pendingCpuStallDots);
@@ -210,7 +232,10 @@ namespace nanoboy.Core
                 int nextBlockByteIndex = reader.ReadInt32();
                 int nextBlockDotPhase = reader.ReadInt32();
                 bool nextOamTransferActive = StatePayload.ReadBoolean(reader);
+                bool nextOamStartPending = StatePayload.ReadBoolean(reader);
                 int nextOamSourceAddress = reader.ReadInt32();
+                byte nextOamSourceRegister = reader.ReadByte();
+                int nextOamStartDelay = reader.ReadInt32();
                 int nextOamByteIndex = reader.ReadInt32();
                 int nextOamCyclePhase = reader.ReadInt32();
                 int nextPendingCpuStallDots = reader.ReadInt32();
@@ -227,6 +252,7 @@ namespace nanoboy.Core
                 StatePayload.RequireRange(nextBlockByteIndex, 0, 0x0F, nameof(blockByteIndex));
                 StatePayload.RequireRange(nextBlockDotPhase, 0, 1, nameof(blockDotPhase));
                 StatePayload.RequireRange(nextOamSourceAddress, 0, 0xFF00, nameof(oamSourceAddress));
+                StatePayload.RequireRange(nextOamStartDelay, 0, 8, nameof(oamStartDelay));
                 StatePayload.RequireRange(nextOamByteIndex, 0, 0xA0, nameof(oamByteIndex));
                 StatePayload.RequireRange(nextOamCyclePhase, 0, 3, nameof(oamCyclePhase));
                 StatePayload.RequireRange(nextPendingCpuStallDots, 0, 0x1000, nameof(pendingCpuStallDots));
@@ -238,7 +264,8 @@ namespace nanoboy.Core
                 }
                 if ((nextOamTransferActive && nextOamByteIndex >= 0xA0) ||
                     (!nextOamTransferActive && nextOamByteIndex != 0 && nextOamByteIndex != 0xA0) ||
-                    (!nextOamTransferActive && nextOamCyclePhase != 0)) {
+                    (!nextOamTransferActive && nextOamCyclePhase != 0) ||
+                    (nextOamStartPending != (nextOamStartDelay > 0))) {
                     throw new InvalidDataException("OAM DMA state has contradictory progress flags.");
                 }
 
@@ -253,7 +280,10 @@ namespace nanoboy.Core
                     blockByteIndex = nextBlockByteIndex;
                     blockDotPhase = nextBlockDotPhase;
                     oamTransferActive = nextOamTransferActive;
+                    oamStartPending = nextOamStartPending;
                     oamSourceAddress = nextOamSourceAddress;
+                    oamSourceRegister = nextOamSourceRegister;
+                    oamStartDelay = nextOamStartDelay;
                     oamByteIndex = nextOamByteIndex;
                     oamCyclePhase = nextOamCyclePhase;
                     pendingCpuStallDots = nextPendingCpuStallDots;

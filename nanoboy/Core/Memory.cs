@@ -43,7 +43,7 @@ namespace nanoboy.Core
             wram = new byte[8, 0x1000];
             wrambank = 1;
             hram = new byte[0x7F];
-            Audio = new Audio.Audio();
+            Audio = new Audio.Audio(dmgMode: !rom.HasColorFeatures);
             serial = new SerialConsole();
             serialControl = 0;
             Interrupt = new Interrupt(cpu);
@@ -104,42 +104,50 @@ namespace nanoboy.Core
                     case 0x07:
                         return (byte)Timer.TAC;
                     case 0x0F:
-                        return (byte)Interrupt.IF;
+                        return (byte)(0xE0 | (Interrupt.IF & 0x1F));
                     case 0x10:
                         value = Audio.Channel1.SweepShift |
                                 ((int)Audio.Channel1.SweepDirection << 3) |
                                 (Audio.Channel1.SweepTime << 4);
-                        return (byte)value;
+                        return (byte)(0x80 | value);
                     case 0x11:
                         value = Audio.Channel1.SoundLengthRaw |
                                 (Audio.Channel1.WavePatternDuty << 6);
-                        return (byte)value;
+                        return (byte)(0x3F | value);
                     case 0x12:
                         value = Audio.Channel1.EnvelopeSweep |
                                 ((int)Audio.Channel1.EnvelopeDirection << 3) |
                                 (Audio.Channel1.Volume << 4);
                         return (byte)value;
                     case 0x14:
-                        return (byte)(Audio.Channel1.StopOnLengthExpired ? 0x40 : 0x00);
+                        return (byte)(0xBF | (Audio.Channel1.StopOnLengthExpired ? 0x40 : 0x00));
+                    case 0x13:
+                    case 0x15:
+                        return 0xFF;
                     case 0x16:
                         value = Audio.Channel2.SoundLengthRaw |
                                 (Audio.Channel2.WavePatternDuty << 6);
-                        return (byte)value;
+                        return (byte)(0x3F | value);
                     case 0x17:
                         value = Audio.Channel2.EnvelopeSweep |
                                 ((int)Audio.Channel2.EnvelopeDirection << 3) |
                                 (Audio.Channel2.Volume << 4);
                         return (byte)value;
                     case 0x19:
-                        return (byte)(Audio.Channel2.StopOnLengthExpired ? 0x40 : 0x00);
+                        return (byte)(0xBF | (Audio.Channel2.StopOnLengthExpired ? 0x40 : 0x00));
+                    case 0x18:
+                        return 0xFF;
                     case 0x1A:
-                        return (byte)(Audio.Channel3.On ? 0x80 : 0x00);
+                        return (byte)(0x7F | (Audio.Channel3.On ? 0x80 : 0x00));
                     case 0x1B:
-                        return (byte)Audio.Channel3.SoundLengthRaw;
+                        return 0xFF;
                     case 0x1C:
-                        return (byte)(Audio.Channel3.OutputLevel << 5);
+                        return (byte)(0x9F | (Audio.Channel3.OutputLevel << 5));
                     case 0x1E:
-                        return (byte)(Audio.Channel3.StopOnLengthExpired ? 0x40 : 0x00);
+                        return (byte)(0xBF | (Audio.Channel3.StopOnLengthExpired ? 0x40 : 0x00));
+                    case 0x1D:
+                    case 0x1F:
+                        return 0xFF;
                     case 0x20:
                         return 0xFF;
                     case 0x21:
@@ -161,6 +169,16 @@ namespace nanoboy.Core
                         return Audio.OutputRouting;
                     case 0x26:
                         return Audio.ReadStatus();
+                    case 0x27:
+                    case 0x28:
+                    case 0x29:
+                    case 0x2A:
+                    case 0x2B:
+                    case 0x2C:
+                    case 0x2D:
+                    case 0x2E:
+                    case 0x2F:
+                        return 0xFF;
                     case 0x30:
                     case 0x31:
                     case 0x32:
@@ -200,6 +218,8 @@ namespace nanoboy.Core
                         return (byte)Video.LY;
                     case 0x45:
                         return (byte)Video.LYC;
+                    case 0x46:
+                        return hdma.OamSourceRegister;
                     case 0x47:
                         return (byte)Video.BGP;
                     case 0x48:
@@ -318,7 +338,11 @@ namespace nanoboy.Core
 
             } else if (address <= 0xFF7F) {
                 int ioOffset = address - 0xFF00;
-                if (ioOffset >= 0x10 && ioOffset <= 0x25 && !Audio.Powered) {
+                bool dmgLengthWriteWhilePoweredOff =
+                    !rom.HasColorFeatures &&
+                    (ioOffset == 0x11 || ioOffset == 0x16 || ioOffset == 0x1B || ioOffset == 0x20);
+                if (ioOffset >= 0x10 && ioOffset <= 0x25 && !Audio.Powered &&
+                    !dmgLengthWriteWhilePoweredOff) {
                     return;
                 }
                 switch (ioOffset) {
@@ -336,7 +360,7 @@ namespace nanoboy.Core
                         }
                         break;
                     case 0x04:
-                        Timer.WriteDiv();
+                        Audio.ResetFrameSequencerDivider(Timer.WriteDiv(cpu.IsDoubleSpeed));
                         break;
                     case 0x05:
                         Timer.WriteTima(value);
@@ -348,7 +372,7 @@ namespace nanoboy.Core
                         Timer.WriteTac(value);
                         break;
                     case 0x0F:
-                        Interrupt.IF = value;
+                        Interrupt.IF = value & 0x1F;
                         break;
                     case 0x10:
                         Audio.Channel1.SweepShift = value & 7;
@@ -357,7 +381,9 @@ namespace nanoboy.Core
                         break;
                     case 0x11:
                         Audio.Channel1.SoundLengthRaw = value & 0x3F;
-                        Audio.Channel1.WavePatternDuty = (value >> 6) & 3;
+                        if (Audio.Powered) {
+                            Audio.Channel1.WavePatternDuty = (value >> 6) & 3;
+                        }
                         break;
                     case 0x12:
                         Audio.Channel1.EnvelopeSweep = value & 7;
@@ -370,14 +396,16 @@ namespace nanoboy.Core
                         break;
                     case 0x14:
                         Audio.Channel1.Frequency = (Audio.Channel1.Frequency & 0xFF) | ((value & 7) << 8);
-                        Audio.Channel1.StopOnLengthExpired = (value & 0x40) == 0x40;
-                        if ((value & 0x80) == 0x80) {
-                            Audio.Channel1.Restart();
-                        }
+                        Audio.Channel1.WriteControl(
+                            (value & 0x40) != 0,
+                            (value & 0x80) != 0,
+                            Audio.ShouldClockLengthOnWrite);
                         break;
                     case 0x16:
                         Audio.Channel2.SoundLengthRaw = value & 0x3F;
-                        Audio.Channel2.WavePatternDuty = (value >> 6) & 3;
+                        if (Audio.Powered) {
+                            Audio.Channel2.WavePatternDuty = (value >> 6) & 3;
+                        }
                         break;
                     case 0x17:
                         Audio.Channel2.EnvelopeSweep = value & 7;
@@ -390,10 +418,10 @@ namespace nanoboy.Core
                         break;
                     case 0x19:
                         Audio.Channel2.Frequency = (Audio.Channel2.Frequency & 0xFF) | ((value & 7) << 8);
-                        Audio.Channel2.StopOnLengthExpired = (value & 0x40) == 0x40;
-                        if ((value & 0x80) == 0x80) {
-                            Audio.Channel2.Restart();
-                        }
+                        Audio.Channel2.WriteControl(
+                            (value & 0x40) != 0,
+                            (value & 0x80) != 0,
+                            Audio.ShouldClockLengthOnWrite);
                         break;
                     case 0x1A:
                         Audio.Channel3.On = (value & 0x80) == 0x80;
@@ -410,10 +438,10 @@ namespace nanoboy.Core
                         break;
                     case 0x1E:
                         Audio.Channel3.FrequencyRaw = (Audio.Channel3.FrequencyRaw & 0xFF) | ((value & 7) << 8);
-                        Audio.Channel3.StopOnLengthExpired = (value & 0x40) == 0x40;
-                        if ((value & 0x80) == 0x80) {
-                            Audio.Channel3.Restart();
-                        }
+                        Audio.Channel3.WriteControl(
+                            (value & 0x40) != 0,
+                            (value & 0x80) != 0,
+                            Audio.ShouldClockLengthOnWrite);
                         break;
                     case 0x20:
                         Audio.Channel4.SoundLengthRaw = value & 0x3F;
@@ -431,10 +459,10 @@ namespace nanoboy.Core
                         Audio.Channel4.DividingRatio = value & 7;
                         break;
                     case 0x23:
-                        Audio.Channel4.StopOnLengthExpired = (value & 0x40) == 0x40;
-                        if ((value & 0x80) == 0x80) {
-                            Audio.Channel4.Restart();
-                        }
+                        Audio.Channel4.WriteControl(
+                            (value & 0x40) != 0,
+                            (value & 0x80) != 0,
+                            Audio.ShouldClockLengthOnWrite);
                         break;
                     case 0x24:
                         Audio.MasterVolume = value;

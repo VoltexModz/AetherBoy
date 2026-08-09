@@ -52,42 +52,49 @@ namespace nanoboy.Core
                 // A speed switch takes effect after STOP. The instruction itself still
                 // belongs to the clock domain that was active when it started.
                 bool doubleSpeed = Cpu.IsDoubleSpeed;
-                int cpuCycles = Memory.Interrupt.ServicePending();
-                if (cpuCycles == 0)
+                Cpu.CycleSink = cycles =>
                 {
-                    cpuCycles = Cpu.Tick();
+                    for (int cpuCycle = 0; cpuCycle < cycles; cpuCycle++)
+                    {
+                        Memory.Timer.Tick();
+                        Memory.HDMA.TickOamDma();
+
+                        if (doubleSpeed)
+                        {
+                            doubleSpeedCpuPhase++;
+                            if (doubleSpeedCpuPhase < 2)
+                            {
+                                continue;
+                            }
+
+                            doubleSpeedCpuPhase = 0;
+                        }
+                        else
+                        {
+                            doubleSpeedCpuPhase = 0;
+                        }
+
+                        Memory.Video.Tick();
+                        Memory.Audio.Tick();
+                        dotsExecuted++;
+                    }
+                };
+                int cpuCycles;
+                try
+                {
+                    cpuCycles = Memory.Interrupt.ServicePending();
+                    if (cpuCycles == 0) {
+                        cpuCycles = Cpu.Tick();
+                    }
+                }
+                finally
+                {
+                    Cpu.CycleSink = null;
                 }
 
                 if (cpuCycles <= 0)
                 {
                     throw new InvalidOperationException("The CPU returned a non-positive cycle count.");
-                }
-
-                for (int cpuCycle = 0; cpuCycle < cpuCycles; cpuCycle++)
-                {
-                    // DIV/TIMA are driven by the CPU clock and therefore continue to
-                    // receive every T-cycle in CGB double-speed mode.
-                    Memory.Timer.Tick();
-                    Memory.HDMA.TickOamDma();
-
-                    if (doubleSpeed)
-                    {
-                        doubleSpeedCpuPhase++;
-                        if (doubleSpeedCpuPhase < 2)
-                        {
-                            continue;
-                        }
-
-                        doubleSpeedCpuPhase = 0;
-                    }
-                    else
-                    {
-                        doubleSpeedCpuPhase = 0;
-                    }
-
-                    Memory.Video.Tick();
-                    Memory.Audio.Tick();
-                    dotsExecuted++;
                 }
             }
 

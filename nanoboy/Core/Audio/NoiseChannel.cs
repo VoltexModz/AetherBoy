@@ -47,14 +47,21 @@ namespace nanoboy.Core.Audio
         public int SoundLength =>
             (64 - (SoundLengthRaw & 0x3F)) * (EmulationClock.CpuClockHz / 256);
 
-        public int SoundLengthRaw;
+        public int SoundLengthRaw {
+            get => soundLengthRaw;
+            set {
+                soundLengthRaw = value & 0x3F;
+                lengthCounter = 64 - soundLengthRaw;
+            }
+        }
         public bool StopOnLengthExpired;
 
         private int envelopeSweep;
         private int lastWrittenVolume;
         private int currentVolume;
         private int envelopeCycles;
-        private int soundLengthCycles;
+        private int soundLengthRaw;
+        private int lengthCounter;
         private int frequencyCycles;
         private bool outputActive;
 
@@ -70,7 +77,7 @@ namespace nanoboy.Core.Audio
 
         public float Next(int sampleRate)
         {
-            if (!outputActive || (StopOnLengthExpired && soundLengthCycles >= SoundLength))
+            if (!outputActive)
             {
                 return 0f;
             }
@@ -123,10 +130,10 @@ namespace nanoboy.Core.Audio
 
         internal void ClockLength()
         {
-            if (StopOnLengthExpired && soundLengthCycles < SoundLength)
+            if (StopOnLengthExpired && lengthCounter > 0)
             {
-                soundLengthCycles += EmulationClock.CpuClockHz / 256;
-                if (soundLengthCycles >= SoundLength)
+                lengthCounter--;
+                if (lengthCounter == 0)
                 {
                     outputActive = false;
                 }
@@ -141,9 +148,31 @@ namespace nanoboy.Core.Audio
             }
         }
 
+        internal void WriteControl(bool lengthEnabled, bool trigger, bool extraLengthClock)
+        {
+            bool enablingLength = !StopOnLengthExpired && lengthEnabled;
+            StopOnLengthExpired = lengthEnabled;
+            if (enablingLength && extraLengthClock) {
+                ClockLength();
+            }
+            if (trigger) {
+                Restart(extraLengthClock && lengthEnabled);
+            }
+        }
+
         public void Restart()
         {
-            soundLengthCycles = 0;
+            Restart(shortenReloadedLength: false);
+        }
+
+        private void Restart(bool shortenReloadedLength)
+        {
+            if (lengthCounter == 0) {
+                lengthCounter = 64;
+                if (shortenReloadedLength) {
+                    lengthCounter--;
+                }
+            }
             envelopeCycles = 0;
             frequencyCycles = 0;
             currentVolume = lastWrittenVolume;
@@ -151,8 +180,10 @@ namespace nanoboy.Core.Audio
             outputActive = DacEnabled;
         }
 
-        internal void PowerOff()
+        internal void PowerOff(bool preserveLength)
         {
+            int preservedLengthRaw = soundLengthRaw;
+            int preservedLengthCounter = lengthCounter;
             ClockFrequency = 0;
             CounterStep = false;
             DividingRatio = 0;
@@ -164,9 +195,13 @@ namespace nanoboy.Core.Audio
             SoundLengthRaw = 0;
             StopOnLengthExpired = false;
             envelopeCycles = 0;
-            soundLengthCycles = 0;
+            lengthCounter = 0;
             frequencyCycles = 0;
             outputActive = false;
+            if (preserveLength) {
+                soundLengthRaw = preservedLengthRaw;
+                lengthCounter = preservedLengthCounter;
+            }
         }
 
         internal byte[] CaptureStatePayload()
@@ -184,7 +219,7 @@ namespace nanoboy.Core.Audio
                 writer.Write(SoundLengthRaw);
                 writer.Write(StopOnLengthExpired);
                 writer.Write(envelopeCycles);
-                writer.Write(soundLengthCycles);
+                writer.Write(lengthCounter);
                 writer.Write(frequencyCycles);
                 writer.Write(outputActive);
             });
@@ -205,7 +240,7 @@ namespace nanoboy.Core.Audio
                 int nextSoundLengthRaw = reader.ReadInt32();
                 bool nextStopOnLengthExpired = StatePayload.ReadBoolean(reader);
                 int nextEnvelopeCycles = reader.ReadInt32();
-                int nextSoundLengthCycles = reader.ReadInt32();
+                int nextLengthCounter = reader.ReadInt32();
                 int nextFrequencyCycles = reader.ReadInt32();
                 bool nextOutputActive = StatePayload.ReadBoolean(reader);
 
@@ -217,9 +252,10 @@ namespace nanoboy.Core.Audio
                 StatePayload.RequireRange(nextLastWrittenVolume, 0, 15, nameof(lastWrittenVolume));
                 StatePayload.RequireRange(nextCurrentVolume, 0, 15, nameof(currentVolume));
                 StatePayload.RequireRange(nextSoundLengthRaw, 0, 63, nameof(SoundLengthRaw));
-                if (nextEnvelopeCycles < 0 || nextSoundLengthCycles < 0 || nextFrequencyCycles < 0) {
+                if (nextEnvelopeCycles < 0 || nextLengthCounter < 0 || nextFrequencyCycles < 0) {
                     throw new InvalidOperationException("Noise-channel phase counters cannot be negative.");
                 }
+                StatePayload.RequireRange(nextLengthCounter, 0, 64, nameof(lengthCounter));
                 int nextFrequencyPeriod = DivisorPeriods[nextDividingRatio] << nextClockFrequency;
                 if (nextFrequencyCycles >= nextFrequencyPeriod) {
                     throw new InvalidOperationException("Noise-channel frequency timer exceeds its period.");
@@ -240,10 +276,10 @@ namespace nanoboy.Core.Audio
                     envelopeSweep = nextEnvelopeSweep;
                     lastWrittenVolume = nextLastWrittenVolume;
                     currentVolume = nextCurrentVolume;
-                    SoundLengthRaw = nextSoundLengthRaw;
+                    soundLengthRaw = nextSoundLengthRaw;
                     StopOnLengthExpired = nextStopOnLengthExpired;
                     envelopeCycles = nextEnvelopeCycles;
-                    soundLengthCycles = nextSoundLengthCycles;
+                    lengthCounter = nextLengthCounter;
                     frequencyCycles = nextFrequencyCycles;
                     outputActive = nextOutputActive;
                 });

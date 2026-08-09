@@ -1,0 +1,65 @@
+{
+  "mode": "conformance",
+  "maximumFrames": 600,
+  "runs": [
+    {
+      "label": "blargg-cpu",
+      "path": "../../.local-assets/conformance/gb-test-roms/cpu_instrs/individual",
+      "required": true
+    },
+    {
+      "label": "blargg-instruction-timing",
+      "path": "../../.local-assets/conformance/gb-test-roms/instr_timing/instr_timing.gb",
+      "required": true
+    },
+    {
+      "label": "mooneye-timer",
+      "path": "../../.local-assets/conformance/mooneye-test-suite/mts-20211031-2031-86d1acf/acceptance/timer",
+      "required": false
+    },
+    {
+      "label": "mooneye-ppu",
+      "path": "../../.local-assets/conformance/mooneye-test-suite/mts-20211031-2031-86d1acf/acceptance/ppu",
+      "required": false
+    },
+    {
+      "label": "mooneye-oam-dma",
+      "path": "../../.local-assets/conformance/mooneye-test-suite/mts-20211031-2031-86d1acf/acceptance/oam_dma",
+      "required": false
+    },
+    {
+      "label": "mooneye-oam-dma-start",
+      "path": "../../.local-assets/conformance/mooneye-test-suite/mts-20211031-2031-86d1acf/acceptance/oam_dma_start.gb",
+      "required": false
+    },
+    {
+      "label": "mooneye-oam-dma-timing",
+      "path": "../../.local-assets/conformance/mooneye-test-suite/mts-20211031-2031-86d1acf/acceptance/oam_dma_timing.gb",
+      "required": false
+    },
+    {
+      "label": "mooneye-oam-dma-restart",
+      "path": "../../.local-assets/conformance/mooneye-test-suite/mts-20211031-2031-86d1acf/acceptance/oam_dma_restart.gb",
+      "required": false
+    },
+    {
+      "label": "blargg-dmg-sound",
+      "path": "../../.local-assets/conformance/gb-test-roms/dmg_sound/rom_singles",
+      "maximumFrames": 6000,
+      "required": false
+    },
+    {
+      "label": "blargg-cgb-sound",
+      "path": "../../.local-assets/conformance/gb-test-roms/cgb_sound/rom_singles",
+      "maximumFrames": 6000,
+      "required": false
+    },
+    {
+      "label": "local-games",
+      "path": "../../.local-assets/roms",
+      "mode": "smoke",
+      "maximumFrames": 600,
+      "required": false
+    }
+  ]
+}

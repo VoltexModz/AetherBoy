@@ -62,6 +62,7 @@ namespace nanoboy.Core.Audio
 
         private readonly AudioSampleClock sampleClock;
         private readonly List<float> sampleBuffer;
+        private readonly bool dmgMode;
         private int sampleRate;
         private int frameSequencerDivider;
         private int frameSequencerStep;
@@ -69,8 +70,9 @@ namespace nanoboy.Core.Audio
         private byte outputRouting;
         private bool disposed;
 
-        public Audio()
+        public Audio(bool dmgMode = false)
         {
+            this.dmgMode = dmgMode;
             Channel1 = new QuadChannel();
             Channel2 = new QuadChannel();
             Channel3 = new WaveChannel();
@@ -92,6 +94,7 @@ namespace nanoboy.Core.Audio
         public int BufferSize { get; set; }
         public bool Enabled { get; set; }
         public bool Powered { get; private set; }
+        internal bool ShouldClockLengthOnWrite => (frameSequencerStep & 1) != 0;
         public byte MasterVolume { get => masterVolume; set => masterVolume = value; }
         public byte OutputRouting { get => outputRouting; set => outputRouting = value; }
 
@@ -126,7 +129,7 @@ namespace nanoboy.Core.Audio
                 throw new ObjectDisposedException(nameof(Audio));
             }
 
-            TickFrameSequencer();
+            TickFrameSequencerDivider();
             if (Powered)
             {
                 Channel1.Tick();
@@ -185,9 +188,13 @@ namespace nanoboy.Core.Audio
         internal void ResetHardware()
         {
             ResetTiming();
+            masterVolume = 0;
+            outputRouting = 0;
+            Channel1.PowerOff(preserveLength: false);
+            Channel2.PowerOff(preserveLength: false);
+            Channel3.PowerOff(preserveLength: false);
+            Channel4.PowerOff(preserveLength: false);
             Powered = true;
-            SetPower(false);
-            SetPower(true);
         }
 
         public void SetPower(bool powered)
@@ -205,10 +212,10 @@ namespace nanoboy.Core.Audio
 
             masterVolume = 0;
             outputRouting = 0;
-            Channel1.PowerOff();
-            Channel2.PowerOff();
-            Channel3.PowerOff();
-            Channel4.PowerOff();
+            Channel1.PowerOff(dmgMode);
+            Channel2.PowerOff(dmgMode);
+            Channel3.PowerOff(dmgMode);
+            Channel4.PowerOff(dmgMode);
         }
 
         public byte ReadStatus()
@@ -221,7 +228,15 @@ namespace nanoboy.Core.Audio
             return (byte)status;
         }
 
-        private void TickFrameSequencer()
+        internal void ResetFrameSequencerDivider(bool clockFrameSequencer)
+        {
+            frameSequencerDivider = 0;
+            if (clockFrameSequencer) {
+                ClockFrameSequencer();
+            }
+        }
+
+        private void TickFrameSequencerDivider()
         {
             frameSequencerDivider++;
             if (frameSequencerDivider < FrameSequencerPeriod)
@@ -230,6 +245,11 @@ namespace nanoboy.Core.Audio
             }
 
             frameSequencerDivider = 0;
+            ClockFrameSequencer();
+        }
+
+        private void ClockFrameSequencer()
+        {
             bool clockChannels = Powered;
             if ((frameSequencerStep & 1) == 0)
             {

@@ -27,8 +27,8 @@ namespace nanoboy.Core
                 return 0;
             }
 
-            int masked = IE & IF & 0x1F;
-            if (masked == 0)
+            (int initialMask, _) = SelectPending();
+            if (initialMask == 0)
             {
                 return 0;
             }
@@ -40,37 +40,38 @@ namespace nanoboy.Core
                 return 0;
             }
 
-            int interruptMask;
-            int vector;
+            int interruptMask = cpu.DispatchInterrupt(SelectPending);
+            if (interruptMask != 0)
+            {
+                Interlocked.And(ref interruptFlags, ~interruptMask);
+            }
+            return 20;
+        }
+
+        private (int Mask, int Vector) SelectPending()
+        {
+            int masked = IE & IF & 0x1F;
             if ((masked & 1) != 0)
             {
-                interruptMask = 1;
-                vector = 0x40;
+                return (1, 0x40);
             }
-            else if ((masked & 2) != 0)
+            if ((masked & 2) != 0)
             {
-                interruptMask = 2;
-                vector = 0x48;
+                return (2, 0x48);
             }
-            else if ((masked & 4) != 0)
+            if ((masked & 4) != 0)
             {
-                interruptMask = 4;
-                vector = 0x50;
+                return (4, 0x50);
             }
-            else if ((masked & 8) != 0)
+            if ((masked & 8) != 0)
             {
-                interruptMask = 8;
-                vector = 0x58;
+                return (8, 0x58);
             }
-            else
+            if ((masked & 16) != 0)
             {
-                interruptMask = 16;
-                vector = 0x60;
+                return (16, 0x60);
             }
-
-            Interlocked.And(ref interruptFlags, ~interruptMask);
-            cpu.Interrupt(vector);
-            return 20;
+            return (0, 0);
         }
 
         internal void Request(int mask)

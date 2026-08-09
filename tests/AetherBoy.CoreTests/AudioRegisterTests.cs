@@ -43,6 +43,79 @@ public sealed class AudioRegisterTests
     }
 
     [TestMethod]
+    public void ApuRegisterReads_ExposeHardwareReadMasks()
+    {
+        using var fixture = new EmulatorFixture();
+        Memory memory = fixture.Emulator.Memory;
+        memory.WriteByte(0xFF26, 0x00);
+        memory.WriteByte(0xFF26, 0x80);
+
+        byte[] masks =
+        {
+            0x80, 0x3F, 0x00, 0xFF, 0xBF,
+            0xFF, 0x3F, 0x00, 0xFF, 0xBF,
+            0x7F, 0xFF, 0x9F, 0xFF, 0xBF,
+            0xFF, 0xFF, 0x00, 0x00, 0xBF,
+            0x00, 0x00, 0x70
+        };
+
+        for (int offset = 0; offset < masks.Length - 1; offset++) {
+            Assert.AreEqual(masks[offset], memory.ReadByte(0xFF10 + offset),
+                $"Unexpected power-on read mask for FF{0x10 + offset:X2}.");
+        }
+        Assert.AreEqual(0xF0, memory.ReadByte(0xFF26));
+
+        memory.WriteByte(0xFF26, 0x00);
+        for (int offset = 0; offset < masks.Length - 1; offset++) {
+            Assert.AreEqual(masks[offset], memory.ReadByte(0xFF10 + offset),
+                $"Unexpected power-off read mask for FF{0x10 + offset:X2}.");
+        }
+    }
+
+    [TestMethod]
+    public void DivReset_ClocksTheApuFrameSequencerOnItsFallingEdge()
+    {
+        using var fixture = new EmulatorFixture();
+        Memory memory = fixture.Emulator.Memory;
+        memory.WriteByte(0xFF26, 0x00);
+        memory.WriteByte(0xFF26, 0x80);
+        memory.WriteByte(0xFF11, 0x3F);
+        memory.WriteByte(0xFF12, 0xF0);
+        memory.WriteByte(0xFF14, 0xC0);
+
+        for (int dot = 0; dot < 4_096; dot++) {
+            memory.Timer.Tick();
+            memory.Audio.Tick();
+        }
+        Assert.AreEqual(1, memory.ReadByte(0xFF26) & 1);
+
+        memory.WriteByte(0xFF04, 0x00);
+
+        Assert.AreEqual(0, memory.ReadByte(0xFF26) & 1);
+    }
+
+    [TestMethod]
+    public void DmgPowerOff_PreservesAndAcceptsLengthRegisterWrites()
+    {
+        using var fixture = new EmulatorFixture();
+        Memory memory = fixture.Emulator.Memory;
+        memory.WriteByte(0xFF20, 0x3F);
+        memory.WriteByte(0xFF26, 0x00);
+        memory.WriteByte(0xFF20, 0x3E);
+        memory.WriteByte(0xFF26, 0x80);
+        memory.WriteByte(0xFF21, 0x08);
+        memory.WriteByte(0xFF23, 0xC0);
+
+        for (int step = 0; step < 3; step++) {
+            for (int dot = 0; dot < 8_192; dot++) {
+                memory.Audio.Tick();
+            }
+        }
+
+        Assert.AreEqual(0, memory.ReadByte(0xFF26) & 8);
+    }
+
+    [TestMethod]
     public void PulseTrigger_ActivatesOnlyWhileItsDacIsEnabled()
     {
         using var fixture = new EmulatorFixture();

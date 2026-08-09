@@ -58,7 +58,11 @@ namespace nanoboy.Core
         private Interrupt interrupt;
         private HDMA hdma;
         private int clock;
+        private int scanlineDuration;
+        private int mode2Duration;
         private int mode3Duration;
+        private bool lcdStartup;
+        private bool hasEverEnabled;
         private uint[] monochromepalette;
         private uint[] frame;
         private readonly uint[] publishedFrame;
@@ -150,6 +154,8 @@ namespace nanoboy.Core
             pram1 = new byte[0x40];
             pram2 = new byte[0x40];
             clock = 0;
+            scanlineDuration = EmulationClock.DotsPerScanline;
+            mode2Duration = 80;
             monochromepalette = new uint[] {
                 0xFFF5F5F5u,
                 0xFF666666u,
@@ -160,6 +166,8 @@ namespace nanoboy.Core
             publishedFrame = new uint[FramePixelCount];
             ModeFlag = 2;
             mode3Duration = 172;
+            lcdStartup = false;
+            hasEverEnabled = false;
             VRAMBank = 0;
         }
 
@@ -195,7 +203,11 @@ namespace nanoboy.Core
             clock = 0;
             LY = 0;
             ModeFlag = 2;
+            mode2Duration = 80;
+            scanlineDuration = EmulationClock.DotsPerScanline;
             mode3Duration = 172;
+            lcdStartup = false;
+            hasEverEnabled = LCDEnable;
             FrameReady = false;
             CoincidenceFlag = LY == LYC;
             statInterruptLine = false;
@@ -227,7 +239,9 @@ namespace nanoboy.Core
         public void WriteLyc(byte value)
         {
             LYC = value;
-            UpdateCoincidence();
+            if (LCDEnable) {
+                UpdateCoincidence();
+            }
             UpdateStatInterruptLine();
         }
 
@@ -247,12 +261,26 @@ namespace nanoboy.Core
                 clock = 0;
                 LY = 0;
                 ModeFlag = 0;
+                lcdStartup = false;
                 FrameReady = false;
+                UpdateStatInterruptLine();
+                return;
             } else if (!wasEnabled && LCDEnable) {
                 clock = 0;
                 LY = 0;
-                ModeFlag = 2;
+                if (hasEverEnabled) {
+                    ModeFlag = 0;
+                    scanlineDuration = 454;
+                    mode2Duration = 80;
+                    lcdStartup = true;
+                } else {
+                    ModeFlag = 2;
+                    scanlineDuration = EmulationClock.DotsPerScanline;
+                    mode2Duration = 80;
+                    lcdStartup = false;
+                }
                 mode3Duration = 172;
+                hasEverEnabled = true;
             }
 
             UpdateCoincidence();
@@ -265,7 +293,6 @@ namespace nanoboy.Core
                 clock = 0;
                 LY = 0;
                 ModeFlag = 0;
-                UpdateCoincidence();
                 UpdateStatInterruptLine();
                 return;
             }
@@ -274,11 +301,23 @@ namespace nanoboy.Core
             UpdateStatInterruptLine();
             clock++;
 
+            if (lcdStartup) {
+                if (clock >= mode2Duration) {
+                    ModeFlag = 3;
+                    clock = 0;
+                    mode3Duration = CalculateMode3Duration();
+                    lcdStartup = false;
+                }
+                UpdateCoincidence();
+                UpdateStatInterruptLine();
+                return;
+            }
+
             switch (ModeFlag)
             {
 
                 case 2:
-                    if (clock >= 80) {
+                    if (clock >= mode2Duration) {
                         ModeFlag = 3;
                         clock = 0;
                         mode3Duration = CalculateMode3Duration();
@@ -304,9 +343,11 @@ namespace nanoboy.Core
                     break;
 
                 case 0:
-                    if (clock >= EmulationClock.DotsPerScanline - 80 - mode3Duration) {
+                    if (clock >= scanlineDuration - mode2Duration - mode3Duration) {
                         clock = 0;
                         LY++;
+                        scanlineDuration = EmulationClock.DotsPerScanline;
+                        mode2Duration = 80;
                         if (LY == 144) {
 
                             ModeFlag = 1;
@@ -351,7 +392,8 @@ namespace nanoboy.Core
             bool nextLine =
                 (CoincidenceInterrupt && CoincidenceFlag) ||
                 (LCDEnable && (
-                    (OAMInterrupt && ModeFlag == 2) ||
+                    (OAMInterrupt && (ModeFlag == 2 ||
+                        (!hasColorFeatures && ModeFlag == 1 && LY == 144))) ||
                     (VBlankInterrupt && ModeFlag == 1) ||
                     (HBlankInterrupt && ModeFlag == 0)));
             if (nextLine && !statInterruptLine) {
@@ -413,10 +455,6 @@ namespace nanoboy.Core
             int windowX = WX - 7;
             for (int sprite = 0; sprite < selectedCount; sprite++) {
                 int oamX = selectedX[sprite];
-                if (oamX == 0) {
-                    duration += 11;
-                    continue;
-                }
                 if (oamX >= 168) {
                     continue;
                 }
@@ -703,7 +741,11 @@ namespace nanoboy.Core
                     writer.Write(ObjectPaletteIndex);
                     writer.Write(VRAMBank);
                     writer.Write(clock);
+                    writer.Write(scanlineDuration);
+                    writer.Write(mode2Duration);
                     writer.Write(mode3Duration);
+                    writer.Write(lcdStartup);
+                    writer.Write(hasEverEnabled);
                     writer.Write(publishedFrameSequence);
                     writer.Write(statInterruptLine);
                     writer.Write(framecounter);
@@ -763,7 +805,11 @@ namespace nanoboy.Core
                 int nextObjectPaletteIndex = reader.ReadInt32();
                 int nextVramBank = reader.ReadInt32();
                 int nextClock = reader.ReadInt32();
+                int nextScanlineDuration = reader.ReadInt32();
+                int nextMode2Duration = reader.ReadInt32();
                 int nextMode3Duration = reader.ReadInt32();
+                bool nextLcdStartup = StatePayload.ReadBoolean(reader);
+                bool nextHasEverEnabled = StatePayload.ReadBoolean(reader);
                 long nextPublishedFrameSequence = reader.ReadInt64();
                 bool nextStatInterruptLine = StatePayload.ReadBoolean(reader);
                 int nextFrameCounter = reader.ReadInt32();
@@ -784,7 +830,13 @@ namespace nanoboy.Core
                 StatePayload.RequireRange(nextObjectPaletteIndex, 0, 0x3F, nameof(ObjectPaletteIndex));
                 StatePayload.RequireRange(nextVramBank, 0, 1, nameof(VRAMBank));
                 StatePayload.RequireRange(nextClock, 0, EmulationClock.DotsPerScanline - 1, nameof(clock));
+                StatePayload.RequireRange(nextScanlineDuration, 454, EmulationClock.DotsPerScanline, nameof(scanlineDuration));
+                StatePayload.RequireRange(nextMode2Duration, 80, 82, nameof(mode2Duration));
                 StatePayload.RequireRange(nextMode3Duration, 172, 289, nameof(mode3Duration));
+                if (nextLcdStartup &&
+                    (!nextLcdEnable || nextModeFlag != 0 || nextLy != 0 || nextMode2Duration != 80)) {
+                    throw new InvalidOperationException("Video state contains an invalid LCD startup phase.");
+                }
                 if (nextPublishedFrameSequence < 0) {
                     throw new InvalidOperationException("Video frame sequence cannot be negative.");
                 }
@@ -830,7 +882,11 @@ namespace nanoboy.Core
                     ObjectPaletteIndex = nextObjectPaletteIndex;
                     VRAMBank = nextVramBank;
                     clock = nextClock;
+                    scanlineDuration = nextScanlineDuration;
+                    mode2Duration = nextMode2Duration;
                     mode3Duration = nextMode3Duration;
+                    lcdStartup = nextLcdStartup;
+                    hasEverEnabled = nextHasEverEnabled;
                     statInterruptLine = nextStatInterruptLine;
                     framecounter = nextFrameCounter;
                     updaterequired = nextUpdateRequired;
@@ -888,7 +944,7 @@ namespace nanoboy.Core
 
         public byte ReadOAM(int address)
         {
-            if (LCDEnable && (ModeFlag == 2 || ModeFlag == 3)) {
+            if (IsOamBlocked()) {
                 return 0xFF;
             }
             return oam[address];
@@ -896,11 +952,16 @@ namespace nanoboy.Core
 
         public void WriteOAM(int address, byte value)
         {
-            if (LCDEnable && (ModeFlag == 2 || ModeFlag == 3)) {
+            if (IsOamBlocked()) {
                 return;
             }
             oam[address] = value;
         }
+
+        private bool IsOamBlocked() =>
+            LCDEnable &&
+            (ModeFlag == 3 ||
+             (ModeFlag == 2 && clock < mode2Duration - 2));
 
         public byte ReadPRAM(int index)
         {

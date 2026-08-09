@@ -16,12 +16,20 @@ public sealed class DmaTests
 
         fixture.Emulator.Memory.WriteByte(0xFF46, 0xC0);
 
-        Assert.IsTrue(fixture.Emulator.Memory.HDMA.IsOamTransferActive);
+        Assert.IsTrue(fixture.Emulator.Memory.HDMA.IsOamTransferPending);
+        Assert.IsFalse(fixture.Emulator.Memory.HDMA.IsOamTransferActive);
         Assert.AreEqual(0, fixture.Emulator.Memory.Video.ReadOAMDirect(0));
-        Assert.AreEqual(0xFF, fixture.Emulator.Memory.ReadByte(0xC000));
-        fixture.Emulator.Memory.WriteByte(0xC000, 0x00);
+        Assert.AreEqual(0x5A, fixture.Emulator.Memory.ReadByte(0xC000));
         fixture.Emulator.Memory.WriteByte(0xFF80, 0xA5);
         Assert.AreEqual(0xA5, fixture.Emulator.Memory.ReadByte(0xFF80));
+
+        for (int tick = 0; tick < 7; tick++) {
+            fixture.Emulator.Memory.HDMA.TickOamDma();
+        }
+        Assert.IsFalse(fixture.Emulator.Memory.HDMA.IsOamTransferActive);
+        fixture.Emulator.Memory.HDMA.TickOamDma();
+        Assert.IsTrue(fixture.Emulator.Memory.HDMA.IsOamTransferActive);
+        Assert.AreEqual(0xFF, fixture.Emulator.Memory.ReadByte(0xC000));
 
         for (int tick = 0; tick < 3; tick++) {
             fixture.Emulator.Memory.HDMA.TickOamDma();
@@ -42,6 +50,29 @@ public sealed class DmaTests
         }
         Assert.IsFalse(fixture.Emulator.Memory.HDMA.IsOamTransferActive);
         Assert.AreEqual((byte)0x5A, fixture.Emulator.Memory.ReadByte(0xC000));
+    }
+
+    [TestMethod]
+    public void OamDma_RegisterRemainsReadableAndCanRestartAnActiveTransfer()
+    {
+        using var fixture = new EmulatorFixture();
+        Memory memory = fixture.Emulator.Memory;
+        memory.WriteByte(0xC000, 0x11);
+        memory.WriteByte(0xD000, 0x22);
+
+        memory.WriteByte(0xFF46, 0xC0);
+        Assert.AreEqual(0xC0, memory.ReadByte(0xFF46));
+        memory.HDMA.TickOamDma();
+        memory.HDMA.TickOamDma();
+
+        memory.WriteByte(0xFF46, 0xD0);
+        Assert.AreEqual(0xD0, memory.ReadByte(0xFF46));
+        for (int tick = 0; tick < 12; tick++) {
+            memory.HDMA.TickOamDma();
+        }
+
+        Assert.AreEqual(0x22, memory.Video.ReadOAMDirect(0));
+        Assert.AreEqual(1, memory.HDMA.OamBytesTransferred);
     }
 
     [TestMethod]
@@ -179,6 +210,20 @@ public sealed class DmaTests
         Assert.AreEqual(0xD5, memory.ReadByte(0xFF21));
         Assert.AreEqual(0xAB, memory.ReadByte(0xFF22));
         Assert.AreEqual(0xFF, memory.ReadByte(0xFF23));
+    }
+
+    [TestMethod]
+    public void InterruptFlags_ReadUnusedBitsHighAndStoreOnlyHardwareBits()
+    {
+        using var fixture = new EmulatorFixture();
+        Memory memory = fixture.Emulator.Memory;
+
+        memory.WriteByte(0xFF0F, 0xFF);
+        Assert.AreEqual(0x1F, memory.Interrupt.IF);
+        Assert.AreEqual(0xFF, memory.ReadByte(0xFF0F));
+
+        memory.WriteByte(0xFF0F, 0x00);
+        Assert.AreEqual(0xE0, memory.ReadByte(0xFF0F));
     }
 
     private sealed class EmulatorFixture : IDisposable

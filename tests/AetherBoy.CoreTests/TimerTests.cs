@@ -106,6 +106,36 @@ public sealed class TimerTests
         Assert.AreEqual(0, interrupt.IF & 0x04);
     }
 
+    [TestMethod]
+    public void TimaWrite_DuringTheReloadCycleIsIgnored()
+    {
+        var (timer, interrupt) = CreateTimer();
+        timer.WriteTma(0x42);
+        timer.WriteTima(0xFF);
+        timer.WriteTac(0b101);
+        Tick(timer, 20);
+
+        timer.WriteTima(0x77);
+
+        Assert.AreEqual(0x42, timer.TIMA);
+        Assert.AreEqual(0x04, interrupt.IF & 0x04);
+    }
+
+    [TestMethod]
+    public void TmaWrite_DuringTheReloadCycleAlsoUpdatesTima()
+    {
+        var (timer, _) = CreateTimer();
+        timer.WriteTma(0x42);
+        timer.WriteTima(0xFF);
+        timer.WriteTac(0b101);
+        Tick(timer, 20);
+
+        timer.WriteTma(0x77);
+
+        Assert.AreEqual(0x77, timer.TMA);
+        Assert.AreEqual(0x77, timer.TIMA);
+    }
+
     private static (GameBoyTimer Timer, Interrupt Interrupt) CreateTimer()
     {
         var interrupt = new Interrupt(new CPU());

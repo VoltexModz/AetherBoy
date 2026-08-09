@@ -2,6 +2,27 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## 4.7.0-alpha.1 – Phase 7 (2026-08-09)
+
+### Kompatibilität und CPU-Bus
+
+- Manifestgesteuerte Conformance-CLI mit Pflicht- und Informationsläufen, Conformance-/Game-Smoke-Modus, Protokolldiagnosen, finalem PC, Frame-SHA-256 und JSON-Berichten ergänzt.
+- CPU-Buszugriffe an T-Zykluspositionen verschoben; Stack, CALL/RET/RST/PUSH, Interrupt-Re-Selektion und Abbruch, DAA, signierte SP-Flags sowie mehrere `(HL)`-Kosten korrigiert.
+- Blargg-CPU-Einzelsuite mit 11/11 und `instr_timing` vollständig bestanden.
+
+### Timer, DMA und PPU
+
+- TIMA-/TMA-Schreibkollisionen im Reload-Takt, IF-Lesemaske sowie OAM-DMA-Register, Startverzögerung und Neustart während eines Transfers implementiert.
+- LCD-Aus-/Einschaltphase, LYC-Freeze, OAM-Randfenster, überlappende Sprite-Fetches und der DMG-spezifische OAM-STAT-Impuls bei VBlank gehärtet.
+- Mooneye-Ergebnis auf 12/13 Timer- und 10/12 PPU-ROMs erhöht; bekannte Restfälle sind in `COMPATIBILITY.md` dokumentiert.
+
+### APU, Zustände und Gates
+
+- APU-Registermasken, DIV-APU-Resetflanke, echte 64-/256-Schritt-Längenzähler, Trigger-Extra-Clock, DMG-Power-Off-Längenregister und initiale Sweep-Overflow-Prüfung implementiert.
+- Blargg-Sound-Fortschritt auf 6/12 DMG- und 7/12 CGB-Einzel-ROMs erhöht; Sweep-Negate, analoger Hochpass und DMG-Wave-RAM-Kollisionen bleiben offen.
+- Testsuite auf **154 Tests** erweitert: 128 Core-, 17 Runtime- und 9 Windows-Smoke-Tests. Save-State-Komponentenschema wegen neuer CPU-, PPU- und APU-Transienten auf 4 angehoben.
+- Drei lokal ignorierte Spiele jeweils 600 Frames absturzfrei ausgeführt; ROMs und externe Test-Binärdateien bleiben außerhalb des Repositorys.
+
 ## 4.6.0-alpha.1 – Phase 6 (2026-08-09)
 
 ### CPU, Bus und CGB-DMA

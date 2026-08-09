@@ -131,7 +131,7 @@ namespace nanoboy.Core
                                       4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
                                       4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
                                       4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
-                                      4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 8, 4,
+                                      8, 8, 8, 8, 8, 8, 4, 8, 4, 4, 4, 4, 4, 4, 8, 4,
                                       4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
                                       4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
                                       4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
@@ -147,7 +147,7 @@ namespace nanoboy.Core
                                     4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
                                     4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
                                     4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
-                                    4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 8, 4,
+                                    8, 8, 8, 8, 8, 8, 4, 8, 4, 4, 4, 4, 4, 4, 8, 4,
                                     4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
                                     4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
                                     4, 4, 4, 4, 4, 4, 8, 4, 4, 4, 4, 4, 4, 4, 8, 4,
@@ -160,10 +160,10 @@ namespace nanoboy.Core
                                        8, 8, 8, 8, 8, 8, 16, 8, 8, 8, 8, 8, 8, 8, 16, 8,
                                        8, 8, 8, 8, 8, 8, 16, 8, 8, 8, 8, 8, 8, 8, 16, 8,
                                        8, 8, 8, 8, 8, 8, 16, 8, 8, 8, 8, 8, 8, 8, 16, 8,
-                                       8, 8, 8, 8, 8, 8, 16, 8, 8, 8, 8, 8, 8, 8, 16, 8,
-                                       8, 8, 8, 8, 8, 8, 16, 8, 8, 8, 8, 8, 8, 8, 16, 8,
-                                       8, 8, 8, 8, 8, 8, 16, 8, 8, 8, 8, 8, 8, 8, 16, 8,
-                                       8, 8, 8, 8, 8, 8, 16, 8, 8, 8, 8, 8, 8, 8, 16, 8,
+                                       8, 8, 8, 8, 8, 8, 12, 8, 8, 8, 8, 8, 8, 8, 12, 8,
+                                       8, 8, 8, 8, 8, 8, 12, 8, 8, 8, 8, 8, 8, 8, 12, 8,
+                                       8, 8, 8, 8, 8, 8, 12, 8, 8, 8, 8, 8, 8, 8, 12, 8,
+                                       8, 8, 8, 8, 8, 8, 12, 8, 8, 8, 8, 8, 8, 8, 12, 8,
                                        8, 8, 8, 8, 8, 8, 16, 8, 8, 8, 8, 8, 8, 8, 16, 8,
                                        8, 8, 8, 8, 8, 8, 16, 8, 8, 8, 8, 8, 8, 8, 16, 8,
                                        8, 8, 8, 8, 8, 8, 16, 8, 8, 8, 8, 8, 8, 8, 16, 8,
@@ -173,6 +173,9 @@ namespace nanoboy.Core
                                        8, 8, 8, 8, 8, 8, 16, 8, 8, 8, 8, 8, 8, 8, 16, 8,
                                        8, 8, 8, 8, 8, 8, 16, 8, 8, 8, 8, 8, 8, 8, 16, 8};
         private int cycleamountext;
+        private int cyclesAdvancedThisTick;
+
+        internal Action<int>? CycleSink { get; set; }
 
 
         private delegate void Instruction();
@@ -2025,8 +2028,9 @@ namespace nanoboy.Core
 
         public int Tick()
         {
+            cyclesAdvancedThisTick = 0;
             if (!Running || WaitForInterrupt || IsStopped || IsLockedUp) {
-                return 4;
+                return CompleteTick(4);
             }
 
             pc &= 0xFFFF;
@@ -2036,12 +2040,12 @@ namespace nanoboy.Core
             update.CPU = this;
             Notify(update);
             if (!Running || WaitForInterrupt) {
-                return 4;
+                return CompleteTick(4);
             }
 
             byte op = ReadByte(pc);
             if (!Running || WaitForInterrupt) {
-                return 4;
+                return CompleteTick(4);
             }
 
             if (haltBug) {
@@ -2052,7 +2056,7 @@ namespace nanoboy.Core
             if (IsIllegalOpcode(op)) {
                 pc = (pc + 1) & 0xFFFF;
                 IsLockedUp = true;
-                return 4;
+                return CompleteTick(4);
             }
 
             cycleamountext = 0;
@@ -2070,19 +2074,60 @@ namespace nanoboy.Core
                 FlagC = ((f >> 4) & 1) == 1;
             }
             AdvanceImeEnableDelay();
-            if (cycleamountext == 0) {
-                return branched ? cyclesbranched[op] : cycles[op];
-            } else {
-                return cycleamountext;
+            int totalCycles = cycleamountext == 0
+                ? (branched ? cyclesbranched[op] : cycles[op])
+                : cycleamountext;
+            return CompleteTick(totalCycles);
+        }
+
+        private int CompleteTick(int totalCycles)
+        {
+            if (CycleSink != null)
+            {
+                int remainingCycles = totalCycles - cyclesAdvancedThisTick;
+                if (remainingCycles < 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Opcode bus schedule used {cyclesAdvancedThisTick} cycles, " +
+                        $"exceeding its {totalCycles}-cycle timing.");
+                }
+                AdvanceCycles(remainingCycles);
             }
+            return totalCycles;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void AdvanceBusCycle()
+        {
+            AdvanceCycles(4);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void AdvanceInternalCycle()
+        {
+            AdvanceCycles(4);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void AdvanceCycles(int cycles)
+        {
+            if (CycleSink == null || cycles == 0)
+            {
+                return;
+            }
+
+            CycleSink(cycles);
+            cyclesAdvancedThisTick += cycles;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Push(int v)
         {
             CPUStatusUpdate update = new CPUStatusUpdate();
-            sp -= 2;
-            WriteShort(sp, v);
+            sp = (sp - 1) & 0xFFFF;
+            WriteByte(sp, v >> 8);
+            sp = (sp - 1) & 0xFFFF;
+            WriteByte(sp, v & 0xFF);
             update.Reason = CPUStatusUpdate.UpdateReason.Push;
             update.Offset = sp;
             update.Value = v;
@@ -2100,22 +2145,43 @@ namespace nanoboy.Core
             update.Value = v;
             update.CPU = this;
             Notify(update);
-            sp += 2;
+            sp = (sp + 2) & 0xFFFF;
             return v;
         }
 
-        public void Interrupt(int address)
+        internal int DispatchInterrupt(Func<(int Mask, int Vector)> selectPending)
         {
             WaitForInterrupt = false;
             IME = false;
             imeEnableDelay = 0;
-            Push(pc);
-            pc = address;
+            int returnAddress = pc;
+
+            AdvanceInternalCycle();
+            AdvanceInternalCycle();
+            sp = (sp - 1) & 0xFFFF;
+            WriteByte(sp, returnAddress >> 8);
+
+            (int mask, int vector) = selectPending();
+            if (mask == 0)
+            {
+                pc = 0;
+                AdvanceCycles(8);
+                return 0;
+            }
+
+            sp = (sp - 1) & 0xFFFF;
+            WriteByte(sp, returnAddress & 0xFF);
+            AdvanceInternalCycle();
+            pc = vector;
+            return mask;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private byte ReadByte(int address)
         {
+            address &= 0xFFFF;
+            int readPhase = address == 0xFF44 ? 4 : 3;
+            AdvanceCycles(readPhase);
             CPUStatusUpdate update = new CPUStatusUpdate();
             byte value = Memory.ReadByte(address);
             update.Reason = CPUStatusUpdate.UpdateReason.MemoryRead;
@@ -2123,18 +2189,27 @@ namespace nanoboy.Core
             update.Value = value;
             update.CPU = this;
             Notify(update);
+            AdvanceCycles(4 - readPhase);
             return value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ushort ReadShort(int address)
         {
-            return (ushort)((Memory.ReadByte(address + 1) << 8) + Memory.ReadByte(address));
+            address &= 0xFFFF;
+            int low = ReadByte(address);
+            int high = ReadByte((address + 1) & 0xFFFF);
+            return (ushort)((high << 8) | low);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void WriteByte(int address, int value)
         {
+            address &= 0xFFFF;
+            // Most writes latch one T-cycle into the final machine cycle. TAC is
+            // sampled against DIV at the cycle boundary, before that first tick.
+            int writePhase = address == 0xFF07 ? 0 : 1;
+            AdvanceCycles(writePhase);
             CPUStatusUpdate update = new CPUStatusUpdate();
             update.Reason = CPUStatusUpdate.UpdateReason.MemoryWrite;
             update.Offset = address;
@@ -2142,13 +2217,15 @@ namespace nanoboy.Core
             update.CPU = this;
             Notify(update);
             Memory.WriteByte(address, (byte)value);
+            AdvanceCycles(4 - writePhase);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void WriteShort(int address, int value)
         {
+            address &= 0xFFFF;
             WriteByte(address, value & 0xFF);
-            WriteByte(address + 1, value >> 8);
+            WriteByte((address + 1) & 0xFFFF, value >> 8);
         }
 
         #region Opcode implementation
@@ -2234,6 +2311,7 @@ namespace nanoboy.Core
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OP_PUSH(int rh, int rl)
         {
+            AdvanceInternalCycle();
             Push((rh << 8) + rl);
             pc++;
         }
@@ -2409,8 +2487,10 @@ namespace nanoboy.Core
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OP_CALL_A16()
         {
+            int destination = ReadShort(pc + 1);
+            AdvanceInternalCycle();
             Push(pc + 3);
-            pc = ReadShort(pc + 1);
+            pc = destination;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2485,6 +2565,7 @@ namespace nanoboy.Core
             if (!FlagZ)
             {
                 branched = true;
+                AdvanceInternalCycle();
                 OP_RET();
             } else {
                 pc++;
@@ -2497,6 +2578,7 @@ namespace nanoboy.Core
             if (FlagZ)
             {
                 branched = true;
+                AdvanceInternalCycle();
                 OP_RET();
             } else {
                 pc++;
@@ -2509,6 +2591,7 @@ namespace nanoboy.Core
             if (!FlagC)
             {
                 branched = true;
+                AdvanceInternalCycle();
                 OP_RET();
             } else {
                 pc++;
@@ -2521,6 +2604,7 @@ namespace nanoboy.Core
             if (FlagC)
             {
                 branched = true;
+                AdvanceInternalCycle();
                 OP_RET();
             } else {
                 pc++;
@@ -2530,6 +2614,7 @@ namespace nanoboy.Core
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OP_RST(int address)
         {
+            AdvanceInternalCycle();
             Push(pc + 1);
             pc = address;
         }
@@ -2619,25 +2704,13 @@ namespace nanoboy.Core
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OP_LD_R16_SP_S8(ref int rh, ref int rl)
         {
-            int v = ReadByte(pc + 1);
-            if (v > 0x7F)
-            {
-                v -= 256;
-            }
-
-            if (v >= 0)
-            {
-                FlagH = (sp & 0xF) + (v & 0xF) > 0xF;
-                FlagC = (sp & 0xFF) + v > 0xFF;
-                FlagN = false;
-            } else {
-                int vp = v * -1;
-                FlagH = (sp & 0xF) < (vp & 0xF);
-                FlagC = vp > (sp & 0xFF);
-                FlagN = true;
-            }
-
-            int result = (sp + v) & 0xFFFF;
+            int immediate = ReadByte(pc + 1);
+            int offset = immediate < 0x80 ? immediate : immediate - 0x100;
+            int result = (sp + offset) & 0xFFFF;
+            FlagZ = false;
+            FlagN = false;
+            FlagH = (sp & 0xF) + (immediate & 0xF) > 0xF;
+            FlagC = (sp & 0xFF) + immediate > 0xFF;
             rl = result & 0xFF;
             rh = result >> 8;
 
@@ -2849,17 +2922,13 @@ namespace nanoboy.Core
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OP_ADD_SP_S8()
         {
-            int v = ReadByte(pc + 1);
-            if (v > 0x7F)
-            {
-                v -= 256;
-            }
-            FlagZ = (sp + v) == 0;
-            FlagN = v < 0;
-            FlagH = (sp & 0xF) + (v & 0xF) > 0xF;
-            FlagC = (sp & 0xFF) + v > 0xFF;
-            sp += v;
-            sp &= 0xFFFF;
+            int immediate = ReadByte(pc + 1);
+            int offset = immediate < 0x80 ? immediate : immediate - 0x100;
+            FlagZ = false;
+            FlagN = false;
+            FlagH = (sp & 0xF) + (immediate & 0xF) > 0xF;
+            FlagC = (sp & 0xFF) + immediate > 0xFF;
+            sp = (sp + offset) & 0xFFFF;
             pc += 2;
         }
 
@@ -3181,14 +3250,30 @@ namespace nanoboy.Core
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void OP_DAA()
         {
-            uint tmp = (uint)a;
-            if (FlagC) tmp |= 256;
-            if (FlagH) tmp |= 512;
-            if (FlagN) tmp |= 1024;
-            tmp = daatable[tmp];
-            a = (int)(tmp >> 8);
-            f = (int)(tmp & 0xFF);
-            wroteflagreg = true;
+            int adjustment = 0;
+            bool carry = FlagC;
+            if (!FlagN) {
+                if (FlagC || a > 0x99) {
+                    adjustment |= 0x60;
+                    carry = true;
+                }
+                if (FlagH || (a & 0x0F) > 0x09) {
+                    adjustment |= 0x06;
+                }
+                a = (a + adjustment) & 0xFF;
+            } else {
+                if (FlagC) {
+                    adjustment |= 0x60;
+                }
+                if (FlagH) {
+                    adjustment |= 0x06;
+                }
+                a = (a - adjustment) & 0xFF;
+            }
+
+            FlagZ = a == 0;
+            FlagH = false;
+            FlagC = carry;
             pc++;
         }
 

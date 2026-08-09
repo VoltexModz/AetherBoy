@@ -133,13 +133,33 @@ public sealed class AudioTimingTests
     }
 
     [TestMethod]
+    public void EnablingLengthBeforeANonLengthStep_ClocksItImmediately()
+    {
+        using var audio = new Audio { Enabled = false };
+        audio.Channel1.SoundLengthRaw = 63;
+        audio.Channel1.Volume = 15;
+        audio.Channel1.Restart();
+        Tick(audio, 8_192);
+        audio.Channel1.SoundLengthRaw = 63;
+
+        audio.Channel1.WriteControl(
+            lengthEnabled: true,
+            trigger: false,
+            audio.ShouldClockLengthOnWrite);
+
+        Assert.IsFalse(audio.Channel1.IsActive);
+    }
+
+    [TestMethod]
     public void FrameSequencer_ClocksSweepOnlyOnStepsTwoAndSix()
     {
         using var audio = new Audio { Enabled = false };
         audio.Channel1.Frequency = 1_000;
+        audio.Channel1.Volume = 1;
         audio.Channel1.SweepTime = 1;
         audio.Channel1.SweepShift = 1;
         audio.Channel1.SweepDirection = SweepMode.Addition;
+        audio.Channel1.Restart();
 
         Tick(audio, 24_575);
         Assert.AreEqual(1_000, audio.Channel1.CurrentFrequency);
@@ -158,6 +178,21 @@ public sealed class AudioTimingTests
         Tick(audio, 24_576);
 
         Assert.AreEqual(1_000, audio.Channel1.CurrentFrequency);
+    }
+
+    [TestMethod]
+    public void SweepTrigger_DisablesChannelWhenTheInitialCalculationOverflows()
+    {
+        var pulse = new QuadChannel
+        {
+            Frequency = 0x7FF,
+            Volume = 1,
+            SweepShift = 1
+        };
+
+        pulse.Restart();
+
+        Assert.IsFalse(pulse.IsActive);
     }
 
     [TestMethod]

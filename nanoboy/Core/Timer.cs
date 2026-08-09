@@ -10,6 +10,7 @@ namespace nanoboy.Core
         private byte tma;
         private byte tac;
         private int reloadDelay;
+        private bool reloadedThisCycle;
 
         public int DIV
         {
@@ -47,10 +48,12 @@ namespace nanoboy.Core
             tma = 0;
             tac = 0;
             reloadDelay = 0;
+            reloadedThisCycle = false;
         }
 
         public void Tick()
         {
+            reloadedThisCycle = false;
             if (reloadDelay > 0)
             {
                 reloadDelay--;
@@ -58,6 +61,7 @@ namespace nanoboy.Core
                 {
                     tima = tma;
                     interrupt.Request(4);
+                    reloadedThisCycle = true;
                 }
             }
 
@@ -67,16 +71,29 @@ namespace nanoboy.Core
             IncrementOnFallingEdge(oldSignal, newSignal);
         }
 
-        public void WriteDiv()
+        public bool WriteDiv(bool doubleSpeed = false)
         {
             bool oldSignal = GetTimerSignal(dividerCounter, tac);
+            bool apuFallingEdge = IsApuDividerHigh(doubleSpeed);
             dividerCounter = 0;
             bool newSignal = GetTimerSignal(dividerCounter, tac);
             IncrementOnFallingEdge(oldSignal, newSignal);
+            return apuFallingEdge;
+        }
+
+        private bool IsApuDividerHigh(bool doubleSpeed)
+        {
+            int dividerBit = doubleSpeed ? 13 : 12;
+            return ((dividerCounter >> dividerBit) & 1) != 0;
         }
 
         public void WriteTima(byte value)
         {
+            if (reloadedThisCycle)
+            {
+                return;
+            }
+
             tima = value;
             if (reloadDelay > 0)
             {
@@ -87,6 +104,10 @@ namespace nanoboy.Core
         public void WriteTma(byte value)
         {
             tma = value;
+            if (reloadedThisCycle)
+            {
+                tima = value;
+            }
         }
 
         public void WriteTac(byte value)
@@ -150,6 +171,7 @@ namespace nanoboy.Core
                 writer.Write(tma);
                 writer.Write(tac);
                 writer.Write(reloadDelay);
+                writer.Write(reloadedThisCycle);
             });
         }
 
@@ -161,6 +183,7 @@ namespace nanoboy.Core
                 byte nextTma = reader.ReadByte();
                 byte nextTac = reader.ReadByte();
                 int nextReloadDelay = reader.ReadInt32();
+                bool nextReloadedThisCycle = StatePayload.ReadBoolean(reader);
                 StatePayload.RequireRange(nextTac, 0, 7, nameof(tac));
                 StatePayload.RequireRange(nextReloadDelay, 0, 4, nameof(reloadDelay));
 
@@ -170,6 +193,7 @@ namespace nanoboy.Core
                     tma = nextTma;
                     tac = nextTac;
                     reloadDelay = nextReloadDelay;
+                    reloadedThisCycle = nextReloadedThisCycle;
                 });
             });
         }

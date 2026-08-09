@@ -193,6 +193,37 @@ public sealed class GeneratedRomConformanceTests
     }
 
     [TestMethod]
+    public void HeadlessRunner_RecognizesMooneyeFailureSignature()
+    {
+        byte[] program =
+        {
+            0x06, 0x42, // LD B,$42
+            0x0E, 0x42, // LD C,$42
+            0x16, 0x42, // LD D,$42
+            0x1E, 0x42, // LD E,$42
+            0x26, 0x42, // LD H,$42
+            0x2E, 0x42, // LD L,$42
+            0x76        // HALT
+        };
+
+        RunProtocolTest(
+            program,
+            expectedOutcome: ConformanceOutcome.Failed,
+            expectedProtocol: ConformanceProtocol.MooneyeRegisters,
+            expectedOutput: "Mooneye failure register signature");
+    }
+
+    [TestMethod]
+    public void HeadlessRunner_RecognizesMooneyeBinarySerialFailureSignature()
+    {
+        RunProtocolTest(
+            CreateSerialProgram("BBBBBB"),
+            expectedOutcome: ConformanceOutcome.Failed,
+            expectedProtocol: ConformanceProtocol.MooneyeRegisters,
+            expectedOutput: "BBBBBB; saved AF=0000 BC=0000 DE=0000 HL=0000");
+    }
+
+    [TestMethod]
     public void HeadlessRunner_RecognizesBlarggMemoryProtocol()
     {
         var program = new List<byte>
@@ -218,6 +249,33 @@ public sealed class GeneratedRomConformanceTests
             expectedOutput: "Passed",
             cartridgeType: Mbc.ROM_MBC5_RAM,
             ramSizeCode: 0x02);
+    }
+
+    [TestMethod]
+    public void HeadlessRunner_CompletesBoundedSmokeRunAndReportsAFrameDigest()
+    {
+        string temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"AetherBoy.SmokeTests-{Guid.NewGuid():N}");
+        string romPath = Path.Combine(temporaryDirectory, "smoke.gb");
+        string savePath = Path.Combine(temporaryDirectory, "smoke.sav");
+        Directory.CreateDirectory(temporaryDirectory);
+        try {
+            File.WriteAllBytes(romPath, CreateRom());
+            var runner = new HeadlessConformanceRunner();
+
+            ConformanceResult result = runner.RunSmoke(new ROM(romPath, savePath), framesToExecute: 2);
+
+            Assert.AreEqual(ConformanceOutcome.Passed, result.Outcome);
+            Assert.AreEqual(ConformanceProtocol.SmokeFrames, result.Protocol);
+            Assert.AreEqual(2, result.FramesExecuted);
+            StringAssert.Contains(result.Output, "Completed 2 frame(s)");
+            StringAssert.Contains(result.Output, "frame-sha256=");
+        } finally {
+            if (Directory.Exists(temporaryDirectory)) {
+                Directory.Delete(temporaryDirectory, recursive: true);
+            }
+        }
     }
 
     [TestMethod]

@@ -1,4 +1,6 @@
 using System;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace nanoboy.Core
@@ -15,7 +17,8 @@ namespace nanoboy.Core
         None,
         SerialText,
         BlarggMemory,
-        MooneyeRegisters
+        MooneyeRegisters,
+        SmokeFrames
     }
 
     public readonly record struct ConformanceResult(
@@ -58,11 +61,16 @@ namespace nanoboy.Core
             for (int frame = 1; frame <= maximumFrames; frame++) {
                 emulator.Frame();
                 if (serialCapture.Outcome is ConformanceOutcome serialOutcome) {
+                    string output = serialCapture.Output;
+                    if (serialOutcome == ConformanceOutcome.Failed &&
+                        serialCapture.Protocol == ConformanceProtocol.MooneyeRegisters) {
+                        output += FormatMooneyeSavedRegisters(emulator.Memory);
+                    }
                     return new ConformanceResult(
                         serialOutcome,
-                        serialCapture.Output,
+                        output,
                         frame,
-                        ConformanceProtocol.SerialText);
+                        serialCapture.Protocol);
                 }
                 if (TryReadBlarggResult(emulator.Memory, out ConformanceOutcome blarggOutcome, out string blarggOutput)) {
                     return new ConformanceResult(
@@ -78,6 +86,13 @@ namespace nanoboy.Core
                         frame,
                         ConformanceProtocol.MooneyeRegisters);
                 }
+                if (HasMooneyeFailSignature(emulator.Cpu)) {
+                    return new ConformanceResult(
+                        ConformanceOutcome.Failed,
+                        "Mooneye failure register signature",
+                        frame,
+                        ConformanceProtocol.MooneyeRegisters);
+                }
             }
 
             return new ConformanceResult(
@@ -85,6 +100,48 @@ namespace nanoboy.Core
                 serialCapture.Output,
                 maximumFrames,
                 ConformanceProtocol.None);
+        }
+
+        public ConformanceResult RunSmoke(ROM rom, int framesToExecute = DefaultMaximumFrames)
+        {
+            if (rom == null) {
+                throw new ArgumentNullException(nameof(rom));
+            }
+            if (framesToExecute <= 0) {
+                throw new ArgumentOutOfRangeException(
+                    nameof(framesToExecute),
+                    framesToExecute,
+                    "At least one frame must be executed.");
+            }
+
+            using var emulator = new Nanoboy(rom);
+            emulator.Configure(new EmulatorConfiguration(
+                Frameskip: 0,
+                AudioEnabled: false,
+                Channel1Enabled: false,
+                Channel2Enabled: false,
+                Channel3Enabled: false,
+                Channel4Enabled: false,
+                SampleRate: 44_100));
+
+            for (int frame = 0; frame < framesToExecute; frame++) {
+                emulator.Frame();
+            }
+
+            var pixels = new int[Video.FramePixelCount];
+            long sequence = 0;
+            bool hasPublishedFrame = emulator.Memory.Video.TryCopyPublishedFrame(pixels, ref sequence);
+            string frameDigest = hasPublishedFrame
+                ? Convert.ToHexString(SHA256.HashData(MemoryMarshal.AsBytes(pixels.AsSpan())))
+                : "unavailable";
+            string output =
+                $"Completed {framesToExecute} frame(s); PC={emulator.Cpu.PC:X4}; " +
+                $"frame-sha256={frameDigest}";
+            return new ConformanceResult(
+                ConformanceOutcome.Passed,
+                output,
+                framesToExecute,
+                ConformanceProtocol.SmokeFrames);
         }
 
         private static bool TryReadBlarggResult(
@@ -127,6 +184,20 @@ namespace nanoboy.Core
             cpu.H == 21 &&
             cpu.L == 34;
 
+        private static bool HasMooneyeFailSignature(CPU cpu) =>
+            cpu.B == 0x42 &&
+            cpu.C == 0x42 &&
+            cpu.D == 0x42 &&
+            cpu.E == 0x42 &&
+            cpu.H == 0x42 &&
+            cpu.L == 0x42;
+
+        private static string FormatMooneyeSavedRegisters(Memory memory) =>
+            $"; saved AF={memory.ReadHRAMDirect(1):X2}{memory.ReadHRAMDirect(0):X2}" +
+            $" BC={memory.ReadHRAMDirect(3):X2}{memory.ReadHRAMDirect(2):X2}" +
+            $" DE={memory.ReadHRAMDirect(5):X2}{memory.ReadHRAMDirect(4):X2}" +
+            $" HL={memory.ReadHRAMDirect(7):X2}{memory.ReadHRAMDirect(6):X2}";
+
         private sealed class ConformanceSerialDevice : ISerialDevice
         {
             private readonly StringBuilder output = new StringBuilder();
@@ -134,6 +205,7 @@ namespace nanoboy.Core
 
             public string Output => output.ToString();
             public ConformanceOutcome? Outcome { get; private set; }
+            public ConformanceProtocol Protocol { get; private set; } = ConformanceProtocol.SerialText;
 
             public void Start()
             {
@@ -143,7 +215,28 @@ namespace nanoboy.Core
                     Outcome = ConformanceOutcome.Failed;
                 } else if (current.Contains("Passed", StringComparison.OrdinalIgnoreCase)) {
                     Outcome = ConformanceOutcome.Passed;
+                } else if (EndsWithMooneyeSignature(current, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42)) {
+                    Protocol = ConformanceProtocol.MooneyeRegisters;
+                    Outcome = ConformanceOutcome.Failed;
+                } else if (EndsWithMooneyeSignature(current, 3, 5, 8, 13, 21, 34)) {
+                    Protocol = ConformanceProtocol.MooneyeRegisters;
+                    Outcome = ConformanceOutcome.Passed;
                 }
+            }
+
+            private static bool EndsWithMooneyeSignature(string value, params byte[] signature)
+            {
+                if (value.Length < signature.Length) {
+                    return false;
+                }
+
+                int offset = value.Length - signature.Length;
+                for (int index = 0; index < signature.Length; index++) {
+                    if (value[offset + index] != (char)signature[index]) {
+                        return false;
+                    }
+                }
+                return true;
             }
 
             public void Stop()
