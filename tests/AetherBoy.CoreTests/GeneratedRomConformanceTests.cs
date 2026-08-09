@@ -73,10 +73,17 @@ public sealed class GeneratedRomConformanceTests
         string savePath = Path.Combine(temporaryDirectory, "dma.sav");
         byte[] program =
         {
+            0xC3, 0x80, 0xFF // JP $FF80; OAM DMA permits instruction fetches only from HRAM.
+        };
+        byte[] hramRoutine =
+        {
             0x3E, 0x5A,       // LD A,$5A
             0xEA, 0x9F, 0xC0, // LD ($C09F),A
             0x3E, 0xC0,       // LD A,$C0
             0xE0, 0x46,       // LDH ($FF46),A
+            0x06, 0x28,       // LD B,$28
+            0x05,             // DEC B
+            0x20, 0xFD,       // JR NZ to DEC B (long enough for 640 DMA T-cycles)
             0x76              // HALT
         };
 
@@ -85,6 +92,9 @@ public sealed class GeneratedRomConformanceTests
             File.WriteAllBytes(romPath, CreateRom(program));
             var rom = new ROM(romPath, savePath);
             using var emulator = new Nanoboy(rom);
+            for (int index = 0; index < hramRoutine.Length; index++) {
+                emulator.Memory.WriteHRAMDirect(index, hramRoutine[index]);
+            }
 
             emulator.Frame();
 
@@ -97,11 +107,82 @@ public sealed class GeneratedRomConformanceTests
         }
     }
 
+    [TestMethod]
+    public void HeadlessRunner_RecognizesSerialPassProtocol()
+    {
+        string temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"AetherBoy.ConformanceTests-{Guid.NewGuid():N}");
+        string romPath = Path.Combine(temporaryDirectory, "serial-pass.gb");
+        string savePath = Path.Combine(temporaryDirectory, "serial-pass.sav");
+
+        Directory.CreateDirectory(temporaryDirectory);
+        try {
+            File.WriteAllBytes(romPath, CreateRom(CreateSerialProgram("Passed")));
+            var runner = new HeadlessConformanceRunner();
+
+            ConformanceResult result = runner.Run(new ROM(romPath, savePath), maximumFrames: 2);
+
+            Assert.AreEqual(ConformanceOutcome.Passed, result.Outcome);
+            Assert.AreEqual("Passed", result.SerialOutput);
+            Assert.AreEqual(1, result.FramesExecuted);
+        } finally {
+            if (Directory.Exists(temporaryDirectory)) {
+                Directory.Delete(temporaryDirectory, recursive: true);
+            }
+        }
+    }
+
+    [TestMethod]
+    public void HeadlessRunner_ReturnsBoundedTimeoutWithoutPassOrFailText()
+    {
+        string temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"AetherBoy.ConformanceTimeoutTests-{Guid.NewGuid():N}");
+        string romPath = Path.Combine(temporaryDirectory, "serial-timeout.gb");
+        string savePath = Path.Combine(temporaryDirectory, "serial-timeout.sav");
+
+        Directory.CreateDirectory(temporaryDirectory);
+        try {
+            File.WriteAllBytes(romPath, CreateRom(new byte[] { 0x76 }));
+            var runner = new HeadlessConformanceRunner();
+
+            ConformanceResult result = runner.Run(new ROM(romPath, savePath), maximumFrames: 2);
+
+            Assert.AreEqual(ConformanceOutcome.TimedOut, result.Outcome);
+            Assert.AreEqual(string.Empty, result.SerialOutput);
+            Assert.AreEqual(2, result.FramesExecuted);
+        } finally {
+            if (Directory.Exists(temporaryDirectory)) {
+                Directory.Delete(temporaryDirectory, recursive: true);
+            }
+        }
+    }
+
     private static byte[] CreateRom() => CreateRom(new byte[] {
         0x3E, 0x42,       // LD A,$42
         0xEA, 0x00, 0xC0, // LD ($C000),A
         0x76              // HALT
     });
+
+    private static byte[] CreateSerialProgram(string message)
+    {
+        var program = new List<byte>();
+        foreach (byte value in Encoding.ASCII.GetBytes(message)) {
+            program.Add(0x3E); // LD A,value
+            program.Add(value);
+            program.Add(0xEA); // LD ($FF01),A
+            program.Add(0x01);
+            program.Add(0xFF);
+            program.Add(0x3E); // LD A,$81
+            program.Add(0x81);
+            program.Add(0xEA); // LD ($FF02),A
+            program.Add(0x02);
+            program.Add(0xFF);
+        }
+        program.Add(0x76); // HALT
+        return program.ToArray();
+    }
 
     private static byte[] CreateRom(byte[] program)
     {

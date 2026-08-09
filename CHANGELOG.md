@@ -2,6 +2,38 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## 4.5.0-alpha.1 – Phase 5 (2026-08-09)
+
+### CPU, Bus und DMA
+
+- STOP ohne vorbereiteten CGB-Speed-Switch als echten Ruhezustand modelliert; eine neue Joypad-Flanke weckt die CPU, während PC und Hardwaretakte im Schlaf stehen bleiben.
+- OAM-DMA von einer sofortigen 160-Byte-Kopie auf ein Byte je vier T-Zyklen beziehungsweise 640 T-Zyklen Gesamtdauer umgestellt.
+- CPU-Zugriffe während OAM-DMA auf HRAM begrenzt; der DMA-Lesepfad berücksichtigt Boot-ROM-Mapping und der laufende Transfer ist vollständig im Save State enthalten.
+- Generiertes OAM-DMA-Test-ROM auf eine während des Transfers aus HRAM ausgeführte Routine migriert.
+
+### PPU und APU
+
+- Scanline-Rendering ohne Tile-/Zeilen-Heapallokationen neu aufgebaut und mit einem harten Allokationsgate für einen vollständigen Frame abgesichert.
+- DMG-Spritepriorität anhand des rohen Hintergrund-Farbindex statt der bereits palettierten ARGB-Farbe korrigiert.
+- CGB-Hintergrundattribut Bit 7, OBJ-Priorität und LCDC.0 als Master-Priorität korrekt kombiniert; Hintergrund und Fenster bleiben auf CGB auch bei gelöschtem LCDC.0 sichtbar.
+- APU auf den achtstufigen 512-Hz-Frame-Sequencer umgestellt: Länge bei 256 Hz, Channel-1-Sweep bei 128 Hz und Lautstärke-Hüllkurven bei 64 Hz.
+- Frame-Sequencer, OAM-DMA, STOP und Serial-Control in das neue Komponentenschema 2 des deterministischen Zustandsvertrags aufgenommen.
+
+### Conformance, Rewind und Tests
+
+- Plattformneutralen, framebegrenzten `HeadlessConformanceRunner` ergänzt, der das verbreitete serielle `Passed`/`Failed`-Protokoll von Test-ROMs auswertet.
+- Seriellen Byte-Transfer mit lesbarem Control-Register und unmittelbar ausgelöstem Serial-Interrupt vervollständigt.
+- Rewind-Historie auf schnelle Brotli-Kompression umgestellt und eine öffentliche Metrik für tatsächlich gehaltene Bytes ergänzt; Anzahl und Zeitfenster bleiben strikt begrenzt.
+- Byte-identischen 300-Frame-Restore/Replay-Langlauftest sowie neue STOP-, DMA-, PPU-Prioritäts-, Renderer-Allokations-, APU-Sequencer-, Serial- und Rewind-Speichertests ergänzt.
+- Gesamtsuite auf **107 Tests** erweitert: 81 Core-, 17 Runtime- und 9 Windows-Smoke-Tests; CI-Mindestzahlen entsprechend angehoben.
+
+### Weiterhin offen
+
+- CPU-Instruktionen und allgemeine Buszugriffe sind noch nicht mikrozyklusgenau; CGB-OAM-Buskonflikte und CPU-Stalls bei General-/HBlank-DMA sind angenähert.
+- Die PPU verwendet noch keinen echten Pixel-FIFO mit variabler Mode-3-Dauer; APU-DAC-Power, Frequenz-Timer und mehrere Register-Nebenwirkungen benötigen weitere Präzisierung.
+- Der Headless-Runner stellt die lokale Conformance-Infrastruktur bereit, enthält aber bewusst keine fremden Test-ROMs. TCP-Link-Kabel und serielles Bit-Timing bleiben offen.
+- Save States aus Komponentenschema 1 werden wegen der neuen deterministischen Felder bewusst abgelehnt; eine automatische Migration ist nicht vorhanden.
+
 ## 4.4.0-alpha.1 – Phase 4 (2026-08-09)
 
 ### Vollständige Save States

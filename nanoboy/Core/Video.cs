@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace nanoboy.Core
@@ -368,192 +367,197 @@ namespace nanoboy.Core
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void RenderLine()
         {
-            if (LCDEnable && LY < 144) {
-                if (BackgroundEnable) {
-                    RenderBackgroundLine();
-                }
-                if (WindowEnable && LY >= WY) {
-                    RenderWindowLine();
-                }
-                if (ObjectEnable) {
-                    RenderSpriteLine();
-                }
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void RenderBackgroundLine()
-        {
-            int mapaddress = BackgroundTileMapSelect ? 0x1C00 : 0x1800;
-            int wrapx = SCX + 160 > 256 ? (SCX + 160) - 256 : 0;
-            int wrapy = (LY + SCY) % 256;
-            int displacementy = wrapy % 8;
-            int row = (wrapy - displacementy) / 8;
-            uint[] mapline = RenderTilemapLine(mapaddress, row, displacementy);
-            Buffer.BlockCopy(mapline, SCX * 4, frame, LY * 160 * 4, (160 - wrapx) * 4);
-            Buffer.BlockCopy(mapline, 0, frame, (LY * 160 + 160 - wrapx) * 4, wrapx * 4);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void RenderWindowLine()
-        {
-            int mapaddress = WindowTileMapSelect ? 0x1C00 : 0x1800;
-            int difference = LY - WY;
-            int displacementy = difference % 8;
-            int row = (difference - displacementy) / 8;
-            uint[] mapline = RenderTilemapLine(mapaddress, row, displacementy);
-            int wx = WX - 7;
-            if (wx >= FrameWidth) {
+            if (!LCDEnable || LY >= FrameHeight) {
                 return;
             }
-            if (wx < 0) {
-                Buffer.BlockCopy(mapline, wx * -4, frame, LY * 160 * 4, (160 - (wx * -1)) * 4);
+
+            Span<byte> backgroundColorIndices = stackalloc byte[FrameWidth];
+            Span<byte> backgroundPriorities = stackalloc byte[FrameWidth];
+            if (hasColorFeatures || BackgroundEnable) {
+                RenderBackgroundLine(backgroundColorIndices, backgroundPriorities);
             } else {
-                Buffer.BlockCopy(mapline, 0,  frame, (LY * 160 + wx) * 4, (160 - wx) * 4);
+                uint colorZero = GetPaletteEntry(0, BGP);
+                frame.AsSpan(LY * FrameWidth, FrameWidth).Fill(colorZero);
+                backgroundColorIndices.Clear();
+                backgroundPriorities.Clear();
+            }
+
+            if (WindowEnable && LY >= WY && (hasColorFeatures || BackgroundEnable)) {
+                RenderWindowLine(backgroundColorIndices, backgroundPriorities);
+            }
+            if (ObjectEnable) {
+                RenderSpriteLine(backgroundColorIndices, backgroundPriorities);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private uint[] RenderTilemapLine(int mapaddress, int row, int displacement)
+        private void RenderBackgroundLine(
+            Span<byte> backgroundColorIndices,
+            Span<byte> backgroundPriorities)
         {
-            uint[] mapline = new uint[256];
-            for (int x = 0; x < 32; x++) {
-                int address = mapaddress + 32 * row + x;
-                int tileindex = vram[0, address];
-                int tileaddress;
-                uint[] tiledata;
-                if (TileDataSelect) {
-                    tileaddress = tileindex * 16;
-                } else {
-                    sbyte signedindex = (sbyte)tileindex;
-                    tileaddress = 0x1000 + signedindex * 16;
-                }
-                if (hasColorFeatures) {
-                    int tileattributes = vram[1, address];
-                    tiledata = ReadTileLineColor(tileaddress, displacement, tileattributes, pram1);
-                } else {
-                    tiledata = ReadTileLine(tileaddress, displacement, BGP);
-                }
-                Buffer.BlockCopy(tiledata, 0, mapline, x * 32, 32);
+            int mapAddress = BackgroundTileMapSelect ? 0x1C00 : 0x1800;
+            int sourceY = (LY + SCY) & 0xFF;
+            for (int screenX = 0; screenX < FrameWidth; screenX++) {
+                int sourceX = (screenX + SCX) & 0xFF;
+                RenderTilemapPixel(
+                    mapAddress,
+                    sourceX,
+                    sourceY,
+                    screenX,
+                    backgroundColorIndices,
+                    backgroundPriorities);
             }
-            return mapline;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void RenderSpriteLine()
+        private void RenderWindowLine(
+            Span<byte> backgroundColorIndices,
+            Span<byte> backgroundPriorities)
         {
-            List<SpriteEntry> entries = new List<SpriteEntry>();
-            int tolerance = ObjectSize ? 16 : 8;
+            int windowX = WX - 7;
+            if (windowX >= FrameWidth) {
+                return;
+            }
+
+            int mapAddress = WindowTileMapSelect ? 0x1C00 : 0x1800;
+            int sourceY = LY - WY;
+            int firstScreenX = Math.Max(0, windowX);
+            for (int screenX = firstScreenX; screenX < FrameWidth; screenX++) {
+                RenderTilemapPixel(
+                    mapAddress,
+                    screenX - windowX,
+                    sourceY,
+                    screenX,
+                    backgroundColorIndices,
+                    backgroundPriorities);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void RenderTilemapPixel(
+            int mapAddress,
+            int sourceX,
+            int sourceY,
+            int screenX,
+            Span<byte> backgroundColorIndices,
+            Span<byte> backgroundPriorities)
+        {
+            int tileMapAddress = mapAddress + ((sourceY >> 3) * 32) + (sourceX >> 3);
+            int tileIndex = vram[0, tileMapAddress];
+            int tileAddress = TileDataSelect
+                ? tileIndex * 16
+                : 0x1000 + (sbyte)tileIndex * 16;
+            int attributes = hasColorFeatures ? vram[1, tileMapAddress] : 0;
+            int tileY = sourceY & 7;
+            int tileX = sourceX & 7;
+            if ((attributes & 0x40) != 0) {
+                tileY = 7 - tileY;
+            }
+            if ((attributes & 0x20) != 0) {
+                tileX = 7 - tileX;
+            }
+
+            int bank = (attributes >> 3) & 1;
+            byte low = vram[bank, tileAddress + tileY * 2];
+            byte high = vram[bank, tileAddress + tileY * 2 + 1];
+            int bit = 7 - tileX;
+            int colorIndex = (((high >> bit) & 1) << 1) | ((low >> bit) & 1);
+            backgroundColorIndices[screenX] = (byte)colorIndex;
+            backgroundPriorities[screenX] = (byte)((attributes >> 7) & 1);
+            frame[LY * FrameWidth + screenX] = hasColorFeatures
+                ? GetPaletteEntryColor(colorIndex, pram1, attributes & 7)
+                : GetPaletteEntry(colorIndex, BGP);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void RenderSpriteLine(
+            ReadOnlySpan<byte> backgroundColorIndices,
+            ReadOnlySpan<byte> backgroundPriorities)
+        {
+            Span<SpriteEntry> entries = stackalloc SpriteEntry[10];
+            int entryCount = 0;
+            int spriteHeight = ObjectSize ? 16 : 8;
 
             for (int i = 0; i < 40; i++) {
-                SpriteEntry entry = new SpriteEntry();
-                entry.Y = oam[i * 4] - 16;
-                entry.X = oam[i * 4 + 1] - 8;
-                entry.TileNumber = oam[i * 4 + 2];
-                entry.Attributes = oam[i * 4 + 3];
-                entry.TableIndex = i;
+                var entry = new SpriteEntry {
+                    Y = oam[i * 4] - 16,
+                    X = oam[i * 4 + 1] - 8,
+                    TileNumber = oam[i * 4 + 2],
+                    Attributes = oam[i * 4 + 3],
+                    TableIndex = i
+                };
 
-                if (entry.Y < 144 && entry.Y > LY - tolerance && entry.Y < LY + 1) {
-                    entries.Add(entry);
-                    if (entries.Count == 10) {
+                if (LY >= entry.Y && LY < entry.Y + spriteHeight) {
+                    entries[entryCount++] = entry;
+                    if (entryCount == entries.Length) {
                         break;
                     }
                 }
             }
 
-            entries.Sort((left, right) => {
-                if (hasColorFeatures || left.X == right.X) {
-                    return right.TableIndex.CompareTo(left.TableIndex);
+            for (int left = 0; left < entryCount - 1; left++) {
+                for (int right = left + 1; right < entryCount; right++) {
+                    if (!DrawsBefore(entries[left], entries[right])) {
+                        (entries[left], entries[right]) = (entries[right], entries[left]);
+                    }
                 }
+            }
 
-                return right.X.CompareTo(left.X);
-            });
-
-            foreach (SpriteEntry entry in entries) {
+            for (int entryIndex = 0; entryIndex < entryCount; entryIndex++) {
+                SpriteEntry entry = entries[entryIndex];
                 int displacementy = LY - entry.Y;
-                int colorpalette = entry.Attributes & 7;
                 int tilenumber = entry.TileNumber;
                 int tilebank = (entry.Attributes >> 3) & 1;
                 int palette = (entry.Attributes & 0x10) == 0x10 ? OBP1 : OBP0;
                 bool flipx = (entry.Attributes & 0x20) == 0x20;
                 bool flipy = (entry.Attributes & 0x40) == 0x40;
                 bool behind = (entry.Attributes & 0x80) == 0x80;
-                uint[] tileline;
                 if (flipy) {
-                    displacementy = tolerance - 1 - displacementy;
+                    displacementy = spriteHeight - 1 - displacementy;
                 }
                 if (ObjectSize) {
                     tilenumber = (tilenumber & 0xFE) | (displacementy / 8);
                     displacementy %= 8;
                 }
-                if (hasColorFeatures) {
-                    int attributes = colorpalette | (tilebank << 3);
-                    tileline = ReadTileLineColor(tilenumber * 16, displacementy, attributes, pram2, true);
-                } else {
-                    tileline = ReadTileLine(tilenumber * 16, displacementy, palette, true);
-                }
-                if (flipx) {
-                    Array.Reverse(tileline);
-                }
-                DrawTile(tileline, entry.X, LY, behind);
-            }
-        }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void DrawTile(uint[] tileline, int x, int y, bool behindbackground = false)
-        {
-            for (int i = 0; i < 8; i++) {
-                if (tileline[i] != 0 && x + i >= 0 && x + i < 160) {
-                    int position = y * 160 + x + i;
-                    if (!behindbackground ||
-                        hasColorFeatures ||
-                        frame[position] == GetPaletteEntry(0, BGP)) {
-                        frame[position] = tileline[i];
+                int tileAddress = tilenumber * 16 + displacementy * 2;
+                byte low = vram[tilebank, tileAddress];
+                byte high = vram[tilebank, tileAddress + 1];
+                for (int pixel = 0; pixel < 8; pixel++) {
+                    int screenX = entry.X + pixel;
+                    if ((uint)screenX >= FrameWidth) {
+                        continue;
+                    }
+
+                    int sourceX = flipx ? 7 - pixel : pixel;
+                    int bit = 7 - sourceX;
+                    int colorIndex = (((high >> bit) & 1) << 1) | ((low >> bit) & 1);
+                    if (colorIndex == 0) {
+                        continue;
+                    }
+
+                    bool backgroundIsOpaque = backgroundColorIndices[screenX] != 0;
+                    bool hidden = hasColorFeatures
+                        ? BackgroundEnable && backgroundIsOpaque &&
+                          (backgroundPriorities[screenX] != 0 || behind)
+                        : behind && backgroundIsOpaque;
+                    if (!hidden) {
+                        frame[LY * FrameWidth + screenX] = hasColorFeatures
+                            ? GetPaletteEntryColor(colorIndex, pram2, entry.Attributes & 7)
+                            : GetPaletteEntry(colorIndex, palette);
                     }
                 }
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private uint[] ReadTileLine(int tileaddress, int displacement, int palette, bool alpha = false)
+        private bool DrawsBefore(SpriteEntry left, SpriteEntry right)
         {
-            byte byte1 = vram[0, tileaddress + displacement * 2];
-            byte byte2 = vram[0, tileaddress + displacement * 2 + 1];
-            uint[] data = new uint[8];
-            for (int x = 0; x < 8; x++) {
-                int color = (((byte2 >> (7 - x)) & 1) << 1) + ((byte1 >> (7 - x)) & 1);
-                if (!alpha || color != 0) {
-                    data[x] = GetPaletteEntry(color, palette);
-                }
+            if (hasColorFeatures || left.X == right.X) {
+                return left.TableIndex > right.TableIndex;
             }
-            return data;
-        }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private uint[] ReadTileLineColor(int tileaddress, int displacement, int attributes, byte[] paletteram, bool alpha = false)
-        {
-            int bank = (attributes >> 3) & 1;
-            bool hflip = (attributes & 0x20) == 0x20;
-            bool vflip = (attributes & 0x40) == 0x40;
-            int palette = attributes & 7;
-            byte byte1;
-            byte byte2;
-            uint[] data = new uint[8];
-            if (vflip) {
-                displacement = 7 - displacement;
-            }
-            byte1 = vram[bank, tileaddress + displacement * 2];
-            byte2 = vram[bank, tileaddress + displacement * 2 + 1];
-            for (int x = 0; x < 8; x++) {
-                int color = (((byte2 >> (7 - x)) & 1) << 1) + ((byte1 >> (7 - x)) & 1);
-                if (!alpha || color != 0) {
-                    data[x] = GetPaletteEntryColor(color, paletteram, palette);
-                }
-            }
-            if (hflip) {
-                Array.Reverse(data);
-            }
-            return data;
+            return left.X > right.X;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -15,10 +15,6 @@ namespace nanoboy.Core.Audio
         public int SweepTime;
         public SweepMode SweepDirection;
         public int SweepShift;
-        public static int[] SweepClockTable = new int[] {
-            0, 32768, 65536, 98304,
-            131072, 163840, 196608, 229376
-        };
         private int lastfrequency;
         private int currentfrequency;
         private int sweepcycles;
@@ -79,6 +75,7 @@ namespace nanoboy.Core.Audio
         public int SoundLengthRaw;
         public bool StopOnLengthExpired;
         private int soundlengthcycles;
+        private bool outputActive;
 
 
         public int WavePatternDuty;
@@ -92,11 +89,12 @@ namespace nanoboy.Core.Audio
             currentfrequency = 0;
             sweepcycles = 0;
             Enabled = true;
+            outputActive = true;
         }
 
         public float Next(int samplerate)
         {
-            if (!StopOnLengthExpired || soundlengthcycles < SoundLength) {
+            if (outputActive && (!StopOnLengthExpired || soundlengthcycles < SoundLength)) {
                 float amplitude = (float)currentvolume * (1f / 16f);
                 float value = (float)(amplitude * Generate((float)((2 * Math.PI * sample *
                     Audio.ConvertFrequency(currentfrequency)) / samplerate), WaveDutyTable[WavePatternDuty]));
@@ -109,26 +107,18 @@ namespace nanoboy.Core.Audio
             }
         }
 
-        public void Tick()
+        internal void ClockLength()
         {
-            int sweepclock = SweepClockTable[SweepTime];
-            int envelopeclock = (int)(EnvelopeSweep * (1f / 64f) * 4194304f);
-
-            if (sweepclock != 0) {
-                sweepcycles++;
-                if (sweepcycles >= sweepclock) {
-                    sweepcycles = 0;
-                    lastfrequency = currentfrequency;
-                    if (SweepDirection == SweepMode.Addition) {
-                        currentfrequency = lastfrequency + lastfrequency / (1 << SweepShift);
-                    } else {
-                        currentfrequency = lastfrequency - lastfrequency / (1 << SweepShift);
-                    }
-                }
+            if (StopOnLengthExpired && soundlengthcycles < SoundLength) {
+                soundlengthcycles += EmulationClock.CpuClockHz / 256;
             }
+        }
 
+        internal void ClockEnvelope()
+        {
             if (EnvelopeSweep != 0) {
-                envelopecycles++;
+                envelopecycles += EmulationClock.CpuClockHz / 64;
+                int envelopeclock = EnvelopeSweep * (EmulationClock.CpuClockHz / 64);
                 if (envelopecycles >= envelopeclock) {
                     envelopecycles = 0;
                     if (EnvelopeDirection == EnvelopeMode.Increase) {
@@ -142,8 +132,34 @@ namespace nanoboy.Core.Audio
                     }
                 }
             }
-            if (StopOnLengthExpired) {
-                soundlengthcycles++;
+        }
+
+        internal void ClockSweep()
+        {
+            int period = SweepTime == 0 ? 8 : SweepTime;
+            sweepcycles += EmulationClock.CpuClockHz / 128;
+            if (sweepcycles < period * (EmulationClock.CpuClockHz / 128)) {
+                return;
+            }
+
+            sweepcycles = 0;
+            if (SweepShift == 0) {
+                return;
+            }
+
+            lastfrequency = currentfrequency;
+            int delta = lastfrequency >> SweepShift;
+            int nextFrequency = SweepDirection == SweepMode.Addition
+                ? lastfrequency + delta
+                : lastfrequency - delta;
+            if ((uint)nextFrequency <= 0x7FF) {
+                currentfrequency = nextFrequency;
+                if (SweepDirection == SweepMode.Addition &&
+                    nextFrequency + (nextFrequency >> SweepShift) > 0x7FF) {
+                    outputActive = false;
+                }
+            } else {
+                outputActive = false;
             }
         }
 
@@ -153,6 +169,8 @@ namespace nanoboy.Core.Audio
             sweepcycles = 0;
             soundlengthcycles = 0;
             envelopecycles = 0;
+            currentvolume = lastwrittenvolume;
+            outputActive = true;
         }
 
         private static float Generate(float x, float duty)
@@ -183,6 +201,7 @@ namespace nanoboy.Core.Audio
                 writer.Write(SoundLengthRaw);
                 writer.Write(StopOnLengthExpired);
                 writer.Write(soundlengthcycles);
+                writer.Write(outputActive);
                 writer.Write(WavePatternDuty);
                 writer.Write(sample);
             });
@@ -207,6 +226,7 @@ namespace nanoboy.Core.Audio
                 int nextSoundLengthRaw = reader.ReadInt32();
                 bool nextStopOnLengthExpired = StatePayload.ReadBoolean(reader);
                 int nextSoundLengthCycles = reader.ReadInt32();
+                bool nextOutputActive = StatePayload.ReadBoolean(reader);
                 int nextWavePatternDuty = reader.ReadInt32();
                 int nextSample = reader.ReadInt32();
 
@@ -242,6 +262,7 @@ namespace nanoboy.Core.Audio
                     SoundLengthRaw = nextSoundLengthRaw;
                     StopOnLengthExpired = nextStopOnLengthExpired;
                     soundlengthcycles = nextSoundLengthCycles;
+                    outputActive = nextOutputActive;
                     WavePatternDuty = nextWavePatternDuty;
                     sample = nextSample;
                 });

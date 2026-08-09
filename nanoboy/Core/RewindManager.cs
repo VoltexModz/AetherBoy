@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
 
 namespace nanoboy.Core
 {
@@ -10,14 +12,16 @@ namespace nanoboy.Core
 
         private readonly LinkedList<byte[]> history = new();
         private int framesSinceCapture;
+        private long storedByteCount;
 
         public int HistoryCount => history.Count;
+        public long StoredByteCount => storedByteCount;
 
         public void Initialize(Nanoboy emulator)
         {
             ArgumentNullException.ThrowIfNull(emulator);
             Clear();
-            history.AddLast(SaveState.Capture(emulator));
+            AddState(SaveState.Capture(emulator));
         }
 
         public void CaptureFrame(Nanoboy emulator)
@@ -29,8 +33,9 @@ namespace nanoboy.Core
             }
 
             framesSinceCapture = 0;
-            history.AddLast(SaveState.Capture(emulator));
+            AddState(SaveState.Capture(emulator));
             if (history.Count > MaximumStates) {
+                storedByteCount -= history.First!.Value.LongLength;
                 history.RemoveFirst();
             }
         }
@@ -46,10 +51,11 @@ namespace nanoboy.Core
                 if (history.Count == 1) {
                     return false;
                 }
+                storedByteCount -= history.Last!.Value.LongLength;
                 history.RemoveLast();
             }
 
-            SaveState.Restore(emulator, history.Last!.Value);
+            SaveState.Restore(emulator, Decompress(history.Last!.Value));
             framesSinceCapture = 0;
             return true;
         }
@@ -58,6 +64,35 @@ namespace nanoboy.Core
         {
             history.Clear();
             framesSinceCapture = 0;
+            storedByteCount = 0;
+        }
+
+        private void AddState(byte[] state)
+        {
+            byte[] compressed = Compress(state);
+            history.AddLast(compressed);
+            storedByteCount += compressed.LongLength;
+        }
+
+        private static byte[] Compress(byte[] state)
+        {
+            using var destination = new MemoryStream();
+            using (var compressor = new BrotliStream(
+                destination,
+                CompressionLevel.Fastest,
+                leaveOpen: true)) {
+                compressor.Write(state, 0, state.Length);
+            }
+            return destination.ToArray();
+        }
+
+        private static byte[] Decompress(byte[] state)
+        {
+            using var source = new MemoryStream(state, writable: false);
+            using var decompressor = new BrotliStream(source, CompressionMode.Decompress);
+            using var destination = new MemoryStream();
+            decompressor.CopyTo(destination);
+            return destination.ToArray();
         }
     }
 }

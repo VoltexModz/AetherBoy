@@ -1,8 +1,8 @@
 # AetherBoy
 
-> **Status: Alpha / experimentell.** AetherBoy ist eine laufende Modernisierung und noch kein verlässlicher Emulator-Release. ROM-gebundene Save States und ein begrenzter Rewind-Puffer sind seit Phase 4 aktiviert; Link-Kabel und mehrere Hardware-Randfälle bleiben offen.
+> **Status: Alpha / experimentell.** AetherBoy ist eine laufende Modernisierung und noch kein verlässlicher Emulator-Release. Phase 5 ergänzt Timing- und Prioritätskorrekturen, einen seriellen Headless-Conformance-Runner und komprimierten Rewind; Link-Kabel und mehrere Hardware-Randfälle bleiben offen.
 
-AetherBoy ist ein Windows-Emulator für Game Boy und Game Boy Color in C#. Das Projekt begann 2014 als `nanoboy` und wurde später als **ChiiBoy Color** weitergeführt. Produkt und Assembly heißen jetzt einheitlich **AetherBoy 4.4.0-alpha.1**; der historische Namespace und Projektordner `nanoboy` bleiben vorerst erhalten.
+AetherBoy ist ein Windows-Emulator für Game Boy und Game Boy Color in C#. Das Projekt begann 2014 als `nanoboy` und wurde später als **ChiiBoy Color** weitergeführt. Produkt und Assembly heißen jetzt einheitlich **AetherBoy 4.5.0-alpha.1**; der historische Namespace und Projektordner `nanoboy` bleiben vorerst erhalten.
 
 AetherBoy ist weder von Nintendo autorisiert noch mit Nintendo verbunden. Game Boy, Game Boy Color und zugehörige Produktnamen sind Marken ihrer jeweiligen Rechteinhaber.
 
@@ -14,10 +14,12 @@ AetherBoy ist weder von Nintendo autorisiert noch mit Nintendo verbunden. Game B
 - verwaltete WinForms-Bildausgabe mit Sharp-, Smooth- und LCD-Grid-Filter
 - NAudio-WinMM-Ausgabe als Windows-Adapter außerhalb des Emulator-Cores
 - zusammengeführte Tastatur- und XInput-Eingabe ohne gegenseitiges Freigeben gehaltener Tasten
-- 94 deterministische Tests einschließlich Mapper-, RTC-, STAT-, DMA-, Save-State-, Rewind-, Owner-Thread-, WAV-, UI- und generierten ROM-End-to-End-Gates
+- 107 deterministische Tests einschließlich Mapper-, RTC-, STAT-, DMA-, PPU-Prioritäts-, APU-Sequencer-, Save-State-, Rewind-, Owner-Thread-, WAV-, UI- und generierten ROM-End-to-End-Gates
 - reproduzierbarer NuGet-Restore sowie Windows- und Linux-Gates in GitHub Actions
 
-Phase 4 vervollständigt den deterministischen Zustandsvertrag: CPU-Transienten, Scheduler, Speicher, Timer, Interrupts, PPU-Puffer und -Paletten, APU-Oszillatoren und -Puffer, Mapper-RAM/RTC, DMA, Joypad und Serial-Zustand werden in versionierten Pflichtsektionen erfasst. Ein Load validiert Integrität, exakte ROM-Identität, Hardwaremodell und sämtliche Komponenten, bevor irgendein laufender Zustand verändert wird. Save/Load/Rewind laufen als geordnete Owner-Thread-Befehle; Dateizugriffe bleiben asynchron außerhalb der Emulation.
+Phase 5 schließt mehrere konkrete Hardwarelücken: STOP schläft bis zu einer neuen Joypad-Flanke, OAM-DMA überträgt ein Byte je vier T-Zyklen und sperrt dabei den CPU-Bus, DMG/CGB-Pixelpriorität basiert auf rohen Farbindizes und CGB-Attributen, und die APU taktet Länge, Sweep und Envelope über den 512-Hz-Frame-Sequencer. Ein begrenzter Headless-Runner wertet das serielle `Passed`/`Failed`-Protokoll generierter oder externer Test-ROMs aus. Rewind-Zustände werden komprimiert und ein 300-Frame-Replay schützt die deterministische Fortsetzung.
+
+Der vollständige Zustandsvertrag aus Phase 4 bleibt erhalten und wurde für die neuen CPU-, DMA-, Serial- und APU-Zustände auf Komponentenschema 2 erweitert. Zustände aus dem vorherigen Schema werden bewusst abgelehnt; eine automatische Migration ist noch nicht vorhanden.
 
 ## Funktionsstatus
 
@@ -25,20 +27,20 @@ Phase 4 vervollständigt den deterministischen Zustandsvertrag: CPU-Transienten,
 
 | Bereich | Status | Bekannte Einschränkung |
 | --- | --- | --- |
-| CPU und Scheduler | experimentell | Double-Speed, EI/DI, Interruptkosten, HALT-Wakeup und HALT-Bug besitzen Regressionstests; Buszugriffe sind noch nicht T-Zyklus-genau und der vollständige STOP-Ruhemodus fehlt. |
+| CPU und Scheduler | verbessert, experimentell | Double-Speed, EI/DI, Interruptkosten, HALT-Wakeup, HALT-Bug sowie STOP-Ruhemodus und Joypad-Wakeup besitzen Regressionstests; Instruktionen bleiben intern atomar und allgemeine Buszugriffe sind noch nicht T-Zyklus-genau. |
 | Timer | verbessert, experimentell | 16-Bit-Divider, TAC-Flanken und verzögerter Overflow sind getestet; seltene Schreibkollisionen im Reload-Takt bleiben angenähert. |
-| Bildausgabe | verbessert, experimentell | Kombinierte STAT-Flanken, LCD-Abschaltung, VRAM-/OAM-Zugriffsfenster, Fenster-Clipping, Paletten-Wrap und mehrere Sprite-Randfälle sind getestet; vollständige FIFO- und CGB-Pixelpriorität fehlen noch. |
-| DMA | verbessert, experimentell | OAM-DMA kopiert alle 160 Bytes; General- und HBlank-DMA übertragen sequenziell, aktualisieren Register und unterstützen Abbruch. OAM-DMA ist noch nicht Takt-für-Takt modelliert. |
+| Bildausgabe | verbessert, experimentell | Kombinierte STAT-Flanken, LCD-Abschaltung, VRAM-/OAM-Zugriffsfenster, Fenster-Clipping, Paletten-Wrap sowie DMG/CGB-Hintergrund-/Sprite-Priorität sind getestet; ein echter Pixel-FIFO und dessen variable Mode-3-Länge fehlen noch. |
+| DMA | verbessert, experimentell | OAM-DMA kopiert 160 Bytes in 640 T-Zyklen und sperrt den CPU-Bus bis auf HRAM; General- und HBlank-DMA übertragen sequenziell, aktualisieren Register und unterstützen Abbruch. CGB-Buskonflikte und CPU-Stalls der CGB-DMA-Modi bleiben angenähert. |
 | DMG/CGB-ROM-Laden | verbessert, experimentell | Header-, Titel-, Größen- und Truncation-Prüfung sowie stabile ROM-Identität sind vorhanden; nur legal beschaffte ROM-Dumps verwenden. |
 | MBC1/MBC2/MBC3/MBC5 | implementiert, experimentell | Banking, RAM-Freigabe, MBC2-Nibble-RAM, MBC3-RTC mit Halt/Carry/Latch und MBC5-Rumble-Maske sind getestet; MBC1M-Sonderverdrahtung bleibt offen. |
 | MBC4 und weitere Spezialmapper | nicht freigegeben | MMM01, MBC4, Pocket Camera, HuC1/HuC3 und weitere Spezialhardware werden mit klarer Fehlermeldung abgelehnt. |
-| NAudio-Ausgabe | verbessert, experimentell | Masterclock, Sample-Akkumulator, Puffergröße und Kanal-Längenzähler wurden korrigiert; der APU-Frame-Sequencer ist noch nicht vollständig hardwaregetreu. |
+| NAudio-Ausgabe | verbessert, experimentell | Masterclock, Sample-Akkumulator, Puffergröße und der 512-Hz-APU-Frame-Sequencer für Länge, Sweep und Envelope sind getestet; DAC-Power, exakte Frequenz-Timer und mehrere Register-Nebenwirkungen bleiben angenähert. |
 | WAV-Aufnahme | verbessert, experimentell | Schreiben und Header-Finalisierung sind synchronisiert und getestet; Datei-I/O und Stop laufen außerhalb des UI- und Emulations-Threads. Lange Aufnahmen und Gerätefehler benötigen noch breitere Praxistests. |
 | Save States | implementiert, experimentell | Fünf Slots (`.ss1` bis `.ss5`), F5/F8 und Controller-Shortcuts sind aktiv. Zustände sind SHA-256-geschützt und an die exakte ROM sowie DMG/CGB gebunden; eine spätere Schema-Version kann eine Migration erfordern. |
-| Rewind | implementiert, experimentell | Erfasst alle vier Frames und hält höchstens 150 Zustände (rund zehn Sekunden). Der Puffer ist sitzungsgebunden und wird bei Reset oder geladenem Save State neu begonnen. |
+| Rewind | implementiert, experimentell | Erfasst alle vier Frames, hält höchstens 150 Brotli-komprimierte Zustände (rund zehn Sekunden) und veröffentlicht den tatsächlich belegten Speicher. Der Puffer ist sitzungsgebunden und wird bei Reset oder geladenem Save State neu begonnen. |
 | GameShark | teilweise implementiert | Einfache RAM-Writes sind vorhanden; Validierung und Nebenwirkungsgrenzen fehlen. |
 | Game Genie | deaktiviert | Codes werden noch nicht im ROM-Lesepfad angewendet. |
-| Link-Kabel/Netplay | nicht funktionsfähig | TCP-Oberfläche und emulierte serielle Hardware sind nicht taktgenau verbunden. |
+| Serial/Link-Kabel | teilweise implementiert | Der unmittelbare Byte-Transfer, Serial-Interrupt und ein begrenzter `Passed`/`Failed`-Conformance-Runner sind vorhanden; TCP-Link-Kabel, Bit-Timing und zwei gekoppelte Emulatorinstanzen fehlen. |
 | Debugger/Disassembler | intern/experimentell | Kein vollständiger Pause-/Step-Workflow; mehrere Grenzfälle sind ungeprüft. |
 
 ## Bauen, testen und starten

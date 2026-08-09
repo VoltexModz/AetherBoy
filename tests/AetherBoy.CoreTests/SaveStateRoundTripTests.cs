@@ -42,6 +42,22 @@ public sealed class SaveStateRoundTripTests
     }
 
     [TestMethod]
+    public void LongRunReplay_RemainsByteIdenticalAfterThreeHundredFrames()
+    {
+        using var fixture = new EmulatorFixture(romMarker: 0x23);
+        MutateState(fixture.Emulator);
+        byte[] origin = SaveState.Capture(fixture.Emulator);
+
+        RunFrames(fixture.Emulator, 300);
+        byte[] expectedFuture = SaveState.Capture(fixture.Emulator);
+
+        SaveState.Restore(fixture.Emulator, origin);
+        RunFrames(fixture.Emulator, 300);
+
+        CollectionAssert.AreEqual(expectedFuture, SaveState.Capture(fixture.Emulator));
+    }
+
+    [TestMethod]
     public void DifferentRom_IsRejectedWithoutMutatingTheTarget()
     {
         using var source = new EmulatorFixture(romMarker: 0x31);
@@ -147,6 +163,22 @@ public sealed class SaveStateRoundTripTests
         Assert.AreEqual(150, rewind.HistoryCount);
         rewind.Clear();
         Assert.AreEqual(0, rewind.HistoryCount);
+        Assert.AreEqual(0L, rewind.StoredByteCount);
+    }
+
+    [TestMethod]
+    public void RewindManager_CompressesItsRetainedSnapshots()
+    {
+        using var fixture = new EmulatorFixture(romMarker: 0x53);
+        byte[] rawState = SaveState.Capture(fixture.Emulator);
+        var rewind = new RewindManager();
+
+        rewind.Initialize(fixture.Emulator);
+        RunFrames(fixture.Emulator, 4, rewind);
+
+        Assert.AreEqual(2, rewind.HistoryCount);
+        Assert.IsLessThan(rawState.LongLength * rewind.HistoryCount, rewind.StoredByteCount,
+            "Rewind history should retain compressed rather than full raw states.");
     }
 
     [TestMethod]
@@ -192,11 +224,13 @@ public sealed class SaveStateRoundTripTests
         memory.WriteByte(0xFF21, 0xD5);
         memory.WriteByte(0xFF22, 0x6B);
         memory.WriteByte(0xFF23, 0xC0);
+        memory.WriteByte(0xFF02, 0x01);
         memory.WriteByte(0xFF51, 0xC0);
         memory.WriteByte(0xFF52, 0x00);
         memory.WriteByte(0xFF53, 0x10);
         memory.WriteByte(0xFF54, 0x00);
         memory.WriteByte(0xFF55, 0x82);
+        memory.WriteByte(0xFF46, 0xC0);
     }
 
     private static void RunFrames(Nanoboy emulator, int count, RewindManager? rewind = null)

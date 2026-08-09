@@ -116,13 +116,117 @@ public sealed class VideoTimingTests
         Assert.AreEqual(0, video.ObjectPaletteIndex);
     }
 
+    [TestMethod]
+    public void CgbBackgroundPriority_ObeysTheLcdcMasterPriorityBit()
+    {
+        Video priorityEnabled = CreatePriorityScene(hasColorFeatures: true, lcdc: 0x93);
+        Video priorityDisabled = CreatePriorityScene(hasColorFeatures: true, lcdc: 0x92);
+        int[] enabledFrame = RenderFrame(priorityEnabled);
+        int[] disabledFrame = RenderFrame(priorityDisabled);
+
+        Assert.AreEqual(unchecked((int)0xFFF80000u), enabledFrame[0],
+            "A priority background pixel must cover the sprite while LCDC.0 is set.");
+        Assert.AreEqual(unchecked((int)0xFF00F800u), disabledFrame[0],
+            "CGB background pixels remain visible with LCDC.0 clear, but lose priority.");
+    }
+
+    [TestMethod]
+    public void DmgSpritePriority_UsesTheRawBackgroundColorIndex()
+    {
+        Video video = CreateVideo(out _);
+        video.BGP = 0x00;
+        video.OBP0 = 0x0C;
+        video.WriteVRAMDirect(0, 0x0000, 0x80);
+        video.WriteVRAMDirect(0, 0x0010, 0x80);
+        video.WriteOAMDirect(0, 16);
+        video.WriteOAMDirect(1, 8);
+        video.WriteOAMDirect(2, 1);
+        video.WriteOAMDirect(3, 0x80);
+        video.WriteLcdc(0x93);
+
+        int[] frame = RenderFrame(video);
+
+        Assert.AreEqual(unchecked((int)0xFFF5F5F5u), frame[0],
+            "Background color 1 must remain opaque even when the palette maps it to color 0.");
+    }
+
+    [TestMethod]
+    public void DmgBackgroundDisable_ClearsPriorityForBehindSprites()
+    {
+        Video video = CreateVideo(out _);
+        video.OBP0 = 0x0C;
+        video.WriteVRAMDirect(0, 0x0010, 0x80);
+        video.WriteOAMDirect(0, 16);
+        video.WriteOAMDirect(1, 8);
+        video.WriteOAMDirect(2, 1);
+        video.WriteOAMDirect(3, 0x80);
+        video.WriteLcdc(0x92);
+
+        int[] frame = RenderFrame(video);
+
+        Assert.AreEqual(unchecked((int)0xFF000000u), frame[0]);
+    }
+
+    [TestMethod]
+    public void RenderingACompleteFrame_DoesNotAllocatePerTileOrPerScanline()
+    {
+        Video video = CreateVideo(out _);
+        Tick(video, EmulationClock.DotsPerFrame);
+
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        Tick(video, EmulationClock.DotsPerFrame);
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.IsLessThan(1_024L, allocated,
+            $"A complete video frame allocated {allocated} bytes.");
+    }
+
     private static Video CreateVideo(out Interrupt interrupt)
+    {
+        return CreateVideo(hasColorFeatures: false, out interrupt);
+    }
+
+    private static Video CreateVideo(bool hasColorFeatures, out Interrupt interrupt)
     {
         var cpu = new CPU();
         interrupt = new Interrupt(cpu);
-        var video = new Video(interrupt, new HDMA(null!), hasColorFeatures: false);
+        var video = new Video(interrupt, new HDMA(null!), hasColorFeatures);
         video.WriteLcdc(0x91);
         return video;
+    }
+
+    private static Video CreatePriorityScene(bool hasColorFeatures, byte lcdc)
+    {
+        Video video = CreateVideo(hasColorFeatures, out _);
+        video.WriteLcdc(0x00);
+
+        video.BackgroundPaletteIndex = 2;
+        video.WritePRAM(0, 0x1F);
+        video.BackgroundPaletteIndex = 3;
+        video.WritePRAM(0, 0x00);
+        video.ObjectPaletteIndex = 2;
+        video.WritePRAM(1, 0xE0);
+        video.ObjectPaletteIndex = 3;
+        video.WritePRAM(1, 0x03);
+
+        video.WriteVRAMDirect(0, 0x0000, 0x80);
+        video.WriteVRAMDirect(1, 0x1800, 0x80);
+        video.WriteVRAMDirect(0, 0x0010, 0x80);
+        video.WriteOAMDirect(0, 16);
+        video.WriteOAMDirect(1, 8);
+        video.WriteOAMDirect(2, 1);
+        video.WriteOAMDirect(3, 0x00);
+        video.WriteLcdc(lcdc);
+        return video;
+    }
+
+    private static int[] RenderFrame(Video video)
+    {
+        int[] snapshot = new int[Video.FramePixelCount];
+        long sequence = 0;
+        Tick(video, EmulationClock.DotsPerFrame);
+        Assert.IsTrue(video.TryCopyPublishedFrame(snapshot, ref sequence));
+        return snapshot;
     }
 
     private static void Tick(Video video, int count)

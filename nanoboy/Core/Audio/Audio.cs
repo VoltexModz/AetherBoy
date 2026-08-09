@@ -58,9 +58,13 @@ namespace nanoboy.Core.Audio
 
     public sealed class Audio : IDisposable
     {
+        private const int FrameSequencerPeriod = EmulationClock.CpuClockHz / 512;
+
         private readonly AudioSampleClock sampleClock;
         private readonly List<float> sampleBuffer;
         private int sampleRate;
+        private int frameSequencerDivider;
+        private int frameSequencerStep;
         private bool disposed;
 
         public Audio()
@@ -116,9 +120,7 @@ namespace nanoboy.Core.Audio
                 throw new ObjectDisposedException(nameof(Audio));
             }
 
-            Channel1.Tick();
-            Channel2.Tick();
-            Channel3.Tick();
+            TickFrameSequencer();
             Channel4.Tick();
 
             if (!sampleClock.Tick(SampleRate))
@@ -150,8 +152,42 @@ namespace nanoboy.Core.Audio
 
         internal void ResetTiming()
         {
+            frameSequencerDivider = 0;
+            frameSequencerStep = 0;
             sampleClock.Reset();
             sampleBuffer.Clear();
+        }
+
+        private void TickFrameSequencer()
+        {
+            frameSequencerDivider++;
+            if (frameSequencerDivider < FrameSequencerPeriod)
+            {
+                return;
+            }
+
+            frameSequencerDivider = 0;
+            if ((frameSequencerStep & 1) == 0)
+            {
+                Channel1.ClockLength();
+                Channel2.ClockLength();
+                Channel3.ClockLength();
+                Channel4.ClockLength();
+            }
+
+            if (frameSequencerStep == 2 || frameSequencerStep == 6)
+            {
+                Channel1.ClockSweep();
+            }
+
+            if (frameSequencerStep == 7)
+            {
+                Channel1.ClockEnvelope();
+                Channel2.ClockEnvelope();
+                Channel4.ClockEnvelope();
+            }
+
+            frameSequencerStep = (frameSequencerStep + 1) & 7;
         }
 
         internal byte[] CaptureStatePayload()
@@ -161,6 +197,8 @@ namespace nanoboy.Core.Audio
                 writer.Write(sampleRate);
                 writer.Write(BufferSize);
                 writer.Write(sampleClock.CaptureState());
+                writer.Write(frameSequencerDivider);
+                writer.Write(frameSequencerStep);
                 writer.Write(sampleBuffer.Count);
                 for (int index = 0; index < sampleBuffer.Count; index++) {
                     writer.Write(sampleBuffer[index]);
@@ -179,12 +217,20 @@ namespace nanoboy.Core.Audio
                 int nextSampleRate = reader.ReadInt32();
                 int nextBufferSize = reader.ReadInt32();
                 long nextAccumulator = reader.ReadInt64();
+                int nextFrameSequencerDivider = reader.ReadInt32();
+                int nextFrameSequencerStep = reader.ReadInt32();
                 int nextSampleCount = reader.ReadInt32();
                 StatePayload.RequireRange(nextSampleRate, 8_000, 192_000, nameof(sampleRate));
                 StatePayload.RequireRange(nextBufferSize, 1, 1_048_576, nameof(BufferSize));
                 if (nextAccumulator < 0 || nextAccumulator >= EmulationClock.CpuClockHz) {
                     throw new InvalidOperationException("Audio sample-clock accumulator is invalid.");
                 }
+                StatePayload.RequireRange(
+                    nextFrameSequencerDivider,
+                    0,
+                    FrameSequencerPeriod - 1,
+                    nameof(frameSequencerDivider));
+                StatePayload.RequireRange(nextFrameSequencerStep, 0, 7, nameof(frameSequencerStep));
                 StatePayload.RequireRange(nextSampleCount, 0, nextBufferSize - 1, "sampleBuffer.Count");
                 var nextSamples = new float[nextSampleCount];
                 for (int index = 0; index < nextSamples.Length; index++) {
@@ -204,6 +250,8 @@ namespace nanoboy.Core.Audio
                     sampleRate = nextSampleRate;
                     BufferSize = nextBufferSize;
                     sampleClock.RestoreState(nextAccumulator);
+                    frameSequencerDivider = nextFrameSequencerDivider;
+                    frameSequencerStep = nextFrameSequencerStep;
                     sampleBuffer.Clear();
                     sampleBuffer.AddRange(nextSamples);
                     restoreChannel1();

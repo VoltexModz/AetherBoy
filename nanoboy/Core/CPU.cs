@@ -114,6 +114,7 @@ namespace nanoboy.Core
 
         public bool IME;
         public bool WaitForInterrupt;
+        public bool IsStopped { get; private set; }
         private int imeEnableDelay;
         private bool haltBug;
 
@@ -506,6 +507,8 @@ namespace nanoboy.Core
                     if (PrepareSpeedSwitch) {
                         IsDoubleSpeed = !IsDoubleSpeed;
                         PrepareSpeedSwitch = false;
+                    } else {
+                        IsStopped = true;
                     }
                     pc += 2;
                     };
@@ -2021,7 +2024,7 @@ namespace nanoboy.Core
 
         public int Tick()
         {
-            if (!Running || WaitForInterrupt) {
+            if (!Running || WaitForInterrupt || IsStopped) {
                 return 4;
             }
 
@@ -2191,10 +2194,16 @@ namespace nanoboy.Core
             Running = true;
             IME = false;
             WaitForInterrupt = false;
+            IsStopped = false;
             imeEnableDelay = 0;
             haltBug = false;
             PrepareSpeedSwitch = false;
             IsDoubleSpeed = false;
+        }
+
+        internal void WakeFromStop()
+        {
+            IsStopped = false;
         }
 
         #endregion
@@ -3429,6 +3438,7 @@ namespace nanoboy.Core
                 writer.Write(wroteflagreg);
                 writer.Write(IME);
                 writer.Write(WaitForInterrupt);
+                writer.Write(IsStopped);
                 writer.Write(imeEnableDelay);
                 writer.Write(haltBug);
                 writer.Write(branched);
@@ -3459,6 +3469,7 @@ namespace nanoboy.Core
                 bool nextWroteFlagRegister = StatePayload.ReadBoolean(reader);
                 bool nextIme = StatePayload.ReadBoolean(reader);
                 bool nextWaitForInterrupt = StatePayload.ReadBoolean(reader);
+                bool nextIsStopped = StatePayload.ReadBoolean(reader);
                 int nextImeEnableDelay = reader.ReadInt32();
                 bool nextHaltBug = StatePayload.ReadBoolean(reader);
                 bool nextBranched = StatePayload.ReadBoolean(reader);
@@ -3488,6 +3499,7 @@ namespace nanoboy.Core
                     wroteflagreg = nextWroteFlagRegister;
                     IME = nextIme;
                     WaitForInterrupt = nextWaitForInterrupt;
+                    IsStopped = nextIsStopped;
                     imeEnableDelay = nextImeEnableDelay;
                     haltBug = nextHaltBug;
                     branched = nextBranched;

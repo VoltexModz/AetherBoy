@@ -24,6 +24,12 @@ namespace nanoboy.Core
 
         public void Frame()
         {
+            if (Cpu.IsStopped)
+            {
+                Memory.Video.FrameReady = false;
+                return;
+            }
+
             int dotBudget = EmulationClock.DotsPerFrame - dotOvershoot;
             int dotsExecuted = 0;
 
@@ -48,6 +54,7 @@ namespace nanoboy.Core
                     // DIV/TIMA are driven by the CPU clock and therefore continue to
                     // receive every T-cycle in CGB double-speed mode.
                     Memory.Timer.Tick();
+                    Memory.HDMA.TickOamDma();
 
                     if (doubleSpeed)
                     {

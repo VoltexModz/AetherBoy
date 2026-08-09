@@ -20,14 +20,16 @@ namespace nanoboy.Core
     public sealed class Joypad
     {
         private readonly Interrupt interrupt;
+        private readonly Action wakeFromStop;
         private GameBoyButtons pressedButtons;
 
         public bool SelectButtonKeys;
         public bool SelectDirectionKeys;
 
-        public Joypad(Interrupt interrupt)
+        public Joypad(Interrupt interrupt, Action wakeFromStop = null)
         {
             this.interrupt = interrupt ?? throw new ArgumentNullException(nameof(interrupt));
+            this.wakeFromStop = wakeFromStop;
         }
 
         public GameBoyButtons PressedButtons => pressedButtons;
@@ -83,7 +85,11 @@ namespace nanoboy.Core
             }
 
             int previousLines = ReadRegister() & 0x0F;
+            GameBoyButtons newlyPressed = pressedButtons & ~this.pressedButtons;
             this.pressedButtons = pressedButtons;
+            if (newlyPressed != GameBoyButtons.None) {
+                wakeFromStop?.Invoke();
+            }
             RequestInterruptForFallingLines(previousLines);
         }
 

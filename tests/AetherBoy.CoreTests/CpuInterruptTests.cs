@@ -109,6 +109,29 @@ public sealed class CpuInterruptTests
     }
 
     [TestMethod]
+    public void Stop_WithoutSpeedSwitchSleepsUntilAButtonTransition()
+    {
+        var memory = new TestMemory();
+        var cpu = CreateCpu(memory);
+        memory[0] = 0x10;
+        memory[1] = 0x00;
+        memory[2] = 0x00;
+
+        cpu.Tick();
+
+        Assert.IsTrue(cpu.IsStopped);
+        Assert.AreEqual((ushort)2, cpu.PC);
+        cpu.Tick();
+        Assert.AreEqual((ushort)2, cpu.PC);
+
+        var joypad = new Joypad(new Interrupt(cpu), cpu.WakeFromStop);
+        joypad.SetButtons(GameBoyButtons.A);
+        Assert.IsFalse(cpu.IsStopped);
+        cpu.Tick();
+        Assert.AreEqual((ushort)3, cpu.PC);
+    }
+
+    [TestMethod]
     public void InterruptService_UsesPriorityAndConsumesTwentyCpuTicks()
     {
         var memory = new TestMemory();

@@ -20,6 +20,7 @@ namespace nanoboy.Core
         private int wrambank;
         private byte[] hram;
         private ISerialDevice serial;
+        private byte serialControl;
         public byte[] BootROM;
         public bool BootROMEnabled;
 
@@ -43,14 +44,19 @@ namespace nanoboy.Core
             hram = new byte[0x7F];
             Audio = new Audio.Audio();
             serial = new SerialConsole();
+            serialControl = 0;
             Interrupt = new Interrupt(cpu);
             Video = new Video(Interrupt, hdma, rom.HasColorFeatures);
-            Joypad = new Joypad(Interrupt);
+            Joypad = new Joypad(Interrupt, cpu.WakeFromStop);
             Timer = new Timer(Interrupt);
         }
 
         public byte ReadByte(int address)
         {
+            if (hdma.IsCpuBusBlocked(address)) {
+                return 0xFF;
+            }
+
             if (BootROMEnabled && BootROM != null) {
                 if (address < 0x0100) {
                     return BootROM[address];
@@ -86,6 +92,8 @@ namespace nanoboy.Core
                         return Joypad.ReadRegister();
                     case 0x01:
                         return serial.Read();
+                    case 0x02:
+                        return (byte)((rom.HasColorFeatures ? 0x7C : 0x7E) | serialControl);
                     case 0x04:
                         return (byte)Timer.DIV;
                     case 0x05:
@@ -241,6 +249,14 @@ namespace nanoboy.Core
 
         internal byte ReadByteForDma(int address)
         {
+            if (BootROMEnabled && BootROM != null) {
+                if (address < 0x0100) {
+                    return BootROM[address];
+                }
+                if (BootROM.Length > 0x0100 && address >= 0x0200 && address < 0x0900) {
+                    return BootROM[address];
+                }
+            }
             if (address <= 0x7FFF) {
                 return mbc.ReadByte(address);
             }
@@ -268,6 +284,10 @@ namespace nanoboy.Core
 
         public void WriteByte(int address, byte value)
         {
+            if (hdma.IsCpuBusBlocked(address)) {
+                return;
+            }
+
             if (address <= 0x7FFF) {
                 mbc.WriteByte(address, value);
             } else if (address <= 0x9FFF) {
@@ -295,8 +315,10 @@ namespace nanoboy.Core
                         serial.Write(value);
                         break;
                     case 0x02:
+                        serialControl = (byte)(value & (rom.HasColorFeatures ? 0x03 : 0x01));
                         if ((value & 0x80) == 0x80) {
                             serial.Start();
+                            Interrupt.Request(8);
                         }
                         break;
                     case 0x04:
@@ -432,10 +454,7 @@ namespace nanoboy.Core
                         Video.WriteLyc(value);
                         break;
                     case 0x46:
-                        int address2 = value << 8;
-                        for (int i = 0; i < 0xA0; i++) {
-                            Video.WriteOAMDirect(i, ReadByteForDma(address2 + i));
-                        }
+                        hdma.StartOamDma(value);
                         break;
                     case 0x47:
                         Video.BGP = value;
@@ -518,8 +537,12 @@ namespace nanoboy.Core
         public void Dispose()
         {
             try {
-                if (mbc is IDisposable disposableMapper) {
-                    disposableMapper.Dispose();
+                try {
+                    serial.Stop();
+                } finally {
+                    if (mbc is IDisposable disposableMapper) {
+                        disposableMapper.Dispose();
+                    }
                 }
             } finally {
                 Audio.Dispose();
@@ -547,6 +570,7 @@ namespace nanoboy.Core
                     }
                 }
                 writer.Write(hram);
+                writer.Write(serialControl);
             });
         }
 
@@ -573,6 +597,8 @@ namespace nanoboy.Core
                 StatePayload.RequireRange(nextWramBank, 1, 7, nameof(wrambank));
                 byte[] nextWram = StatePayload.ReadBytes(reader, 8 * 0x1000, "WRAM");
                 byte[] nextHram = StatePayload.ReadBytes(reader, 0x7F, "HRAM");
+                int nextSerialControl = reader.ReadByte();
+                StatePayload.RequireRange(nextSerialControl, 0, 3, nameof(serialControl));
 
                 return (Action)(() => {
                     BootROMEnabled = nextBootRomEnabled;
@@ -584,8 +610,20 @@ namespace nanoboy.Core
                         }
                     }
                     Array.Copy(nextHram, hram, hram.Length);
+                    serialControl = (byte)nextSerialControl;
                 });
             });
+        }
+
+        public void AttachSerialDevice(ISerialDevice device)
+        {
+            if (device == null) {
+                throw new ArgumentNullException(nameof(device));
+            }
+
+            serial.Stop();
+            serial = device;
+            serialControl = 0;
         }
 
         internal byte[] CaptureSerialStatePayload()

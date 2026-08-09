@@ -7,7 +7,7 @@ namespace AetherBoy.CoreTests;
 public sealed class DmaTests
 {
     [TestMethod]
-    public void OamDma_CopiesAllOneHundredSixtyBytes()
+    public void OamDma_CopiesOneByteEveryFourCpuTicksAndBlocksTheCpuBus()
     {
         using var fixture = new EmulatorFixture();
         for (int index = 0; index < 0xA0; index++) {
@@ -16,12 +16,32 @@ public sealed class DmaTests
 
         fixture.Emulator.Memory.WriteByte(0xFF46, 0xC0);
 
+        Assert.IsTrue(fixture.Emulator.Memory.HDMA.IsOamTransferActive);
+        Assert.AreEqual(0, fixture.Emulator.Memory.Video.ReadOAMDirect(0));
+        Assert.AreEqual(0xFF, fixture.Emulator.Memory.ReadByte(0xC000));
+        fixture.Emulator.Memory.WriteByte(0xC000, 0x00);
+        fixture.Emulator.Memory.WriteByte(0xFF80, 0xA5);
+        Assert.AreEqual(0xA5, fixture.Emulator.Memory.ReadByte(0xFF80));
+
+        for (int tick = 0; tick < 3; tick++) {
+            fixture.Emulator.Memory.HDMA.TickOamDma();
+        }
+        Assert.AreEqual(0, fixture.Emulator.Memory.Video.ReadOAMDirect(0));
+        fixture.Emulator.Memory.HDMA.TickOamDma();
+        Assert.AreEqual((byte)0x5A, fixture.Emulator.Memory.Video.ReadOAMDirect(0));
+
+        for (int tick = 4; tick < 0xA0 * 4; tick++) {
+            fixture.Emulator.Memory.HDMA.TickOamDma();
+        }
+
         for (int index = 0; index < 0xA0; index++) {
             Assert.AreEqual(
                 (byte)(index ^ 0x5A),
                 fixture.Emulator.Memory.Video.ReadOAMDirect(index),
                 $"OAM byte {index:X2}");
         }
+        Assert.IsFalse(fixture.Emulator.Memory.HDMA.IsOamTransferActive);
+        Assert.AreEqual((byte)0x5A, fixture.Emulator.Memory.ReadByte(0xC000));
     }
 
     [TestMethod]

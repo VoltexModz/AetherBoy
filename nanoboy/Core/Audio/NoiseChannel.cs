@@ -75,7 +75,6 @@ namespace nanoboy.Core.Audio
 
         public void Tick()
         {
-            int envelopeClock = (int)(EnvelopeSweep * (1f / 64f) * EmulationClock.CpuClockHz);
             int frequencyPeriod = Math.Max(1, (int)(EmulationClock.CpuClockHz / ResultFrequency));
 
             frequencyCycles++;
@@ -90,9 +89,14 @@ namespace nanoboy.Core.Audio
                 }
             }
 
+        }
+
+        internal void ClockEnvelope()
+        {
             if (EnvelopeSweep != 0)
             {
-                envelopeCycles++;
+                envelopeCycles += EmulationClock.CpuClockHz / 64;
+                int envelopeClock = EnvelopeSweep * (EmulationClock.CpuClockHz / 64);
                 if (envelopeCycles >= envelopeClock)
                 {
                     envelopeCycles = 0;
@@ -109,10 +113,13 @@ namespace nanoboy.Core.Audio
                     }
                 }
             }
+        }
 
-            if (StopOnLengthExpired)
+        internal void ClockLength()
+        {
+            if (StopOnLengthExpired && soundLengthCycles < SoundLength)
             {
-                soundLengthCycles++;
+                soundLengthCycles += EmulationClock.CpuClockHz / 256;
             }
         }
 

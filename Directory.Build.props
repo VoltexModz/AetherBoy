@@ -2,9 +2,9 @@
   <PropertyGroup>
     <Deterministic>true</Deterministic>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-    <Version>4.4.0-alpha.1</Version>
-    <AssemblyVersion>4.4.0.0</AssemblyVersion>
-    <FileVersion>4.4.0.0</FileVersion>
+    <Version>4.5.0-alpha.1</Version>
+    <AssemblyVersion>4.5.0.0</AssemblyVersion>
+    <FileVersion>4.5.0.0</FileVersion>
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditMode>all</NuGetAuditMode>
     <NuGetAuditLevel>low</NuGetAuditLevel>

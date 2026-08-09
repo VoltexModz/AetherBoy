@@ -115,4 +115,68 @@ public sealed class AudioTimingTests
 
         Assert.AreEqual(0x7FFF, noise.Counter);
     }
+
+    [TestMethod]
+    public void FrameSequencer_ClocksLengthOnTheFirst256HzBoundary()
+    {
+        using var audio = new Audio { Enabled = false };
+        audio.Channel1.Volume = 15;
+        audio.Channel1.SoundLengthRaw = 63;
+        audio.Channel1.StopOnLengthExpired = true;
+
+        Tick(audio, 8_191);
+        Assert.IsGreaterThan(0f, audio.Channel1.Next(44_100));
+        audio.Tick();
+        Assert.AreEqual(0f, audio.Channel1.Next(44_100));
+    }
+
+    [TestMethod]
+    public void FrameSequencer_ClocksSweepOnlyOnStepsTwoAndSix()
+    {
+        using var audio = new Audio { Enabled = false };
+        audio.Channel1.Frequency = 1_000;
+        audio.Channel1.SweepTime = 1;
+        audio.Channel1.SweepShift = 1;
+        audio.Channel1.SweepDirection = SweepMode.Addition;
+
+        Tick(audio, 24_575);
+        Assert.AreEqual(1_000, audio.Channel1.CurrentFrequency);
+        audio.Tick();
+        Assert.AreEqual(1_500, audio.Channel1.CurrentFrequency);
+    }
+
+    [TestMethod]
+    public void SweepShiftZero_DoesNotChangeTheChannelFrequency()
+    {
+        using var audio = new Audio { Enabled = false };
+        audio.Channel1.Frequency = 1_000;
+        audio.Channel1.SweepTime = 1;
+        audio.Channel1.SweepShift = 0;
+
+        Tick(audio, 24_576);
+
+        Assert.AreEqual(1_000, audio.Channel1.CurrentFrequency);
+    }
+
+    [TestMethod]
+    public void FrameSequencer_ClocksEnvelopeAt64Hz()
+    {
+        using var audio = new Audio { Enabled = false };
+        audio.Channel4.Volume = 1;
+        audio.Channel4.EnvelopeSweep = 1;
+        audio.Channel4.EnvelopeDirection = EnvelopeMode.Increase;
+
+        Tick(audio, 65_535);
+        Assert.AreEqual(1, audio.Channel4.CurrentVolume);
+        audio.Tick();
+        Assert.AreEqual(2, audio.Channel4.CurrentVolume);
+    }
+
+    private static void Tick(Audio audio, int count)
+    {
+        for (int tick = 0; tick < count; tick++)
+        {
+            audio.Tick();
+        }
+    }
 }

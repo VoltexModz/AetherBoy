@@ -52,10 +52,10 @@ namespace nanoboy.Core.Audio
             }
         }
 
-        public void Tick()
+        internal void ClockLength()
         {
-            if (StopOnLengthExpired) {
-                soundlengthcycles++;
+            if (StopOnLengthExpired && soundlengthcycles < SoundLength) {
+                soundlengthcycles += EmulationClock.CpuClockHz / 256;
             }
         }
 
