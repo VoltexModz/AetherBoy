@@ -60,11 +60,69 @@ public sealed class VideoTimingTests
         }
     }
 
+    [TestMethod]
+    public void StatInterrupt_UsesTheCombinedLineRisingEdge()
+    {
+        Video video = CreateVideo(out Interrupt interrupt);
+        video.WriteStat(0x28);
+        Assert.AreEqual(2, interrupt.IF & 2, "Enabling the current Mode 2 source raises STAT.");
+
+        interrupt.IF = 0;
+        Tick(video, 80);
+        Assert.AreEqual(3, video.ModeFlag);
+        Tick(video, 172);
+        Assert.AreEqual(0, video.ModeFlag);
+        Assert.AreEqual(2, interrupt.IF & 2, "Entering HBlank raises the combined STAT line.");
+    }
+
+    [TestMethod]
+    public void LcdDisable_ImmediatelyResetsLyAndMakesVideoMemoryAccessible()
+    {
+        Video video = CreateVideo(out _);
+        video.WriteVRAMDirect(0, 0, 0x11);
+        video.WriteOAMDirect(0, 0x22);
+
+        Tick(video, 100);
+        Assert.AreEqual(3, video.ModeFlag);
+        Assert.AreEqual(0xFF, video.ReadVRAM(0));
+        Assert.AreEqual(0xFF, video.ReadOAM(0));
+
+        video.WriteLcdc(0x00);
+        Assert.AreEqual(0, video.LY);
+        Assert.AreEqual(0, video.ModeFlag);
+        Assert.AreEqual(0x11, video.ReadVRAM(0));
+        Assert.AreEqual(0x22, video.ReadOAM(0));
+    }
+
+    [TestMethod]
+    public void OffscreenWindowAndPaletteAutoIncrement_DoNotOverflowBuffers()
+    {
+        Video video = CreateVideo(out _);
+        video.WriteLcdc(0xB1);
+        video.WX = 255;
+        Tick(video, 252);
+        Assert.AreEqual(0, video.ModeFlag);
+
+        video.BackgroundPaletteIndex = 0x3F;
+        video.BackgroundPaletteAI = true;
+        video.WritePRAM(0, 0x7A);
+        Assert.AreEqual(0, video.BackgroundPaletteIndex);
+        video.BackgroundPaletteIndex = 0x3F;
+        Assert.AreEqual(0x7A, video.ReadPRAM(0));
+
+        video.ObjectPaletteIndex = 0x3F;
+        video.ObjectPaletteAI = true;
+        video.WritePRAM(1, 0x6B);
+        Assert.AreEqual(0, video.ObjectPaletteIndex);
+    }
+
     private static Video CreateVideo(out Interrupt interrupt)
     {
         var cpu = new CPU();
         interrupt = new Interrupt(cpu);
-        return new Video(interrupt, new HDMA(null!), hasColorFeatures: false);
+        var video = new Video(interrupt, new HDMA(null!), hasColorFeatures: false);
+        video.WriteLcdc(0x91);
+        return video;
     }
 
     private static void Tick(Video video, int count)

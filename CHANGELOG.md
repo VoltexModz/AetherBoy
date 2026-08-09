@@ -2,6 +2,47 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## 4.3.0-alpha.1 – Phase 3 (2026-08-09)
+
+### Cartridge und Mapper
+
+- ROM-Header auf Mindestlänge, deklarierte ROM-Größe, moderne RAM-Größen und Sondercodes für 72/80/96 ROM-Bänke validiert.
+- CGB-Titelfeld korrekt begrenzt und jede geladene ROM über eine stabile SHA-256-Identität gebunden.
+- Gemeinsamen Cartridge-Vertrag mit defensiven Mapper-Zuständen, begrenztem RAM und explizitem Flush/Dispose eingeführt.
+- MBC1-Banking, RAM-Freigabe und beide Banking-Modi korrigiert; verbotene Banknummern werden hardwaregerecht umgebogen.
+- MBC2 mit adressbitgesteuerten Registern, 512×4-Bit-RAM und Spiegelung implementiert.
+- MBC3-Banking und RTC-Register mit Latch, Halt, 512-Tage-Carry, injizierbarer Zeitquelle und atomarer RTC-Persistenz implementiert.
+- MBC5 mit vollständiger 9-Bit-ROM-Bank, Bank 0, bis zu 16 RAM-Bänken und separater Rumble-Maske implementiert.
+- Battery-RAM wird im Speicher geändert und an Lebenszyklusgrenzen atomar ersetzt, statt bei jedem Byte ein Datei-Handle zu öffnen.
+
+### PPU, DMA und APU
+
+- STAT als gemeinsame, flankengesteuerte Interruptleitung für LYC sowie Modi 0/1/2 modelliert; schreibgeschützte Statusbits können nicht mehr überschrieben werden.
+- LCD-Abschaltung setzt LY/Modus unmittelbar zurück; CPU-Zugriffe auf VRAM und OAM beachten die gesperrten PPU-Modi.
+- Fenster außerhalb des sichtbaren Bereichs, CGB-Paletten-Autoinkrement, Zehn-Sprites-Limit, DMG-Sprite-Reihenfolge und vertikal gespiegelte 8×16-Sprites korrigiert.
+- OAM-DMA auf alle 160 Bytes korrigiert.
+- CGB-General- und HBlank-DMA kopieren fortlaufende 16-Byte-Blöcke, aktualisieren Quell-/Zielregister und bilden Abschluss sowie Abbruch in FF55 ab.
+- NR41–NR44 sind ohne Exception lesbar und bewahren die beschreibbaren Noise-Felder.
+
+### Deterministischer Zustandsvertrag
+
+- Neues `AETHSTAT`-Format mit Versions- und Mindestleserversion, ROM-SHA-256, DMG/CGB-Modell und einzeln versionierten Pflichtsektionen entworfen.
+- Deterministische Abschnittsreihenfolge, Duplikatprüfung, Vorwärtskompatibilität für optionale Sektionen, harte Größenlimits und SHA-256-Integritätsprüfung implementiert.
+- Mapper-Zustände besitzen einen eigenen begrenzten Binärcodec und können verlustfrei in echte Mapper zurückgespielt werden.
+- Das historische unvollständige Save-State-v1 und Rewind bleiben bewusst deaktiviert; Phase 4 liefert vollständige Payloads für alle Pflichtsektionen.
+
+### Tests und CI
+
+- Mapper-, ROM-Header-, RTC-, DMA-, STAT-, Speicherzugriffs- und Zustandsvertrag-Regressionstests ergänzt.
+- Zweites vollständig generiertes Test-ROM führt OAM-DMA über CPU, Loader und Bus bis zum letzten OAM-Byte aus.
+- Gesamtsuite auf **83 Tests** erweitert; Windows- und Linux-Mindesttestzahlen entsprechend angehoben.
+
+### Weiterhin offen
+
+- T-Zyklus-genaue OAM-DMA-Buskonflikte, vollständiger STOP-Ruhemodus, PPU-FIFO/CGB-Pixelpriorität und APU-Frame-Sequencer.
+- MBC1M, MBC4, MMM01, Kamera- und HuC-Spezialhardware.
+- Vollständige Save-State-Payloads, Rewind und Link-Kabel bleiben deaktiviert.
+
 ## 4.2.0-alpha.1 – Phase 2 (2026-08-01)
 
 ### Architektur und Plattformgrenzen
@@ -136,4 +177,4 @@ GameShark-RAM-Codes bleiben als **experimentelle** Funktion sichtbar. Das ist ke
 
 ## Nächster Meilenstein
 
-Phase 3 erweitert die ROM-basierte Hardware-Conformance, korrigiert Mapper-/PPU-/APU-Grenzfälle und entwirft einen versionierten, deterministischen Zustandsvertrag als Grundlage für Save States und Rewind.
+Phase 4 implementiert vollständige Payloads für den neuen Zustandsvertrag, verifiziert deterministische Roundtrips und aktiviert Save States sowie Rewind erst nach ROM-gebundenen Kompatibilitäts- und Belastungstests.

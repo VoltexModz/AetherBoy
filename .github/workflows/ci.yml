@@ -52,7 +52,7 @@ jobs:
         run: dotnet build .\nanoboy.sln --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Test
-        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 59
+        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 83
 
   portable:
     name: Linux / portable Core + Runtime
@@ -89,7 +89,7 @@ jobs:
         run: dotnet build ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Test Core
-        run: dotnet test --project ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 36
+        run: dotnet test --project ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 60
 
       - name: Test Runtime
         run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 15

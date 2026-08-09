@@ -23,6 +23,7 @@ namespace nanoboy.Core
 
         public ROM ROM => rom;
         public IMemoryDevice MBC => mbc;
+        public HDMA HDMA => hdma;
         public int WRAMBank { get => wrambank; set => wrambank = value; }
         public byte ReadWRAMDirect(int bank, int offset) => wram[bank, offset];
         public void WriteWRAMDirect(int bank, int offset, byte value) => wram[bank, offset] = value;
@@ -129,9 +130,20 @@ namespace nanoboy.Core
                     case 0x1E:
                         return (byte)(Audio.Channel3.StopOnLengthExpired ? 0x40 : 0x00);
                     case 0x20:
+                        return 0xFF;
                     case 0x21:
+                        value = Audio.Channel4.EnvelopeSweep |
+                                ((int)Audio.Channel4.EnvelopeDirection << 3) |
+                                (Audio.Channel4.Volume << 4);
+                        return (byte)value;
                     case 0x22:
-                    case 0x23: throw new NotImplementedException();
+                        value = Audio.Channel4.DividingRatio |
+                                (Audio.Channel4.CounterStep ? 0x08 : 0x00) |
+                                (Audio.Channel4.ClockFrequency << 4);
+                        return (byte)value;
+                    case 0x23:
+                        return (byte)(0xBF |
+                            (Audio.Channel4.StopOnLengthExpired ? 0x40 : 0x00));
                     case 0x30:
                     case 0x31:
                     case 0x32:
@@ -162,13 +174,7 @@ namespace nanoboy.Core
                         value += Video.BackgroundEnable ? 0x01 : 0x0;
                         return (byte)value;
                     case 0x41:
-                        value = Video.CoincidenceInterrupt ? 0x40 : 0x0;
-                        value += Video.OAMInterrupt ? 0x20 : 0x0;
-                        value += Video.VBlankInterrupt ? 0x10 : 0x0;
-                        value += Video.HBlankInterrupt ? 0x08 : 0x0;
-                        value += Video.CoincidenceFlag ? 0x04 : 0x0;
-                        value += Video.ModeFlag & 0x03;
-                        return (byte)value;
+                        return Video.ReadStat();
                     case 0x42:
                         return (byte)Video.SCY;
                     case 0x43:
@@ -205,9 +211,7 @@ namespace nanoboy.Core
                     case 0x54:
                         return (byte)hdma.DestinationAddress;
                     case 0x55:
-                        value = (hdma.Length / 0x10 - 1) |
-                                (hdma.IsHBlank ? 0x80 : 0x00);
-                        return (byte)value;
+                        return hdma.ReadControl();
                     case 0x68:
                         value = Video.BackgroundPaletteIndex;
                         value |= Video.BackgroundPaletteAI ? 0x80 : 0x00;
@@ -231,6 +235,33 @@ namespace nanoboy.Core
             } else {
                 return (byte)Interrupt.IE;
             }
+        }
+
+        internal byte ReadByteForDma(int address)
+        {
+            if (address <= 0x7FFF) {
+                return mbc.ReadByte(address);
+            }
+            if (address <= 0x9FFF) {
+                return Video.ReadVRAMDirect(Video.VRAMBank, address - 0x8000);
+            }
+            if (address <= 0xBFFF) {
+                return mbc.ReadByte(address);
+            }
+            if (address <= 0xCFFF) {
+                return wram[0, address - 0xC000];
+            }
+            if (address <= 0xDFFF) {
+                return wram[wrambank, address - 0xD000];
+            }
+            if (address <= 0xEFFF) {
+                return wram[0, address - 0xE000];
+            }
+            if (address <= 0xFDFF) {
+                return wram[wrambank, address - 0xF000];
+            }
+
+            return ReadByte(address);
         }
 
         public void WriteByte(int address, byte value)
@@ -384,22 +415,10 @@ namespace nanoboy.Core
                         Audio.Channel3.WaveRAM[(address & 0xF) * 2 + 1] = (byte)(value & 0xF);
                         break;
                     case 0x40:
-                        Video.LCDEnable = ((value >> 7) & 1) == 1;
-                        Video.WindowTileMapSelect = ((value >> 6) & 1) == 1;
-                        Video.WindowEnable = ((value >> 5) & 1) == 1;
-                        Video.TileDataSelect = ((value >> 4) & 1) == 1;
-                        Video.BackgroundTileMapSelect = ((value >> 3) & 1) == 1;
-                        Video.ObjectSize = ((value >> 2) & 1) == 1;
-                        Video.ObjectEnable = ((value >> 1) & 1) == 1;
-                        Video.BackgroundEnable = (value & 1) == 1;
+                        Video.WriteLcdc(value);
                         break;
                     case 0x41:
-                        Video.CoincidenceInterrupt = ((value >> 6) & 1) == 1;
-                        Video.OAMInterrupt = ((value >> 5) & 1) == 1;
-                        Video.VBlankInterrupt = ((value >> 4) & 1) == 1;
-                        Video.HBlankInterrupt = ((value >> 3) & 1) == 1;
-                        Video.CoincidenceFlag = ((value >> 2) & 1) == 1;
-                        Video.ModeFlag = value & 3;
+                        Video.WriteStat(value);
                         break;
                     case 0x42:
                         Video.SCY = value;
@@ -408,12 +427,12 @@ namespace nanoboy.Core
                         Video.SCX = value;
                         break;
                     case 0x45:
-                        Video.LYC = value;
+                        Video.WriteLyc(value);
                         break;
                     case 0x46:
                         int address2 = value << 8;
-                        for (int i = 0; i < 0x9F; i++) {
-                            WriteByte(0xFE00 + i, ReadByte(address2 + i));
+                        for (int i = 0; i < 0xA0; i++) {
+                            Video.WriteOAMDirect(i, ReadByteForDma(address2 + i));
                         }
                         break;
                     case 0x47:
@@ -459,11 +478,7 @@ namespace nanoboy.Core
                         hdma.DestinationAddress = hdma.DestinationAddress & 0xFF00 | (value & 0xF0);
                         break;
                     case 0x55:
-                        hdma.Length = ((value & 0x7F) + 1) * 0x10;
-                        hdma.IsHBlank = (value & 0x80) == 0x80;
-                        if (!hdma.IsHBlank) {
-                            hdma.PerformGeneralPurpose();
-                        }
+                        hdma.WriteControl(value);
                         break;
                     case 0x68:
                         Video.BackgroundPaletteIndex = value & 0x3F;
@@ -500,7 +515,13 @@ namespace nanoboy.Core
 
         public void Dispose()
         {
-            Audio.Dispose();
+            try {
+                if (mbc is IDisposable disposableMapper) {
+                    disposableMapper.Dispose();
+                }
+            } finally {
+                Audio.Dispose();
+            }
         }
     }
 }

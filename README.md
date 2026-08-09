@@ -2,7 +2,7 @@
 
 > **Status: Alpha / experimentell.** AetherBoy ist eine laufende Modernisierung und noch kein verlässlicher Emulator-Release. Save States, Rewind und Link-Kabel bleiben bewusst deaktiviert, bis ihr Zustand vollständig und reproduzierbar getestet ist.
 
-AetherBoy ist ein Windows-Emulator für Game Boy und Game Boy Color in C#. Das Projekt begann 2014 als `nanoboy` und wurde später als **ChiiBoy Color** weitergeführt. Produkt und Assembly heißen jetzt einheitlich **AetherBoy 4.2.0-alpha.1**; der historische Namespace und Projektordner `nanoboy` bleiben vorerst erhalten.
+AetherBoy ist ein Windows-Emulator für Game Boy und Game Boy Color in C#. Das Projekt begann 2014 als `nanoboy` und wurde später als **ChiiBoy Color** weitergeführt. Produkt und Assembly heißen jetzt einheitlich **AetherBoy 4.3.0-alpha.1**; der historische Namespace und Projektordner `nanoboy` bleiben vorerst erhalten.
 
 AetherBoy ist weder von Nintendo autorisiert noch mit Nintendo verbunden. Game Boy, Game Boy Color und zugehörige Produktnamen sind Marken ihrer jeweiligen Rechteinhaber.
 
@@ -14,10 +14,10 @@ AetherBoy ist weder von Nintendo autorisiert noch mit Nintendo verbunden. Game B
 - verwaltete WinForms-Bildausgabe mit Sharp-, Smooth- und LCD-Grid-Filter
 - NAudio-WinMM-Ausgabe als Windows-Adapter außerhalb des Emulator-Cores
 - zusammengeführte Tastatur- und XInput-Eingabe ohne gegenseitiges Freigeben gehaltener Tasten
-- 59 deterministische Tests einschließlich Owner-Thread-, Frame-Austausch-, Audio-Dispatch-, WAV- und generierten ROM-End-to-End-Gates
+- 83 deterministische Tests einschließlich Mapper-, RTC-, STAT-, DMA-, Zustandsvertrag-, Owner-Thread-, WAV- und generierten ROM-End-to-End-Gates
 - reproduzierbarer NuGet-Restore sowie Windows- und Linux-Gates in GitHub Actions
 
-Phase 2 trennt Core, Runtime und Windows-Frontend. Nur der Owner-Thread erzeugt, verändert und entsorgt den Emulatorzustand; WinForms kommuniziert über eine geordnete Command-Queue, liest unveränderliche ROM-, Audio- und Cheat-Snapshots und übernimmt Bilder aus einem synchronisierten, vorallokierten Frame-Austausch. Das beseitigt die bekannten UI/Core-Races und laufende Large-Object-Heap-Allokationen im Bildpfad, ist aber noch keine vollständige Hardware-Conformance.
+Phase 3 erweitert die Hardware-Conformance: Der Cartridge-Pfad validiert Header und ROM-Größen, identifiziert ROMs per SHA-256 und implementiert getrennte MBC1-, MBC2-, MBC3- und MBC5-Mapper mit atomarer Battery-RAM-Persistenz. STAT-Flanken, LCD-Speicherzugriffe, OAM-/CGB-DMA und mehrere PPU-/APU-Randfälle besitzen Regressionstests. Ein deterministischer, versionierter und integritätsgeschützter Zustandsvertrag bildet die Grundlage für neue Save States; die alte unvollständige Save-State-Funktion bleibt weiterhin deaktiviert.
 
 ## Funktionsstatus
 
@@ -27,13 +27,14 @@ Phase 2 trennt Core, Runtime und Windows-Frontend. Nur der Owner-Thread erzeugt,
 | --- | --- | --- |
 | CPU und Scheduler | experimentell | Double-Speed, EI/DI, Interruptkosten, HALT-Wakeup und HALT-Bug besitzen Regressionstests; Buszugriffe sind noch nicht T-Zyklus-genau und der vollständige STOP-Ruhemodus fehlt. |
 | Timer | verbessert, experimentell | 16-Bit-Divider, TAC-Flanken und verzögerter Overflow sind getestet; seltene Schreibkollisionen im Reload-Takt bleiben angenähert. |
-| Bildausgabe | experimentell | Verwalteter Renderer und Snapshots sind GPU-unabhängig; PPU-, STAT-, DMA- und Pixel-Prioritätsgenauigkeit sind noch nicht vollständig belegt. |
-| DMG/CGB-ROM-Laden | experimentell | Nur mit legal beschafften ROM-Dumps testen; Mapper- und CGB-Abdeckung ist unvollständig. |
-| MBC1/MBC3 | teilweise implementiert | RTC- und Persistenzverhalten sind nicht vollständig verifiziert. |
-| MBC2/MBC4/MBC5 und weitere Mapper | nicht freigegeben | MBC5 wird aktuell fälschlich über den MBC3-Pfad behandelt; andere Mapper fehlen. |
+| Bildausgabe | verbessert, experimentell | Kombinierte STAT-Flanken, LCD-Abschaltung, VRAM-/OAM-Zugriffsfenster, Fenster-Clipping, Paletten-Wrap und mehrere Sprite-Randfälle sind getestet; vollständige FIFO- und CGB-Pixelpriorität fehlen noch. |
+| DMA | verbessert, experimentell | OAM-DMA kopiert alle 160 Bytes; General- und HBlank-DMA übertragen sequenziell, aktualisieren Register und unterstützen Abbruch. OAM-DMA ist noch nicht Takt-für-Takt modelliert. |
+| DMG/CGB-ROM-Laden | verbessert, experimentell | Header-, Titel-, Größen- und Truncation-Prüfung sowie stabile ROM-Identität sind vorhanden; nur legal beschaffte ROM-Dumps verwenden. |
+| MBC1/MBC2/MBC3/MBC5 | implementiert, experimentell | Banking, RAM-Freigabe, MBC2-Nibble-RAM, MBC3-RTC mit Halt/Carry/Latch und MBC5-Rumble-Maske sind getestet; MBC1M-Sonderverdrahtung bleibt offen. |
+| MBC4 und weitere Spezialmapper | nicht freigegeben | MMM01, MBC4, Pocket Camera, HuC1/HuC3 und weitere Spezialhardware werden mit klarer Fehlermeldung abgelehnt. |
 | NAudio-Ausgabe | verbessert, experimentell | Masterclock, Sample-Akkumulator, Puffergröße und Kanal-Längenzähler wurden korrigiert; der APU-Frame-Sequencer ist noch nicht vollständig hardwaregetreu. |
 | WAV-Aufnahme | verbessert, experimentell | Schreiben und Header-Finalisierung sind synchronisiert und getestet; Datei-I/O und Stop laufen außerhalb des UI- und Emulations-Threads. Lange Aufnahmen und Gerätefehler benötigen noch breitere Praxistests. |
-| Save States | nicht freigegeben | Das v1-Binärformat bildet keinen vollständigen deterministischen Emulatorzustand ab. |
+| Save States | nicht freigegeben | Der neue Vertrag definiert ROM-Bindung, Hardwaremodell, versionierte Pflichtsektionen, Größenlimits und SHA-256-Integrität; vollständige Komponenten-Payloads und UI-Aktivierung folgen erst in Phase 4. |
 | Rewind | nicht freigegeben | Baut auf demselben unzuverlässigen Save-State-Format auf. |
 | GameShark | teilweise implementiert | Einfache RAM-Writes sind vorhanden; Validierung und Nebenwirkungsgrenzen fehlen. |
 | Game Genie | deaktiviert | Codes werden noch nicht im ROM-Lesepfad angewendet. |

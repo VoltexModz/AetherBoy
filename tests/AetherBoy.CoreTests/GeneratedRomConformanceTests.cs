@@ -63,7 +63,47 @@ public sealed class GeneratedRomConformanceTests
         }
     }
 
-    private static byte[] CreateRom()
+    [TestMethod]
+    public void GeneratedRom_ExecutesOamDmaThroughTheCpuBus()
+    {
+        string temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"AetherBoy.DmaRomTests-{Guid.NewGuid():N}");
+        string romPath = Path.Combine(temporaryDirectory, "dma.gb");
+        string savePath = Path.Combine(temporaryDirectory, "dma.sav");
+        byte[] program =
+        {
+            0x3E, 0x5A,       // LD A,$5A
+            0xEA, 0x9F, 0xC0, // LD ($C09F),A
+            0x3E, 0xC0,       // LD A,$C0
+            0xE0, 0x46,       // LDH ($FF46),A
+            0x76              // HALT
+        };
+
+        Directory.CreateDirectory(temporaryDirectory);
+        try {
+            File.WriteAllBytes(romPath, CreateRom(program));
+            var rom = new ROM(romPath, savePath);
+            using var emulator = new Nanoboy(rom);
+
+            emulator.Frame();
+
+            Assert.AreEqual(0x5A, emulator.Memory.Video.ReadOAMDirect(0x9F));
+            Assert.IsTrue(emulator.Cpu.WaitForInterrupt);
+        } finally {
+            if (Directory.Exists(temporaryDirectory)) {
+                Directory.Delete(temporaryDirectory, recursive: true);
+            }
+        }
+    }
+
+    private static byte[] CreateRom() => CreateRom(new byte[] {
+        0x3E, 0x42,       // LD A,$42
+        0xEA, 0x00, 0xC0, // LD ($C000),A
+        0x76              // HALT
+    });
+
+    private static byte[] CreateRom(byte[] program)
     {
         var rom = new byte[RomSize];
 
@@ -85,13 +125,7 @@ public sealed class GeneratedRomConformanceTests
         rom[0x014C] = 0x00;
         rom[0x014D] = ComputeHeaderChecksum(rom);
 
-        // LD A,$42; LD ($C000),A; HALT
-        rom[0x0150] = 0x3E;
-        rom[0x0151] = 0x42;
-        rom[0x0152] = 0xEA;
-        rom[0x0153] = 0x00;
-        rom[0x0154] = 0xC0;
-        rom[0x0155] = 0x76;
+        program.CopyTo(rom, 0x0150);
 
         ushort globalChecksum = ComputeGlobalChecksum(rom);
         rom[0x014E] = (byte)(globalChecksum >> 8);

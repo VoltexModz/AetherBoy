@@ -64,7 +64,7 @@ namespace nanoboy.Core
         private readonly uint[] publishedFrame;
         private readonly object framePublishLock = new object();
         private long publishedFrameSequence;
-        private bool coincidenceinterrupttriggered;
+        private bool statInterruptLine;
         private int framecounter;
         private bool updaterequired;
 
@@ -194,19 +194,80 @@ namespace nanoboy.Core
             LY = 0;
             ModeFlag = 2;
             FrameReady = false;
-            CoincidenceFlag = false;
-            coincidenceinterrupttriggered = false;
+            CoincidenceFlag = LY == LYC;
+            statInterruptLine = false;
             framecounter = 0;
             updaterequired = false;
         }
 
+        public byte ReadStat()
+        {
+            int value = 0x80;
+            value |= CoincidenceInterrupt ? 0x40 : 0;
+            value |= OAMInterrupt ? 0x20 : 0;
+            value |= VBlankInterrupt ? 0x10 : 0;
+            value |= HBlankInterrupt ? 0x08 : 0;
+            value |= CoincidenceFlag ? 0x04 : 0;
+            value |= LCDEnable ? ModeFlag & 0x03 : 0;
+            return (byte)value;
+        }
+
+        public void WriteStat(byte value)
+        {
+            CoincidenceInterrupt = (value & 0x40) != 0;
+            OAMInterrupt = (value & 0x20) != 0;
+            VBlankInterrupt = (value & 0x10) != 0;
+            HBlankInterrupt = (value & 0x08) != 0;
+            UpdateStatInterruptLine();
+        }
+
+        public void WriteLyc(byte value)
+        {
+            LYC = value;
+            UpdateCoincidence();
+            UpdateStatInterruptLine();
+        }
+
+        public void WriteLcdc(byte value)
+        {
+            bool wasEnabled = LCDEnable;
+            LCDEnable = (value & 0x80) != 0;
+            WindowTileMapSelect = (value & 0x40) != 0;
+            WindowEnable = (value & 0x20) != 0;
+            TileDataSelect = (value & 0x10) != 0;
+            BackgroundTileMapSelect = (value & 0x08) != 0;
+            ObjectSize = (value & 0x04) != 0;
+            ObjectEnable = (value & 0x02) != 0;
+            BackgroundEnable = (value & 0x01) != 0;
+
+            if (wasEnabled && !LCDEnable) {
+                clock = 0;
+                LY = 0;
+                ModeFlag = 0;
+                FrameReady = false;
+            } else if (!wasEnabled && LCDEnable) {
+                clock = 0;
+                LY = 0;
+                ModeFlag = 2;
+            }
+
+            UpdateCoincidence();
+            UpdateStatInterruptLine();
+        }
+
         public void Tick()
         {
-            CoincidenceFlag = LY == LYC;
-            if (CoincidenceInterrupt && CoincidenceFlag && !coincidenceinterrupttriggered) {
-                interrupt.Request(2);
-                coincidenceinterrupttriggered = true;
+            if (!LCDEnable) {
+                clock = 0;
+                LY = 0;
+                ModeFlag = 0;
+                UpdateCoincidence();
+                UpdateStatInterruptLine();
+                return;
             }
+
+            UpdateCoincidence();
+            UpdateStatInterruptLine();
             clock++;
 
             switch (ModeFlag)
@@ -241,7 +302,6 @@ namespace nanoboy.Core
                     if (clock >= 204) {
                         clock = 0;
                         LY++;
-                        coincidenceinterrupttriggered = false;
                         if (LY == 144) {
 
                             ModeFlag = 1;
@@ -263,7 +323,6 @@ namespace nanoboy.Core
                     if (clock >= 456) {
                         clock = 0;
                         LY++;
-                        coincidenceinterrupttriggered = false;
                         if (LY > 153) {
 
                             ModeFlag = 2;
@@ -272,6 +331,29 @@ namespace nanoboy.Core
                     }
                     break;
             }
+
+            UpdateCoincidence();
+            UpdateStatInterruptLine();
+        }
+
+        private void UpdateCoincidence()
+        {
+            CoincidenceFlag = LY == LYC;
+        }
+
+        private void UpdateStatInterruptLine()
+        {
+            bool nextLine =
+                (CoincidenceInterrupt && CoincidenceFlag) ||
+                (LCDEnable && (
+                    (OAMInterrupt && ModeFlag == 2) ||
+                    (VBlankInterrupt && ModeFlag == 1) ||
+                    (HBlankInterrupt && ModeFlag == 0)));
+            if (nextLine && !statInterruptLine) {
+                interrupt.Request(2);
+            }
+
+            statInterruptLine = nextLine;
         }
 
         private void PublishFrame()
@@ -286,7 +368,7 @@ namespace nanoboy.Core
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void RenderLine()
         {
-            if (LCDEnable && LY <= 144) {
+            if (LCDEnable && LY < 144) {
                 if (BackgroundEnable) {
                     RenderBackgroundLine();
                 }
@@ -321,6 +403,9 @@ namespace nanoboy.Core
             int row = (difference - displacementy) / 8;
             uint[] mapline = RenderTilemapLine(mapaddress, row, displacementy);
             int wx = WX - 7;
+            if (wx >= FrameWidth) {
+                return;
+            }
             if (wx < 0) {
                 Buffer.BlockCopy(mapline, wx * -4, frame, LY * 160 * 4, (160 - (wx * -1)) * 4);
             } else {
@@ -368,10 +453,21 @@ namespace nanoboy.Core
                 entry.Attributes = oam[i * 4 + 3];
                 entry.TableIndex = i;
 
-                if (entry.X < 160 && entry.Y < 144 && entry.Y > LY - tolerance && entry.Y < LY + 1) {
+                if (entry.Y < 144 && entry.Y > LY - tolerance && entry.Y < LY + 1) {
                     entries.Add(entry);
+                    if (entries.Count == 10) {
+                        break;
+                    }
                 }
             }
+
+            entries.Sort((left, right) => {
+                if (hasColorFeatures || left.X == right.X) {
+                    return right.TableIndex.CompareTo(left.TableIndex);
+                }
+
+                return right.X.CompareTo(left.X);
+            });
 
             foreach (SpriteEntry entry in entries) {
                 int displacementy = LY - entry.Y;
@@ -383,18 +479,12 @@ namespace nanoboy.Core
                 bool flipy = (entry.Attributes & 0x40) == 0x40;
                 bool behind = (entry.Attributes & 0x80) == 0x80;
                 uint[] tileline;
-                if (ObjectSize) {
-                    if (displacementy > 7) {
-
-                        tilenumber |= 1;
-                        displacementy -= 8;
-                    } else {
-
-                        tilenumber &= 0xFE;
-                    }
-                }
                 if (flipy) {
-                    displacementy = 7 - displacementy;
+                    displacementy = tolerance - 1 - displacementy;
+                }
+                if (ObjectSize) {
+                    tilenumber = (tilenumber & 0xFE) | (displacementy / 8);
+                    displacementy %= 8;
                 }
                 if (hasColorFeatures) {
                     int attributes = colorpalette | (tilebank << 3);
@@ -405,7 +495,7 @@ namespace nanoboy.Core
                 if (flipx) {
                     Array.Reverse(tileline);
                 }
-                DrawTile(tileline, entry.X, LY);
+                DrawTile(tileline, entry.X, LY, behind);
             }
         }
 
@@ -414,7 +504,12 @@ namespace nanoboy.Core
         {
             for (int i = 0; i < 8; i++) {
                 if (tileline[i] != 0 && x + i >= 0 && x + i < 160) {
-                    frame[y * 160 + x + i] = tileline[i];
+                    int position = y * 160 + x + i;
+                    if (!behindbackground ||
+                        hasColorFeatures ||
+                        frame[position] == GetPaletteEntry(0, BGP)) {
+                        frame[position] = tileline[i];
+                    }
                 }
             }
         }
@@ -482,21 +577,33 @@ namespace nanoboy.Core
 
         public byte ReadVRAM(int address)
         {
+            if (LCDEnable && ModeFlag == 3) {
+                return 0xFF;
+            }
             return vram[VRAMBank, address];
         }
 
         public void WriteVRAM(int address, byte value)
         {
+            if (LCDEnable && ModeFlag == 3) {
+                return;
+            }
             vram[VRAMBank, address] = value;
         }
 
         public byte ReadOAM(int address)
         {
+            if (LCDEnable && (ModeFlag == 2 || ModeFlag == 3)) {
+                return 0xFF;
+            }
             return oam[address];
         }
 
         public void WriteOAM(int address, byte value)
         {
+            if (LCDEnable && (ModeFlag == 2 || ModeFlag == 3)) {
+                return;
+            }
             oam[address] = value;
         }
 
@@ -511,14 +618,16 @@ namespace nanoboy.Core
         public void WritePRAM(int index, byte value)
         {
             if (index == 0) {
-                pram1[BackgroundPaletteIndex & 0x3F] = value;
+                int paletteIndex = BackgroundPaletteIndex & 0x3F;
+                pram1[paletteIndex] = value;
                 if (BackgroundPaletteAI) {
-                    BackgroundPaletteIndex++;
+                    BackgroundPaletteIndex = (paletteIndex + 1) & 0x3F;
                 }
             } else {
-                pram2[ObjectPaletteIndex] = value;
+                int paletteIndex = ObjectPaletteIndex & 0x3F;
+                pram2[paletteIndex] = value;
                 if (ObjectPaletteAI) {
-                    ObjectPaletteIndex++;
+                    ObjectPaletteIndex = (paletteIndex + 1) & 0x3F;
                 }
             }
         }

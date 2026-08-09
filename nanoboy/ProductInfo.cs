@@ -17,7 +17,7 @@ namespace nanoboy
 
                 if (string.IsNullOrWhiteSpace(value))
                 {
-                    return "4.2.0-alpha.1";
+                    return "4.3.0-alpha.1";
                 }
 
                 int metadataSeparator = value.IndexOf('+');
