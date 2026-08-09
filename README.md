@@ -1,8 +1,8 @@
 # AetherBoy
 
-> **Status: Alpha / experimentell.** AetherBoy ist eine laufende Modernisierung und noch kein verlässlicher Emulator-Release. Phase 7 führt echte externe Kompatibilitätsmatrizen ein und vertieft CPU-Bus-, Interrupt-, Timer-, DMA-, PPU- und APU-Timing; Link-Kabel, ein echter Pixel-FIFO und mehrere Hardware-Randfälle bleiben offen.
+> **Status: Alpha / experimentell.** AetherBoy ist eine laufende Modernisierung und noch kein verlässlicher Emulator-Release. Phase 8 schließt die ausgewählten DMG-/CGB-Soundsuiten vollständig, ergänzt serielles Bit-Timing und präzisiert die PPU-Spritegrenze; ein echter Pixel-FIFO, ein konkreter Link-Transport und wenige Hardware-Randfälle bleiben offen.
 
-AetherBoy ist ein Windows-Emulator für Game Boy und Game Boy Color in C#. Das Projekt begann 2014 als `nanoboy` und wurde später als **ChiiBoy Color** weitergeführt. Produkt und Assembly heißen jetzt einheitlich **AetherBoy 4.7.0-alpha.1**; der historische Namespace und Projektordner `nanoboy` bleiben vorerst erhalten.
+AetherBoy ist ein Windows-Emulator für Game Boy und Game Boy Color in C#. Das Projekt begann 2014 als `nanoboy` und wurde später als **ChiiBoy Color** weitergeführt. Produkt und Assembly heißen jetzt einheitlich **AetherBoy 4.8.0-alpha.1**; der historische Namespace und Projektordner `nanoboy` bleiben vorerst erhalten.
 
 AetherBoy ist weder von Nintendo autorisiert noch mit Nintendo verbunden. Game Boy, Game Boy Color und zugehörige Produktnamen sind Marken ihrer jeweiligen Rechteinhaber.
 
@@ -14,12 +14,12 @@ AetherBoy ist weder von Nintendo autorisiert noch mit Nintendo verbunden. Game B
 - verwaltete WinForms-Bildausgabe mit Sharp-, Smooth- und LCD-Grid-Filter
 - NAudio-WinMM-Ausgabe als Windows-Adapter außerhalb des Emulator-Cores
 - zusammengeführte Tastatur- und XInput-Eingabe ohne gegenseitiges Freigeben gehaltener Tasten
-- 154 deterministische Tests: 128 Core-, 17 Runtime- und 9 Windows-Smoke-Tests einschließlich Mapper-, RTC-, CPU-Bus-, Interrupt-, DMA-, PPU-Timing-, APU-Power-, Save-State-, Rewind-, Owner-Thread-, WAV-, UI- und generierten ROM-End-to-End-Gates
+- 167 deterministische Tests: 141 Core-, 17 Runtime- und 9 Windows-Smoke-Tests einschließlich Mapper-, RTC-, CPU-Bus-, Interrupt-, DMA-, PPU-Timing-, APU-Power-, Serial-, Save-State-, Rewind-, Owner-Thread-, WAV-, UI- und generierten ROM-End-to-End-Gates
 - reproduzierbarer NuGet-Restore sowie Windows- und Linux-Gates in GitHub Actions
 
-Phase 7 schließt weitere konkrete Hardwarelücken: CPU-Lese-, Schreib-, Stack- und Interruptzugriffe werden an ihren T-Zykluspositionen ausgeführt; DAA, signierte SP-Flags und mehrere Instruktionskosten wurden korrigiert. Timer-Reload-Kollisionen, OAM-DMA-Start/Neustart, IF-Bitmasken, DMG-VBlank/STAT und mehrere LCD-/Sprite-Grenzen besitzen ROM-verifizierte Semantik. Die APU liest Hardwaremasken korrekt, folgt DIV-APU-Resetflanken und verwendet echte Längen-, Trigger-, Sweep- und DMG-Power-Zustände. Die Conformance-CLI unterstützt nun Manifeste, Pflicht-/Informationsläufe, absturzfreie Game-Smokes, Protokolldiagnosen und JSON-Berichte. Die aktuelle, reproduzierbare Matrix steht in [COMPATIBILITY.md](COMPATIBILITY.md).
+Phase 8 schließt die ausgewählten Blargg-Soundsuiten auf DMG und CGB mit jeweils 12/12 ab. Dazu gehören Sweep-Shift-0/Negate, DIV-abhängiges APU-Power-On, modellabhängige Wave-Startphasen, DMG-Wave-RAM-Zugriff und Retrigger-Korruption sowie ein analoger Hochpass. Der Serial-Port überträgt nun acht echte Bits mit Normal-, CGB-Fast- oder externer Clock und ist vollständig im deterministischen Zustand enthalten. Die PPU-Auswahl steigt durch die präzisierte Sprite-Transfergrenze auf 11/12. Die aktuelle, reproduzierbare Matrix steht in [COMPATIBILITY.md](COMPATIBILITY.md).
 
-Der vollständige Zustandsvertrag aus Phase 4 bleibt erhalten und wurde für die neuen CPU-, DMA-, PPU- und APU-Zustände auf Komponentenschema 4 erweitert. Zustände aus älteren Komponentenschemata werden bewusst abgelehnt; eine automatische Migration ist noch nicht vorhanden.
+Der vollständige Zustandsvertrag aus Phase 4 bleibt erhalten und wurde für die neuen PPU-, APU- und Serial-Transienten auf Komponentenschema 5 erweitert. Zustände aus älteren Komponentenschemata werden bewusst abgelehnt; eine automatische Migration ist noch nicht vorhanden.
 
 ## Funktionsstatus
 
@@ -34,13 +34,13 @@ Der vollständige Zustandsvertrag aus Phase 4 bleibt erhalten und wurde für die
 | DMG/CGB-ROM-Laden | verbessert, experimentell | Header-, Titel-, Größen- und Truncation-Prüfung sowie stabile ROM-Identität sind vorhanden; nur legal beschaffte ROM-Dumps verwenden. |
 | MBC1/MBC2/MBC3/MBC5 | implementiert, experimentell | Banking, RAM-Freigabe, MBC2-Nibble-RAM, MBC3-RTC mit Halt/Carry/Latch und MBC5-Rumble-Maske sind getestet; MBC1M-Sonderverdrahtung bleibt offen. |
 | MBC4 und weitere Spezialmapper | nicht freigegeben | MMM01, MBC4, Pocket Camera, HuC1/HuC3 und weitere Spezialhardware werden mit klarer Fehlermeldung abgelehnt. |
-| NAudio-Ausgabe | verbessert, experimentell | Register-Lesemasken, DIV-APU, 512-Hz-Frame-Sequencer, echte Längenzähler/Trigger, DMG-Power-Off, NR52, DAC, NR50/NR51 und hardwaregetaktete Frequenzperioden sind getestet; analoger Hochpass, vollständige Sweep-Negate- und DMG-Wave-RAM-Kollisionen bleiben angenähert. |
+| NAudio-Ausgabe | verbessert, experimentell | Registermasken, DIV-APU, Power-On-Phase, Frame-Sequencer, Längenzähler, Trigger, Sweep, DAC, NR50/NR51, modellabhängiger Hochpass sowie DMG/CGB-Wave-RAM-Verhalten sind getestet; seltene APU-Revisionseffekte und hörbare Langzeitvergleiche bleiben offen. |
 | WAV-Aufnahme | verbessert, experimentell | Schreiben und Header-Finalisierung sind synchronisiert und getestet; Datei-I/O und Stop laufen außerhalb des UI- und Emulations-Threads. Lange Aufnahmen und Gerätefehler benötigen noch breitere Praxistests. |
 | Save States | implementiert, experimentell | Fünf Slots (`.ss1` bis `.ss5`), F5/F8 und Controller-Shortcuts sind aktiv. Zustände sind SHA-256-geschützt und an die exakte ROM sowie DMG/CGB gebunden; eine spätere Schema-Version kann eine Migration erfordern. |
 | Rewind | implementiert, experimentell | Erfasst alle vier Frames, hält höchstens 150 Brotli-komprimierte Zustände (rund zehn Sekunden) und veröffentlicht den tatsächlich belegten Speicher. Der Puffer ist sitzungsgebunden und wird bei Reset oder geladenem Save State neu begonnen. |
 | GameShark | teilweise implementiert | Einfache RAM-Writes sind vorhanden; Validierung und Nebenwirkungsgrenzen fehlen. |
 | Game Genie | deaktiviert | Codes werden noch nicht im ROM-Lesepfad angewendet. |
-| Serial/Link-Kabel | teilweise implementiert | Der unmittelbare Byte-Transfer und Serial-Interrupt sind vorhanden. Runner und CLI erkennen serielle Blargg-Ausgabe sowie zwei zusätzliche Testprotokolle; TCP-Link-Kabel, Bit-Timing und zwei gekoppelte Emulatorinstanzen fehlen. |
+| Serial/Link-Kabel | teilweise implementiert | Acht-Bit-Transfer, Normal- und CGB-Fast-Clock, externe Clock, Interrupt und ein optionaler Bit-Gerätevertrag sind implementiert und zustandsfest. Ein konkreter TCP-/IPC-Transport und die Kopplung zweier Emulatorinstanzen fehlen. |
 | Debugger/Disassembler | intern/experimentell | Kein vollständiger Pause-/Step-Workflow; mehrere Grenzfälle sind ungeprüft. |
 
 ## Bauen, testen und starten

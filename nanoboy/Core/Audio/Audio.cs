@@ -66,8 +66,11 @@ namespace nanoboy.Core.Audio
         private int sampleRate;
         private int frameSequencerDivider;
         private int frameSequencerStep;
+        private bool skipNextFrameSequencerClock;
         private byte masterVolume;
         private byte outputRouting;
+        private float highPassCapacitor;
+        private float highPassChargeFactor;
         private bool disposed;
 
         public Audio(bool dmgMode = false)
@@ -75,7 +78,7 @@ namespace nanoboy.Core.Audio
             this.dmgMode = dmgMode;
             Channel1 = new QuadChannel();
             Channel2 = new QuadChannel();
-            Channel3 = new WaveChannel();
+            Channel3 = new WaveChannel(dmgMode);
             Channel4 = new NoiseChannel();
             sampleClock = new AudioSampleClock();
             sampleBuffer = new List<float>(1_024);
@@ -117,6 +120,8 @@ namespace nanoboy.Core.Audio
                 }
 
                 sampleRate = value;
+                highPassChargeFactor = CalculateHighPassChargeFactor(value);
+                highPassCapacitor = 0f;
                 sampleClock.Reset();
                 sampleBuffer.Clear();
             }
@@ -165,7 +170,11 @@ namespace nanoboy.Core.Audio
                 sample = Math.Clamp((left * leftGain + right * rightGain) * 0.125f, -1f, 1f);
             }
 
-            sampleBuffer.Add(sample);
+            bool capacitorConnected =
+                Enabled && Powered &&
+                (Channel1.DacEnabled || Channel2.DacEnabled ||
+                 Channel3.DacEnabled || Channel4.DacEnabled);
+            sampleBuffer.Add(ApplyHighPass(sample, capacitorConnected));
             if (sampleBuffer.Count < BufferSize)
             {
                 return;
@@ -181,6 +190,8 @@ namespace nanoboy.Core.Audio
         {
             frameSequencerDivider = 0;
             frameSequencerStep = 0;
+            skipNextFrameSequencerClock = false;
+            highPassCapacitor = 0f;
             sampleClock.Reset();
             sampleBuffer.Clear();
         }
@@ -197,7 +208,7 @@ namespace nanoboy.Core.Audio
             Powered = true;
         }
 
-        public void SetPower(bool powered)
+        public void SetPower(bool powered, bool dividerHigh = false)
         {
             if (Powered == powered)
             {
@@ -207,8 +218,15 @@ namespace nanoboy.Core.Audio
             Powered = powered;
             if (powered)
             {
+                frameSequencerStep = 0;
+                // Enabling the APU during the high half of the source DIV bit
+                // suppresses its next falling-edge event.
+                skipNextFrameSequencerClock = dividerHigh;
                 return;
             }
+
+            frameSequencerStep = 0;
+            skipNextFrameSequencerClock = false;
 
             masterVolume = 0;
             outputRouting = 0;
@@ -228,6 +246,30 @@ namespace nanoboy.Core.Audio
             return (byte)status;
         }
 
+        internal float ApplyHighPass(float input)
+        {
+            return ApplyHighPass(input, capacitorConnected: true);
+        }
+
+        internal float ApplyHighPass(float input, bool capacitorConnected)
+        {
+            if (!capacitorConnected) {
+                return 0f;
+            }
+
+            float output = input - highPassCapacitor;
+            highPassCapacitor = input - output * highPassChargeFactor;
+            return Math.Clamp(output, -1f, 1f);
+        }
+
+        private float CalculateHighPassChargeFactor(int outputSampleRate)
+        {
+            double perCpuCycle = dmgMode ? 0.999958d : 0.998943d;
+            return (float)Math.Pow(
+                perCpuCycle,
+                (double)EmulationClock.CpuClockHz / outputSampleRate);
+        }
+
         internal void ResetFrameSequencerDivider(bool clockFrameSequencer)
         {
             frameSequencerDivider = 0;
@@ -245,36 +287,36 @@ namespace nanoboy.Core.Audio
             }
 
             frameSequencerDivider = 0;
+            if (Powered && skipNextFrameSequencerClock) {
+                skipNextFrameSequencerClock = false;
+                return;
+            }
             ClockFrameSequencer();
         }
 
         private void ClockFrameSequencer()
         {
-            bool clockChannels = Powered;
+            if (!Powered) {
+                return;
+            }
             if ((frameSequencerStep & 1) == 0)
             {
-                if (clockChannels) {
-                    Channel1.ClockLength();
-                    Channel2.ClockLength();
-                    Channel3.ClockLength();
-                    Channel4.ClockLength();
-                }
+                Channel1.ClockLength();
+                Channel2.ClockLength();
+                Channel3.ClockLength();
+                Channel4.ClockLength();
             }
 
             if (frameSequencerStep == 2 || frameSequencerStep == 6)
             {
-                if (clockChannels) {
-                    Channel1.ClockSweep();
-                }
+                Channel1.ClockSweep();
             }
 
             if (frameSequencerStep == 7)
             {
-                if (clockChannels) {
-                    Channel1.ClockEnvelope();
-                    Channel2.ClockEnvelope();
-                    Channel4.ClockEnvelope();
-                }
+                Channel1.ClockEnvelope();
+                Channel2.ClockEnvelope();
+                Channel4.ClockEnvelope();
             }
 
             frameSequencerStep = (frameSequencerStep + 1) & 7;
@@ -287,11 +329,13 @@ namespace nanoboy.Core.Audio
                 writer.Write(Powered);
                 writer.Write(masterVolume);
                 writer.Write(outputRouting);
+                writer.Write(highPassCapacitor);
                 writer.Write(sampleRate);
                 writer.Write(BufferSize);
                 writer.Write(sampleClock.CaptureState());
                 writer.Write(frameSequencerDivider);
                 writer.Write(frameSequencerStep);
+                writer.Write(skipNextFrameSequencerClock);
                 writer.Write(sampleBuffer.Count);
                 for (int index = 0; index < sampleBuffer.Count; index++) {
                     writer.Write(sampleBuffer[index]);
@@ -310,11 +354,13 @@ namespace nanoboy.Core.Audio
                 bool nextPowered = StatePayload.ReadBoolean(reader);
                 byte nextMasterVolume = reader.ReadByte();
                 byte nextOutputRouting = reader.ReadByte();
+                float nextHighPassCapacitor = reader.ReadSingle();
                 int nextSampleRate = reader.ReadInt32();
                 int nextBufferSize = reader.ReadInt32();
                 long nextAccumulator = reader.ReadInt64();
                 int nextFrameSequencerDivider = reader.ReadInt32();
                 int nextFrameSequencerStep = reader.ReadInt32();
+                bool nextSkipFrameSequencerClock = StatePayload.ReadBoolean(reader);
                 int nextSampleCount = reader.ReadInt32();
                 StatePayload.RequireRange(nextSampleRate, 8_000, 192_000, nameof(sampleRate));
                 StatePayload.RequireRange(nextBufferSize, 1, 1_048_576, nameof(BufferSize));
@@ -330,6 +376,10 @@ namespace nanoboy.Core.Audio
                 StatePayload.RequireRange(nextSampleCount, 0, nextBufferSize - 1, "sampleBuffer.Count");
                 if (!nextPowered && (nextMasterVolume != 0 || nextOutputRouting != 0)) {
                     throw new InvalidOperationException("Powered-off APU state contains live mixer registers.");
+                }
+                if (!float.IsFinite(nextHighPassCapacitor) ||
+                    nextHighPassCapacitor < -1f || nextHighPassCapacitor > 1f) {
+                    throw new InvalidOperationException("Audio high-pass capacitor state is invalid.");
                 }
                 var nextSamples = new float[nextSampleCount];
                 for (int index = 0; index < nextSamples.Length; index++) {
@@ -349,11 +399,14 @@ namespace nanoboy.Core.Audio
                     Powered = nextPowered;
                     masterVolume = nextMasterVolume;
                     outputRouting = nextOutputRouting;
+                    highPassCapacitor = nextHighPassCapacitor;
                     sampleRate = nextSampleRate;
+                    highPassChargeFactor = CalculateHighPassChargeFactor(nextSampleRate);
                     BufferSize = nextBufferSize;
                     sampleClock.RestoreState(nextAccumulator);
                     frameSequencerDivider = nextFrameSequencerDivider;
                     frameSequencerStep = nextFrameSequencerStep;
+                    skipNextFrameSequencerClock = nextSkipFrameSequencerClock;
                     sampleBuffer.Clear();
                     sampleBuffer.AddRange(nextSamples);
                     restoreChannel1();

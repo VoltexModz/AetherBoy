@@ -151,7 +151,10 @@ public sealed class GeneratedRomConformanceTests
             ConformanceResult result = runner.Run(new ROM(romPath, savePath), maximumFrames: 2);
 
             Assert.AreEqual(ConformanceOutcome.TimedOut, result.Outcome);
-            Assert.AreEqual(string.Empty, result.SerialOutput);
+            StringAssert.Contains(result.SerialOutput, "timeout PC=");
+            StringAssert.Contains(result.SerialOutput, " SP=");
+            StringAssert.Contains(result.SerialOutput, " DIV=");
+            StringAssert.Contains(result.SerialOutput, " NR52=");
             Assert.AreEqual(2, result.FramesExecuted);
             Assert.AreEqual(ConformanceProtocol.None, result.Protocol);
         } finally {

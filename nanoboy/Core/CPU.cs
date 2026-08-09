@@ -2180,7 +2180,15 @@ namespace nanoboy.Core
         private byte ReadByte(int address)
         {
             address &= 0xFFFF;
-            int readPhase = address == 0xFF44 ? 4 : 3;
+            // Wave RAM arbitration is resolved at the start of the I/O read
+            // machine cycle; ordinary CPU reads latch near its end.
+            bool dmgWaveRamRead =
+                address >= 0xFF30 && address <= 0xFF3F &&
+                Memory is nanoboy.Core.Memory systemMemory &&
+                !systemMemory.HasColorHardware;
+            int readPhase = dmgWaveRamRead
+                ? 1
+                : address == 0xFF44 ? 4 : 3;
             AdvanceCycles(readPhase);
             CPUStatusUpdate update = new CPUStatusUpdate();
             byte value = Memory.ReadByte(address);

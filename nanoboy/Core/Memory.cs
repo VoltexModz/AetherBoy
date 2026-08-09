@@ -20,7 +20,12 @@ namespace nanoboy.Core
         private int wrambank;
         private byte[] hram;
         private ISerialDevice serial;
+        private byte serialData;
         private byte serialControl;
+        private byte serialIncomingData;
+        private int serialClock;
+        private int serialBitsRemaining;
+        private bool serialTransferActive;
         public byte[] BootROM;
         public bool BootROMEnabled;
 
@@ -28,6 +33,7 @@ namespace nanoboy.Core
         public IMemoryDevice MBC => mbc;
         public HDMA HDMA => hdma;
         internal bool CpuIsHalted => cpu.WaitForInterrupt;
+        internal bool HasColorHardware => rom.HasColorFeatures;
         public int WRAMBank { get => wrambank; set => wrambank = value; }
         public byte ReadWRAMDirect(int bank, int offset) => wram[bank, offset];
         public void WriteWRAMDirect(int bank, int offset, byte value) => wram[bank, offset] = value;
@@ -45,7 +51,12 @@ namespace nanoboy.Core
             hram = new byte[0x7F];
             Audio = new Audio.Audio(dmgMode: !rom.HasColorFeatures);
             serial = new SerialConsole();
+            serialData = 0;
             serialControl = 0;
+            serialIncomingData = 0xFF;
+            serialClock = 0;
+            serialBitsRemaining = 0;
+            serialTransferActive = false;
             Interrupt = new Interrupt(cpu);
             Video = new Video(Interrupt, hdma, rom.HasColorFeatures);
             Joypad = new Joypad(Interrupt, cpu.WakeFromStop);
@@ -92,9 +103,11 @@ namespace nanoboy.Core
                     case 0x00:
                         return Joypad.ReadRegister();
                     case 0x01:
-                        return serial.Read();
+                        return serialData;
                     case 0x02:
-                        return (byte)((rom.HasColorFeatures ? 0x7C : 0x7E) | serialControl);
+                        return (byte)((rom.HasColorFeatures ? 0x7C : 0x7E) |
+                            serialControl |
+                            (serialTransferActive ? 0x80 : 0x00));
                     case 0x04:
                         return (byte)Timer.DIV;
                     case 0x05:
@@ -195,9 +208,7 @@ namespace nanoboy.Core
                     case 0x3D:
                     case 0x3E:
                     case 0x3F:
-                        value = Audio.Channel3.WaveRAM[(address & 0xF) * 2 + 1] |
-                                (Audio.Channel3.WaveRAM[(address & 0xF) * 2] << 4);
-                        return (byte)value;
+                        return Audio.Channel3.ReadWaveRam(address);
                     case 0x40:
                         value = Video.LCDEnable ? 0x80 : 0x0;
                         value += Video.WindowTileMapSelect ? 0x40 : 0x0;
@@ -350,13 +361,14 @@ namespace nanoboy.Core
                         Joypad.WriteSelection(value);
                         break;
                     case 0x01:
-                        serial.Write(value);
+                        serialData = value;
                         break;
                     case 0x02:
                         serialControl = (byte)(value & (rom.HasColorFeatures ? 0x03 : 0x01));
                         if ((value & 0x80) == 0x80) {
-                            serial.Start();
-                            Interrupt.Request(8);
+                            StartSerialTransfer();
+                        } else if (serialTransferActive) {
+                            AbortSerialTransfer();
                         }
                         break;
                     case 0x04:
@@ -471,7 +483,9 @@ namespace nanoboy.Core
                         Audio.OutputRouting = value;
                         break;
                     case 0x26:
-                        Audio.SetPower((value & 0x80) != 0);
+                        Audio.SetPower(
+                            (value & 0x80) != 0,
+                            Timer.ApuDividerHigh(cpu.IsDoubleSpeed));
                         break;
 
                     case 0x30:
@@ -490,8 +504,7 @@ namespace nanoboy.Core
                     case 0x3D:
                     case 0x3E:
                     case 0x3F:
-                        Audio.Channel3.WaveRAM[(address & 0xF) * 2] = (byte)(value >> 4);
-                        Audio.Channel3.WaveRAM[(address & 0xF) * 2 + 1] = (byte)(value & 0xF);
+                        Audio.Channel3.WriteWaveRam(address, value);
                         break;
                     case 0x40:
                         Video.WriteLcdc(value);
@@ -607,6 +620,99 @@ namespace nanoboy.Core
             }
         }
 
+        internal void TickSerial()
+        {
+            if (!serialTransferActive || (serialControl & 0x01) == 0) {
+                return;
+            }
+
+            int clockPeriod = (rom.HasColorFeatures && (serialControl & 0x02) != 0) ? 16 : 512;
+            serialClock++;
+            if (serialClock < clockPeriod) {
+                return;
+            }
+
+            serialClock = 0;
+            AdvanceSerialBit();
+        }
+
+        /// <summary>
+        /// Supplies one externally clocked serial bit. Returns false unless an
+        /// external-clock transfer is active; otherwise returns the outgoing bit.
+        /// </summary>
+        public bool TryClockSerialBit(bool incomingBit, out bool outgoingBit)
+        {
+            outgoingBit = false;
+            if (!serialTransferActive || (serialControl & 0x01) != 0) {
+                return false;
+            }
+
+            outgoingBit = (serialData & 0x80) != 0;
+            AdvanceSerialBit(incomingBit);
+            return true;
+        }
+
+        internal void ResetSerial()
+        {
+            if (serialTransferActive) {
+                serial.Stop();
+            }
+
+            serialData = 0;
+            serialControl = 0;
+            serialIncomingData = 0xFF;
+            serialClock = 0;
+            serialBitsRemaining = 0;
+            serialTransferActive = false;
+        }
+
+        private void StartSerialTransfer()
+        {
+            if (serialTransferActive) {
+                serial.Stop();
+            }
+
+            serialClock = 0;
+            serialBitsRemaining = 8;
+            serialTransferActive = true;
+            serial.Write(serialData);
+            serial.Start();
+            serialIncomingData = serial is ISerialBitDevice ? (byte)0xFF : serial.Read();
+        }
+
+        private void AbortSerialTransfer()
+        {
+            serial.Stop();
+            serialClock = 0;
+            serialBitsRemaining = 0;
+            serialTransferActive = false;
+        }
+
+        private void AdvanceSerialBit(bool? suppliedIncomingBit = null)
+        {
+            bool outgoingBit = (serialData & 0x80) != 0;
+            bool incomingBit;
+            if (suppliedIncomingBit.HasValue) {
+                incomingBit = suppliedIncomingBit.Value;
+            } else if (serial is ISerialBitDevice bitDevice) {
+                incomingBit = bitDevice.ExchangeBit(outgoingBit);
+            } else {
+                incomingBit = (serialIncomingData & 0x80) != 0;
+                serialIncomingData <<= 1;
+            }
+
+            serialData = (byte)((serialData << 1) | (incomingBit ? 1 : 0));
+            serialBitsRemaining--;
+            if (serialBitsRemaining > 0) {
+                return;
+            }
+
+            serial.Stop();
+            serialClock = 0;
+            serialTransferActive = false;
+            Interrupt.Request(8);
+        }
+
         public void Dispose()
         {
             try {
@@ -643,7 +749,12 @@ namespace nanoboy.Core
                     }
                 }
                 writer.Write(hram);
+                writer.Write(serialData);
                 writer.Write(serialControl);
+                writer.Write(serialIncomingData);
+                writer.Write(serialClock);
+                writer.Write(serialBitsRemaining);
+                writer.Write(serialTransferActive);
             });
         }
 
@@ -670,8 +781,21 @@ namespace nanoboy.Core
                 StatePayload.RequireRange(nextWramBank, 1, 7, nameof(wrambank));
                 byte[] nextWram = StatePayload.ReadBytes(reader, 8 * 0x1000, "WRAM");
                 byte[] nextHram = StatePayload.ReadBytes(reader, 0x7F, "HRAM");
+                int nextSerialData = reader.ReadByte();
                 int nextSerialControl = reader.ReadByte();
                 StatePayload.RequireRange(nextSerialControl, 0, 3, nameof(serialControl));
+                int nextSerialIncomingData = reader.ReadByte();
+                int nextSerialClock = reader.ReadInt32();
+                StatePayload.RequireRange(nextSerialClock, 0, 511, nameof(serialClock));
+                int nextSerialBitsRemaining = reader.ReadInt32();
+                StatePayload.RequireRange(nextSerialBitsRemaining, 0, 8, nameof(serialBitsRemaining));
+                bool nextSerialTransferActive = StatePayload.ReadBoolean(reader);
+                if (nextSerialTransferActive != (nextSerialBitsRemaining > 0)) {
+                    throw new InvalidDataException("Serial transfer activity and remaining bit count disagree.");
+                }
+                if (!nextSerialTransferActive && nextSerialClock != 0) {
+                    throw new InvalidDataException("An inactive serial transfer cannot retain a clock phase.");
+                }
 
                 return (Action)(() => {
                     BootROMEnabled = nextBootRomEnabled;
@@ -683,7 +807,12 @@ namespace nanoboy.Core
                         }
                     }
                     Array.Copy(nextHram, hram, hram.Length);
+                    serialData = (byte)nextSerialData;
                     serialControl = (byte)nextSerialControl;
+                    serialIncomingData = (byte)nextSerialIncomingData;
+                    serialClock = nextSerialClock;
+                    serialBitsRemaining = nextSerialBitsRemaining;
+                    serialTransferActive = nextSerialTransferActive;
                 });
             });
         }
@@ -694,9 +823,8 @@ namespace nanoboy.Core
                 throw new ArgumentNullException(nameof(device));
             }
 
-            serial.Stop();
+            ResetSerial();
             serial = device;
-            serialControl = 0;
         }
 
         internal byte[] CaptureSerialStatePayload()

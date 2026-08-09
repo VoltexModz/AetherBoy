@@ -97,7 +97,7 @@ namespace nanoboy.Core
 
             return new ConformanceResult(
                 ConformanceOutcome.TimedOut,
-                serialCapture.Output,
+                FormatTimeoutState(emulator, serialCapture.Output),
                 maximumFrames,
                 ConformanceProtocol.None);
         }
@@ -174,6 +174,49 @@ namespace nanoboy.Core
             outcome = status == 0 ? ConformanceOutcome.Passed : ConformanceOutcome.Failed;
             output = message.ToString();
             return true;
+        }
+
+        private static string FormatTimeoutState(Nanoboy emulator, string serialOutput)
+        {
+            var output = new StringBuilder(serialOutput);
+            if (TryReadBlarggProgress(emulator.Memory, out string progress)) {
+                if (output.Length > 0) {
+                    output.Append("; ");
+                }
+                output.Append("Blargg progress: ").Append(progress);
+            }
+            if (output.Length > 0) {
+                output.Append("; ");
+            }
+            output.Append($"timeout PC={emulator.Cpu.PC:X4} SP={emulator.Cpu.SP:X4} ")
+                .Append($"AF={emulator.Cpu.A:X2}{emulator.Cpu.F:X2} ")
+                .Append($"BC={emulator.Cpu.B:X2}{emulator.Cpu.C:X2} ")
+                .Append($"DE={emulator.Cpu.D:X2}{emulator.Cpu.E:X2} ")
+                .Append($"HL={emulator.Cpu.H:X2}{emulator.Cpu.L:X2} ")
+                .Append($"DIV={emulator.Memory.Timer.DIV:X2} NR52={emulator.Memory.Audio.ReadStatus():X2} ")
+                .Append($"opcode={emulator.Memory.ReadByte(emulator.Cpu.PC):X2}");
+            return output.ToString();
+        }
+
+        private static bool TryReadBlarggProgress(Memory memory, out string output)
+        {
+            output = string.Empty;
+            if (memory.ReadByte(0xA001) != 0xDE ||
+                memory.ReadByte(0xA002) != 0xB0 ||
+                memory.ReadByte(0xA003) != 0x61) {
+                return false;
+            }
+
+            var message = new StringBuilder();
+            for (int address = 0xA004; address <= 0xAFFF; address++) {
+                int value = memory.ReadByte(address);
+                if (value == 0 || value == 0xFF) {
+                    break;
+                }
+                message.Append((char)value);
+            }
+            output = message.ToString();
+            return output.Length > 0;
         }
 
         private static bool HasMooneyePassSignature(CPU cpu) =>

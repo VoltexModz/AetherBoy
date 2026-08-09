@@ -95,6 +95,25 @@ public sealed class AudioRegisterTests
     }
 
     [TestMethod]
+    public void PowerOnDuringHighDivHalf_SkipsTheNextFrameSequencerEdge()
+    {
+        using var fixture = new EmulatorFixture();
+        Memory memory = fixture.Emulator.Memory;
+        memory.WriteByte(0xFF26, 0x00);
+        TickHardware(memory, 4_096);
+        memory.WriteByte(0xFF26, 0x80);
+        memory.WriteByte(0xFF11, 0x3F);
+        memory.WriteByte(0xFF12, 0xF0);
+        memory.WriteByte(0xFF14, 0xC0);
+
+        TickHardware(memory, 4_096);
+        Assert.AreEqual(1, memory.ReadByte(0xFF26) & 1);
+
+        TickHardware(memory, 8_192);
+        Assert.AreEqual(0, memory.ReadByte(0xFF26) & 1);
+    }
+
+    [TestMethod]
     public void DmgPowerOff_PreservesAndAcceptsLengthRegisterWrites()
     {
         using var fixture = new EmulatorFixture();
@@ -152,6 +171,14 @@ public sealed class AudioRegisterTests
         }
 
         Assert.AreEqual(0, memory.ReadByte(0xFF26) & 1);
+    }
+
+    private static void TickHardware(Memory memory, int dots)
+    {
+        for (int dot = 0; dot < dots; dot++) {
+            memory.Timer.Tick();
+            memory.Audio.Tick();
+        }
     }
 
     private sealed class EmulatorFixture : IDisposable

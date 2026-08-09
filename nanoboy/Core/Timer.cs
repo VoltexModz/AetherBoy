@@ -74,14 +74,14 @@ namespace nanoboy.Core
         public bool WriteDiv(bool doubleSpeed = false)
         {
             bool oldSignal = GetTimerSignal(dividerCounter, tac);
-            bool apuFallingEdge = IsApuDividerHigh(doubleSpeed);
+            bool apuFallingEdge = ApuDividerHigh(doubleSpeed);
             dividerCounter = 0;
             bool newSignal = GetTimerSignal(dividerCounter, tac);
             IncrementOnFallingEdge(oldSignal, newSignal);
             return apuFallingEdge;
         }
 
-        private bool IsApuDividerHigh(bool doubleSpeed)
+        internal bool ApuDividerHigh(bool doubleSpeed = false)
         {
             int dividerBit = doubleSpeed ? 13 : 12;
             return ((dividerCounter >> dividerBit) & 1) != 0;

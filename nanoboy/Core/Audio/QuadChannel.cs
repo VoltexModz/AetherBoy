@@ -187,12 +187,14 @@ namespace nanoboy.Core.Audio
             }
 
             sweepcycles = SweepTime == 0 ? 8 : SweepTime;
-            if (!sweepEnabled || SweepTime == 0 || SweepShift == 0) {
+            if (!sweepEnabled || SweepTime == 0) {
                 return;
             }
 
             int nextFrequency = CalculateSweepFrequency();
-            if (!outputActive) {
+            // A zero shift still performs the overflow calculation on a
+            // sweep clock, but never writes the result back to NR13/NR14.
+            if (!outputActive || SweepShift == 0) {
                 return;
             }
             lastfrequency = nextFrequency;

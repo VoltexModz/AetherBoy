@@ -4,6 +4,7 @@ namespace nanoboy.Core.Audio
 {
     public sealed class WaveChannel
     {
+        private readonly bool dmgMode;
         public bool Enabled;
 
         public byte[] WaveRAM;
@@ -41,12 +42,41 @@ namespace nanoboy.Core.Audio
         private float[] outputlevels = new float[] {0f, 1f, 0.5f, 0.25f};
         private int frequencyTimer;
         private int wavePosition;
+        private int waveRamAccessCycles;
         public int WavePosition => wavePosition;
 
-        public WaveChannel()
+        public WaveChannel(bool dmgMode = false)
         {
+            this.dmgMode = dmgMode;
             Enabled = true;
             WaveRAM = new byte[0x20];
+        }
+
+        internal byte ReadWaveRam(int address)
+        {
+            int byteIndex = address & 0x0F;
+            if (outputActive) {
+                if (dmgMode && waveRamAccessCycles != 2) {
+                    return 0xFF;
+                }
+                byteIndex = wavePosition >> 1;
+            }
+
+            return PackWaveByte(byteIndex);
+        }
+
+        internal void WriteWaveRam(int address, byte value)
+        {
+            int byteIndex = address & 0x0F;
+            if (outputActive) {
+                if (dmgMode && waveRamAccessCycles != 2) {
+                    return;
+                }
+                byteIndex = wavePosition >> 1;
+            }
+
+            WaveRAM[byteIndex * 2] = (byte)(value >> 4);
+            WaveRAM[byteIndex * 2 + 1] = (byte)(value & 0x0F);
         }
 
         public float Next(int samplerate)
@@ -61,15 +91,18 @@ namespace nanoboy.Core.Audio
 
         internal void Tick()
         {
+            if (waveRamAccessCycles > 0) {
+                waveRamAccessCycles--;
+            }
             if (!outputActive) {
                 return;
             }
 
-            frequencyTimer++;
-            int period = Math.Max(2, (0x800 - FrequencyRaw) * 2);
-            if (frequencyTimer >= period) {
-                frequencyTimer -= period;
+            frequencyTimer--;
+            if (frequencyTimer <= 0) {
+                frequencyTimer = GetFrequencyPeriod();
                 wavePosition = (wavePosition + 1) & 0x1F;
+                waveRamAccessCycles = 2;
             }
         }
 
@@ -109,14 +142,20 @@ namespace nanoboy.Core.Audio
 
         private void Restart(bool shortenReloadedLength)
         {
+            if (dmgMode && outputActive && frequencyTimer == 2) {
+                ApplyDmgRetriggerCorruption();
+            }
             if (lengthCounter == 0) {
                 lengthCounter = 256;
                 if (shortenReloadedLength) {
                     lengthCounter--;
                 }
             }
-            frequencyTimer = 0;
+            // The DMG wave sequencer starts three 2 MHz APU cycles after the
+            // programmed countdown; the CGB bus schedule is two dots later.
+            frequencyTimer = GetFrequencyPeriod() + (dmgMode ? 6 : 8);
             wavePosition = 0;
+            waveRamAccessCycles = 0;
             outputActive = DacEnabled;
         }
 
@@ -133,6 +172,7 @@ namespace nanoboy.Core.Audio
             OutputLevel = 0;
             frequencyTimer = 0;
             wavePosition = 0;
+            waveRamAccessCycles = 0;
             if (preserveLength) {
                 soundLengthRaw = preservedLengthRaw;
                 lengthCounter = preservedLengthCounter;
@@ -153,6 +193,7 @@ namespace nanoboy.Core.Audio
                 writer.Write(OutputLevel);
                 writer.Write(frequencyTimer);
                 writer.Write(wavePosition);
+                writer.Write(waveRamAccessCycles);
             });
         }
 
@@ -170,18 +211,21 @@ namespace nanoboy.Core.Audio
                 int nextOutputLevel = reader.ReadInt32();
                 int nextFrequencyTimer = reader.ReadInt32();
                 int nextWavePosition = reader.ReadInt32();
+                int nextWaveRamAccessCycles = reader.ReadInt32();
                 StatePayload.RequireRange(nextFrequencyRaw, 0, 0x7FF, nameof(FrequencyRaw));
                 StatePayload.RequireRange(nextSoundLengthRaw, 0, 0xFF, nameof(SoundLengthRaw));
                 StatePayload.RequireRange(nextOutputLevel, 0, 3, nameof(OutputLevel));
                 StatePayload.RequireRange(nextWavePosition, 0, 0x1F, nameof(wavePosition));
+                StatePayload.RequireRange(
+                    nextWaveRamAccessCycles,
+                    0,
+                    2,
+                    nameof(waveRamAccessCycles));
                 if (nextLengthCounter < 0 || nextFrequencyTimer < 0) {
                     throw new InvalidOperationException("Wave-channel phase counters cannot be negative.");
                 }
                 StatePayload.RequireRange(nextLengthCounter, 0, 256, nameof(lengthCounter));
-                int nextFrequencyPeriod = Math.Max(2, (0x800 - nextFrequencyRaw) * 2);
-                if (nextFrequencyTimer >= nextFrequencyPeriod) {
-                    throw new InvalidOperationException("Wave-channel frequency timer exceeds its period.");
-                }
+                StatePayload.RequireRange(nextFrequencyTimer, 0, 4_096, nameof(frequencyTimer));
                 if (nextOutputActive && !nextOn) {
                     throw new InvalidOperationException("Active wave-channel state has its DAC disabled.");
                 }
@@ -198,8 +242,34 @@ namespace nanoboy.Core.Audio
                     OutputLevel = nextOutputLevel;
                     frequencyTimer = nextFrequencyTimer;
                     wavePosition = nextWavePosition;
+                    waveRamAccessCycles = nextWaveRamAccessCycles;
                 });
             });
+        }
+
+        private byte PackWaveByte(int byteIndex) =>
+            (byte)((WaveRAM[byteIndex * 2] << 4) | WaveRAM[byteIndex * 2 + 1]);
+
+        private int GetFrequencyPeriod() => Math.Max(2, (0x800 - FrequencyRaw) * 2);
+
+        private void ApplyDmgRetriggerCorruption()
+        {
+            int bytePosition = ((wavePosition + 1) >> 1) & 0x0F;
+            if (bytePosition < 4) {
+                CopyWaveByte(bytePosition, 0);
+                return;
+            }
+
+            int sourceStart = bytePosition & ~3;
+            for (int index = 0; index < 4; index++) {
+                CopyWaveByte(sourceStart + index, index);
+            }
+        }
+
+        private void CopyWaveByte(int sourceIndex, int destinationIndex)
+        {
+            WaveRAM[destinationIndex * 2] = WaveRAM[sourceIndex * 2];
+            WaveRAM[destinationIndex * 2 + 1] = WaveRAM[sourceIndex * 2 + 1];
         }
     }
 }

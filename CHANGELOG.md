@@ -2,6 +2,29 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## 4.8.0-alpha.1 – Phase 8 (2026-08-09)
+
+### APU und Wave-RAM
+
+- Sweep-Shift 0 führt auf dem 128-Hz-Takt die Overflow-Prüfung aus, ohne die Frequenz zurückzuschreiben; Sweep-Negate-Latch und zweistufige Overflow-Prüfung sind vervollständigt.
+- APU-Power-On richtet den Frame-Sequencer an der aktuellen DIV-Hälfte aus und überspringt die nächste Flanke, wenn die Quellflanke beim Einschalten bereits hoch war.
+- DMG- und CGB-Wave-Startphase, laufende Frequenzänderungen, modellabhängige Wave-RAM-Lese-/Schreibfenster sowie die DMG-Retrigger-Korruption implementiert.
+- Analogen modellabhängigen Hochpass mit gehaltenem Kondensatorzustand bei abgeschalteten DACs ergänzt.
+- Blargg `dmg_sound` und `cgb_sound` bestehen nun jeweils **12/12** Einzel-ROMs.
+
+### PPU, Serial und Diagnose
+
+- Sprite-Transfergrenze in Mode 3 um die inklusive letzte Fetch-Kante präzisiert; die Mooneye-PPU-Auswahl steigt auf **11/12**.
+- Serial-Port von sofortigem Byteabschluss auf acht hardwaregetaktete Bits umgestellt: 512 T-Zyklen pro DMG/CGB-Normalbit, 16 T-Zyklen im CGB-Fast-Modus sowie externer Clock-Eingang und optionaler Bit-Gerätevertrag.
+- Laufende Serial-Transfers einschließlich Clockphase, Restbits und Schieberegister in Save States aufgenommen.
+- Conformance-Timeouts berichten nun Blargg-Zwischenstand, CPU-Register, DIV, NR52 und aktuellen Opcode statt eines leeren Ergebnisses.
+
+### Verifikation und Grenzen
+
+- Testsuite auf **167 Tests** erweitert: 141 Core-, 17 Runtime- und 9 Windows-Smoke-Tests. Das Save-State-Komponentenschema steigt für neue PPU-, APU- und Serial-Transienten auf 5.
+- Reproduzierbare Matrix: **67/70** Läufe bestanden, keine blockierenden Fehler; offen bleiben `rapid_toggle`, `lcdon_timing-GS` und `sources-GS`. Drei lokale Spiele liefen erneut jeweils 600 Frames absturzfrei.
+- Ein echter Pixel-FIFO, subzyklische Timer-/DMA-Buskonflikte und ein konkreter Link-Transport zwischen zwei Instanzen bleiben offen. Serielle Bitsemantik und externe Clock-Anbindung sind vorhanden, TCP/Netzwerk bewusst noch nicht.
+
 ## 4.7.0-alpha.1 – Phase 7 (2026-08-09)
 
 ### Kompatibilität und CPU-Bus

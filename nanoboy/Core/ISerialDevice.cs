@@ -10,6 +10,16 @@ namespace nanoboy.Core
         byte Read();
     }
 
+    /// <summary>
+    /// Optional extension for serial devices that exchange data one bit at a time.
+    /// Devices that only implement <see cref="ISerialDevice"/> continue to exchange
+    /// a complete byte at the start of a transfer.
+    /// </summary>
+    public interface ISerialBitDevice : ISerialDevice
+    {
+        bool ExchangeBit(bool outgoingBit);
+    }
+
     public class SerialConsole : ISerialDevice
     {
 
@@ -27,7 +37,7 @@ namespace nanoboy.Core
 
         public byte Read()
         {
-            return 0;
+            return 0xFF;
         }
     }
 }

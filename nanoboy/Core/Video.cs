@@ -61,6 +61,7 @@ namespace nanoboy.Core
         private int scanlineDuration;
         private int mode2Duration;
         private int mode3Duration;
+        private bool mode3InclusiveTransferEnd;
         private bool lcdStartup;
         private bool hasEverEnabled;
         private uint[] monochromepalette;
@@ -166,6 +167,7 @@ namespace nanoboy.Core
             publishedFrame = new uint[FramePixelCount];
             ModeFlag = 2;
             mode3Duration = 172;
+            mode3InclusiveTransferEnd = false;
             lcdStartup = false;
             hasEverEnabled = false;
             VRAMBank = 0;
@@ -206,6 +208,7 @@ namespace nanoboy.Core
             mode2Duration = 80;
             scanlineDuration = EmulationClock.DotsPerScanline;
             mode3Duration = 172;
+            mode3InclusiveTransferEnd = false;
             lcdStartup = false;
             hasEverEnabled = LCDEnable;
             FrameReady = false;
@@ -280,6 +283,7 @@ namespace nanoboy.Core
                     lcdStartup = false;
                 }
                 mode3Duration = 172;
+                mode3InclusiveTransferEnd = false;
                 hasEverEnabled = true;
             }
 
@@ -325,7 +329,8 @@ namespace nanoboy.Core
                     break;
 
                 case 3:
-                    if (clock >= mode3Duration) {
+                    int transferEnd = mode3Duration + (mode3InclusiveTransferEnd ? 1 : 0);
+                    if (clock >= transferEnd) {
 
                         if (hdma.IsHBlank) {
                             hdma.PerformHBlank();
@@ -414,6 +419,7 @@ namespace nanoboy.Core
 
         private int CalculateMode3Duration()
         {
+            mode3InclusiveTransferEnd = ObjectEnable;
             int duration = 172 + (SCX & 7);
             bool windowVisible =
                 WindowEnable &&
@@ -744,6 +750,7 @@ namespace nanoboy.Core
                     writer.Write(scanlineDuration);
                     writer.Write(mode2Duration);
                     writer.Write(mode3Duration);
+                    writer.Write(mode3InclusiveTransferEnd);
                     writer.Write(lcdStartup);
                     writer.Write(hasEverEnabled);
                     writer.Write(publishedFrameSequence);
@@ -808,6 +815,7 @@ namespace nanoboy.Core
                 int nextScanlineDuration = reader.ReadInt32();
                 int nextMode2Duration = reader.ReadInt32();
                 int nextMode3Duration = reader.ReadInt32();
+                bool nextMode3InclusiveTransferEnd = StatePayload.ReadBoolean(reader);
                 bool nextLcdStartup = StatePayload.ReadBoolean(reader);
                 bool nextHasEverEnabled = StatePayload.ReadBoolean(reader);
                 long nextPublishedFrameSequence = reader.ReadInt64();
@@ -885,6 +893,7 @@ namespace nanoboy.Core
                     scanlineDuration = nextScanlineDuration;
                     mode2Duration = nextMode2Duration;
                     mode3Duration = nextMode3Duration;
+                    mode3InclusiveTransferEnd = nextMode3InclusiveTransferEnd;
                     lcdStartup = nextLcdStartup;
                     hasEverEnabled = nextHasEverEnabled;
                     statInterruptLine = nextStatInterruptLine;

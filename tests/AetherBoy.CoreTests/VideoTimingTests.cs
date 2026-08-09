@@ -248,6 +248,22 @@ public sealed class VideoTimingTests
     }
 
     [TestMethod]
+    public void SpriteFetch_KeepsTheInclusiveTransferBoundaryInModeThree()
+    {
+        Video video = CreateVideo(out _);
+        video.WriteOAMDirect(0, 16);
+        video.WriteOAMDirect(1, 8);
+        video.WriteLcdc(0x93);
+
+        Tick(video, 80);
+        Tick(video, video.CurrentMode3Duration);
+        Assert.AreEqual(3, video.ModeFlag);
+
+        Tick(video, 1);
+        Assert.AreEqual(0, video.ModeFlag);
+    }
+
+    [TestMethod]
     public void OverlappingSprites_ShareTheTileWaitButKeepTheirFetchPenalty()
     {
         Video video = CreateVideo(out _);

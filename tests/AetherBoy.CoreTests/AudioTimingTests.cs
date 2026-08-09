@@ -47,6 +47,109 @@ public sealed class AudioTimingTests
     }
 
     [TestMethod]
+    public void AnalogHighPass_RemovesDcWithoutChangingTheInitialEdge()
+    {
+        using var audio = new Audio(dmgMode: true) { Enabled = false };
+
+        float first = audio.ApplyHighPass(0.75f);
+        float second = audio.ApplyHighPass(0.75f);
+        float settled = second;
+        for (int sample = 0; sample < 4_096; sample++) {
+            settled = audio.ApplyHighPass(0.75f);
+        }
+
+        Assert.AreEqual(0.75f, first, 0.0001f);
+        Assert.IsGreaterThan(0f, second);
+        Assert.IsTrue(second < first);
+        Assert.AreEqual(0f, settled, 0.0001f);
+    }
+
+    [TestMethod]
+    public void AnalogHighPass_HoldsItsChargeWhileEveryDacIsDisconnected()
+    {
+        using var audio = new Audio(dmgMode: true) { Enabled = false };
+        for (int sample = 0; sample < 4_096; sample++) {
+            audio.ApplyHighPass(0.75f);
+        }
+
+        for (int sample = 0; sample < 4_096; sample++) {
+            Assert.AreEqual(0f, audio.ApplyHighPass(0f, capacitorConnected: false));
+        }
+
+        Assert.AreEqual(0f, audio.ApplyHighPass(0.75f), 0.0001f);
+    }
+
+    [TestMethod]
+    public void CgbWaveRam_UsesTheCurrentlyPlayingByteForEveryAddress()
+    {
+        var channel = new WaveChannel(dmgMode: false) {
+            On = true,
+            FrequencyRaw = 0x7FF
+        };
+        channel.WriteWaveRam(0, 0x12);
+        channel.WriteWaveRam(1, 0x34);
+        channel.Restart();
+
+        Assert.AreEqual(0x12, channel.ReadWaveRam(0x0F));
+        for (int dot = 0; dot < 12; dot++) {
+            channel.Tick();
+        }
+        Assert.AreEqual(2, channel.WavePosition);
+        Assert.AreEqual(0x34, channel.ReadWaveRam(0));
+
+        channel.WriteWaveRam(0x0F, 0xAB);
+        channel.On = false;
+        channel.ApplyDacState();
+        Assert.AreEqual(0xAB, channel.ReadWaveRam(1));
+    }
+
+    [TestMethod]
+    public void DmgWaveRam_IsAccessibleOnlyOnTheFetchTick()
+    {
+        var channel = new WaveChannel(dmgMode: true) {
+            On = true,
+            FrequencyRaw = 0x7FE
+        };
+        channel.WriteWaveRam(0, 0x12);
+        channel.Restart();
+
+        Assert.AreEqual(0xFF, channel.ReadWaveRam(0));
+        for (int dot = 0; dot < 9; dot++) {
+            channel.Tick();
+            Assert.AreEqual(0xFF, channel.ReadWaveRam(0));
+        }
+        channel.Tick();
+        Assert.AreEqual(0x12, channel.ReadWaveRam(0x0F));
+        channel.Tick();
+        Assert.AreEqual(0xFF, channel.ReadWaveRam(0));
+    }
+
+    [TestMethod]
+    public void DmgWaveRetrigger_CopiesTheCurrentAlignedBlockIntoTheFirstFourBytes()
+    {
+        var channel = new WaveChannel(dmgMode: true) {
+            On = true,
+            FrequencyRaw = 0x7FF
+        };
+        for (int index = 0; index < 16; index++) {
+            channel.WriteWaveRam(index, (byte)(index * 0x11));
+        }
+        channel.Restart();
+        for (int dot = 0; dot < 26; dot++) {
+            channel.Tick();
+        }
+
+        channel.Restart();
+        channel.On = false;
+        channel.ApplyDacState();
+
+        Assert.AreEqual(0x44, channel.ReadWaveRam(0));
+        Assert.AreEqual(0x55, channel.ReadWaveRam(1));
+        Assert.AreEqual(0x66, channel.ReadWaveRam(2));
+        Assert.AreEqual(0x77, channel.ReadWaveRam(3));
+    }
+
+    [TestMethod]
     public void ChannelLengthCounters_UseHardwareClockFractions()
     {
         var pulse = new QuadChannel { SoundLengthRaw = 0 };
@@ -181,6 +284,25 @@ public sealed class AudioTimingTests
     }
 
     [TestMethod]
+    public void SweepShiftZero_ChecksOverflowOnlyWhenTheSweepClockRuns()
+    {
+        var pulse = new QuadChannel {
+            Frequency = 0x7FF,
+            Volume = 1,
+            SweepTime = 1,
+            SweepShift = 0
+        };
+
+        pulse.Restart();
+        Assert.IsTrue(pulse.IsActive);
+
+        pulse.ClockSweep();
+
+        Assert.IsFalse(pulse.IsActive);
+        Assert.AreEqual(0x7FF, pulse.CurrentFrequency);
+    }
+
+    [TestMethod]
     public void SweepTrigger_DisablesChannelWhenTheInitialCalculationOverflows()
     {
         var pulse = new QuadChannel
@@ -224,15 +346,27 @@ public sealed class AudioTimingTests
     }
 
     [TestMethod]
-    public void WaveFrequencyTimer_AdvancesSampleAfterTwoDotsAtPeriod2047()
+    public void WaveFrequencyTimer_AppliesTheModelSpecificTriggerStartupDelay()
     {
-        var wave = new WaveChannel { FrequencyRaw = 0x7FF, On = true };
-        wave.Restart();
+        var dmgWave = new WaveChannel(dmgMode: true) { FrequencyRaw = 0x7FF, On = true };
+        dmgWave.Restart();
 
-        wave.Tick();
-        Assert.AreEqual(0, wave.WavePosition);
-        wave.Tick();
-        Assert.AreEqual(1, wave.WavePosition);
+        for (int dot = 0; dot < 7; dot++) {
+            dmgWave.Tick();
+        }
+        Assert.AreEqual(0, dmgWave.WavePosition);
+        dmgWave.Tick();
+        Assert.AreEqual(1, dmgWave.WavePosition);
+
+        var cgbWave = new WaveChannel(dmgMode: false) { FrequencyRaw = 0x7FF, On = true };
+        cgbWave.Restart();
+
+        for (int dot = 0; dot < 9; dot++) {
+            cgbWave.Tick();
+        }
+        Assert.AreEqual(0, cgbWave.WavePosition);
+        cgbWave.Tick();
+        Assert.AreEqual(1, cgbWave.WavePosition);
     }
 
     [TestMethod]

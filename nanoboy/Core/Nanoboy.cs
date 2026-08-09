@@ -42,6 +42,7 @@ namespace nanoboy.Core
                     {
                         Memory.Timer.Tick();
                         Memory.HDMA.TickOamDma();
+                        Memory.TickSerial();
                     }
                     Memory.Video.Tick();
                     Memory.Audio.Tick();
@@ -58,6 +59,7 @@ namespace nanoboy.Core
                     {
                         Memory.Timer.Tick();
                         Memory.HDMA.TickOamDma();
+                        Memory.TickSerial();
 
                         if (doubleSpeed)
                         {
@@ -114,6 +116,7 @@ namespace nanoboy.Core
             Memory.Interrupt.IF = 0;
             Memory.Timer.Reset();
             Memory.HDMA.Reset();
+            Memory.ResetSerial();
             Memory.Video.ResetTiming();
             Memory.Audio.ResetHardware();
 
