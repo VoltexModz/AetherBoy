@@ -148,6 +148,7 @@ namespace nanoboy
 
         public NanoboySettings()
         {
+            RecentFiles.AddRange(RecentRomStore.Load());
             nanoboy.Properties.Settings.Default.PropertyChanged += PropertyChanged;
         }
     }

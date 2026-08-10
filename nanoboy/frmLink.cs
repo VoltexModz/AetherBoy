@@ -140,7 +140,7 @@ namespace nanoboy
             lblStatus.Text = $"Verbinde mit {ip}...";
             if (!linkCable.ConnectClient(ip, 8765))
             {
-                MessageBox.Show("Verbindung fehlgeschlagen. Ist der Host gestartet?", "Link-Kabel", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AetherSignal.Show(this, "Verbindung fehlgeschlagen. Ist der Host gestartet?", "Link-Kabel", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 UpdateStatus();
             }
         }

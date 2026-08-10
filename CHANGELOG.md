@@ -21,6 +21,14 @@ Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und no
 - Neues Command-Deck stellt Öffnen, Pause/Fortsetzen, Rewind, Speichern, Laden und umschaltbares Turbo direkt bereit; die fünf State-Slots sind ebenfalls unmittelbar anwählbar.
 - Bestehende vollständige Menüs bleiben hinter `SYSTEM`, `TUNE`, `TOOLS` und `INFO` erreichbar; `Strg+O`, F5, F8 sowie die bisherigen Spiel- und Turbo-Tasten bleiben erhalten.
 
+### Dialoge und Cartridge Vault
+
+- About, Steuerung, Changelog, Cheat-Manager, Audio Inspector und Link-Lab auf eine gemeinsame rahmenlose Aether-Chrome mit eigener Typografie, Flächen und Fenstersteuerung umgestellt.
+- Audiopegel und Wave-RAM-Scope als eigene animierte Telemetrieelemente statt generischer WinForms-Balken neu gezeichnet.
+- Native MessageBoxen vollständig durch farbcodierte Aether-Signale für Information, Warnung, Entscheidung und Fehler ersetzt.
+- Neue Cartridge-Vault bündelt persistente zuletzt verwendete ROMs, markiert fehlende Dateien, akzeptiert Drag-and-drop und führt erst bei Bedarf in den nativen Dateibrowser.
+- Laufender Session-Status und gültige ROM-Drop-Ziele erhalten dezente Puls- und Signalübergänge; Animationen verändern keine Emulationstaktrate.
+
 ## 4.8.0-alpha.1 – Phase 8 (2026-08-09)
 
 ### APU und Wave-RAM

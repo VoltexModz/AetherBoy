@@ -106,13 +106,13 @@ namespace nanoboy
 
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(code))
             {
-                MessageBox.Show("Bitte geben Sie einen Namen und einen Code ein.", "Cheat Manager", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                AetherSignal.Show(this, "Bitte geben Sie einen Namen und einen Code ein.", "Cheat Manager", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             if (!IsSupportedGameSharkCode(code))
             {
-                MessageBox.Show(
+                AetherSignal.Show(this,
                     "Unterstützt werden derzeit nur experimentelle GameShark-RAM-Codes im Format 01XXYYZZ.",
                     "Nicht unterstützter Cheat-Code",
                     MessageBoxButtons.OK,
@@ -137,7 +137,7 @@ namespace nanoboy
                 txtName.Clear();
                 txtCode.Clear();
                 RefreshCheatList();
-                MessageBox.Show(
+                AetherSignal.Show(this,
                     "Experimenteller GameShark-RAM-Code hinzugefügt.",
                     "GameShark Cheat Manager",
                     MessageBoxButtons.OK,
@@ -203,7 +203,7 @@ namespace nanoboy
                 RefreshCheatList();
                 if (!removed)
                 {
-                    MessageBox.Show(
+                    AetherSignal.Show(this,
                         "Der ausgewählte Cheat ist nicht mehr vorhanden.",
                         "Cheat Manager",
                         MessageBoxButtons.OK,
@@ -297,7 +297,7 @@ namespace nanoboy
             string message = session.State == SessionState.Faulted
                 ? "Die Emulationssitzung wurde wegen eines Fehlers beendet. Cheats können nicht mehr geändert werden."
                 : "Das Spiel wird gerade beendet oder ist bereits geschlossen. Cheats können nicht mehr geändert werden.";
-            MessageBox.Show(
+            AetherSignal.Show(this,
                 message,
                 "Cheat Manager nicht verfügbar",
                 MessageBoxButtons.OK,
@@ -311,7 +311,7 @@ namespace nanoboy
                 return;
             }
 
-            MessageBox.Show(
+            AetherSignal.Show(this,
                 message,
                 "Fehler",
                 MessageBoxButtons.OK,

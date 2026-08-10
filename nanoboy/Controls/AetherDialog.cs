@@ -328,6 +328,12 @@ namespace nanoboy.Controls
             {
                 bool selected = eventArgs.Item.Selected;
                 Color background = selected ? Color.FromArgb(39, 32, 68) : AetherColors.SurfaceRaised;
+                Color foreground = eventArgs.SubItem.Text switch
+                {
+                    "READY" => AetherColors.Success,
+                    "MISSING" => AetherColors.Danger,
+                    _ => selected ? AetherColors.Cyan : AetherColors.Text
+                };
                 using var fill = new SolidBrush(background);
                 eventArgs.Graphics.FillRectangle(fill, eventArgs.Bounds);
                 TextRenderer.DrawText(
@@ -335,7 +341,7 @@ namespace nanoboy.Controls
                     eventArgs.SubItem.Text,
                     listView.Font,
                     Rectangle.Inflate(eventArgs.Bounds, -8, 0),
-                    selected ? AetherColors.Cyan : AetherColors.Text,
+                    foreground,
                     TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             };
         }

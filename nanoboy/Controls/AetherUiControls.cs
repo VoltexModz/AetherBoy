@@ -329,11 +329,20 @@ namespace nanoboy.Controls
 
     internal sealed class AetherStatusDot : Control
     {
+        private readonly Timer animationTimer;
         private Color signalColor = AetherColors.Muted;
+        private bool animated;
+        private float phase;
 
         public AetherStatusDot()
         {
             Size = new Size(12, 12);
+            animationTimer = new Timer { Interval = 55 };
+            animationTimer.Tick += (_, _) =>
+            {
+                phase += 0.12f;
+                Invalidate();
+            };
             SetStyle(ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
         }
 
@@ -348,13 +357,52 @@ namespace nanoboy.Controls
             }
         }
 
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public bool Animated
+        {
+            get => animated;
+            set
+            {
+                if (animated == value)
+                {
+                    return;
+                }
+
+                animated = value;
+                animationTimer.Enabled = value;
+                if (!value)
+                {
+                    phase = 0f;
+                }
+                Invalidate();
+            }
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.Clear(Parent?.BackColor ?? AetherColors.Surface);
+            if (animated)
+            {
+                float pulse = 0.5f + (0.5f * (float)Math.Sin(phase));
+                Rectangle halo = Rectangle.Inflate(ClientRectangle, -1, -1);
+                using var haloBrush = new SolidBrush(Color.FromArgb(28 + (int)(pulse * 34), signalColor));
+                e.Graphics.FillEllipse(haloBrush, halo);
+            }
+
             Rectangle dot = Rectangle.Inflate(ClientRectangle, -2, -2);
             using var brush = new SolidBrush(signalColor);
             e.Graphics.FillEllipse(brush, dot);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                animationTimer.Dispose();
+            }
+
+            base.Dispose(disposing);
         }
     }
 }

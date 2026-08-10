@@ -215,6 +215,63 @@ public sealed class FrontendBoundaryTests
         Assert.IsFalse(address.Enabled);
     }
 
+    [STATestMethod]
+    public void RomLibrary_DistinguishesReadyAndMissingCartridges()
+    {
+        string availableRom = Path.Combine(
+            Path.GetTempPath(),
+            $"aetherboy-library-{Guid.NewGuid():N}.gb");
+        string missingRom = Path.Combine(
+            Path.GetTempPath(),
+            $"aetherboy-missing-{Guid.NewGuid():N}.gbc");
+        File.WriteAllBytes(availableRom, new byte[0x150]);
+
+        try
+        {
+            using var form = new frmRomLibrary(new[] { availableRom, missingRom });
+            Type formType = form.GetType();
+            ListView list = GetRequiredField<ListView>(formType, form, "romList");
+            Button browse = GetRequiredField<Button>(formType, form, "browseButton");
+
+            Assert.AreEqual(FormBorderStyle.None, form.FormBorderStyle);
+            Assert.IsTrue(form.AllowDrop);
+            Assert.AreEqual(2, list.Items.Count);
+            Assert.AreEqual("READY", list.Items[0].SubItems[2].Text);
+            Assert.AreEqual("MISSING", list.Items[1].SubItems[2].Text);
+            Assert.IsTrue(browse.Enabled);
+            Assert.IsNull(form.SelectedRomPath);
+        }
+        finally
+        {
+            File.Delete(availableRom);
+        }
+    }
+
+    [STATestMethod]
+    public void AetherSignalDialog_ProvidesBrandedModalChrome()
+    {
+        Type dialogType = typeof(frmNano).Assembly.GetType("nanoboy.Controls.AetherSignalDialog")
+            ?? throw new AssertFailedException("Aether signal dialog type is missing.");
+        using var dialog = Activator.CreateInstance(
+            dialogType,
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null,
+            args: new object[]
+            {
+                "Test signal",
+                "Signal title",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning
+            },
+            culture: null) as Form
+            ?? throw new AssertFailedException("Aether signal dialog could not be created.");
+
+        Assert.AreEqual(FormBorderStyle.None, dialog.FormBorderStyle);
+        Assert.IsFalse(dialog.ShowInTaskbar);
+        Assert.AreEqual(1, dialog.Controls.Find("aetherDialogHeader", true).Length);
+        Assert.AreEqual(1, dialog.Controls.Find("aetherSignalOKButton", true).Length);
+    }
+
     private static T GetRequiredField<T>(Type type, object instance, string name) where T : class
     {
         return type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(instance) as T

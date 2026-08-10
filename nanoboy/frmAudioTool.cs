@@ -134,7 +134,7 @@ namespace nanoboy
                     SetRecorderIdleControls();
                     if (!Volatile.Read(ref isClosing))
                     {
-                        MessageBox.Show(
+                        AetherSignal.Show(this,
                             $"Die WAV-Aufnahme wurde wegen eines Schreibfehlers beendet.\n\n{exception.Message}",
                             "Audio Recorder",
                             MessageBoxButtons.OK,
@@ -152,7 +152,7 @@ namespace nanoboy
                     !Volatile.Read(ref isClosing) &&
                     !IsDisposed)
                 {
-                    MessageBox.Show(
+                    AetherSignal.Show(this,
                         "Aufnahme gestoppt und WAV-Datei gespeichert!",
                         "Audio Recorder",
                         MessageBoxButtons.OK,
@@ -171,7 +171,7 @@ namespace nanoboy
             AudioSnapshot? audio = currentSession?.LatestSnapshot.Audio;
             if (audio == null)
             {
-                MessageBox.Show(
+                AetherSignal.Show(this,
                     "Kein Spiel oder Audio aktiv.",
                     "Audio Recorder",
                     MessageBoxButtons.OK,
@@ -337,7 +337,7 @@ namespace nanoboy
                     {
                         if (!Volatile.Read(ref isClosing))
                         {
-                            MessageBox.Show(
+                            AetherSignal.Show(this,
                                 $"Die WAV-Datei konnte nicht vollständig gespeichert werden.\n\n{exception.Message}",
                                 "Audio Recorder",
                                 MessageBoxButtons.OK,
@@ -385,7 +385,7 @@ namespace nanoboy
                 if (!Volatile.Read(ref isClosing) &&
                     ReferenceEquals(sourceSession, Volatile.Read(ref session)))
                 {
-                    MessageBox.Show(
+                    AetherSignal.Show(this,
                         $"Die WAV-Datei konnte nicht angelegt werden.\n\n{exception.Message}",
                         "Audio Recorder",
                         MessageBoxButtons.OK,

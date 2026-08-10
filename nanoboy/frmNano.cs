@@ -164,9 +164,11 @@ namespace nanoboy
         #region "Menu"
         private void menuOpen_Click(object sender, EventArgs e)
         {
-            if (openRom.ShowDialog() == DialogResult.OK)
+            using var library = new frmRomLibrary(settings.RecentFiles);
+            if (library.ShowDialog(this) == DialogResult.OK &&
+                library.SelectedRomPath is string path)
             {
-                LoadRomFile(openRom.FileName);
+                LoadRomFile(path);
             }
         }
 
@@ -178,7 +180,7 @@ namespace nanoboy
             if (!StopSession())
             {
                 updateTimer.Start();
-                MessageBox.Show(
+                AetherSignal.Show(this,
                     "Der laufende Emulator konnte nicht sicher beendet werden. Die neue ROM wurde nicht geladen.",
                     "Emulator beschäftigt",
                     MessageBoxButtons.OK,
@@ -217,7 +219,7 @@ namespace nanoboy
                 preparedAudioOutput?.Dispose();
                 UpdateAetherSessionUi(null);
                 Debug.WriteLine($"Could not start emulation session for '{path}': {exception}");
-                MessageBox.Show(
+                AetherSignal.Show(this,
                     $"Die ROM konnte nicht gestartet werden.\n\n{exception.Message}",
                     "ROM konnte nicht geladen werden",
                     MessageBoxButtons.OK,
@@ -296,9 +298,9 @@ namespace nanoboy
             }
         }
 
-        private static void ShowAudioUnavailableMessage()
+        private void ShowAudioUnavailableMessage()
         {
-            MessageBox.Show(
+            AetherSignal.Show(this,
                 "Das Windows-Audiogerät konnte nicht geöffnet werden. AetherBoy läuft stumm weiter.",
                 "Audio nicht verfügbar",
                 MessageBoxButtons.OK,
@@ -308,12 +310,14 @@ namespace nanoboy
         private void AddRecentFile(string path)
         {
             if (string.IsNullOrEmpty(path)) return;
-            settings.RecentFiles.Remove(path);
+            settings.RecentFiles.RemoveAll(candidate =>
+                candidate.Equals(path, StringComparison.OrdinalIgnoreCase));
             settings.RecentFiles.Insert(0, path);
-            while (settings.RecentFiles.Count > 5)
+            while (settings.RecentFiles.Count > 8)
             {
                 settings.RecentFiles.RemoveAt(settings.RecentFiles.Count - 1);
             }
+            RecentRomStore.Save(settings.RecentFiles);
             RebuildRecentFilesMenu();
         }
 
@@ -330,7 +334,13 @@ namespace nanoboy
             foreach (var file in settings.RecentFiles)
             {
                 string filePath = file;
-                var item = new ToolStripMenuItem(Path.GetFileName(filePath));
+                bool exists = File.Exists(filePath);
+                var item = new ToolStripMenuItem(
+                    exists ? Path.GetFileName(filePath) : $"{Path.GetFileName(filePath)} (fehlt)")
+                {
+                    Enabled = exists,
+                    ToolTipText = filePath
+                };
                 item.Click += (s, e) => LoadRomFile(filePath);
                 menuRecentFiles.DropDownItems.Add(item);
             }
@@ -384,7 +394,7 @@ namespace nanoboy
             catch (Exception exception)
             {
                 Debug.WriteLine($"Could not save state: {exception}");
-                MessageBox.Show(
+                AetherSignal.Show(this,
                     $"Der Spielstand konnte nicht gespeichert werden.\n\n{exception.Message}",
                     "Save State fehlgeschlagen",
                     MessageBoxButtons.OK,
@@ -408,7 +418,7 @@ namespace nanoboy
             string statePath = GetStatePath(romPath, settings.SaveSlot);
             if (!File.Exists(statePath))
             {
-                MessageBox.Show(
+                AetherSignal.Show(this,
                     $"In Slot {settings.SaveSlot} ist noch kein Spielstand vorhanden.",
                     "Kein Save State",
                     MessageBoxButtons.OK,
@@ -431,7 +441,7 @@ namespace nanoboy
             catch (Exception exception)
             {
                 Debug.WriteLine($"Could not load state: {exception}");
-                MessageBox.Show(
+                AetherSignal.Show(this,
                     $"Der Spielstand konnte nicht geladen werden. Der laufende Zustand blieb unverändert.\n\n{exception.Message}",
                     "Save State ungültig",
                     MessageBoxButtons.OK,
@@ -508,7 +518,7 @@ namespace nanoboy
             {
                 if (!await currentSession.RewindAsync().ConfigureAwait(true))
                 {
-                    MessageBox.Show(
+                    AetherSignal.Show(this,
                         "Es ist noch kein früherer Zustand im Rewind-Puffer vorhanden.",
                         "Rewind",
                         MessageBoxButtons.OK,
@@ -522,7 +532,7 @@ namespace nanoboy
             catch (Exception exception)
             {
                 Debug.WriteLine($"Could not rewind: {exception}");
-                MessageBox.Show(
+                AetherSignal.Show(this,
                     $"Zurückspulen ist fehlgeschlagen.\n\n{exception.Message}",
                     "Rewind fehlgeschlagen",
                     MessageBoxButtons.OK,
@@ -584,7 +594,7 @@ namespace nanoboy
             EmulationSession currentSession = session;
             if (currentSession == null)
             {
-                MessageBox.Show(
+                AetherSignal.Show(this,
                     "Bitte zuerst eine ROM laden.",
                     "Cheat Manager",
                     MessageBoxButtons.OK,
@@ -600,9 +610,9 @@ namespace nanoboy
             ShowUnavailableFeature("Link-Kabel Multiplayer");
         }
 
-        private static void ShowUnavailableFeature(string feature)
+        private void ShowUnavailableFeature(string feature)
         {
-            MessageBox.Show(
+            AetherSignal.Show(this,
                 $"{feature} ist in dieser Version experimentell und vorerst deaktiviert.",
                 "Funktion deaktiviert",
                 MessageBoxButtons.OK,
@@ -622,11 +632,11 @@ namespace nanoboy
                               $"Color (GBC): {(rom.HasColorFeatures ? "Ja" : "Nein")}\n" +
                               $"Super Game Boy (SGB): {(rom.HasSuperGameBoyFeatures ? "Ja" : "Nein")}\n" +
                               $"Region: {(rom.IsJapanese ? "Japan" : "International")}";
-                MessageBox.Show(info, "ROM Informationen", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                AetherSignal.Show(this, info, "ROM Informationen", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             else
             {
-                MessageBox.Show("Keine ROM geladen.", "ROM Informationen", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                AetherSignal.Show(this, "Keine ROM geladen.", "ROM Informationen", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -807,7 +817,7 @@ namespace nanoboy
                 }
 
                 Exception fault = currentSession.Fault;
-                MessageBox.Show(
+                AetherSignal.Show(this,
                     $"Die Emulation wurde wegen eines Fehlers beendet.\n\n{fault?.Message}",
                     "Emulationsfehler",
                     MessageBoxButtons.OK,
@@ -978,7 +988,7 @@ namespace nanoboy
             {
                 e.Cancel = true;
                 updateTimer.Start();
-                MessageBox.Show(
+                AetherSignal.Show(this,
                     "Der Emulator wird noch beendet. Bitte versuchen Sie es gleich erneut.",
                     "Emulator beschäftigt",
                     MessageBoxButtons.OK,

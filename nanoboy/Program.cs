@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Windows.Forms;
+using nanoboy.Controls;
 
 namespace nanoboy
 {
@@ -16,7 +17,7 @@ namespace nanoboy
             Application.ThreadException += (s, e) =>
             {
                 WriteCrashLog(e.Exception);
-                MessageBox.Show(
+                AetherSignal.Show(
                     "AetherBoy wurde wegen eines unerwarteten Fehlers beendet. " +
                     "Ein Diagnoseprotokoll wurde im lokalen Anwendungsordner gespeichert.",
                     ProductInfo.Name,
@@ -54,9 +55,7 @@ namespace nanoboy
             try
             {
                 string candidate = Path.GetFullPath(args[0]);
-                string extension = Path.GetExtension(candidate);
-                if (!extension.Equals(".gb", StringComparison.OrdinalIgnoreCase) &&
-                    !extension.Equals(".gbc", StringComparison.OrdinalIgnoreCase))
+                if (!RomFiles.IsSupportedPath(candidate))
                 {
                     return false;
                 }

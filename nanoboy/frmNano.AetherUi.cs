@@ -609,6 +609,8 @@ namespace nanoboy
                 SessionState.Faulted => AetherColors.Danger,
                 _ => AetherColors.Muted
             };
+            aetherStatusDot.Animated = state is
+                SessionState.Starting or SessionState.Running or SessionState.Stopping;
 
             bool actionsEnabled = hasSession && state is not SessionState.Stopping and not SessionState.Stopped and not SessionState.Faulted;
             aetherPauseButton.Enabled = actionsEnabled;
@@ -651,21 +653,7 @@ namespace nanoboy
 
         private static bool TryGetDroppedRom(IDataObject? data, out string? path)
         {
-            path = null;
-            if (data?.GetData(DataFormats.FileDrop) is not string[] files || files.Length != 1)
-            {
-                return false;
-            }
-
-            string extension = Path.GetExtension(files[0]);
-            if (!extension.Equals(".gb", StringComparison.OrdinalIgnoreCase) &&
-                !extension.Equals(".gbc", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            path = files[0];
-            return true;
+            return RomFiles.TryGetSingleDrop(data, out path);
         }
 
         private void WireWindowDrag(Control control)

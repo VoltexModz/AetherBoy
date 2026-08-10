@@ -29,7 +29,6 @@ namespace nanoboy
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            this.openRom = new System.Windows.Forms.OpenFileDialog();
             this.menuStrip = new System.Windows.Forms.MenuStrip();
             this.menuFile = new System.Windows.Forms.ToolStripMenuItem();
             this.menuOpen = new System.Windows.Forms.ToolStripMenuItem();
@@ -598,11 +597,6 @@ namespace nanoboy
             //
             this.toolStripSeparator3.Name = "toolStripSeparator3";
             this.toolStripSeparator3.Size = new System.Drawing.Size(177, 6);
-            //
-            // openRom
-            //
-            this.openRom.Filter = "Gameboy ROMs (*.gb, *.gbc)|*.gb;*.gbc";
-            //
             // updateTimer
             //
             this.updateTimer.Interval = 16;
@@ -696,7 +690,6 @@ namespace nanoboy
         private System.Windows.Forms.ToolStripMenuItem menuRomInfo;
         private System.Windows.Forms.ToolStripMenuItem menuAbout;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
-        private System.Windows.Forms.OpenFileDialog openRom;
         private System.Windows.Forms.ToolStripMenuItem menuItem4;
         private System.Windows.Forms.ToolStripMenuItem menuVideoFilter;
         private System.Windows.Forms.ToolStripMenuItem menuFilterSharp;
