@@ -1,6 +1,7 @@
 using System;
 using System.Windows.Forms;
 using AetherBoy.Runtime;
+using nanoboy.Controls;
 
 namespace nanoboy
 {
@@ -17,7 +18,68 @@ namespace nanoboy
             Text = $"GameShark-Cheats (experimentell) – {ProductInfo.DisplayName}";
             this.session = session;
             RefreshCheatList();
-            DarkTheme.Apply(this);
+            ConfigureAetherLayout();
+            AetherDialog.Apply(
+                this,
+                "MEMORY PATCH BAY // 04",
+                "Experimentelle GameShark-RAM-Codes pro laufender Spielsitzung");
+        }
+
+        private void ConfigureAetherLayout()
+        {
+            ClientSize = new System.Drawing.Size(860, 520);
+            MinimumSize = Size;
+            MaximumSize = Size;
+
+            lstCheats.Location = new System.Drawing.Point(24, 24);
+            lstCheats.Size = new System.Drawing.Size(812, 282);
+            colStatus.Width = 78;
+            colName.Width = 286;
+            colCode.Width = 218;
+            colType.Width = 228;
+
+            lblName.Location = new System.Drawing.Point(24, 332);
+            lblName.Text = "NAME / BESCHREIBUNG";
+            lblName.Font = new System.Drawing.Font("Segoe UI", 7.5f, System.Drawing.FontStyle.Bold);
+            txtName.Location = new System.Drawing.Point(24, 354);
+            txtName.Size = new System.Drawing.Size(310, 32);
+
+            lblCode.Location = new System.Drawing.Point(354, 332);
+            lblCode.Text = "GAMESHARK CODE";
+            lblCode.Font = new System.Drawing.Font("Segoe UI", 7.5f, System.Drawing.FontStyle.Bold);
+            txtCode.Location = new System.Drawing.Point(354, 354);
+            txtCode.Size = new System.Drawing.Size(250, 32);
+            txtCode.Font = new System.Drawing.Font("Cascadia Mono", 10f, System.Drawing.FontStyle.Bold);
+            txtCode.CharacterCasing = CharacterCasing.Upper;
+
+            btnAdd.Location = new System.Drawing.Point(624, 350);
+            btnAdd.Size = new System.Drawing.Size(212, 40);
+            btnAdd.Text = "+  CODE HINZUFÜGEN";
+            if (btnAdd is AetherButton addButton)
+            {
+                addButton.Kind = AetherButtonKind.Primary;
+            }
+
+            lblExperimentalInfo.Location = new System.Drawing.Point(24, 414);
+            lblExperimentalInfo.Size = new System.Drawing.Size(520, 22);
+            lblExperimentalInfo.Text = "SUPPORTED FORMAT  //  01XXYYZZ  //  RAM WRITE";
+            lblExperimentalInfo.Font = new System.Drawing.Font("Segoe UI", 7.5f, System.Drawing.FontStyle.Bold);
+
+            btnToggle.Location = new System.Drawing.Point(24, 456);
+            btnToggle.Size = new System.Drawing.Size(150, 40);
+            btnToggle.Text = "AKTIV / INAKTIV";
+            if (btnToggle is AetherButton toggleButton)
+            {
+                toggleButton.Kind = AetherButtonKind.Secondary;
+            }
+
+            btnRemove.Location = new System.Drawing.Point(186, 456);
+            btnRemove.Size = new System.Drawing.Size(150, 40);
+            btnRemove.Text = "ENTFERNEN";
+            if (btnRemove is AetherButton removeButton)
+            {
+                removeButton.Kind = AetherButtonKind.Danger;
+            }
         }
 
         private void RefreshCheatList()

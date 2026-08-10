@@ -18,14 +18,14 @@ namespace nanoboy
         private void InitializeComponent()
         {
             this.lblStatus = new System.Windows.Forms.Label();
-            this.grpHost = new System.Windows.Forms.GroupBox();
-            this.btnHost = new System.Windows.Forms.Button();
+            this.grpHost = new nanoboy.Controls.AetherGroupBox();
+            this.btnHost = new nanoboy.Controls.AetherButton();
             this.lblHostDesc = new System.Windows.Forms.Label();
-            this.grpClient = new System.Windows.Forms.GroupBox();
+            this.grpClient = new nanoboy.Controls.AetherGroupBox();
             this.txtIP = new System.Windows.Forms.TextBox();
             this.lblIP = new System.Windows.Forms.Label();
-            this.btnConnect = new System.Windows.Forms.Button();
-            this.btnDisconnect = new System.Windows.Forms.Button();
+            this.btnConnect = new nanoboy.Controls.AetherButton();
+            this.btnDisconnect = new nanoboy.Controls.AetherButton();
             this.grpHost.SuspendLayout();
             this.grpClient.SuspendLayout();
             this.SuspendLayout();

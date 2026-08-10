@@ -18,7 +18,7 @@ namespace nanoboy
         private void InitializeComponent()
         {
             this.txtChangelog = new System.Windows.Forms.TextBox();
-            this.btnClose = new System.Windows.Forms.Button();
+            this.btnClose = new nanoboy.Controls.AetherButton();
             this.SuspendLayout();
             //
             // txtChangelog

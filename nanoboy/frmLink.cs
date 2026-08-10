@@ -1,6 +1,7 @@
 using System;
 using System.Windows.Forms;
 using nanoboy.Core;
+using nanoboy.Controls;
 
 namespace nanoboy
 {
@@ -22,7 +23,70 @@ namespace nanoboy
             }
 
             UpdateStatus();
-            DarkTheme.Apply(this);
+            ConfigureAetherLayout();
+            AetherDialog.Apply(
+                this,
+                "LINK LAB // 05",
+                "Konzeptoberfläche für eine zukünftige deterministische Verbindung");
+        }
+
+        private void ConfigureAetherLayout()
+        {
+            ClientSize = new System.Drawing.Size(700, 420);
+            MinimumSize = Size;
+            MaximumSize = Size;
+
+            lblStatus.Location = new System.Drawing.Point(26, 24);
+            lblStatus.Size = new System.Drawing.Size(648, 24);
+            lblStatus.Text = "OFFLINE  //  LINK-TRANSPORT NICHT FREIGEGEBEN";
+            lblStatus.ForeColor = AetherColors.Danger;
+            lblStatus.Tag = "danger";
+
+            var warning = new Label
+            {
+                Name = "lblLinkWarning",
+                AutoSize = false,
+                Font = new System.Drawing.Font("Segoe UI", 9f, System.Drawing.FontStyle.Regular),
+                ForeColor = AetherColors.Muted,
+                Location = new System.Drawing.Point(26, 58),
+                Size = new System.Drawing.Size(648, 48),
+                Text = "Die Oberfläche bleibt als Zukunftsentwurf sichtbar. Netzwerkaktionen sind gesperrt, bis Serial-Timing, Synchronisation und Fehlerfälle verifiziert sind."
+            };
+            Controls.Add(warning);
+
+            grpHost.Location = new System.Drawing.Point(24, 126);
+            grpHost.Size = new System.Drawing.Size(316, 206);
+            grpHost.Text = "HOST // PORT 8765";
+            lblHostDesc.AutoSize = false;
+            lblHostDesc.Location = new System.Drawing.Point(22, 44);
+            lblHostDesc.Size = new System.Drawing.Size(268, 42);
+            lblHostDesc.Text = "Lokale Sitzung öffnen und auf einen zweiten Emulator warten.";
+            btnHost.Location = new System.Drawing.Point(22, 132);
+            btnHost.Size = new System.Drawing.Size(270, 42);
+            btnHost.Text = "HOST STARTEN";
+
+            grpClient.Location = new System.Drawing.Point(360, 126);
+            grpClient.Size = new System.Drawing.Size(316, 206);
+            grpClient.Text = "CLIENT // DIRECT IP";
+            lblIP.Location = new System.Drawing.Point(22, 42);
+            lblIP.Text = "IP-ADRESSE";
+            txtIP.Location = new System.Drawing.Point(22, 66);
+            txtIP.Size = new System.Drawing.Size(270, 30);
+            btnConnect.Location = new System.Drawing.Point(22, 132);
+            btnConnect.Size = new System.Drawing.Size(270, 42);
+            btnConnect.Text = "VERBINDEN";
+
+            btnDisconnect.Location = new System.Drawing.Point(502, 356);
+            btnDisconnect.Size = new System.Drawing.Size(174, 40);
+            btnDisconnect.Text = "TRENNEN";
+            if (btnDisconnect is AetherButton disconnectButton)
+            {
+                disconnectButton.Kind = AetherButtonKind.Danger;
+            }
+
+            grpHost.Enabled = false;
+            grpClient.Enabled = false;
+            btnDisconnect.Enabled = false;
         }
 
         private void OnConnected()

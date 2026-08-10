@@ -152,7 +152,7 @@ namespace nanoboy.Controls
                 surface = hovered ? AetherColors.SurfaceRaised : AetherColors.Chrome;
             }
 
-            if (kind == AetherButtonKind.Primary)
+            if (kind == AetherButtonKind.Primary && Enabled)
             {
                 Color left = pressed
                     ? Color.FromArgb(112, 42, 213)

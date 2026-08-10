@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using AetherBoy.Runtime;
 using AetherBoy.Runtime.Audio;
+using nanoboy.Controls;
 
 namespace nanoboy
 {
@@ -35,7 +36,58 @@ namespace nanoboy
             Branding.AppBrand.ApplyIcon(this);
             Text = $"Audio Inspector \u2013 {ProductInfo.DisplayName}";
             FormClosing += frmAudioTool_FormClosing;
-            DarkTheme.Apply(this);
+            ConfigureAetherLayout();
+            AetherDialog.Apply(
+                this,
+                "APU TELEMETRY // 06",
+                "Live-Inspektion der vier Hardwarekanäle und verlustfreie WAV-Aufnahme",
+                showMinimize: true);
+        }
+
+        private void ConfigureAetherLayout()
+        {
+            ClientSize = new System.Drawing.Size(900, 590);
+            MinimumSize = Size;
+            MaximumSize = Size;
+
+            groupBox1.Location = new System.Drawing.Point(24, 24);
+            groupBox1.Size = new System.Drawing.Size(180, 220);
+            groupBox1.Text = "OUTPUT LEVELS";
+            levelDisplayControl1.Location = new System.Drawing.Point(22, 56);
+            levelDisplayControl2.Location = new System.Drawing.Point(58, 56);
+            levelDisplayControl3.Location = new System.Drawing.Point(94, 56);
+            levelDisplayControl4.Location = new System.Drawing.Point(130, 56);
+            label1.Location = new System.Drawing.Point(24, 32);
+            label1.Text = "Q1    Q2     W      N";
+
+            groupBox2.Location = new System.Drawing.Point(222, 24);
+            groupBox2.Size = new System.Drawing.Size(318, 220);
+            groupBox2.Text = "PULSE 01 // SWEEP";
+
+            groupBox3.Location = new System.Drawing.Point(558, 24);
+            groupBox3.Size = new System.Drawing.Size(318, 220);
+            groupBox3.Text = "PULSE 02 // TONE";
+
+            groupBox4.Location = new System.Drawing.Point(24, 264);
+            groupBox4.Size = new System.Drawing.Size(516, 238);
+            groupBox4.Text = "WAVE CHANNEL // RAM SCOPE";
+            waveDataControl1.Location = new System.Drawing.Point(14, 70);
+            waveDataControl1.Size = new System.Drawing.Size(488, 150);
+
+            groupBox5.Location = new System.Drawing.Point(558, 264);
+            groupBox5.Size = new System.Drawing.Size(318, 238);
+            groupBox5.Text = "NOISE CHANNEL // LFSR";
+
+            checkBox1.Location = new System.Drawing.Point(24, 536);
+            checkBox1.Text = "LIVE REFRESH";
+
+            btnRecordWav.Location = new System.Drawing.Point(646, 526);
+            btnRecordWav.Size = new System.Drawing.Size(230, 42);
+            btnRecordWav.Text = "AUDIO AUFNEHMEN  //  WAV";
+            if (btnRecordWav is AetherButton recordButton)
+            {
+                recordButton.Kind = AetherButtonKind.Primary;
+            }
         }
 
         [Browsable(false)]

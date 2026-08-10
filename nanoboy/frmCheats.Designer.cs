@@ -26,9 +26,9 @@ namespace nanoboy
             this.txtName = new System.Windows.Forms.TextBox();
             this.lblCode = new System.Windows.Forms.Label();
             this.txtCode = new System.Windows.Forms.TextBox();
-            this.btnAdd = new System.Windows.Forms.Button();
-            this.btnToggle = new System.Windows.Forms.Button();
-            this.btnRemove = new System.Windows.Forms.Button();
+            this.btnAdd = new nanoboy.Controls.AetherButton();
+            this.btnToggle = new nanoboy.Controls.AetherButton();
+            this.btnRemove = new nanoboy.Controls.AetherButton();
             this.lblExperimentalInfo = new System.Windows.Forms.Label();
             this.SuspendLayout();
             //

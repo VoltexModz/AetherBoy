@@ -161,6 +161,60 @@ public sealed class FrontendBoundaryTests
         Assert.AreEqual(false, startupMethod.Invoke(null, invalidStartupArguments));
     }
 
+    [STATestMethod]
+    public void SecondaryWindows_ShareTheAetherDialogShell()
+    {
+        using var cable = new LinkCable();
+        Form[] forms =
+        {
+            new frmAbout(),
+            new frmChangelog(),
+            new frmControls(new NanoboySettings()),
+            new frmAudioTool(),
+            new frmLink(cable)
+        };
+
+        try
+        {
+            foreach (Form form in forms)
+            {
+                Assert.AreEqual(
+                    FormBorderStyle.None,
+                    form.FormBorderStyle,
+                    $"{form.GetType().Name} still uses operating-system chrome.");
+                Assert.AreEqual(1, form.Controls.Find("aetherDialogHeader", true).Length);
+                Assert.AreEqual(1, form.Controls.Find("aetherDialogBody", true).Length);
+                Assert.AreEqual(1, form.Controls.Find("aetherDialogMark", true).Length);
+                Assert.AreEqual(1, form.Controls.Find("aetherDialogCloseButton", true).Length);
+            }
+        }
+        finally
+        {
+            foreach (Form form in forms)
+            {
+                form.Dispose();
+            }
+        }
+    }
+
+    [STATestMethod]
+    public void DisabledLinkLab_DoesNotExposeNetworkActions()
+    {
+        using var cable = new LinkCable();
+        using var form = new frmLink(cable);
+        Type formType = form.GetType();
+
+        Button host = GetRequiredField<Button>(formType, form, "btnHost");
+        Button connect = GetRequiredField<Button>(formType, form, "btnConnect");
+        Button disconnect = GetRequiredField<Button>(formType, form, "btnDisconnect");
+        TextBox address = GetRequiredField<TextBox>(formType, form, "txtIP");
+
+        Assert.IsFalse(host.Enabled);
+        Assert.IsFalse(connect.Enabled);
+        Assert.IsFalse(disconnect.Enabled);
+        Assert.IsFalse(address.Enabled);
+    }
+
     private static T GetRequiredField<T>(Type type, object instance, string name) where T : class
     {
         return type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(instance) as T

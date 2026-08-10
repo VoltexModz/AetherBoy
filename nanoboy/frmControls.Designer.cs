@@ -43,7 +43,7 @@ namespace nanoboy
             this.label7 = new System.Windows.Forms.Label();
             this.txtKeyLeft = new System.Windows.Forms.TextBox();
             this.label8 = new System.Windows.Forms.Label();
-            this.button1 = new System.Windows.Forms.Button();
+            this.button1 = new nanoboy.Controls.AetherButton();
             this.SuspendLayout();
             //
             // label1

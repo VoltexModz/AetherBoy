@@ -35,8 +35,8 @@ namespace nanoboy
             this.timer1 = new System.Windows.Forms.Timer(this.components);
             this.checkBox1 = new System.Windows.Forms.CheckBox();
             this.label1 = new System.Windows.Forms.Label();
-            this.groupBox1 = new System.Windows.Forms.GroupBox();
-            this.groupBox2 = new System.Windows.Forms.GroupBox();
+            this.groupBox1 = new nanoboy.Controls.AetherGroupBox();
+            this.groupBox2 = new nanoboy.Controls.AetherGroupBox();
             this.labelQ1SoundLength = new System.Windows.Forms.Label();
             this.label7 = new System.Windows.Forms.Label();
             this.labelQ1EnvelDirection = new System.Windows.Forms.Label();
@@ -53,7 +53,7 @@ namespace nanoboy
             this.label4 = new System.Windows.Forms.Label();
             this.labelQ1Freq = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
-            this.groupBox3 = new System.Windows.Forms.GroupBox();
+            this.groupBox3 = new nanoboy.Controls.AetherGroupBox();
             this.labelQ2SoundLength = new System.Windows.Forms.Label();
             this.label11 = new System.Windows.Forms.Label();
             this.labelQ2EnvelDirection = new System.Windows.Forms.Label();
@@ -70,13 +70,13 @@ namespace nanoboy
             this.label23 = new System.Windows.Forms.Label();
             this.labelQ2Freq = new System.Windows.Forms.Label();
             this.label25 = new System.Windows.Forms.Label();
-            this.groupBox4 = new System.Windows.Forms.GroupBox();
+            this.groupBox4 = new nanoboy.Controls.AetherGroupBox();
             this.labelWSoundLength = new System.Windows.Forms.Label();
             this.labelWFreq = new System.Windows.Forms.Label();
             this.label12 = new System.Windows.Forms.Label();
             this.label9 = new System.Windows.Forms.Label();
             this.waveDataControl1 = new nanoboy.Controls.WaveDataControl();
-            this.groupBox5 = new System.Windows.Forms.GroupBox();
+            this.groupBox5 = new nanoboy.Controls.AetherGroupBox();
             this.labelNSoundLength = new System.Windows.Forms.Label();
             this.labelNEnvelDirection = new System.Windows.Forms.Label();
             this.labelNEnvelSweep = new System.Windows.Forms.Label();
@@ -93,7 +93,7 @@ namespace nanoboy
             this.label18 = new System.Windows.Forms.Label();
             this.label16 = new System.Windows.Forms.Label();
             this.label14 = new System.Windows.Forms.Label();
-            this.btnRecordWav = new System.Windows.Forms.Button();
+            this.btnRecordWav = new nanoboy.Controls.AetherButton();
             this.groupBox1.SuspendLayout();
             this.groupBox2.SuspendLayout();
             this.groupBox3.SuspendLayout();
