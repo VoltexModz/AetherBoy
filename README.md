@@ -12,9 +12,10 @@ AetherBoy ist weder von Nintendo autorisiert noch mit Nintendo verbunden. Game B
 - plattformneutraler `AetherBoy.Core` auf `net10.0` mit DMG- und CGB-Codepfaden
 - exklusiver Emulations-Owner-Thread mit typisierten Befehlen und unveränderlichen Snapshots
 - verwaltete WinForms-Bildausgabe mit Sharp-, Smooth- und LCD-Grid-Filter
+- eigenständige Aether-Wave-Oberfläche mit rahmenloser Fenster-Chrome, Display-Bühne, Live-Sessionleiste, direktem Command-Deck und ROM-Drag-and-drop
 - NAudio-WinMM-Ausgabe als Windows-Adapter außerhalb des Emulator-Cores
 - zusammengeführte Tastatur- und XInput-Eingabe ohne gegenseitiges Freigeben gehaltener Tasten
-- 167 deterministische Tests: 141 Core-, 17 Runtime- und 9 Windows-Smoke-Tests einschließlich Mapper-, RTC-, CPU-Bus-, Interrupt-, DMA-, PPU-Timing-, APU-Power-, Serial-, Save-State-, Rewind-, Owner-Thread-, WAV-, UI- und generierten ROM-End-to-End-Gates
+- 169 deterministische Tests: 141 Core-, 17 Runtime- und 11 Windows-Smoke-Tests einschließlich Mapper-, RTC-, CPU-Bus-, Interrupt-, DMA-, PPU-Timing-, APU-Power-, Serial-, Save-State-, Rewind-, Owner-Thread-, WAV-, Aether-Wave-UI- und generierten ROM-End-to-End-Gates
 - reproduzierbarer NuGet-Restore sowie Windows- und Linux-Gates in GitHub Actions
 
 Phase 8 schließt die ausgewählten Blargg-Soundsuiten auf DMG und CGB mit jeweils 12/12 ab. Dazu gehören Sweep-Shift-0/Negate, DIV-abhängiges APU-Power-On, modellabhängige Wave-Startphasen, DMG-Wave-RAM-Zugriff und Retrigger-Korruption sowie ein analoger Hochpass. Der Serial-Port überträgt nun acht echte Bits mit Normal-, CGB-Fast- oder externer Clock und ist vollständig im deterministischen Zustand enthalten. Die PPU-Auswahl steigt durch die präzisierte Sprite-Transfergrenze auf 11/12. Die aktuelle, reproduzierbare Matrix steht in [COMPATIBILITY.md](COMPATIBILITY.md).

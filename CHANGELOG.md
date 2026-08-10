@@ -13,6 +13,14 @@ Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und no
 - EXE, Hauptfenster, Werkzeuge und About-Dialog beziehen ihre Marke nun aus einer zentralen eingebetteten Branding-Ressource.
 - Markenfarben, Größenregeln und der absichtlich sparsame Einsatz des Aether-Verlaufs in `branding/BRAND.md` dokumentiert.
 
+### Hauptfenster
+
+- Klassische sichtbare Menüleiste durch eine eigene rahmenlose Aether-Wave-Chrome mit verschiebbarer Titelfläche, Fenstersteuerung und vier kompakten Funktionsmenüs ersetzt.
+- Neue Display-Bühne mit eigenständigem Leerlaufzustand, Markenmotiv und direkter ROM-Aktion ergänzt; einzelne `.gb`- und `.gbc`-Dateien lassen sich außerdem auf das Fenster ziehen.
+- Session-Instrumentenleiste zeigt ROM-Titel, DMG/CGB-Modell, Laufzustand, Framezahl, Audio, Bildfilter und aktiven Save-State-Slot ohne zusätzliche Dialoge.
+- Neues Command-Deck stellt Öffnen, Pause/Fortsetzen, Rewind, Speichern, Laden und umschaltbares Turbo direkt bereit; die fünf State-Slots sind ebenfalls unmittelbar anwählbar.
+- Bestehende vollständige Menüs bleiben hinter `SYSTEM`, `TUNE`, `TOOLS` und `INFO` erreichbar; `Strg+O`, F5, F8 sowie die bisherigen Spiel- und Turbo-Tasten bleiben erhalten.
+
 ## 4.8.0-alpha.1 – Phase 8 (2026-08-09)
 
 ### APU und Wave-RAM

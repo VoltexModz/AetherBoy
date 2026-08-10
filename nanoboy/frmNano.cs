@@ -43,6 +43,7 @@ namespace nanoboy
             SetPalette(settings.PaletteIndex);
             SetDisplayFilter(settings.DisplayFilterIndex);
             DarkTheme.Apply(this);
+            InitializeAetherShell();
         }
 
         private bool StopSession()
@@ -55,6 +56,7 @@ namespace nanoboy
             {
                 currentRomPath = null;
                 DisposeAudioOutput(null);
+                UpdateAetherSessionUi(null);
                 return true;
             }
 
@@ -90,6 +92,8 @@ namespace nanoboy
                 session = null;
                 currentRomPath = null;
             }
+
+            UpdateAetherSessionUi(null);
 
             return true;
         }
@@ -166,7 +170,7 @@ namespace nanoboy
             }
         }
 
-        private void LoadRomFile(string path)
+        internal void LoadRomFile(string path)
         {
             if (!File.Exists(path)) return;
 
@@ -211,6 +215,7 @@ namespace nanoboy
             catch (Exception exception)
             {
                 preparedAudioOutput?.Dispose();
+                UpdateAetherSessionUi(null);
                 Debug.WriteLine($"Could not start emulation session for '{path}': {exception}");
                 MessageBox.Show(
                     $"Die ROM konnte nicht gestartet werden.\n\n{exception.Message}",
@@ -235,7 +240,9 @@ namespace nanoboy
                 audiotoolwindow.Session = session;
             }
 
+            UpdateAetherSessionUi(session.LatestSnapshot);
             updateTimer.Start();
+            gameView.Focus();
         }
 
         private static bool RomHasColorFeatures(string path)
@@ -350,6 +357,7 @@ namespace nanoboy
             menuSaveSlot3.Text = slot == 3 ? "Slot 3 (Aktiv)" : "Slot 3";
             menuSaveSlot4.Text = slot == 4 ? "Slot 4 (Aktiv)" : "Slot 4";
             menuSaveSlot5.Text = slot == 5 ? "Slot 5 (Aktiv)" : "Slot 5";
+            UpdateAetherSlotButtons();
         }
 
         private async void QuickSave()
@@ -568,6 +576,7 @@ namespace nanoboy
                 2 => GameDisplayFilter.LcdGrid,
                 _ => GameDisplayFilter.Sharp
             };
+            UpdateAetherSessionUi(session?.LatestSnapshot);
         }
 
         private void menuCheats_Click(object sender, EventArgs e)
@@ -658,9 +667,7 @@ namespace nanoboy
 
         private void menuSizeFull_Click(object sender, EventArgs e)
         {
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
-            this.Location = new Point(0, 0);
-            this.Size = new Size(Screen.FromControl(this).Bounds.Width, Screen.FromControl(this).Bounds.Height);
+            ToggleAetherFullscreen();
         }
 
         private void menuAudioC1_Click(object sender, EventArgs e)
@@ -812,6 +819,8 @@ namespace nanoboy
             {
                 gameView.Present(displayFrame);
             }
+
+            UpdateAetherSessionUi(currentSession.LatestSnapshot);
         }
 
         private void PollGamepad()
@@ -998,6 +1007,19 @@ namespace nanoboy
         private void ResizeWindow(int size)
         {
             if (size <= 0) size = 2;
+            if (aetherShellInitialized)
+            {
+                if (WindowState != FormWindowState.Normal)
+                {
+                    WindowState = FormWindowState.Normal;
+                }
+
+                ClientSize = GetAetherClientSize(size);
+                settings.VideoScaleFactor = Math.Clamp(size, 1, 4);
+                UpdateEmulatorSettings();
+                return;
+            }
+
             if (FormBorderStyle == FormBorderStyle.None)
             {
                 FormBorderStyle = FormBorderStyle.Sizable;
@@ -1045,6 +1067,7 @@ namespace nanoboy
             EmulationSession currentSession = session;
             if (currentSession == null)
             {
+                UpdateAetherSessionUi(null);
                 return;
             }
 
@@ -1068,6 +1091,7 @@ namespace nanoboy
             }
 
             ObserveSessionCommand(currentSession.ConfigureAsync(CreateEmulatorConfiguration()));
+            UpdateAetherSessionUi(currentSession.LatestSnapshot);
         }
 
         private async void ObserveSessionCommand(Task command)

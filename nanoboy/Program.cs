@@ -7,7 +7,7 @@ namespace nanoboy
     static class Program
     {
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
             AppDomain.CurrentDomain.UnhandledException += (s, e) =>
             {
@@ -29,11 +29,45 @@ namespace nanoboy
             try
             {
                 ApplicationConfiguration.Initialize();
-                Application.Run(new frmNano());
+                var mainWindow = new frmNano();
+                if (TryGetStartupRom(args, out string? startupRom))
+                {
+                    mainWindow.Shown += (_, _) => mainWindow.LoadRomFile(startupRom);
+                }
+
+                Application.Run(mainWindow);
             }
             catch (Exception ex)
             {
                 WriteCrashLog(ex);
+            }
+        }
+
+        private static bool TryGetStartupRom(string[] args, out string? path)
+        {
+            path = null;
+            if (args.Length != 1 || string.IsNullOrWhiteSpace(args[0]))
+            {
+                return false;
+            }
+
+            try
+            {
+                string candidate = Path.GetFullPath(args[0]);
+                string extension = Path.GetExtension(candidate);
+                if (!extension.Equals(".gb", StringComparison.OrdinalIgnoreCase) &&
+                    !extension.Equals(".gbc", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+
+                path = candidate;
+                return true;
+            }
+            catch (Exception exception) when (
+                exception is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                return false;
             }
         }
 
