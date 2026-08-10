@@ -13,6 +13,7 @@ namespace nanoboy
             ArgumentNullException.ThrowIfNull(session);
 
             InitializeComponent();
+            Branding.AppBrand.ApplyIcon(this);
             Text = $"GameShark-Cheats (experimentell) – {ProductInfo.DisplayName}";
             this.session = session;
             RefreshCheatList();

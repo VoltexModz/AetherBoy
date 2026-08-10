@@ -33,6 +33,7 @@ namespace nanoboy
         public frmNano()
         {
             InitializeComponent();
+            Branding.AppBrand.ApplyIcon(this);
             Text = ProductInfo.DisplayName;
             Deactivate += frmNano_Deactivate;
             settings = new NanoboySettings();

@@ -28,7 +28,6 @@ namespace nanoboy
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(frmAudioTool));
             this.levelDisplayControl1 = new nanoboy.Controls.LevelDisplayControl();
             this.levelDisplayControl2 = new nanoboy.Controls.LevelDisplayControl();
             this.levelDisplayControl3 = new nanoboy.Controls.LevelDisplayControl();
@@ -759,7 +758,6 @@ namespace nanoboy
             this.Controls.Add(this.groupBox1);
             this.Controls.Add(this.checkBox1);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow;
-            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MaximizeBox = false;
             this.Name = "frmAudioTool";
             this.Text = "AetherBoy GBC Emulator - Audio-Inspector";

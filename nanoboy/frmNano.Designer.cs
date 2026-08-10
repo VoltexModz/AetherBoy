@@ -29,7 +29,6 @@ namespace nanoboy
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(frmNano));
             this.openRom = new System.Windows.Forms.OpenFileDialog();
             this.menuStrip = new System.Windows.Forms.MenuStrip();
             this.menuFile = new System.Windows.Forms.ToolStripMenuItem();
@@ -627,7 +626,6 @@ namespace nanoboy
             this.ClientSize = new System.Drawing.Size(320, 312);
             this.Controls.Add(this.gameView);
             this.Controls.Add(this.menuStrip);
-            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MainMenuStrip = this.menuStrip;
             this.Name = "frmNano";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;

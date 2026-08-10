@@ -17,6 +17,7 @@ namespace nanoboy
         public frmControls(NanoboySettings settings)
         {
             InitializeComponent();
+            Branding.AppBrand.ApplyIcon(this);
             this.settings = settings;
             Text = $"Steuerung – {ProductInfo.DisplayName}";
             DarkTheme.Apply(this);

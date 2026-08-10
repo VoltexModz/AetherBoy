@@ -17,7 +17,7 @@
     <FileVersion>4.8.0.0</FileVersion>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <NeutralLanguage>de</NeutralLanguage>
-    <ApplicationIcon>qwdwqdwqdqwdwqdqwdqwdqwd_3fT_icon.ico</ApplicationIcon>
+    <ApplicationIcon>Branding\AetherBoy.ico</ApplicationIcon>
     <Nullable>annotations</Nullable>
     <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
     <ImplicitUsings>disable</ImplicitUsings>
@@ -26,6 +26,11 @@
 
   <ItemGroup>
     <PackageReference Include="NAudio.WinMM" Version="2.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Branding\AetherBoy.ico" LogicalName="AetherBoy.Branding.AppIcon.ico" />
+    <EmbeddedResource Include="Branding\AetherBoyMark.png" LogicalName="AetherBoy.Branding.Mark.png" />
   </ItemGroup>
 
   <ItemGroup>

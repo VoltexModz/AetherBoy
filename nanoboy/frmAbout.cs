@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Windows.Forms;
 
 namespace nanoboy
@@ -8,6 +9,10 @@ namespace nanoboy
         public frmAbout()
         {
             InitializeComponent();
+            Branding.AppBrand.ApplyIcon(this);
+            Image? previousImage = pictureBox1.Image;
+            pictureBox1.Image = Branding.AppBrand.CreateMarkBitmap();
+            previousImage?.Dispose();
             Text = $"Über {ProductInfo.Name}";
             textBox1.Text =
                 $"{ProductInfo.DisplayName}\r\n\r\n" +

@@ -9,6 +9,7 @@ namespace nanoboy
         public frmChangelog()
         {
             InitializeComponent();
+            Branding.AppBrand.ApplyIcon(this);
             LoadChangelogText();
             DarkTheme.Apply(this);
         }

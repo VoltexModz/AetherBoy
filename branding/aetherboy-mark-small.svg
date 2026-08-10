@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">AetherBoy compact Aether Wave mark</title>
+  <desc id="description">A compact gradient A with a handheld screen and three signal fragments.</desc>
+  <defs>
+    <linearGradient id="small-wave" x1="34" y1="47" x2="211" y2="209" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8b38ff"/>
+      <stop offset="0.5" stop-color="#a942f5"/>
+      <stop offset="1" stop-color="#29e2ed"/>
+    </linearGradient>
+    <linearGradient id="small-frame" x1="25" y1="25" x2="231" y2="231" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a444ff"/>
+      <stop offset="1" stop-color="#20dbe7"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="4" y="4" width="248" height="248" rx="55" fill="#050712"/>
+  <rect x="8" y="8" width="240" height="240" rx="51" fill="none" stroke="url(#small-frame)" stroke-opacity="0.56" stroke-width="2"/>
+
+  <g fill="url(#small-wave)">
+    <rect x="25" y="66" width="25" height="7" rx="3.5"/>
+    <rect x="17" y="81" width="29" height="7" rx="3.5"/>
+    <rect x="23" y="97" width="19" height="7" rx="3.5"/>
+    <path d="M111 39c4-10 12-15 23-15h12c10 0 17 5 22 15l59 174h-41l-14-45h-68l-15 45H48l63-174Zm9 93h40l-20-62-20 62Z" fill-rule="evenodd"/>
+  </g>
+
+  <rect x="121" y="99" width="47" height="61" rx="8" fill="url(#small-wave)" stroke="#050712" stroke-width="7"/>
+  <g fill="none" stroke="#050712" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="129" y="107" width="31" height="23" rx="2" stroke-width="5"/>
+    <path d="M133 143h14M140 136v14" stroke-width="5"/>
+  </g>
+  <circle cx="157" cy="142" r="3.4" fill="#050712"/>
+  <circle cx="163" cy="149" r="3.4" fill="#050712"/>
+</svg>

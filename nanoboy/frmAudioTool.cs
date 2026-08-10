@@ -32,6 +32,7 @@ namespace nanoboy
         public frmAudioTool()
         {
             InitializeComponent();
+            Branding.AppBrand.ApplyIcon(this);
             Text = $"Audio Inspector \u2013 {ProductInfo.DisplayName}";
             FormClosing += frmAudioTool_FormClosing;
             DarkTheme.Apply(this);

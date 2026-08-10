@@ -2,6 +2,17 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## Unveröffentlicht – Aether-Wave-UI
+
+### Markenfundament
+
+- Die vom Projektinhaber entworfene Aether-Wave-Richtung als reproduzierbare Vektormarke rekonstruiert: ein verlaufendes `A`, eine aufgelöste Signalwelle und eine integrierte Handheld-Silhouette.
+- Detaillierte Mastermarke und optisch vereinfachte Small-Mark für Windows-Systemflächen getrennt, damit das Zeichen auch bei 16 × 16 Pixeln lesbar bleibt.
+- Multi-Resolution-ICO mit 16, 20, 24, 32, 40, 48, 64, 128 und 256 Pixeln sowie 512-Pixel-Anwendungsgrafik aus denselben SVG-Quellen erzeugt.
+- Altes `N3`-Bild, historische Designer-Icons und das kryptisch benannte 2018er Anwendungsicon entfernt.
+- EXE, Hauptfenster, Werkzeuge und About-Dialog beziehen ihre Marke nun aus einer zentralen eingebetteten Branding-Ressource.
+- Markenfarben, Größenregeln und der absichtlich sparsame Einsatz des Aether-Verlaufs in `branding/BRAND.md` dokumentiert.
+
 ## 4.8.0-alpha.1 – Phase 8 (2026-08-09)
 
 ### APU und Wave-RAM

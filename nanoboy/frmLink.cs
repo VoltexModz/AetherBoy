@@ -11,6 +11,7 @@ namespace nanoboy
         public frmLink(LinkCable cable)
         {
             InitializeComponent();
+            Branding.AppBrand.ApplyIcon(this);
             Text = $"Link-Kabel (deaktiviert) – {ProductInfo.DisplayName}";
             linkCable = cable;
 
