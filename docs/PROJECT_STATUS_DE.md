@@ -6,8 +6,9 @@ Branch: `development`
 
 ## Kurzfassung
 
-AetherBoy ist heute eine moderne Windows-Anwendung für Game Boy, Game Boy Color
-und experimentell Game Boy Advance. GB und GBC beruhen auf dem historischen
+AetherBoy ist heute eine moderne Windows-Anwendung und besitzt zusätzlich einen
+ersten nativen Linux-Host für Wayland und Hyprland. Emuliert werden Game Boy,
+Game Boy Color und experimentell Game Boy Advance. GB und GBC beruhen auf dem historischen
 NanoBoy-/ChiiBoy-Code, wurden aber in Architektur, Hardwaremodell, Oberfläche,
 Speicherung, Eingabe und Tests stark überarbeitet. Für GBA existieren zwei
 Pfade: ein kleiner eigener Lern- und Regressionkern sowie ein produktiver,
@@ -27,6 +28,7 @@ Anwendungsfälle, aber noch keinen vollständigen kommerziellen GBA-Durchspielte
 | mGBA | vom Projektinhaber bereitgestelltes Quellarchiv | Architektur- und Verhaltensreferenz; kein mGBA-Kern eingebunden und keine mechanische Portierung | MPL-2.0; Details in `docs/MGBA_REVIEW.md` |
 | GBA-Hardwareverhalten | öffentliche Hardwaredokumentation und dokumentierte BIOS-Verträge | Zur Prüfung unserer C#-Implementierungen und Tests verwendet | Keine Nintendo-BIOS-Datei enthalten |
 | Audioausgabe | NAudio.WinMM 2.3.0 | Windows-Adapter außerhalb der Emulator-Cores | MIT |
+| Linux-Desktop | SDL3-CS und SDL3-CS.Linux 3.4.16 | Nativer Wayland-Adapter; kein X11/XWayland-Fallback | Zlib |
 | Testplattform | MSTest.Sdk 4.3.2 | Automatisierte Core-, Runtime- und Windows-Tests | MIT |
 
 Die genaue Drittanbieterzuordnung steht in `THIRD_PARTY_NOTICES.md`. ROMs,
@@ -39,13 +41,15 @@ nicht Teil des Repositorys.
 
 - Umstellung auf .NET 10 mit reproduzierbarem Restore und gesperrten
   Abhängigkeitsversionen.
-- Trennung in plattformneutralen Core, Runtime-Vertrag und Windows-Frontend.
+- Trennung in plattformneutralen Core, Runtime-Vertrag, Windows-Frontend und
+  nativen Linux-Wayland-Host.
 - Exklusiver Emulations-Owner-Thread mit typisierten Befehlen statt direkter
   UI-Zugriffe auf veränderlichen Kernzustand.
 - Unveränderliche Snapshots und synchronisierter Frame-/Audiotransport zwischen
   Emulations- und UI-Thread.
 - Dynamische Bildgeometrie für 160×144 (GB/GBC) und 240×160 (GBA).
-- Windows- und portable Linux-CI-Gates mit einer festen Mindesttestzahl.
+- Windows- und Linux-CI-Gates mit einer festen Mindesttestzahl sowie Build und
+  Hyprland-Profilerkennung des nativen Wayland-Hosts.
 
 ### Oberfläche und Bedienung
 
@@ -60,6 +64,8 @@ nicht Teil des Repositorys.
 - Sharp-, Smooth- und LCD-Grid-Ausgabe mit korrektem Seitenverhältnis.
 - Windows Gaming Input plus XInput-Fallback, Hot-Plug und frei speicherbare
   Tastatur-/Controllerbelegung einschließlich GBA-L/R.
+- Eigener SDL3-Wayland-Host mit Aether-Oberfläche, ROM-Drag-and-drop,
+  Tastatur/Gamepad-Hot-Plug, Vollbild und Hyprland-spezifischem Desktopprofil.
 
 ### Spielstände und Zustände
 
@@ -149,6 +155,9 @@ Auf dieser Basis wurden unter anderem ergänzt oder korrigiert:
 - 87 Runtime-Tests.
 - 28 Windows-Smoke-Tests.
 - Gesamt: 290 bestanden, 0 fehlgeschlagen.
+- Nativer Ubuntu-Build und `linux-x64`-Publish: 0 Warnungen, 0 Fehler; der
+  veröffentlichte Host erkannte Hyprland und öffnete unter WSLg einen echten
+  Wayland-Fensterlauf.
 - Selbstenthaltener Windows-x64-Build wurde real gestartet und blieb im
   automatischen Start-Smoke stabil.
 - Das Build-Paket wurde auf ROM-, BIOS- und Save-Dateien geprüft: 0 Treffer.
@@ -170,6 +179,9 @@ Firmware für die automatischen Tests.
 - Spezialhardware wie Pocket Camera, HuC1/HuC3, MMM01 und weitere seltene
   Mapper ist nicht freigegeben.
 - Ältere experimentelle GBA-Save-States vor Kernschema 5 sind nicht kompatibel.
+- Der neue Linux-Desktopadapter besitzt noch keine Audioausgabe, kein
+  vollständiges Control Center, keine sichtbaren fünf Slots und keine
+  Rewind-Bedienung; Details stehen in `docs/LINUX_WAYLAND.md`.
 - AetherBoy ist Alpha-Software und noch kein versprochener Ersatz für etablierte
   Referenzemulatoren.
 
@@ -186,6 +198,13 @@ Für ein selbstenthaltenes Windows-x64-Paket:
 
 ```powershell
 dotnet publish ./nanoboy/nanoboy.csproj -c Release -r win-x64 --self-contained true
+```
+
+Der native Wayland-Build unter Linux:
+
+```bash
+bash scripts/build-linux.sh
+bash scripts/run-linux.sh "/pfad/zu/deinem-spiel.gba"
 ```
 
 ## Nächster sinnvoller Meilenstein

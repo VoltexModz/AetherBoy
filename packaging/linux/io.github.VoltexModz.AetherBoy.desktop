@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=AetherBoy
+GenericName=Game Boy Emulator
+Comment=Play Game Boy, Game Boy Color and Game Boy Advance games
+Exec=aetherboy %f
+TryExec=aetherboy
+Icon=io.github.VoltexModz.AetherBoy
+Terminal=false
+Categories=Game;Emulator;
+MimeType=application/x-gameboy-rom;application/x-gameboy-color-rom;application/x-gba-rom;
+Keywords=Game Boy;Game Boy Color;Game Boy Advance;Emulator;

@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "SDL3-CS": {
+        "type": "Direct",
+        "requested": "[3.4.16, )",
+        "resolved": "3.4.16",
+        "contentHash": "iUflNvlk5dsKwjBugy7tGB2Av/t2hp3OYnpgb1/dLrxMjWQVAd4Wayl5fmBv/z3xH8I8IeD+m0K1e+42AnYb8w=="
+      },
+      "SDL3-CS.Linux": {
+        "type": "Direct",
+        "requested": "[3.4.16, )",
+        "resolved": "3.4.16",
+        "contentHash": "jC1+e5CVbeNCsF7mdZaCqgD2rPY8RCsGdMxzokxjj+ZNNu3Nzc9esl+z6tFCGuHd2kg2565t8zIVI5Up0GoQmg=="
+      },
+      "aetherboy.core": {
+        "type": "Project"
+      },
+      "aetherboy.runtime": {
+        "type": "Project",
+        "dependencies": {
+          "AetherBoy.Core": "[4.8.0-alpha.1, )",
+          "AetherBoy.Vendored.GBADotnet.Core": "[4.8.0-alpha.1, )"
+        }
+      },
+      "aetherboy.vendored.gbadotnet.core": {
+        "type": "Project"
+      }
+    },
+    "net10.0/linux-arm64": {
+      "SDL3-CS.Linux": {
+        "type": "Direct",
+        "requested": "[3.4.16, )",
+        "resolved": "3.4.16",
+        "contentHash": "jC1+e5CVbeNCsF7mdZaCqgD2rPY8RCsGdMxzokxjj+ZNNu3Nzc9esl+z6tFCGuHd2kg2565t8zIVI5Up0GoQmg=="
+      }
+    },
+    "net10.0/linux-x64": {
+      "SDL3-CS.Linux": {
+        "type": "Direct",
+        "requested": "[3.4.16, )",
+        "resolved": "3.4.16",
+        "contentHash": "jC1+e5CVbeNCsF7mdZaCqgD2rPY8RCsGdMxzokxjj+ZNNu3Nzc9esl+z6tFCGuHd2kg2565t8zIVI5Up0GoQmg=="
+      }
+    }
+  }
+}

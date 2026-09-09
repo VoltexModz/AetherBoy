@@ -2,6 +2,32 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## Unveröffentlicht – Nativer Linux-/Wayland-Desktop
+
+- Eigenen `net10.0`-Linux-Host auf SDL3-Basis ergänzt. Er verwendet denselben
+  Core und Runtime-Vertrag wie das Windows-Frontend, rendert GB/GBC mit 160×144
+  und GBA mit 240×160 und lädt `.gb`, `.gbc` und `.gba` per Kommandozeile oder
+  Wayland-Drag-and-drop.
+- Den SDL-Videotreiber fest auf `wayland` gesetzt und den tatsächlich gewählten
+  Backendnamen nach der Initialisierung geprüft. X11 und XWayland werden mit
+  klarer Diagnose abgelehnt statt still als Fallback zu starten.
+- Hyprland, KDE und GNOME werden getrennt erkannt. Hyprland erhält die stabile
+  App-ID `io.github.VoltexModz.AetherBoy`, compositorseitige Dekoration und ein
+  mitgeliefertes XDG-Portalprofil mit GTK-Dateiauswahl-Fallback.
+- Tastatur, SDL3-Gamepad-Hot-Plug und Analogstick angebunden; GBA-L/R, Pause,
+  gehaltenes Turbo, Vollbild sowie Quick Save/Load auf Slot 1 funktionieren im
+  ersten nativen Host. Batterie-Saves und Zustände bleiben ROM-nah kompatibel.
+- Reproduzierbare Build-, Run- und benutzerlokale Installationsskripte für
+  `linux-x64` und `linux-arm64`, Freedesktop-Desktopdatei sowie die vorhandenen
+  AetherBoy-Icons in allen Größen ergänzt.
+- Linux-CI baut jetzt zusätzlich den nativen Desktop und prüft die
+  Hyprland-Profilerkennung ohne Display. Unter Ubuntu wurden Publish, echter
+  WSLg-Wayland-Fensterlauf sowie 175 Core- und 87 Runtime-Tests verifiziert;
+  die vollständigen 290 Windows-Tests bleiben grün.
+- Audioausgabe, vollständiges Control Center, alle fünf sichtbaren Slots,
+  Rewind-Bedienung und ein eigener Portal-Öffnen-Dialog bleiben als nächste
+  Linux-Frontendschritte offen.
+
 ## Unveröffentlicht – Integriertes GBA-Backend
 
 - DaveTCode/GBADotnet am exakten Commit

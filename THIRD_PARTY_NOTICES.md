@@ -31,11 +31,23 @@ compatibility screenshot or UI project is redistributed.
 | Scope | Package | Version | Declared license | Upstream |
 | --- | --- | ---: | --- | --- |
 | Windows frontend | NAudio.WinMM | 2.3.0 | MIT | <https://github.com/naudio/NAudio> |
+| Linux Wayland frontend | SDL3-CS | 3.4.16 | Zlib | <https://github.com/edwardgushchin/SDL3-CS> |
+| Linux Wayland native runtime | SDL3-CS.Linux | 3.4.16 | Zlib | <https://github.com/edwardgushchin/SDL3-CS> |
 | Test/build | MSTest.Sdk | 4.3.2 | MIT | <https://github.com/microsoft/testfx> |
 
 `NAudio.WinMM` depends on `NAudio.Core`. `MSTest.Sdk` brings the Microsoft Testing Platform and its test-host dependencies. The committed `packages.lock.json` files are the authoritative record of the complete resolved dependency graph for each project.
 
 OpenTK, OpenTK.GLControl and the excluded legacy OpenAL implementation were removed in Phase 1. XInput is called as a Windows system API and is not redistributed as a package by this repository.
+
+## SDL3-CS and SDL3-CS.Linux 3.4.16
+
+Copyright (C) 2024-2026 Eduard Gushchin <eduardgushchin@yandex.ru>
+
+These packages use the zlib license. The license permits use, modification and
+redistribution, prohibits misrepresenting the original authorship, requires
+altered source versions to be marked, and requires the notice to remain in source
+distributions. The complete upstream notice is included in both resolved NuGet
+packages; its terms are not replaced by this summary.
 
 ## NAudio.WinMM and NAudio.Core 2.3.0
 

@@ -6,8 +6,9 @@ Branch: `development`
 
 ## Executive summary
 
-AetherBoy is now a modern Windows application for Game Boy, Game Boy Color and
-experimental Game Boy Advance emulation. GB and GBC originate from the historic
+AetherBoy is now a modern Windows application with an additional first native
+Linux host for Wayland and Hyprland. It emulates Game Boy, Game Boy Color and
+experimental Game Boy Advance. GB and GBC originate from the historic
 NanoBoy/ChiiBoy codebase, but their architecture, hardware model, interface,
 storage, input and tests have been substantially reworked. GBA has two paths: a
 small independent learning/regression core and a production source fork of the
@@ -27,6 +28,7 @@ not yet prove a complete playthrough of a commercial GBA game.
 | mGBA | source archive supplied by the project owner | Architecture and behavioural reference; no mGBA core linked and no mechanical port | MPL-2.0; details in `docs/MGBA_REVIEW.md` |
 | GBA hardware behaviour | public hardware documentation and documented BIOS contracts | Used to validate our C# implementations and tests | No Nintendo BIOS file included |
 | Audio output | NAudio.WinMM 2.3.0 | Windows adapter outside the emulator cores | MIT |
+| Linux desktop | SDL3-CS and SDL3-CS.Linux 3.4.16 | Native Wayland adapter with no X11/XWayland fallback | Zlib |
 | Test platform | MSTest.Sdk 4.3.2 | Automated core, runtime and Windows tests | MIT |
 
 The complete dependency attribution is in `THIRD_PARTY_NOTICES.md`. ROMs,
@@ -38,13 +40,15 @@ game data are not part of the repository.
 ### Architecture and runtime
 
 - Migrated to .NET 10 with reproducible restore and locked dependencies.
-- Split the code into a portable core, runtime contract and Windows frontend.
+- Split the code into a portable core, runtime contract, Windows frontend and
+  native Linux Wayland host.
 - Added an exclusive emulation owner thread with typed commands instead of UI
   code directly mutating core state.
 - Added immutable snapshots and synchronised frame/audio transfer between the
   emulation and UI threads.
 - Generalised video geometry for 160×144 GB/GBC and 240×160 GBA output.
-- Added Windows and portable Linux CI gates with an enforced minimum test count.
+- Added Windows and Linux CI gates with an enforced minimum test count plus a
+  native Wayland-host build and Hyprland-profile check.
 
 ### Interface and controls
 
@@ -59,6 +63,8 @@ game data are not part of the repository.
 - Added sharp, smooth and LCD-grid display modes with correct aspect ratios.
 - Added Windows Gaming Input with XInput fallback, hot-plug and persisted
   keyboard/controller remapping, including GBA L/R.
+- Added an SDL3 Wayland host with an Aether-native shell, ROM drag and drop,
+  keyboard/gamepad hot-plug, fullscreen and a Hyprland-specific desktop profile.
 
 ### Saves and states
 
@@ -146,6 +152,9 @@ Work on that foundation includes:
 - 87 runtime tests.
 - 28 Windows smoke tests.
 - Total: 290 passed, 0 failed.
+- Native Ubuntu build and `linux-x64` publish: 0 warnings, 0 errors. The
+  published host detected its Hyprland profile and entered a genuine Wayland
+  window loop under WSLg.
 - The self-contained Windows x64 build was launched and remained stable during
   the automated startup smoke check.
 - The package was scanned for ROM, BIOS and save files: 0 matches.
@@ -166,6 +175,9 @@ or Nintendo firmware is required by the automated test suite.
 - Special hardware such as Pocket Camera, HuC1/HuC3, MMM01 and other uncommon
   mappers is not released.
 - Experimental GBA save states older than core schema 5 are incompatible.
+- The new Linux desktop adapter does not yet provide audio output, the complete
+  Control Center, five visible slots or rewind controls; see
+  `docs/LINUX_WAYLAND.md`.
 - AetherBoy is alpha software and is not yet claimed as a replacement for
   established reference emulators.
 
@@ -182,6 +194,13 @@ Create a self-contained Windows x64 package with:
 
 ```powershell
 dotnet publish ./nanoboy/nanoboy.csproj -c Release -r win-x64 --self-contained true
+```
+
+Build and run the native Wayland host on Linux with:
+
+```bash
+bash scripts/build-linux.sh
+bash scripts/run-linux.sh "/path/to/your-game.gba"
 ```
 
 ## Recommended next milestone

@@ -2,7 +2,7 @@
 
 > **Status: Alpha / experimentell.** AetherBoy ist eine laufende Modernisierung und noch kein verlässlicher Emulator-Release. GB/GBC besitzen breite automatisierte Abdeckung; der neu integrierte GBA-Pfad braucht noch echte Spiel-, Audio- und Speichertests.
 
-AetherBoy ist ein Windows-Emulator für Game Boy, Game Boy Color und experimentell Game Boy Advance in C#. Das Projekt begann 2014 als `nanoboy` und wurde später als **ChiiBoy Color** weitergeführt. Produkt und Assembly heißen jetzt einheitlich **AetherBoy 4.8.0-alpha.1**; der historische Namespace und Projektordner `nanoboy` bleiben vorerst erhalten.
+AetherBoy ist ein Emulator für Game Boy, Game Boy Color und experimentell Game Boy Advance in C#. Neben dem vollständigen Windows-Frontend entsteht ein eigener nativer Linux-Host für Wayland und Hyprland; X11/XWayland wird dort bewusst nicht verwendet. Das Projekt begann 2014 als `nanoboy` und wurde später als **ChiiBoy Color** weitergeführt. Produkt und Assembly heißen jetzt einheitlich **AetherBoy 4.8.0-alpha.1**; der historische Namespace und Projektordner `nanoboy` bleiben vorerst erhalten.
 
 AetherBoy ist weder von Nintendo autorisiert noch mit Nintendo verbunden. Game Boy, Game Boy Color, Game Boy Advance und zugehörige Produktnamen sind Marken ihrer jeweiligen Rechteinhaber.
 
@@ -25,6 +25,7 @@ bekannte Grenzen stehen im [GBADotnet-Review](docs/GBADOTNET_REVIEW.md) und im
 separater Lern- und Regressionpfad erhalten; mGBA bleibt reine Referenz.
 
 - Windows-Forms-Anwendung auf **.NET 10 LTS**
+- nativer SDL3-Linux-Host für Wayland mit eigenem Hyprland-Profil, ROM-Drop, Tastatur, Gamepad, Vollbild und Save-State-Slot 1
 - plattformneutraler `AetherBoy.Core` auf `net10.0` mit DMG- und CGB-Codepfaden
 - vendorter, MIT-lizenzierter C#-GBA-Kern hinter demselben Owner-Thread-Vertrag
 - exklusiver Emulations-Owner-Thread mit typisierten Befehlen und unveränderlichen Snapshots
@@ -67,6 +68,23 @@ Der vollständige Zustandsvertrag aus Phase 4 bleibt erhalten und wurde für die
 | Debugger/Disassembler | intern/experimentell | Kein vollständiger Pause-/Step-Workflow; mehrere Grenzfälle sind ungeprüft. |
 
 ## Bauen, testen und starten
+
+### Linux / natives Wayland
+
+Voraussetzungen sind eine echte Wayland-Sitzung, das .NET-10-SDK und ein
+funktionierender Linux-Grafiktreiber. X11 und XWayland werden vom Linux-Host
+absichtlich abgelehnt.
+
+```bash
+bash scripts/build-linux.sh
+bash scripts/run-linux.sh "/pfad/zu/deinem-spiel.gba"
+```
+
+Hyprland wird separat erkannt. Einstieg: [Linux User Guide (English)](docs/LINUX_USER_GUIDE.md) ·
+[Linux/Wayland und Hyprland (Deutsch)](docs/LINUX_WAYLAND.md). Der
+Linux-Desktopadapter ist noch nicht funktionsgleich mit dem Windows-Control-Center.
+
+### Windows
 
 Voraussetzungen:
 
