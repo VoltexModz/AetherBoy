@@ -50,6 +50,17 @@ namespace AetherBoy.Runtime
         public override void Apply(SessionOwnerContext context) => context.Machine.SetButtons(pressedButtons);
     }
 
+    internal sealed class SetGameBoyAdvanceButtonsCommand : EmulationCommand
+    {
+        private readonly GameBoyAdvanceButtons pressedButtons;
+
+        public SetGameBoyAdvanceButtonsCommand(GameBoyAdvanceButtons pressedButtons) =>
+            this.pressedButtons = pressedButtons;
+
+        public override void Apply(SessionOwnerContext context) =>
+            context.Machine.SetGameBoyAdvanceButtons(pressedButtons);
+    }
+
     internal sealed class ConfigureCommand : EmulationCommand
     {
         private readonly EmulatorConfiguration configuration;

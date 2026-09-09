@@ -4,6 +4,30 @@ This file records direct package dependencies declared by the repository as insp
 
 ## Direct dependencies
 
+The user-supplied mGBA source archive was reviewed on 2026-09-07 as an engineering
+reference only. It is MPL-2.0-licensed and remains in an ignored local reference
+directory, retaining its original notices. It is not linked, built or included in
+the product. No mGBA function bodies were imported or mechanically translated in
+the initial review step. During the later HLE-BIOS work, `src/gba/bios.c` was
+consulted alongside documented GBA BIOS service contracts to validate observable
+service behavior. AetherBoy's `HleBios.cs` is an independently written C#
+implementation; no C function body, BIOS binary or test ROM was copied into the
+product. The archive identity, inspected areas, hardware-documentation sources
+for the newly written code and limitations are recorded in
+[docs/MGBA_REVIEW.md](docs/MGBA_REVIEW.md). This is not a claim of formal clean-room
+development. Any future source reuse requires its own provenance/license review.
+
+The GBA runtime includes a source snapshot of
+[DaveTCode/GBADotnet](https://github.com/DaveTCode/GBADotnet) at commit
+`994c4b225c6e4277ada8d37bb9283f53827ee3e1` (2022-05-16). The upstream core is
+MIT licensed, Copyright (c) 2022 David Tyler. AetherBoy vendors 66 original core
+source files and four outputs produced by the upstream source generators. The
+snapshot, its full license and the AetherBoy build wrapper are kept under
+[`third_party/GBADotnet.Core`](third_party/GBADotnet.Core); integration and known
+limitations are recorded in
+[`docs/GBADOTNET_REVIEW.md`](docs/GBADOTNET_REVIEW.md). No upstream ROM, BIOS,
+compatibility screenshot or UI project is redistributed.
+
 | Scope | Package | Version | Declared license | Upstream |
 | --- | --- | ---: | --- | --- |
 | Windows frontend | NAudio.WinMM | 2.3.0 | MIT | <https://github.com/naudio/NAudio> |

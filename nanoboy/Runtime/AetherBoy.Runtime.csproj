@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Core\AetherBoy.Core.csproj" />
+    <ProjectReference Include="..\..\third_party\GBADotnet.Core\AetherBoy.Vendored.GBADotnet.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

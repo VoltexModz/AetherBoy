@@ -115,8 +115,12 @@
       "aetherboy.runtime": {
         "type": "Project",
         "dependencies": {
-          "AetherBoy.Core": "[1.0.0, )"
+          "AetherBoy.Core": "[4.8.0-alpha.1, )",
+          "AetherBoy.Vendored.GBADotnet.Core": "[4.8.0-alpha.1, )"
         }
+      },
+      "aetherboy.vendored.gbadotnet.core": {
+        "type": "Project"
       }
     }
   }

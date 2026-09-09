@@ -19,15 +19,20 @@ namespace nanoboy
         private EmulationSession session;
         private NanoboySettings settings;
         private frmAudioTool audiotoolwindow;
+        private frmControlCenter controlCenter;
         private NAudioSoundOut audioOutput;
         private readonly InputAggregator input = new InputAggregator();
+        private GameBoyAdvanceButtons keyboardAdvanceButtons;
+        private GameBoyAdvanceButtons gamepadAdvanceButtons;
+        private GameBoyAdvanceButtons postedAdvanceButtons;
         private bool turboPressed;
         private bool sessionFaultReported;
-        private readonly int[] displayFrame = new int[EmulationSnapshot.FramePixelCount];
+        private int[] displayFrame = new int[EmulationSnapshot.FramePixelCount];
         private long displayedFrameSequence;
-        private XInputGamepadState lastPadState;
+        private HostGamepadState lastPadState;
         private string currentRomPath;
         private bool stateOperationInProgress;
+        private bool batteryRecoveryNoticeShown;
         private static readonly TimeSpan SessionShutdownTimeout = TimeSpan.FromSeconds(2);
 
         public frmNano()
@@ -44,12 +49,16 @@ namespace nanoboy
             SetDisplayFilter(settings.DisplayFilterIndex);
             DarkTheme.Apply(this);
             InitializeAetherShell();
+            updateTimer.Start();
         }
 
         private bool StopSession()
         {
             turboPressed = false;
             input.Clear();
+            keyboardAdvanceButtons = GameBoyAdvanceButtons.None;
+            gamepadAdvanceButtons = GameBoyAdvanceButtons.None;
+            postedAdvanceButtons = GameBoyAdvanceButtons.None;
 
             EmulationSession previousSession = session;
             if (previousSession == null)
@@ -132,9 +141,16 @@ namespace nanoboy
             }
         }
 
-        private byte[] LoadBootROM(bool isColor)
+        private byte[] LoadBootROM(bool isColor, bool isGameBoyAdvance = false)
         {
-            string bootFileName = isColor ? "gbc_boot.bin" : "dmg_boot.bin";
+            if (!settings.BootRomEnable)
+            {
+                return null;
+            }
+
+            string bootFileName = isGameBoyAdvance
+                ? "gba_bios.bin"
+                : isColor ? "gbc_boot.bin" : "dmg_boot.bin";
             string localPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, bootFileName);
             if (File.Exists(bootFileName))
             {
@@ -192,8 +208,14 @@ namespace nanoboy
             input.Clear();
             turboPressed = false;
             sessionFaultReported = false;
+            batteryRecoveryNoticeShown = false;
 
-            byte[] bootRom = LoadBootROM(RomHasColorFeatures(path));
+            bool isGameBoyAdvance = Path.GetExtension(path).Equals(
+                ".gba",
+                StringComparison.OrdinalIgnoreCase);
+            byte[] bootRom = isGameBoyAdvance
+                ? LoadBootROM(isColor: false, isGameBoyAdvance: true)
+                : LoadBootROM(RomHasColorFeatures(path));
             EmulatorConfiguration configuration = CreateEmulatorConfiguration();
             NAudioSoundOut preparedAudioOutput = null;
             if (configuration.AudioEnabled && !TryCreateAudioOutput(out preparedAudioOutput))
@@ -234,7 +256,8 @@ namespace nanoboy
             }
 
             displayedFrameSequence = 0;
-            lastPadState = XInputGamepadState.Disconnected;
+            lastPadState = GamepadInput.GetState();
+            UpdateAetherGamepadUi(lastPadState);
             gameView.ClearFrame();
 
             if (audiotoolwindow != null && !audiotoolwindow.IsDisposed)
@@ -280,11 +303,11 @@ namespace nanoboy
                 SampleRate: 44_100);
         }
 
-        private static bool TryCreateAudioOutput(out NAudioSoundOut output)
+        private bool TryCreateAudioOutput(out NAudioSoundOut output)
         {
             try
             {
-                output = new NAudioSoundOut(44_100);
+                output = new NAudioSoundOut(44_100, settings.AudioVolume / 100f);
                 return true;
             }
             catch (Exception exception) when (
@@ -348,11 +371,178 @@ namespace nanoboy
 
         private void menuSaveStateQuickSave_Click(object sender, EventArgs e) => QuickSave();
         private void menuSaveStateQuickLoad_Click(object sender, EventArgs e) => QuickLoad();
+        private void menuBatterySaveSafety_Click(object sender, EventArgs e) => OpenBatterySaveSafety(this);
         private void menuSaveSlot1_Click(object sender, EventArgs e) => SelectSaveSlot(1);
         private void menuSaveSlot2_Click(object sender, EventArgs e) => SelectSaveSlot(2);
         private void menuSaveSlot3_Click(object sender, EventArgs e) => SelectSaveSlot(3);
         private void menuSaveSlot4_Click(object sender, EventArgs e) => SelectSaveSlot(4);
         private void menuSaveSlot5_Click(object sender, EventArgs e) => SelectSaveSlot(5);
+
+        private void menuControlCenter_Click(object sender, EventArgs e) => OpenControlCenter();
+
+        private void OpenControlCenter()
+        {
+            if (controlCenter != null && !controlCenter.IsDisposed)
+            {
+                if (controlCenter.WindowState == FormWindowState.Minimized)
+                {
+                    controlCenter.WindowState = FormWindowState.Normal;
+                }
+                controlCenter.Activate();
+                controlCenter.BringToFront();
+                return;
+            }
+
+            controlCenter = new frmControlCenter(new ControlCenterBridge
+            {
+                Settings = settings,
+                SnapshotProvider = () => session?.LatestSnapshot,
+                GamepadProvider = () => GamepadInput.GetState(),
+                RomPathProvider = () => currentRomPath,
+                SetPalette = SetPalette,
+                SetDisplayFilter = SetDisplayFilter,
+                SetWindowScale = ResizeWindow,
+                ToggleFullscreen = ToggleAetherFullscreen,
+                ApplyAudioSettings = ApplyAudioSettingsFromControlCenter,
+                SetFrameskip = SetFrameskip,
+                SetSaveSlot = SelectSaveSlot,
+                OpenControls = () => new frmControls(settings).ShowDialog(controlCenter),
+                OpenSaveSafety = () => OpenBatterySaveSafety(controlCenter),
+                OpenAudioInspector = () => menuAudioInspector_Click(controlCenter, EventArgs.Empty),
+                QuickSave = QuickSave,
+                QuickLoad = QuickLoad,
+                ResetSettings = ResetSettingsToDefaults
+            });
+            controlCenter.FormClosed += (_, _) => controlCenter = null;
+            controlCenter.Show(this);
+        }
+
+        private void OpenBatterySaveSafety(IWin32Window owner)
+        {
+            EmulationSession currentSession = session;
+            string romPath = currentRomPath;
+            RomSnapshot? rom = currentSession?.LatestSnapshot.Rom;
+            if (currentSession == null || string.IsNullOrEmpty(romPath) || rom == null)
+            {
+                AetherSignal.Show(
+                    owner,
+                    "Starte zuerst ein Spiel. Danach zeigt das Save Safety Center den Batterie-Spielstand und seine Backups.",
+                    "Kein Spiel aktiv",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+            if (!rom.BatterySave.IsEnabled || rom.BatterySave.ExpectedLength <= 0)
+            {
+                AetherSignal.Show(
+                    owner,
+                    "Dieses Spiel besitzt keinen unterstützten Batterie-RAM-Spielstand. Save States bleiben davon unabhängig verfügbar.",
+                    "Kein Batterie-Spielstand",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            string savePath = Path.ChangeExtension(romPath, "sav");
+            byte[] selectedSaveData;
+            int generation;
+            try
+            {
+                using var manager = new frmBatterySaveManager(
+                    savePath,
+                    rom.BatterySave.ExpectedLength,
+                    string.IsNullOrWhiteSpace(rom.Title) ? Path.GetFileNameWithoutExtension(romPath) : rom.Title);
+                if (manager.ShowDialog(owner) != DialogResult.OK || manager.SelectedSaveData == null)
+                {
+                    return;
+                }
+
+                selectedSaveData = manager.SelectedSaveData;
+                generation = (int)manager.SelectedGeneration;
+            }
+            catch (Exception exception) when (
+                exception is IOException ||
+                exception is UnauthorizedAccessException ||
+                exception is InvalidDataException)
+            {
+                AetherSignal.Show(
+                    owner,
+                    $"Die Sicherungen konnten nicht gelesen werden.\n\n{exception.Message}",
+                    "Save Safety nicht verfügbar",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
+            }
+
+            DialogResult confirmation = AetherSignal.Show(
+                owner,
+                $"Backup {generation} wirklich aktivieren?\n\nDer derzeitige Spielstand wird vorher sicher beendet und als neuestes Backup erhalten. Anschließend startet das Spiel neu.",
+                "Backup wiederherstellen",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+            if (confirmation != DialogResult.Yes)
+            {
+                return;
+            }
+
+            stateOperationInProgress = true;
+            updateTimer.Stop();
+            try
+            {
+                if (!StopSession())
+                {
+                    AetherSignal.Show(
+                        owner,
+                        "Der laufende Emulator konnte nicht sicher beendet werden. Das Backup wurde nicht verändert.",
+                        "Wiederherstellung abgebrochen",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    updateTimer.Start();
+                    return;
+                }
+
+                BatterySaveStore.Restore(
+                    savePath,
+                    rom.BatterySave.ExpectedLength,
+                    selectedSaveData);
+                LoadRomFile(romPath);
+                if (session != null)
+                {
+                    AetherSignal.Show(
+                        owner,
+                        $"Backup {generation} ist jetzt aktiv. Der vorherige Stand liegt weiterhin als rotierende Sicherung vor.",
+                        "Spielstand wiederhergestellt",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception exception) when (
+                exception is IOException ||
+                exception is UnauthorizedAccessException ||
+                exception is InvalidDataException)
+            {
+                Debug.WriteLine($"Could not restore battery save: {exception}");
+                if (session == null && File.Exists(romPath))
+                {
+                    LoadRomFile(romPath);
+                }
+
+                AetherSignal.Show(
+                    owner,
+                    $"Das Backup konnte nicht aktiviert werden.\n\n{exception.Message}",
+                    "Wiederherstellung fehlgeschlagen",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            finally
+            {
+                stateOperationInProgress = false;
+                if (!updateTimer.Enabled)
+                {
+                    updateTimer.Start();
+                }
+            }
+        }
 
         private void SelectSaveSlot(int slot)
         {
@@ -378,7 +568,6 @@ namespace nanoboy
             {
                 return;
             }
-
             stateOperationInProgress = true;
             try
             {
@@ -414,7 +603,6 @@ namespace nanoboy
             {
                 return;
             }
-
             string statePath = GetStatePath(romPath, settings.SaveSlot);
             if (!File.Exists(statePath))
             {
@@ -625,12 +813,15 @@ namespace nanoboy
             RomSnapshot rom = session?.LatestSnapshot.Rom;
             if (rom != null)
             {
+                string model = rom.IsGameBoyAdvance
+                    ? "Game Boy Advance"
+                    : rom.HasColorFeatures ? "Game Boy Color" : "Game Boy";
                 string info = $"Titel: {rom.Title}\n" +
                               $"Typ: {rom.CartridgeType}\n" +
+                              $"System: {model}\n" +
                               $"ROM Größe: {rom.RomSize / 1024} KB\n" +
                               $"RAM Größe: {rom.RamSize / 1024} KB\n" +
-                              $"Color (GBC): {(rom.HasColorFeatures ? "Ja" : "Nein")}\n" +
-                              $"Super Game Boy (SGB): {(rom.HasSuperGameBoyFeatures ? "Ja" : "Nein")}\n" +
+                              $"Super Game Boy (SGB): {(rom.IsGameBoyAdvance ? "Nicht zutreffend" : rom.HasSuperGameBoyFeatures ? "Ja" : "Nein")}\n" +
                               $"Region: {(rom.IsJapanese ? "Japan" : "International")}";
                 AetherSignal.Show(this, info, "ROM Informationen", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
@@ -715,40 +906,46 @@ namespace nanoboy
             UpdateEmulatorSettings();
         }
 
-        private void menuFrameSkip0_Click(object sender, EventArgs e)
+        private void ApplyAudioSettingsFromControlCenter()
         {
-            settings.Frameskip = 0;
+            menuAudioOn.Checked = settings.AudioEnable;
+            menuAudioC1.Checked = settings.Channel1Enable;
+            menuAudioC2.Checked = settings.Channel2Enable;
+            menuAudioC3.Checked = settings.Channel3Enable;
+            menuAudioC4.Checked = settings.Channel4Enable;
             UpdateEmulatorSettings();
-            LoadConfiguration();
         }
 
-        private void menuFrameSkip1_Click(object sender, EventArgs e)
+        private void SetFrameskip(int frameskip)
         {
-            settings.Frameskip = 1;
+            settings.Frameskip = Math.Clamp(frameskip, 0, 4);
+            menuFrameSkip0.Checked = settings.Frameskip == 0;
+            menuFrameSkip1.Checked = settings.Frameskip == 1;
+            menuFrameSkip2.Checked = settings.Frameskip == 2;
+            menuFrameSkip3.Checked = settings.Frameskip == 3;
+            menuFrameSkip4.Checked = settings.Frameskip == 4;
             UpdateEmulatorSettings();
-            LoadConfiguration();
         }
 
-        private void menuFrameSkip2_Click(object sender, EventArgs e)
+        private void ResetSettingsToDefaults()
         {
-            settings.Frameskip = 2;
-            UpdateEmulatorSettings();
+            nanoboy.Properties.Settings.Default.Reset();
+            SetPalette(settings.PaletteIndex);
+            SetDisplayFilter(settings.DisplayFilterIndex);
+            SelectSaveSlot(settings.SaveSlot);
             LoadConfiguration();
+            ApplyAudioSettingsFromControlCenter();
         }
 
-        private void menuFrameSkip3_Click(object sender, EventArgs e)
-        {
-            settings.Frameskip = 3;
-            UpdateEmulatorSettings();
-            LoadConfiguration();
-        }
+        private void menuFrameSkip0_Click(object sender, EventArgs e) => SetFrameskip(0);
 
-        private void menuFrameSkip4_Click(object sender, EventArgs e)
-        {
-            settings.Frameskip = 4;
-            UpdateEmulatorSettings();
-            LoadConfiguration();
-        }
+        private void menuFrameSkip1_Click(object sender, EventArgs e) => SetFrameskip(1);
+
+        private void menuFrameSkip2_Click(object sender, EventArgs e) => SetFrameskip(2);
+
+        private void menuFrameSkip3_Click(object sender, EventArgs e) => SetFrameskip(3);
+
+        private void menuFrameSkip4_Click(object sender, EventArgs e) => SetFrameskip(4);
 
         private void menuControls_Click(object sender, EventArgs e)
         {
@@ -782,6 +979,16 @@ namespace nanoboy
 
         private void menuAudioInspector_Click(object sender, EventArgs e)
         {
+            if (session?.LatestSnapshot.Rom?.IsGameBoyAdvance == true)
+            {
+                AetherSignal.Show(this,
+                    "Die GBA-Audioausgabe ist aktiv. Der Audio Inspector zeigt derzeit nur die vier klassischen GB/C-PSG-Kanäle; GBA-Kanaltelemetrie folgt mit dem Audio-Hardening.",
+                    "GBA Audio Inspector",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
             if (audiotoolwindow != null && !audiotoolwindow.IsDisposed)
             {
                 audiotoolwindow.Session = session;
@@ -817,6 +1024,7 @@ namespace nanoboy
                 }
 
                 Exception fault = currentSession.Fault;
+                Program.WriteCrashLog(fault);
                 AetherSignal.Show(this,
                     $"Die Emulation wurde wegen eines Fehlers beendet.\n\n{fault?.Message}",
                     "Emulationsfehler",
@@ -825,24 +1033,49 @@ namespace nanoboy
                 return;
             }
 
+            EmulationSnapshot snapshot = currentSession.LatestSnapshot;
+            if (snapshot.State == SessionState.Starting)
+                return;
+
+            if (gameView.VideoGeometry != snapshot.VideoGeometry)
+            {
+                gameView.SetVideoGeometry(snapshot.VideoGeometry);
+                displayFrame = new int[snapshot.VideoGeometry.PixelCount];
+                displayedFrameSequence = 0;
+            }
+
             if (currentSession.TryCopyLatestFrame(displayFrame, ref displayedFrameSequence))
             {
                 gameView.Present(displayFrame);
             }
 
-            UpdateAetherSessionUi(currentSession.LatestSnapshot);
+            UpdateAetherSessionUi(snapshot);
+
+            if (!batteryRecoveryNoticeShown && snapshot.Rom?.BatterySave.RecoveredFromBackup == true)
+            {
+                batteryRecoveryNoticeShown = true;
+                int generation = snapshot.Rom.BatterySave.LoadedGeneration;
+                AetherSignal.Show(
+                    this,
+                    $"Der aktuelle Batterie-Spielstand war nicht verwendbar. AetherBoy hat automatisch Backup {generation} geladen und repariert die Hauptdatei bei der nächsten Sicherung.",
+                    "Spielstand automatisch gerettet",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
         }
 
         private void PollGamepad()
         {
+            HostGamepadState padState = GamepadInput.GetState();
+            UpdateAetherGamepadUi(padState);
+
             if (session == null)
             {
                 input.ClearGamepad();
-                lastPadState = XInputGamepadState.Disconnected;
+                lastPadState = padState;
                 return;
             }
 
-            XInputGamepadState padState = XInputGamepad.GetState();
             if (!padState.IsConnected)
             {
                 if (lastPadState.IsConnected)
@@ -854,36 +1087,68 @@ namespace nanoboy
                 return;
             }
 
-            bool up = padState.IsButtonDown(XInputButtons.DPadUp) || padState.LeftThumbY > 0.5f;
-            bool down = padState.IsButtonDown(XInputButtons.DPadDown) || padState.LeftThumbY < -0.5f;
-            bool left = padState.IsButtonDown(XInputButtons.DPadLeft) || padState.LeftThumbX < -0.5f;
-            bool right = padState.IsButtonDown(XInputButtons.DPadRight) || padState.LeftThumbX > 0.5f;
-
-            GameBoyButtons gamepadButtons = GameBoyButtons.None;
-            if (padState.IsButtonDown(XInputButtons.A)) gamepadButtons |= GameBoyButtons.A;
-            if (padState.IsButtonDown(XInputButtons.B) || padState.IsButtonDown(XInputButtons.X)) gamepadButtons |= GameBoyButtons.B;
-            if (padState.IsButtonDown(XInputButtons.Start)) gamepadButtons |= GameBoyButtons.Start;
-            if (padState.IsButtonDown(XInputButtons.Back)) gamepadButtons |= GameBoyButtons.Select;
-            if (up) gamepadButtons |= GameBoyButtons.Up;
-            if (down) gamepadButtons |= GameBoyButtons.Down;
-            if (left) gamepadButtons |= GameBoyButtons.Left;
-            if (right) gamepadButtons |= GameBoyButtons.Right;
-
+            GamepadBindings bindings = settings.GamepadBindings;
+            GameBoyButtons gamepadButtons = GamepadMapper.ToGameBoyButtons(padState, bindings);
             if (input.SetGamepadButtons(gamepadButtons))
             {
                 PostInputState();
             }
 
-            if (padState.IsButtonDown(XInputButtons.RightShoulder) &&
-                !lastPadState.IsButtonDown(XInputButtons.RightShoulder))
+            bool isGameBoyAdvance = session.LatestSnapshot.Rom?.IsGameBoyAdvance == true;
+            if (isGameBoyAdvance)
             {
-                QuickSave();
-            }
+                GameBoyAdvanceButtons advanceButtons = GameBoyAdvanceButtons.None;
+                if (padState.IsAnyButtonDown(settings.GamepadL) ||
+                    padState.LeftTrigger > GamepadMapper.DefaultStickThreshold)
+                {
+                    advanceButtons |= GameBoyAdvanceButtons.L;
+                }
+                if (padState.IsAnyButtonDown(settings.GamepadR) ||
+                    padState.RightTrigger > GamepadMapper.DefaultStickThreshold)
+                {
+                    advanceButtons |= GameBoyAdvanceButtons.R;
+                }
+                if (gamepadAdvanceButtons != advanceButtons)
+                {
+                    gamepadAdvanceButtons = advanceButtons;
+                    PostAdvanceInputState();
+                }
 
-            if (padState.IsButtonDown(XInputButtons.LeftShoulder) &&
-                !lastPadState.IsButtonDown(XInputButtons.LeftShoulder))
+                HostGamepadButtons shoulderBindings = settings.GamepadL | settings.GamepadR;
+                if ((bindings.QuickSave & shoulderBindings) == 0 &&
+                    GamepadMapper.WasPressed(padState, lastPadState, bindings.QuickSave))
+                {
+                    QuickSave();
+                }
+                if ((bindings.QuickLoad & shoulderBindings) == 0 &&
+                    GamepadMapper.WasPressed(padState, lastPadState, bindings.QuickLoad))
+                {
+                    QuickLoad();
+                }
+            }
+            else
             {
-                QuickLoad();
+                if (gamepadAdvanceButtons != GameBoyAdvanceButtons.None)
+                {
+                    gamepadAdvanceButtons = GameBoyAdvanceButtons.None;
+                    PostAdvanceInputState();
+                }
+
+                if (GamepadMapper.WasPressed(
+                    padState,
+                    lastPadState,
+                    bindings.QuickSave))
+                {
+                    QuickSave();
+                }
+
+                if (GamepadMapper.WasPressed(
+                    padState,
+                    lastPadState,
+                    bindings.QuickLoad))
+                {
+                    QuickLoad();
+                }
             }
 
             lastPadState = padState;
@@ -894,6 +1159,11 @@ namespace nanoboy
             if (input.ClearGamepad())
             {
                 PostInputState();
+            }
+            if (gamepadAdvanceButtons != GameBoyAdvanceButtons.None)
+            {
+                gamepadAdvanceButtons = GameBoyAdvanceButtons.None;
+                PostAdvanceInputState();
             }
         }
 
@@ -934,6 +1204,7 @@ namespace nanoboy
             {
                 PostInputState();
             }
+            SetAdvanceKeyboardButton(e.KeyCode, pressed: true);
         }
 
         private void gameView_KeyUp(object sender, KeyEventArgs e)
@@ -955,6 +1226,7 @@ namespace nanoboy
             {
                 PostInputState();
             }
+            SetAdvanceKeyboardButton(e.KeyCode, pressed: false);
         }
 
         private GameBoyButtons MapKey(Keys key)
@@ -978,6 +1250,49 @@ namespace nanoboy
             {
                 ObserveSessionCommand(currentSession.SetButtonsAsync(input.Combined));
             }
+        }
+
+        private void SetAdvanceKeyboardButton(Keys key, bool pressed)
+        {
+            if (session?.LatestSnapshot.Rom?.IsGameBoyAdvance != true)
+            {
+                return;
+            }
+
+            GameBoyAdvanceButtons button = GameBoyAdvanceButtons.None;
+            if (key == settings.KeyL) button |= GameBoyAdvanceButtons.L;
+            if (key == settings.KeyR) button |= GameBoyAdvanceButtons.R;
+            if (button == GameBoyAdvanceButtons.None)
+            {
+                return;
+            }
+
+            GameBoyAdvanceButtons nextButtons = pressed
+                ? keyboardAdvanceButtons | button
+                : keyboardAdvanceButtons & ~button;
+            if (nextButtons != keyboardAdvanceButtons)
+            {
+                keyboardAdvanceButtons = nextButtons;
+                PostAdvanceInputState();
+            }
+        }
+
+        private void PostAdvanceInputState()
+        {
+            EmulationSession currentSession = session;
+            if (currentSession == null)
+            {
+                return;
+            }
+
+            GameBoyAdvanceButtons combined = keyboardAdvanceButtons | gamepadAdvanceButtons;
+            if (combined == postedAdvanceButtons)
+            {
+                return;
+            }
+
+            postedAdvanceButtons = combined;
+            ObserveSessionCommand(currentSession.SetGameBoyAdvanceButtonsAsync(combined));
         }
         #endregion
 
@@ -1012,6 +1327,11 @@ namespace nanoboy
             {
                 ObserveSessionCommand(currentSession.SetButtonsAsync(input.Combined));
             }
+            if (keyboardAdvanceButtons != GameBoyAdvanceButtons.None)
+            {
+                keyboardAdvanceButtons = GameBoyAdvanceButtons.None;
+                PostAdvanceInputState();
+            }
         }
 
         private void ResizeWindow(int size)
@@ -1036,8 +1356,8 @@ namespace nanoboy
             }
 
             ClientSize = new Size(
-                GameDisplayControl.FrameWidth * size,
-                menuStrip.Height + GameDisplayControl.FrameHeight * size);
+                gameView.VideoGeometry.Width * size,
+                menuStrip.Height + gameView.VideoGeometry.Height * size);
             if (settings.VideoScaleFactor != size)
             {
                 settings.VideoScaleFactor = size;
@@ -1098,6 +1418,12 @@ namespace nanoboy
             else if (!settings.AudioEnable && Volatile.Read(ref audioOutput) != null)
             {
                 DisposeAudioOutput(currentSession);
+            }
+
+            NAudioSoundOut activeOutput = Volatile.Read(ref audioOutput);
+            if (activeOutput != null)
+            {
+                activeOutput.Volume = settings.AudioVolume / 100f;
             }
 
             ObserveSessionCommand(currentSession.ConfigureAsync(CreateEmulatorConfiguration()));

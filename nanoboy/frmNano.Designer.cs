@@ -37,6 +37,7 @@ namespace nanoboy
             this.menuSaveState = new System.Windows.Forms.ToolStripMenuItem();
             this.menuSaveStateQuickSave = new System.Windows.Forms.ToolStripMenuItem();
             this.menuSaveStateQuickLoad = new System.Windows.Forms.ToolStripMenuItem();
+            this.menuBatterySaveSafety = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparatorSave = new System.Windows.Forms.ToolStripSeparator();
             this.menuSaveSlot1 = new System.Windows.Forms.ToolStripMenuItem();
             this.menuSaveSlot2 = new System.Windows.Forms.ToolStripMenuItem();
@@ -46,6 +47,7 @@ namespace nanoboy
             this.toolStripSeparatorClose = new System.Windows.Forms.ToolStripSeparator();
             this.menuClose = new System.Windows.Forms.ToolStripMenuItem();
             this.menuItem1 = new System.Windows.Forms.ToolStripMenuItem();
+            this.menuControlCenter = new System.Windows.Forms.ToolStripMenuItem();
             this.menuItem2 = new System.Windows.Forms.ToolStripMenuItem();
             this.menuAudioOn = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
@@ -147,6 +149,7 @@ namespace nanoboy
             this.menuSaveState.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.menuSaveStateQuickSave,
             this.menuSaveStateQuickLoad,
+            this.menuBatterySaveSafety,
             this.toolStripSeparatorSave,
             this.menuSaveSlot1,
             this.menuSaveSlot2,
@@ -171,6 +174,14 @@ namespace nanoboy
             this.menuSaveStateQuickLoad.Size = new System.Drawing.Size(201, 22);
             this.menuSaveStateQuickLoad.Text = "Schnellladen (F8)";
             this.menuSaveStateQuickLoad.Click += new System.EventHandler(this.menuSaveStateQuickLoad_Click);
+            //
+            // menuBatterySaveSafety
+            //
+            this.menuBatterySaveSafety.Name = "menuBatterySaveSafety";
+            this.menuBatterySaveSafety.Size = new System.Drawing.Size(246, 22);
+            this.menuBatterySaveSafety.Text = "Save Safety Center";
+            this.menuBatterySaveSafety.ToolTipText = "Batterie-Spielstand und drei rotierende Backups prüfen oder wiederherstellen.";
+            this.menuBatterySaveSafety.Click += new System.EventHandler(this.menuBatterySaveSafety_Click);
             //
             // toolStripSeparatorSave
             //
@@ -227,6 +238,7 @@ namespace nanoboy
             // menuItem1
             //
             this.menuItem1.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuControlCenter,
             this.menuItem2,
             this.menuItem3,
             this.menuPalette,
@@ -234,6 +246,13 @@ namespace nanoboy
             this.menuItem1.Name = "menuItem1";
             this.menuItem1.Size = new System.Drawing.Size(69, 20);
             this.menuItem1.Text = "Optionen";
+            //
+            // menuControlCenter
+            //
+            this.menuControlCenter.Name = "menuControlCenter";
+            this.menuControlCenter.Size = new System.Drawing.Size(180, 22);
+            this.menuControlCenter.Text = "Control Center";
+            this.menuControlCenter.Click += new System.EventHandler(this.menuControlCenter_Click);
             //
             // menuItem2
             //
@@ -642,6 +661,7 @@ namespace nanoboy
         private System.Windows.Forms.ToolStripMenuItem menuSaveState;
         private System.Windows.Forms.ToolStripMenuItem menuSaveStateQuickSave;
         private System.Windows.Forms.ToolStripMenuItem menuSaveStateQuickLoad;
+        private System.Windows.Forms.ToolStripMenuItem menuBatterySaveSafety;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparatorSave;
         private System.Windows.Forms.ToolStripMenuItem menuSaveSlot1;
         private System.Windows.Forms.ToolStripMenuItem menuSaveSlot2;
@@ -651,6 +671,7 @@ namespace nanoboy
         private System.Windows.Forms.ToolStripSeparator toolStripSeparatorClose;
         private System.Windows.Forms.ToolStripMenuItem menuClose;
         private System.Windows.Forms.ToolStripMenuItem menuItem1;
+        private System.Windows.Forms.ToolStripMenuItem menuControlCenter;
         private System.Windows.Forms.ToolStripMenuItem menuItem2;
         private System.Windows.Forms.ToolStripMenuItem menuItem3;
         private System.Windows.Forms.ToolStripMenuItem menuPalette;

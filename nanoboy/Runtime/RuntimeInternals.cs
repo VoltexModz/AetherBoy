@@ -12,10 +12,14 @@ namespace AetherBoy.Runtime
 
     internal interface IEmulationMachine : IDisposable
     {
+        VideoGeometry VideoGeometry => VideoGeometry.GameBoy;
+        EmulationFeature Features => EmulationFeature.GameBoyStandard;
+
         event EventHandler<AudioSamplesAvailableEventArgs>? AudioSamplesAvailable;
 
         void RunFrame();
         void SetButtons(GameBoyButtons pressedButtons);
+        void SetGameBoyAdvanceButtons(GameBoyAdvanceButtons pressedButtons) { }
         void Configure(EmulatorConfiguration configuration);
         void SetPalette(int paletteIndex);
         void Reset();

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using nanoboy.Core;
@@ -98,6 +99,23 @@ namespace AetherBoy.Runtime
             }
 
             return EnqueueAsync(new SetButtonsCommand(pressedButtons), cancellationToken);
+        }
+
+        public Task SetGameBoyAdvanceButtonsAsync(
+            GameBoyAdvanceButtons pressedButtons,
+            CancellationToken cancellationToken = default)
+        {
+            if ((pressedButtons & ~GameBoyAdvanceButtons.All) != 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(pressedButtons),
+                    pressedButtons,
+                    "The GBA button mask contains unsupported bits.");
+            }
+
+            return EnqueueAsync(
+                new SetGameBoyAdvanceButtonsCommand(pressedButtons),
+                cancellationToken);
         }
 
         public Task ConfigureAsync(
@@ -221,6 +239,10 @@ namespace AetherBoy.Runtime
             ArgumentException.ThrowIfNullOrWhiteSpace(savePath);
             ValidateConfiguration(configuration);
             ValidatePalette(paletteIndex);
+            if (Path.GetExtension(romPath).Equals(".gba", StringComparison.OrdinalIgnoreCase))
+            {
+                return new GbaProductionMachineFactory(romPath, savePath, configuration, bootRom);
+            }
             return new ProductionMachineFactory(romPath, savePath, bootRom, configuration, paletteIndex);
         }
 
@@ -321,6 +343,7 @@ namespace AetherBoy.Runtime
             try
             {
                 machine = machineFactory.Create();
+                frameExchange.Configure(machine.VideoGeometry);
                 machine.AudioSamplesAvailable += ForwardAudioSamples;
                 context = new SessionOwnerContext(machine);
                 PublishStateAndSnapshot(context, SessionState.Running, emulatedFrameCount);
@@ -494,14 +517,14 @@ namespace AetherBoy.Runtime
                 context.IsPaused,
                 context.IsTurboEnabled,
                 emulatedFrameCount,
-                frameExchange.PublishedSequence);
+                frameExchange.PublishedSequence).WithVideoGeometry(frameExchange.Geometry);
             Volatile.Write(ref latestSnapshot, snapshot);
             Volatile.Write(ref state, (int)nextState);
         }
 
         private void PublishTerminalState(SessionState terminalState)
         {
-            EmulationSnapshot terminalSnapshot = LatestSnapshot.WithState(
+            EmulationSnapshot terminalSnapshot = LatestSnapshot.WithVideoGeometry(frameExchange.Geometry).WithState(
                 terminalState,
                 isPaused: false);
             Volatile.Write(ref latestSnapshot, terminalSnapshot);

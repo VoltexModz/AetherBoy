@@ -11,6 +11,8 @@ namespace AetherBoy.Runtime
 
         private readonly CheatSnapshot[] cheats;
         private readonly IReadOnlyList<CheatSnapshot> readOnlyCheats;
+        private readonly GbaDiagnosticEventSnapshot[] diagnosticEvents;
+        private readonly IReadOnlyList<GbaDiagnosticEventSnapshot> readOnlyDiagnosticEvents;
 
         internal EmulationSnapshot(
             SessionState state,
@@ -20,7 +22,10 @@ namespace AetherBoy.Runtime
             long videoFrameSequence,
             RomSnapshot? rom,
             AudioSnapshot? audio,
-            ReadOnlySpan<CheatSnapshot> cheats)
+            ReadOnlySpan<CheatSnapshot> cheats,
+            VideoGeometry? videoGeometry = null,
+            EmulationFeature features = EmulationFeature.None,
+            ReadOnlySpan<GbaDiagnosticEventSnapshot> diagnosticEvents = default)
         {
             State = state;
             IsPaused = isPaused;
@@ -29,8 +34,12 @@ namespace AetherBoy.Runtime
             VideoFrameSequence = videoFrameSequence;
             Rom = rom;
             Audio = audio;
+            VideoGeometry = videoGeometry ?? VideoGeometry.GameBoy;
+            Features = features;
             this.cheats = cheats.ToArray();
             readOnlyCheats = Array.AsReadOnly(this.cheats);
+            this.diagnosticEvents = diagnosticEvents.ToArray();
+            readOnlyDiagnosticEvents = Array.AsReadOnly(this.diagnosticEvents);
         }
 
         public SessionState State { get; }
@@ -40,7 +49,10 @@ namespace AetherBoy.Runtime
         public long VideoFrameSequence { get; }
         public RomSnapshot? Rom { get; }
         public AudioSnapshot? Audio { get; }
+        public VideoGeometry VideoGeometry { get; }
+        public EmulationFeature Features { get; }
         public IReadOnlyList<CheatSnapshot> Cheats => readOnlyCheats;
+        public IReadOnlyList<GbaDiagnosticEventSnapshot> DiagnosticEvents => readOnlyDiagnosticEvents;
         public bool HasVideoFrame => VideoFrameSequence != 0;
 
         internal EmulationSnapshot WithState(SessionState state, bool isPaused)
@@ -53,8 +65,24 @@ namespace AetherBoy.Runtime
                 VideoFrameSequence,
                 Rom,
                 Audio,
-                cheats);
+                cheats,
+                VideoGeometry,
+                Features,
+                diagnosticEvents);
         }
+
+        internal EmulationSnapshot WithVideoGeometry(VideoGeometry geometry)
+        {
+            if (VideoGeometry == geometry)
+                return this;
+
+            return new EmulationSnapshot(
+                State, IsPaused, IsTurboEnabled, EmulatedFrameCount, VideoFrameSequence,
+                Rom, Audio, cheats, geometry, Features, diagnosticEvents);
+        }
+
+        public bool Supports(EmulationFeature feature) =>
+            (Features & feature) == feature;
 
         internal static EmulationSnapshot Starting { get; } = new EmulationSnapshot(
             SessionState.Starting,

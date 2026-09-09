@@ -3,6 +3,34 @@ using System.Collections.Generic;
 
 namespace AetherBoy.Runtime
 {
+    [Flags]
+    public enum EmulationFeature
+    {
+        None = 0,
+        SaveStates = 1 << 0,
+        Rewind = 1 << 1,
+        Cheats = 1 << 2,
+        MonochromePalettes = 1 << 3,
+        AudioChannelControls = 1 << 4,
+        AudioInspector = 1 << 5,
+        Frameskip = 1 << 6,
+        ShoulderButtons = 1 << 7,
+
+        GameBoyStandard = SaveStates | Rewind | Cheats | MonochromePalettes |
+            AudioChannelControls | AudioInspector | Frameskip,
+        GameBoyAdvanceStandard = SaveStates | Rewind | Cheats | AudioChannelControls |
+            AudioInspector | Frameskip | ShoulderButtons
+    }
+
+    public sealed record BatterySaveSnapshot(
+        bool IsEnabled,
+        int ExpectedLength,
+        int LoadedGeneration,
+        bool InvalidPrimaryDetected)
+    {
+        public bool RecoveredFromBackup => LoadedGeneration >= 1;
+    }
+
     public sealed record RomSnapshot(
         string Title,
         string CartridgeType,
@@ -10,7 +38,13 @@ namespace AetherBoy.Runtime
         int RamSize,
         bool HasColorFeatures,
         bool HasSuperGameBoyFeatures,
-        bool IsJapanese);
+        bool IsJapanese,
+        string RomSha256,
+        BatterySaveSnapshot BatterySave)
+    {
+        public bool IsGameBoyAdvance =>
+            CartridgeType.StartsWith("GBA", StringComparison.OrdinalIgnoreCase);
+    }
 
     public sealed record PulseChannelSnapshot(
         bool Enabled,
@@ -108,4 +142,10 @@ namespace AetherBoy.Runtime
     }
 
     public sealed record CheatSnapshot(Guid Id, string Name, string Code, bool Enabled);
+
+    public sealed record GbaDiagnosticEventSnapshot(
+        long Cycle,
+        string Category,
+        string Message,
+        uint? Address);
 }

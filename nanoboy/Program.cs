@@ -1,5 +1,7 @@
 using System;
+using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Windows.Forms;
 using nanoboy.Controls;
 
@@ -70,7 +72,7 @@ namespace nanoboy
             }
         }
 
-        private static void WriteCrashLog(Exception exception)
+        internal static void WriteCrashLog(Exception exception)
         {
             if (exception == null)
             {
@@ -86,12 +88,35 @@ namespace nanoboy
                 Directory.CreateDirectory(logDirectory);
 
                 string fileName = $"crash-{DateTime.UtcNow:yyyyMMdd-HHmmssfff}.log";
-                File.WriteAllText(Path.Combine(logDirectory, fileName), exception.ToString());
+                File.WriteAllText(
+                    Path.Combine(logDirectory, fileName),
+                    BuildPrivacySafeExceptionReport(exception));
             }
             catch
             {
                 // Crash reporting must never replace the original failure.
             }
+        }
+
+        private static string BuildPrivacySafeExceptionReport(Exception exception)
+        {
+            var report = new StringBuilder();
+            report.AppendLine(ProductInfo.DisplayName);
+            report.AppendLine(DateTimeOffset.Now.ToString("O"));
+            report.AppendLine("Local diagnostic log · no ROM bytes, ROM paths or telemetry");
+            int depth = 0;
+            for (Exception? current = exception; current is not null && depth < 8; current = current.InnerException, depth++)
+            {
+                report.AppendLine();
+                report.AppendLine($"Exception[{depth}] {current.GetType().FullName}");
+                report.AppendLine($"HResult      0x{current.HResult:X8}");
+                if (current.TargetSite is not null)
+                    report.AppendLine($"Target       {current.TargetSite.DeclaringType?.FullName}.{current.TargetSite.Name}");
+                string stack = new StackTrace(current, fNeedFileInfo: false).ToString();
+                if (!string.IsNullOrWhiteSpace(stack))
+                    report.Append(stack);
+            }
+            return report.ToString();
         }
     }
 }

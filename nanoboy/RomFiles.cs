@@ -20,7 +20,8 @@ namespace nanoboy
             {
                 string extension = Path.GetExtension(path);
                 return extension.Equals(".gb", StringComparison.OrdinalIgnoreCase) ||
-                    extension.Equals(".gbc", StringComparison.OrdinalIgnoreCase);
+                    extension.Equals(".gbc", StringComparison.OrdinalIgnoreCase) ||
+                    extension.Equals(".gba", StringComparison.OrdinalIgnoreCase);
             }
             catch (ArgumentException)
             {

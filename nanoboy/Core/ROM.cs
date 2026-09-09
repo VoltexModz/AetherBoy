@@ -105,7 +105,8 @@ namespace nanoboy.Core
                         ROMSize,
                         RAMSize,
                         batteryBacked,
-                        savePath);
+                        savePath,
+                        isMulticart: Mbc1MulticartDetector.LooksLikeMulticart(data.AsSpan(0, ROMSize)));
 
                 case Mbc.ROM_MBC2:
                 case Mbc.ROM_MBC2_BATT:

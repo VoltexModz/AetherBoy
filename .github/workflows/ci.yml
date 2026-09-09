@@ -41,10 +41,12 @@ jobs:
             nanoboy/packages.lock.json
             nanoboy/Core/packages.lock.json
             nanoboy/Runtime/packages.lock.json
+            third_party/GBADotnet.Core/packages.lock.json
             tests/AetherBoy.SmokeTests/packages.lock.json
             tests/AetherBoy.CoreTests/packages.lock.json
             tests/AetherBoy.RuntimeTests/packages.lock.json
             tools/AetherBoy.Conformance/packages.lock.json
+            tools/AetherBoy.GbaProbe/packages.lock.json
 
       - name: Restore locked dependencies
         run: dotnet restore .\nanoboy.sln --locked-mode --configfile .\NuGet.config
@@ -53,7 +55,7 @@ jobs:
         run: dotnet build .\nanoboy.sln --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Test
-        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 173
+        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 290
 
   portable:
     name: Linux / portable Core + Runtime
@@ -74,9 +76,11 @@ jobs:
           cache-dependency-path: |
             nanoboy/Core/packages.lock.json
             nanoboy/Runtime/packages.lock.json
+            third_party/GBADotnet.Core/packages.lock.json
             tests/AetherBoy.CoreTests/packages.lock.json
             tests/AetherBoy.RuntimeTests/packages.lock.json
             tools/AetherBoy.Conformance/packages.lock.json
+            tools/AetherBoy.GbaProbe/packages.lock.json
 
       - name: Restore Core tests
         run: dotnet restore ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --locked-mode --configfile ./NuGet.config
@@ -87,6 +91,9 @@ jobs:
       - name: Restore conformance tool
         run: dotnet restore ./tools/AetherBoy.Conformance/AetherBoy.Conformance.csproj --locked-mode --configfile ./NuGet.config
 
+      - name: Restore own GBA probe
+        run: dotnet restore ./tools/AetherBoy.GbaProbe/AetherBoy.GbaProbe.csproj --locked-mode --configfile ./NuGet.config
+
       - name: Build Core tests
         run: dotnet build ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
@@ -96,11 +103,17 @@ jobs:
       - name: Build conformance tool
         run: dotnet build ./tools/AetherBoy.Conformance/AetherBoy.Conformance.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
+      - name: Build own GBA probe
+        run: dotnet build ./tools/AetherBoy.GbaProbe/AetherBoy.GbaProbe.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+
       - name: Test Core
-        run: dotnet test --project ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 141
+        run: dotnet test --project ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 175
 
       - name: Test Runtime
-        run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 17
+        run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 87
 
       - name: Smoke-test conformance CLI
         run: dotnet run --project ./tools/AetherBoy.Conformance/AetherBoy.Conformance.csproj --configuration Release --no-build -- --help
+
+      - name: Execute own GBA ARM / Mode 3 probe
+        run: dotnet run --project ./tools/AetherBoy.GbaProbe/AetherBoy.GbaProbe.csproj --configuration Release --no-build --no-restore

@@ -15,14 +15,18 @@ namespace nanoboy
 
             InitializeComponent();
             Branding.AppBrand.ApplyIcon(this);
-            Text = $"GameShark-Cheats (experimentell) – {ProductInfo.DisplayName}";
             this.session = session;
+            Text = session.LatestSnapshot.Rom?.IsGameBoyAdvance == true
+                ? $"GBA Cheat Lab – {ProductInfo.DisplayName}"
+                : $"GameShark-Cheats (experimentell) – {ProductInfo.DisplayName}";
             RefreshCheatList();
             ConfigureAetherLayout();
             AetherDialog.Apply(
                 this,
                 "MEMORY PATCH BAY // 04",
-                "Experimentelle GameShark-RAM-Codes pro laufender Spielsitzung");
+                IsGba
+                    ? "Rohpatches, CodeBreaker und GameShark – sicher auf GBA-Arbeitsspeicher begrenzt"
+                    : "Experimentelle GameShark-RAM-Codes pro laufender Spielsitzung");
         }
 
         private void ConfigureAetherLayout()
@@ -45,7 +49,7 @@ namespace nanoboy
             txtName.Size = new System.Drawing.Size(310, 32);
 
             lblCode.Location = new System.Drawing.Point(354, 332);
-            lblCode.Text = "GAMESHARK CODE";
+            lblCode.Text = IsGba ? "GBA PATCH / CB / GS" : "GAMESHARK CODE";
             lblCode.Font = new System.Drawing.Font("Segoe UI", 7.5f, System.Drawing.FontStyle.Bold);
             txtCode.Location = new System.Drawing.Point(354, 354);
             txtCode.Size = new System.Drawing.Size(250, 32);
@@ -62,7 +66,9 @@ namespace nanoboy
 
             lblExperimentalInfo.Location = new System.Drawing.Point(24, 414);
             lblExperimentalInfo.Size = new System.Drawing.Size(520, 22);
-            lblExperimentalInfo.Text = "SUPPORTED FORMAT  //  01XXYYZZ  //  RAM WRITE";
+            lblExperimentalInfo.Text = IsGba
+                ? "RAW 02000000:FF  //  CB XXXXXXXX XXXX  //  GS XXXXXXXX XXXXXXXX"
+                : "SUPPORTED FORMAT  //  01XXYYZZ  //  RAM WRITE";
             lblExperimentalInfo.Font = new System.Drawing.Font("Segoe UI", 7.5f, System.Drawing.FontStyle.Bold);
 
             btnToggle.Location = new System.Drawing.Point(24, 456);
@@ -92,7 +98,7 @@ namespace nanoboy
                     cheat.Enabled ? "An" : "Aus",
                     cheat.Name,
                     cheat.Code,
-                    "GameShark"
+                    IsGba ? GetGbaCheatType(cheat.Code) : "GameShark"
                 });
                 item.Tag = cheat;
                 lstCheats.Items.Add(item);
@@ -110,10 +116,12 @@ namespace nanoboy
                 return;
             }
 
-            if (!IsSupportedGameSharkCode(code))
+            if (!IsGba && !IsSupportedGameSharkCode(code))
             {
                 AetherSignal.Show(this,
-                    "Unterstützt werden derzeit nur experimentelle GameShark-RAM-Codes im Format 01XXYYZZ.",
+                    IsGba
+                        ? "GBA-Codes verwenden ADDRESS:VALUE, CodeBreaker XXXXXXXX XXXX oder GameShark XXXXXXXX XXXXXXXX."
+                        : "Unterstützt werden derzeit nur experimentelle GameShark-RAM-Codes im Format 01XXYYZZ.",
                     "Nicht unterstützter Cheat-Code",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
@@ -138,14 +146,14 @@ namespace nanoboy
                 txtCode.Clear();
                 RefreshCheatList();
                 AetherSignal.Show(this,
-                    "Experimenteller GameShark-RAM-Code hinzugefügt.",
-                    "GameShark Cheat Manager",
+                    IsGba ? "GBA-Cheat hinzugefügt." : "Experimenteller GameShark-RAM-Code hinzugefügt.",
+                    IsGba ? "GBA Patch Manager" : "GameShark Cheat Manager",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
             }
-            catch (FormatException)
+            catch (FormatException ex)
             {
-                ShowCheatError("Der GameShark-Code konnte nicht hinzugefügt werden.");
+                ShowCheatError(IsGba ? ex.Message : "Der GameShark-Code konnte nicht hinzugefügt werden.");
             }
             catch (InvalidOperationException) when (!CanAcceptCommands())
             {
@@ -182,6 +190,19 @@ namespace nanoboy
 
             return true;
         }
+
+        private static string GetGbaCheatType(string code)
+        {
+            if (code.StartsWith("CB:", StringComparison.Ordinal))
+                return "CodeBreaker";
+            if (code.StartsWith("GS:", StringComparison.Ordinal))
+                return "GameShark v1/v2";
+            if (code.StartsWith("GSRAW:", StringComparison.Ordinal))
+                return "GameShark raw";
+            return "GBA RAM patch";
+        }
+
+        private bool IsGba => session.LatestSnapshot.Rom?.IsGameBoyAdvance == true;
 
         private async void btnRemove_Click(object sender, EventArgs e)
         {

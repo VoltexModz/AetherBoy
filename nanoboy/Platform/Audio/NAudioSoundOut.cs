@@ -57,11 +57,36 @@ namespace nanoboy.Platform.Audio
         private WaveOutEvent waveOut;
         private GameBoyWaveProvider wave;
         private int currentSampleRate;
+        private float volume;
         private bool disposed;
 
-        public NAudioSoundOut(int sampleRate)
+        public NAudioSoundOut(int sampleRate, float volume = 1f)
         {
+            this.volume = Math.Clamp(volume, 0f, 1f);
             Initialize(sampleRate);
+        }
+
+        public float Volume
+        {
+            get
+            {
+                lock (sync)
+                {
+                    return volume;
+                }
+            }
+            set
+            {
+                lock (sync)
+                {
+                    ObjectDisposedException.ThrowIf(disposed, this);
+                    volume = Math.Clamp(value, 0f, 1f);
+                    if (waveOut != null)
+                    {
+                        waveOut.Volume = volume;
+                    }
+                }
+            }
         }
 
         public void Submit(float[] buffer, int sampleRate)
@@ -102,7 +127,8 @@ namespace nanoboy.Platform.Audio
             waveOut = new WaveOutEvent
             {
                 DesiredLatency = 100,
-                NumberOfBuffers = 3
+                NumberOfBuffers = 3,
+                Volume = volume
             };
             waveOut.Init(wave);
             waveOut.Play();

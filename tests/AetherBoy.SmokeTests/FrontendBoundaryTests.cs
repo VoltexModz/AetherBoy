@@ -60,6 +60,8 @@ public sealed class FrontendBoundaryTests
             "menuSaveState",
             "menuSaveStateQuickSave",
             "menuSaveStateQuickLoad",
+            "menuBatterySaveSafety",
+            "menuControlCenter",
             "menuSaveSlot1",
             "menuSaveSlot2",
             "menuSaveSlot3",
@@ -100,6 +102,7 @@ public sealed class FrontendBoundaryTests
         Panel emptyState = GetRequiredField<Panel>(formType, form, "aetherEmptyState");
         Control stage = GetRequiredField<Control>(formType, form, "aetherStage");
         Button open = GetRequiredField<Button>(formType, form, "aetherOpenButton");
+        Button controlCenter = GetRequiredField<Button>(formType, form, "aetherControlCenterButton");
         Button pause = GetRequiredField<Button>(formType, form, "aetherPauseButton");
         Button rewind = GetRequiredField<Button>(formType, form, "aetherRewindButton");
         Button save = GetRequiredField<Button>(formType, form, "aetherSaveButton");
@@ -115,12 +118,89 @@ public sealed class FrontendBoundaryTests
         Assert.AreSame(stage, gameView.Parent);
         Assert.IsFalse(legacyMenu.Visible);
         Assert.IsTrue(open.Enabled);
+        Assert.IsTrue(controlCenter.Enabled);
         Assert.IsFalse(pause.Enabled);
         Assert.IsFalse(rewind.Enabled);
         Assert.IsFalse(save.Enabled);
         Assert.IsFalse(load.Enabled);
         Assert.IsFalse(turbo.Enabled);
         Assert.AreEqual(5, slots.Length);
+    }
+
+    [STATestMethod]
+    public void ControlCenter_ProvidesSevenNavigableLiveSections()
+    {
+        using var main = new frmNano();
+        main.Show();
+        try
+        {
+            MethodInfo open = typeof(frmNano).GetMethod(
+                "OpenControlCenter",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new AssertFailedException("Control Center entry point is missing.");
+            open.Invoke(main, null);
+            Application.DoEvents();
+
+            Form center = typeof(frmNano)
+                .GetField("controlCenter", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.GetValue(main) as Form
+                ?? throw new AssertFailedException("Control Center was not created.");
+            try
+            {
+                Assert.AreEqual(FormBorderStyle.None, center.FormBorderStyle);
+                Assert.AreEqual(1, center.Controls.Find("aetherDialogHeader", true).Length);
+                Assert.AreEqual(1, center.Controls.Find("controlCenterContentHost", true).Length);
+                Assert.AreEqual(1, center.Controls.Find("controlCenterNavigation", true).Length);
+
+                string[] pages =
+                {
+                    "Overview",
+                    "Display",
+                    "Audio",
+                    "Input",
+                    "Saves",
+                    "System",
+                    "Diagnostics"
+                };
+                foreach (string page in pages)
+                {
+                    Assert.AreEqual(
+                        1,
+                        center.Controls.Find("controlCenterPage" + page, true).Length,
+                        $"Missing Control Center page: {page}");
+                    Assert.AreEqual(
+                        1,
+                        center.Controls.Find("controlCenterNav" + page, true).Length,
+                        $"Missing Control Center navigation: {page}");
+                }
+
+                Button diagnosticsNav = center.Controls
+                    .Find("controlCenterNavDiagnostics", true)
+                    .Single() as Button
+                    ?? throw new AssertFailedException("Diagnostics navigation is missing.");
+                diagnosticsNav.PerformClick();
+                Application.DoEvents();
+                Control diagnosticsPage = center.Controls
+                    .Find("controlCenterPageDiagnostics", true)
+                    .Single();
+                RichTextBox diagnosticsText = center.Controls
+                    .Find("controlCenterDiagnosticsText", true)
+                    .Single() as RichTextBox
+                    ?? throw new AssertFailedException("Diagnostics text is missing.");
+                Assert.IsTrue(diagnosticsPage.Visible);
+                StringAssert.Contains(diagnosticsText.Text, "AETHERBOY");
+                StringAssert.Contains(diagnosticsText.Text, "CARTRIDGE");
+
+            }
+            finally
+            {
+                center.Close();
+            }
+        }
+        finally
+        {
+            main.Close();
+        }
     }
 
     [STATestMethod]
@@ -136,6 +216,12 @@ public sealed class FrontendBoundaryTests
         object?[] validArguments = { validData, null };
         Assert.AreEqual(true, method.Invoke(null, validArguments));
         Assert.AreEqual(@"C:\roms\demo.GBC", validArguments[1]);
+
+        var gbaData = new DataObject();
+        gbaData.SetData(DataFormats.FileDrop, new[] { @"C:\roms\demo.GBA" });
+        object?[] gbaArguments = { gbaData, null };
+        Assert.AreEqual(true, method.Invoke(null, gbaArguments));
+        Assert.AreEqual(@"C:\roms\demo.GBA", gbaArguments[1]);
 
         var invalidData = new DataObject();
         invalidData.SetData(DataFormats.FileDrop, new[] { @"C:\roms\notes.txt" });
@@ -156,6 +242,10 @@ public sealed class FrontendBoundaryTests
         object?[] startupArguments = { new[] { @"C:\roms\demo.gb" }, null };
         Assert.AreEqual(true, startupMethod.Invoke(null, startupArguments));
         Assert.AreEqual(Path.GetFullPath(@"C:\roms\demo.gb"), startupArguments[1]);
+
+        object?[] gbaStartupArguments = { new[] { @"C:\roms\demo.gba" }, null };
+        Assert.AreEqual(true, startupMethod.Invoke(null, gbaStartupArguments));
+        Assert.AreEqual(Path.GetFullPath(@"C:\roms\demo.gba"), gbaStartupArguments[1]);
 
         object?[] invalidStartupArguments = { new[] { @"C:\roms\demo.zip" }, null };
         Assert.AreEqual(false, startupMethod.Invoke(null, invalidStartupArguments));
@@ -244,6 +334,48 @@ public sealed class FrontendBoundaryTests
         finally
         {
             File.Delete(availableRom);
+        }
+    }
+
+    [STATestMethod]
+    public void SaveSafetyCenter_ListsCurrentSaveAndThreeBackups()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            $"aetherboy-save-safety-{Guid.NewGuid():N}");
+        string savePath = Path.Combine(directory, "game.sav");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            File.WriteAllBytes(savePath, new byte[32]);
+            File.WriteAllBytes(savePath + ".bak1", new byte[32]);
+
+            Type formType = typeof(frmNano).Assembly.GetType("nanoboy.frmBatterySaveManager")
+                ?? throw new AssertFailedException("Save Safety Center type is missing.");
+            using var form = Activator.CreateInstance(
+                formType,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                args: new object[] { savePath, 32, "TEST GAME" },
+                culture: null) as Form
+                ?? throw new AssertFailedException("Save Safety Center could not be created.");
+            ListView list = form.Controls.Find("batterySaveGenerationList", true).Single() as ListView
+                ?? throw new AssertFailedException("Save generation list is missing.");
+            Button restore = form.Controls.Find("batterySaveRestoreButton", true).Single() as Button
+                ?? throw new AssertFailedException("Save restore button is missing.");
+
+            Assert.AreEqual(FormBorderStyle.None, form.FormBorderStyle);
+            Assert.AreEqual(1, form.Controls.Find("aetherDialogHeader", true).Length);
+            Assert.AreEqual(4, list.Items.Count);
+            Assert.AreEqual("BEREIT", list.Items[0].SubItems[1].Text);
+            Assert.AreEqual("LEGACY", list.Items[0].SubItems[4].Text);
+            Assert.AreEqual("BEREIT", list.Items[1].SubItems[1].Text);
+            Assert.AreEqual("NICHT VORHANDEN", list.Items[3].SubItems[1].Text);
+            Assert.IsFalse(restore.Enabled, "Restore stays gated until a backup is selected in the shown dialog.");
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
         }
     }
 

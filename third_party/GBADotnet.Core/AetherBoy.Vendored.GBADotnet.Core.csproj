@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>AetherBoy.Vendored.GBADotnet.Core</AssemblyName>
+    <RootNamespace>GameboyAdvanced.Core</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Description>MIT-licensed GBADotnet core vendored for the AetherBoy GBA backend.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AetherBoy.RuntimeTests" />
+  </ItemGroup>
+</Project>

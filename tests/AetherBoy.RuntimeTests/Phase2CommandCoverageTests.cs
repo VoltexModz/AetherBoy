@@ -126,6 +126,7 @@ public sealed class Phase2CommandCoverageTests
             Assert.IsTrue(snapshot.EmulatedFrameCount >= 1);
             Assert.IsTrue(snapshot.HasVideoFrame);
             Assert.AreEqual("AETHERBOY RT", snapshot.Rom?.Title);
+            Assert.AreEqual(64, snapshot.Rom?.RomSha256.Length);
 
             var frame = new int[EmulationSnapshot.FramePixelCount];
             long frameSequence = 0;
@@ -154,6 +155,56 @@ public sealed class Phase2CommandCoverageTests
             {
                 Directory.Delete(temporaryDirectory, recursive: false);
             }
+        }
+    }
+
+    [TestMethod]
+    public void ProductionMachine_FlushesDirtyBatteryRamAtConfiguredFrameBoundary()
+    {
+        string temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"AetherBoy.RuntimeBatteryTests-{Guid.NewGuid():N}");
+        string romPath = Path.Combine(temporaryDirectory, "generated-battery.gb");
+        string savePath = Path.Combine(temporaryDirectory, "generated-battery.sav");
+
+        Directory.CreateDirectory(temporaryDirectory);
+        try
+        {
+            File.WriteAllBytes(romPath, CreateBatteryRamRom());
+            var configuration = new EmulatorConfiguration(
+                Frameskip: 0,
+                AudioEnabled: false,
+                Channel1Enabled: false,
+                Channel2Enabled: false,
+                Channel3Enabled: false,
+                Channel4Enabled: false,
+                SampleRate: 44_100);
+            using var machine = new ProductionMachine(
+                romPath,
+                savePath,
+                bootRom: null,
+                configuration,
+                paletteIndex: 0,
+                persistentFlushIntervalFrames: 1);
+
+            machine.RunFrame();
+
+            Assert.IsTrue(File.Exists(savePath));
+            Assert.AreEqual(0x2000, new FileInfo(savePath).Length);
+            Assert.AreEqual(0x42, File.ReadAllBytes(savePath)[0]);
+            Assert.IsTrue(File.Exists(savePath + ".guard"));
+            EmulationSnapshot snapshot = machine.CaptureSnapshot(
+                SessionState.Running,
+                isPaused: false,
+                isTurboEnabled: false,
+                emulatedFrameCount: 1,
+                videoFrameSequence: 0);
+            Assert.IsTrue(snapshot.Rom?.BatterySave.IsEnabled);
+            Assert.AreEqual(0x2000, snapshot.Rom?.BatterySave.ExpectedLength);
+        }
+        finally
+        {
+            Directory.Delete(temporaryDirectory, recursive: true);
         }
     }
 
@@ -188,6 +239,27 @@ public sealed class Phase2CommandCoverageTests
         rom[0x0156] = 0x01;
         rom[0x0157] = 0x80;
         rom[0x0158] = 0x76; // HALT
+
+        ushort globalChecksum = ComputeGlobalChecksum(rom);
+        rom[0x014E] = (byte)(globalChecksum >> 8);
+        rom[0x014F] = (byte)globalChecksum;
+        return rom;
+    }
+
+    private static byte[] CreateBatteryRamRom()
+    {
+        byte[] rom = CreateVideoRom();
+        rom[0x0147] = (byte)Mbc.ROM_RAM_BATT;
+        rom[0x0149] = 0x02; // 8 KiB cartridge RAM
+        rom[0x014D] = ComputeHeaderChecksum(rom);
+
+        rom[0x0150] = 0x3E; // LD A,$42
+        rom[0x0151] = 0x42;
+        rom[0x0152] = 0xEA; // LD ($A000),A
+        rom[0x0153] = 0x00;
+        rom[0x0154] = 0xA0;
+        rom[0x0155] = 0x76; // HALT
+        Array.Clear(rom, 0x0156, 3);
 
         ushort globalChecksum = ComputeGlobalChecksum(rom);
         rom[0x014E] = (byte)(globalChecksum >> 8);

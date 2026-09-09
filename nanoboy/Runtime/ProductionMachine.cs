@@ -35,6 +35,8 @@ namespace AetherBoy.Runtime
 
     internal sealed class ProductionMachine : IEmulationMachine
     {
+        private const int PersistentFlushIntervalFrames = 1_800;
+
         private sealed record ManagedCheat(Guid Id, CheatItem Item);
 
         private readonly Nanoboy emulator;
@@ -42,6 +44,8 @@ namespace AetherBoy.Runtime
         private readonly List<ManagedCheat> cheats = new();
         private readonly RewindManager rewindManager = new();
         private readonly RomSnapshot romSnapshot;
+        private readonly int persistentFlushIntervalFrames;
+        private int framesSincePersistentFlush;
         private bool disposed;
 
         public ProductionMachine(
@@ -49,8 +53,15 @@ namespace AetherBoy.Runtime
             string savePath,
             byte[]? bootRom,
             EmulatorConfiguration configuration,
-            int paletteIndex)
+            int paletteIndex,
+            int persistentFlushIntervalFrames = PersistentFlushIntervalFrames)
         {
+            if (persistentFlushIntervalFrames <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(persistentFlushIntervalFrames));
+            }
+
+            this.persistentFlushIntervalFrames = persistentFlushIntervalFrames;
             ROM rom = new(romPath, savePath);
             Nanoboy? createdEmulator = null;
             try
@@ -67,6 +78,7 @@ namespace AetherBoy.Runtime
                 throw;
             }
 
+            BatterySaveLoadStatus batterySave = rom.MBC.BatterySaveStatus;
             romSnapshot = new RomSnapshot(
                 (rom.Title ?? string.Empty).TrimEnd('\0', ' '),
                 rom.CartridgeType.ToString(),
@@ -74,11 +86,19 @@ namespace AetherBoy.Runtime
                 rom.RAMSize,
                 rom.HasColorFeatures,
                 rom.HasSGBFeatures,
-                rom.Japanese);
+                rom.Japanese,
+                rom.RomSha256,
+                new BatterySaveSnapshot(
+                    batterySave.IsEnabled,
+                    batterySave.ExpectedLength,
+                    (int)batterySave.LoadedFrom,
+                    batterySave.InvalidPrimaryDetected));
             rewindManager.Initialize(emulator);
         }
 
         public event EventHandler<AudioSamplesAvailableEventArgs>? AudioSamplesAvailable;
+
+        public EmulationFeature Features => EmulationFeature.GameBoyStandard;
 
         public void RunFrame()
         {
@@ -86,6 +106,13 @@ namespace AetherBoy.Runtime
             emulator.Frame();
             cheatEngine.ApplyCheats(emulator.Memory);
             rewindManager.CaptureFrame(emulator);
+
+            framesSincePersistentFlush++;
+            if (framesSincePersistentFlush >= persistentFlushIntervalFrames)
+            {
+                emulator.Memory.ROM.MBC.FlushPersistentState();
+                framesSincePersistentFlush = 0;
+            }
         }
 
         public void SetButtons(GameBoyButtons pressedButtons)
@@ -203,7 +230,8 @@ namespace AetherBoy.Runtime
                 videoFrameSequence,
                 romSnapshot,
                 CaptureAudioSnapshot(),
-                cheatSnapshots);
+                cheatSnapshots,
+                features: Features);
         }
 
         public void Dispose()

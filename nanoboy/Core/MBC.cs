@@ -6,6 +6,7 @@ namespace nanoboy.Core
     public interface ICartridgeMapper : IMemoryDevice, IDisposable
     {
         Mbc CartridgeType { get; }
+        BatterySaveLoadStatus BatterySaveStatus { get; }
         CartridgeMapperState CaptureState();
         void ValidateState(CartridgeMapperState state);
         void RestoreState(CartridgeMapperState state);
@@ -57,13 +58,18 @@ namespace nanoboy.Core
                 ? saveFile
                 : null;
 
-            if (data.Length > 0 && this.saveFile != null && File.Exists(this.saveFile)) {
-                byte[] savedData = File.ReadAllBytes(this.saveFile);
-                Array.Copy(savedData, data, Math.Min(savedData.Length, data.Length));
+            if (data.Length > 0 && this.saveFile != null) {
+                BatterySaveStore.LoadResult load = BatterySaveStore.Load(this.saveFile, data.Length);
+                Array.Copy(load.Data, data, data.Length);
+                LoadStatus = load.Status;
+                dirty = load.Status.RecoveredFromBackup;
+            } else {
+                LoadStatus = BatterySaveLoadStatus.Disabled(data.Length);
             }
         }
 
         public int Length => data.Length;
+        public BatterySaveLoadStatus LoadStatus { get; }
 
         public byte Read(int index)
         {
@@ -111,14 +117,7 @@ namespace nanoboy.Core
                 return;
             }
 
-            string directory = Path.GetDirectoryName(saveFile);
-            if (!string.IsNullOrEmpty(directory)) {
-                Directory.CreateDirectory(directory);
-            }
-
-            string temporaryFile = saveFile + ".tmp";
-            File.WriteAllBytes(temporaryFile, data);
-            File.Move(temporaryFile, saveFile, true);
+            BatterySaveStore.Write(saveFile, data);
             dirty = false;
         }
 
@@ -174,6 +173,7 @@ namespace nanoboy.Core
         protected int RomBankCount => Rom.Length / RomBankSize;
 
         public Mbc CartridgeType { get; }
+        public BatterySaveLoadStatus BatterySaveStatus => Ram.LoadStatus;
 
         public abstract byte ReadByte(int address);
         public abstract void WriteByte(int address, byte value);
@@ -303,16 +303,29 @@ namespace nanoboy.Core
             int romSize,
             int ramSize,
             bool batteryBacked,
-            string? saveFile)
+            string? saveFile,
+            bool isMulticart = false)
             : base(romData, cartridgeType, romSize, ramSize, batteryBacked, saveFile)
         {
+            IsMulticart = isMulticart;
         }
+
+        public bool IsMulticart { get; }
+        private int BankGroupBase => bankHigh << (IsMulticart ? 4 : 5);
+        private int SwitchableRomBank => BankGroupBase | (romBankLow & (IsMulticart ? 0x0F : 0x1F));
 
         public int CurrentROMBank
         {
-            get => (bankHigh << 5) | romBankLow;
+            get => SwitchableRomBank;
             set
             {
+                if (IsMulticart) {
+                    romBankLow = value & 0x0F;
+                    // Raw 0x10 selects the zero sub-bank without triggering 0 -> 1.
+                    if (romBankLow == 0) romBankLow = 0x10;
+                    bankHigh = (value >> 4) & 0x03;
+                    return;
+                }
                 romBankLow = value & 0x1F;
                 if (romBankLow == 0) {
                     romBankLow = 1;
@@ -343,11 +356,11 @@ namespace nanoboy.Core
         {
             EnsureCartridgeAddress(address);
             if (address <= 0x3FFF) {
-                int bank = mode == 1 ? bankHigh << 5 : 0;
+                int bank = mode == 1 ? BankGroupBase : 0;
                 return ReadRom(bank, address);
             }
             if (address <= 0x7FFF) {
-                return ReadRom((bankHigh << 5) | romBankLow, address - 0x4000);
+                return ReadRom(SwitchableRomBank, address - 0x4000);
             }
             if (!ramEnabled) {
                 return 0xFF;
@@ -380,17 +393,20 @@ namespace nanoboy.Core
         public override CartridgeMapperState CaptureState() =>
             new CartridgeMapperState(
                 CartridgeType,
-                new[] { (byte)romBankLow, (byte)bankHigh, (byte)mode, ramEnabled ? (byte)1 : (byte)0 },
+                IsMulticart
+                    ? new[] { (byte)romBankLow, (byte)bankHigh, (byte)mode, ramEnabled ? (byte)1 : (byte)0, (byte)1 }
+                    : new[] { (byte)romBankLow, (byte)bankHigh, (byte)mode, ramEnabled ? (byte)1 : (byte)0 },
                 Ram.Capture());
 
         public override void ValidateState(CartridgeMapperState state)
         {
-            ValidateState(state, CartridgeType, 4, Ram.Length);
+            ValidateState(state, CartridgeType, IsMulticart ? 5 : 4, Ram.Length);
             byte[] registers = state.CopyRegisters();
             if (registers[0] < 1 || registers[0] > 0x1F ||
                 registers[1] > 0x03 ||
                 registers[2] > 1 ||
-                registers[3] > 1) {
+                registers[3] > 1 ||
+                (IsMulticart && registers[4] != 1)) {
                 throw new InvalidDataException("MBC1 state contains invalid register values.");
             }
         }

@@ -35,12 +35,15 @@ namespace nanoboy
         private Label aetherFrameValue = null!;
         private Label aetherAudioValue = null!;
         private Label aetherFilterValue = null!;
+        private Label aetherInputValue = null!;
         private Label aetherSlotValue = null!;
         private AetherButton aetherOpenButton = null!;
+        private AetherButton aetherControlCenterButton = null!;
         private AetherButton aetherPauseButton = null!;
         private AetherButton aetherRewindButton = null!;
         private AetherButton aetherSaveButton = null!;
         private AetherButton aetherLoadButton = null!;
+        private AetherButton aetherSaveSafetyButton = null!;
         private AetherButton aetherTurboButton = null!;
         private AetherButton aetherMaximizeButton = null!;
         private AetherButton[] aetherSlotButtons = Array.Empty<AetherButton>();
@@ -312,12 +315,13 @@ namespace nanoboy
                 BackColor = AetherColors.Surface,
                 ColumnCount = 1,
                 Dock = DockStyle.Fill,
-                RowCount = 14
+                RowCount = 15
             };
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 12f));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
@@ -349,8 +353,10 @@ namespace nanoboy
             layout.Controls.Add(CreateMetricRow("FRAME", out aetherFrameValue), 0, 6);
             layout.Controls.Add(CreateMetricRow("AUDIO", out aetherAudioValue), 0, 7);
             layout.Controls.Add(CreateMetricRow("FILTER", out aetherFilterValue), 0, 8);
-            layout.Controls.Add(CreateMetricRow("SLOT", out aetherSlotValue), 0, 9);
-            layout.Controls.Add(CreateUiLabel("STATE BANK", 7.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 30), 0, 10);
+            layout.Controls.Add(CreateMetricRow("INPUT", out aetherInputValue), 0, 9);
+            aetherInputValue.AutoEllipsis = true;
+            layout.Controls.Add(CreateMetricRow("SLOT", out aetherSlotValue), 0, 10);
+            layout.Controls.Add(CreateUiLabel("STATE BANK", 7.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 30), 0, 11);
 
             var slots = new FlowLayoutPanel
             {
@@ -376,7 +382,16 @@ namespace nanoboy
                 aetherSlotButtons[slot - 1] = button;
                 slots.Controls.Add(button);
             }
-            layout.Controls.Add(slots, 0, 12);
+            layout.Controls.Add(slots, 0, 13);
+
+            aetherSaveSafetyButton = CreateActionButton(
+                "SAVE SAFETY CENTER",
+                AetherButtonKind.Ghost,
+                190);
+            aetherSaveSafetyButton.Dock = DockStyle.Bottom;
+            aetherSaveSafetyButton.Margin = Padding.Empty;
+            aetherSaveSafetyButton.Click += (_, args) => menuBatterySaveSafety_Click(aetherSaveSafetyButton, args);
+            layout.Controls.Add(aetherSaveSafetyButton, 0, 12);
 
             var hint = CreateUiLabel(
                 "SPACE HOLD · TURBO\r\nF5 SAVE · F8 LOAD",
@@ -386,7 +401,7 @@ namespace nanoboy
                 DockStyle.Fill,
                 40,
                 ContentAlignment.BottomLeft);
-            layout.Controls.Add(hint, 0, 13);
+            layout.Controls.Add(hint, 0, 14);
             rail.Controls.Add(layout);
             return rail;
         }
@@ -410,6 +425,8 @@ namespace nanoboy
 
             AetherButton open = CreateActionButton("OPEN ROM", AetherButtonKind.Primary, 126);
             open.Click += (_, _) => OpenRomFromAetherUi();
+            aetherControlCenterButton = CreateActionButton("CONTROL", AetherButtonKind.Secondary, 94);
+            aetherControlCenterButton.Click += (_, _) => OpenControlCenter();
             aetherPauseButton = CreateActionButton("PAUSE", AetherButtonKind.Secondary, 92);
             aetherPauseButton.Click += aetherPauseButton_Click;
             aetherRewindButton = CreateActionButton("REWIND", AetherButtonKind.Secondary, 94);
@@ -434,6 +451,7 @@ namespace nanoboy
             aetherTurboButton.Click += aetherTurboButton_Click;
 
             commands.Controls.Add(open);
+            commands.Controls.Add(aetherControlCenterButton);
             commands.Controls.Add(aetherPauseButton);
             commands.Controls.Add(aetherRewindButton);
             commands.Controls.Add(aetherSaveButton);
@@ -520,6 +538,18 @@ namespace nanoboy
             };
         }
 
+        private void UpdateAetherGamepadUi(Input.HostGamepadState state)
+        {
+            if (!aetherShellInitialized || aetherInputValue == null)
+            {
+                return;
+            }
+
+            aetherInputValue.Text = state.IsConnected
+                ? state.DeviceName?.ToUpperInvariant() ?? "GAMEPAD"
+                : "KEYBOARD";
+        }
+
         private void OpenRomFromAetherUi()
         {
             menuOpen_Click(this, EventArgs.Empty);
@@ -573,9 +603,13 @@ namespace nanoboy
                 : hasSession ? "READING HEADER" : "NO CARTRIDGE";
             aetherModelValue.Text = snapshot?.Rom == null
                 ? "—"
-                : snapshot.Rom.HasColorFeatures ? "CGB" : "DMG";
+                : snapshot.Rom.IsGameBoyAdvance
+                    ? "GBA"
+                    : snapshot.Rom.HasColorFeatures ? "CGB" : "DMG";
             aetherFrameValue.Text = snapshot == null ? "—" : snapshot.EmulatedFrameCount.ToString("N0");
-            aetherAudioValue.Text = settings.AudioEnable ? "ON · 44.1K" : "MUTED";
+            aetherAudioValue.Text = settings.AudioEnable
+                ? snapshot?.Rom?.IsGameBoyAdvance == true ? "ON · 65.5K" : "ON · 44.1K"
+                : "MUTED";
             aetherFilterValue.Text = gameView.Filter switch
             {
                 GameDisplayFilter.Smooth => "SMOOTH",
@@ -614,10 +648,30 @@ namespace nanoboy
 
             bool actionsEnabled = hasSession && state is not SessionState.Stopping and not SessionState.Stopped and not SessionState.Faulted;
             aetherPauseButton.Enabled = actionsEnabled;
-            aetherRewindButton.Enabled = actionsEnabled && !stateOperationInProgress;
-            aetherSaveButton.Enabled = actionsEnabled && !stateOperationInProgress;
-            aetherLoadButton.Enabled = actionsEnabled && !stateOperationInProgress;
+            EmulationFeature features = snapshot?.Rom is null
+                ? EmulationFeature.GameBoyStandard
+                : snapshot.Features;
+            bool supportsSaveStates = (features & EmulationFeature.SaveStates) != 0;
+            bool supportsRewind = (features & EmulationFeature.Rewind) != 0;
+            aetherRewindButton.Enabled = actionsEnabled && supportsRewind && !stateOperationInProgress;
+            aetherSaveButton.Enabled = actionsEnabled && supportsSaveStates && !stateOperationInProgress;
+            aetherLoadButton.Enabled = actionsEnabled && supportsSaveStates && !stateOperationInProgress;
+            aetherSaveSafetyButton.Enabled = actionsEnabled &&
+                snapshot?.Rom?.BatterySave.IsEnabled == true &&
+                snapshot.Rom.BatterySave.ExpectedLength > 0 &&
+                !stateOperationInProgress;
             aetherTurboButton.Enabled = actionsEnabled;
+            menuSaveState.Enabled = supportsSaveStates;
+            menuRewind.Enabled = supportsRewind;
+            menuCheats.Enabled = (features & EmulationFeature.Cheats) != 0;
+            menuPalette.Enabled = (features & EmulationFeature.MonochromePalettes) != 0;
+            bool supportsAudioChannels = (features & EmulationFeature.AudioChannelControls) != 0;
+            menuAudioC1.Enabled = supportsAudioChannels;
+            menuAudioC2.Enabled = supportsAudioChannels;
+            menuAudioC3.Enabled = supportsAudioChannels;
+            menuAudioC4.Enabled = supportsAudioChannels;
+            menuItem5.Enabled = supportsAudioChannels;
+            menuAudioInspector.Enabled = (features & EmulationFeature.AudioInspector) != 0;
             aetherPauseButton.Text = snapshot?.IsPaused == true ? "RESUME" : "PAUSE";
             aetherPauseButton.Selected = snapshot?.IsPaused == true;
             aetherTurboButton.Selected = snapshot?.IsTurboEnabled == true;
@@ -702,11 +756,11 @@ namespace nanoboy
             }
         }
 
-        private static Size GetAetherClientSize(int scale)
+        private Size GetAetherClientSize(int scale)
         {
             int normalizedScale = Math.Clamp(scale, 1, 4);
-            int displayWidth = GameDisplayControl.FrameWidth * normalizedScale;
-            int displayHeight = GameDisplayControl.FrameHeight * normalizedScale;
+            int displayWidth = gameView.VideoGeometry.Width * normalizedScale;
+            int displayHeight = gameView.VideoGeometry.Height * normalizedScale;
             return new Size(
                 Math.Max(860, displayWidth + 330),
                 Math.Max(620, displayHeight + 202));

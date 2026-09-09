@@ -214,5 +214,185 @@ namespace nanoboy.Properties {
                 this["SampleRate"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Q")]
+        public global::System.Windows.Forms.Keys KeyL {
+            get {
+                return ((global::System.Windows.Forms.Keys)(this["KeyL"]));
+            }
+            set {
+                this["KeyL"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("E")]
+        public global::System.Windows.Forms.Keys KeyR {
+            get {
+                return ((global::System.Windows.Forms.Keys)(this["KeyR"]));
+            }
+            set {
+                this["KeyR"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1024")]
+        public int GamepadAButton {
+            get {
+                return ((int)(this["GamepadAButton"]));
+            }
+            set {
+                this["GamepadAButton"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("6144")]
+        public int GamepadBButton {
+            get {
+                return ((int)(this["GamepadBButton"]));
+            }
+            set {
+                this["GamepadBButton"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("16")]
+        public int GamepadStartButton {
+            get {
+                return ((int)(this["GamepadStartButton"]));
+            }
+            set {
+                this["GamepadStartButton"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("32")]
+        public int GamepadSelectButton {
+            get {
+                return ((int)(this["GamepadSelectButton"]));
+            }
+            set {
+                this["GamepadSelectButton"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("256")]
+        public int GamepadLButton {
+            get {
+                return ((int)(this["GamepadLButton"]));
+            }
+            set {
+                this["GamepadLButton"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("512")]
+        public int GamepadRButton {
+            get {
+                return ((int)(this["GamepadRButton"]));
+            }
+            set {
+                this["GamepadRButton"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("256")]
+        public int GamepadQuickLoadButton {
+            get {
+                return ((int)(this["GamepadQuickLoadButton"]));
+            }
+            set {
+                this["GamepadQuickLoadButton"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("512")]
+        public int GamepadQuickSaveButton {
+            get {
+                return ((int)(this["GamepadQuickSaveButton"]));
+            }
+            set {
+                this["GamepadQuickSaveButton"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int PaletteIndex {
+            get {
+                return ((int)(this["PaletteIndex"]));
+            }
+            set {
+                this["PaletteIndex"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int DisplayFilterIndex {
+            get {
+                return ((int)(this["DisplayFilterIndex"]));
+            }
+            set {
+                this["DisplayFilterIndex"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1")]
+        public int SaveSlot {
+            get {
+                return ((int)(this["SaveSlot"]));
+            }
+            set {
+                this["SaveSlot"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool BootRomEnable {
+            get {
+                return ((bool)(this["BootRomEnable"]));
+            }
+            set {
+                this["BootRomEnable"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        public int AudioVolume {
+            get {
+                return ((int)(this["AudioVolume"]));
+            }
+            set {
+                this["AudioVolume"] = value;
+            }
+        }
     }
 }

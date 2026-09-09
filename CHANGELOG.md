@@ -2,6 +2,120 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## Unveröffentlicht – Integriertes GBA-Backend
+
+- DaveTCode/GBADotnet am exakten Commit
+  `994c4b225c6e4277ada8d37bb9283f53827ee3e1` geprüft und dessen MIT-lizenzierten
+  C#-Kern samt vorerzeugter Decoder als nachvollziehbaren Source-Snapshot unter
+  `third_party/GBADotnet.Core` aufgenommen. ROMs, BIOS, Oberflächen und
+  Kompatibilitätsbilder wurden nicht übernommen.
+- `GbaProductionMachine` verbindet ARM/Thumb, Bus, Scheduler, PPU, PSG plus
+  Direct Sound, Keypad und SRAM/Flash/EEPROM/RTC mit AetherBoys Owner-Thread, dynamischem
+  240×160-Frame-Austausch, Audioausgabe und geschützter Batterie-Speicherung.
+- `.gba` im Cartridge Vault, Drag-and-drop, Recent Files und Kommandozeilenstart
+  freigeschaltet; Status, ROM-Info und Control Center zeigen das Modell als GBA.
+  DMG/CGB-Boot-ROMs werden für diesen Pfad nicht geladen.
+- GBA L/R separat vom unveränderten GB-Tastenbyte ergänzt. Q/E sowie LB/RB sind
+  sichere Defaults, Tastatur und Gamepad lassen sich jetzt in der Input Matrix
+  neu belegen; LT/RT bleiben als zusätzlicher Controller-Fallback aktiv.
+- Einen eigenen, versionierten und Brotli-komprimierten GBA-Zustandsvertrag für
+  CPU/Pipeline, Scheduler, Bus, RAM, PPU, APU, DMA, Timer, IRQ, Eingabe,
+  Cartridge-Controller und Bildzustand ergänzt. SHA-256 schützt die Datei und
+  bindet sie an exakte ROM und BIOS. Fünf Quick-Save-Slots, F5/F8 und Rewind
+  sind im normalen Fenster freigeschaltet.
+- Frameskip für GBA an die reine Bildpräsentation angebunden; Hardwarezeit und
+  Rewind-Aufzeichnung laufen auch bei ausgelassenen Bildern vollständig weiter.
+- Optionales, vom Nutzer bereitgestelltes `gba_bios.bin` mit strikter
+  16-KiB-Prüfung ergänzt. Ohne Datei übernimmt ein eigener HLE-BIOS-Fallback
+  Reset/Wait/Halt, Mathematik, CpuSet/CpuFastSet, affine Matrizen und die
+  dokumentierten BitPack-, LZ77-, Huffman-, RLE- und Differential-Decoder;
+  keine proprietäre Firmware wird mitgeliefert.
+- Kern- und UI-Funktionen über zentral veröffentlichte Capability-Metadaten
+  geschaltet und den statischen DMA-Pipelinezustand pro Emulatorinstanz isoliert.
+- Den importierten Kern zur gepflegten AetherBoy-Basis weiterentwickelt: vollständige
+  GBA-Headerfeldbreiten, allokationsfreie SDK-Save-Marker-Erkennung inklusive
+  `SRAM_F`, stabilere Flash-Befehlsfolgen und korrektes 128-KiB-Banking ergänzt.
+  EEPROM-Daten laufen nun in Hardware-Bitreihenfolge und können Nullbits korrekt
+  überschreiben; ungültige ARM-/Thumb- und Coprozessorbefehle nehmen den
+  Undefined-Instruction-Vektor, statt den Emulatorprozess zu beenden.
+- Alle vier GBA-PSG-Kanäle mit Frame-Sequencer, Länge, Hüllkurve, Pulse-Sweep,
+  Wave-RAM und Noise-LFSR implementiert und mit Direct Sound stereo gemischt.
+  Die vorhandenen Kanal-Schalter und der Audio Inspector gelten nun auch für GBA;
+  ein Wave-DAC-DC-Offset sowie FIFO-Nachfüllung nach Teilverbrauch wurden korrigiert.
+- GPIO-RTC mit serieller Bitfolge, BCD-Datum/-Zeit, 12/24-Stundenmodus,
+  Save-State-Transienten und eigener atomarer `.sav.rtc`-Persistenz samt Backups
+  ergänzt. Der Cartridge-Status weist RTC und den aktiven BIOS-Modus aus.
+- GBA-Serial von sofortigem Fake-IRQ auf zeitgesteuerte 8-/32-Bit-Transfers,
+  Multiplayer-/UART-/Joybus-Register, IRQ und Save-State-Fortsetzung umgestellt.
+  Ohne Gegenstelle liefert der interne Clockpfad deterministisch High-Bits. Eine
+  lokale Zwei-Core-Kopplung tauscht 8-/32-Bit-Daten nun reproduzierbar mit
+  internem oder externem Clock-Peer; App-Host und Netzwerk bleiben separat offen.
+- GBA-Cheats um gängige CodeBreaker-Direkt-/Logik-/Bedingungscodes sowie rohe
+  und verschlüsselte GameShark-v1/v2-RAM-Writes erweitert. Die Engine begrenzt
+  auch dekodierte Ziele strikt auf EWRAM/IWRAM; Action Replay/PAR v3 und
+  komplexe Hook-/Fill-/List-Codes werden nicht vorgetäuscht.
+  Mosaic für Text-, Affine-, Bitmap- und OBJ-Pfade sowie
+  mehrere Sprite-/Reset-Randfälle ergänzt.
+- Begrenzten lokalen GBA-Diagnosepuffer für HLE-BIOS-Aufrufe, unbekannte
+  ARM-/Thumb-Pfade, unmapped I/O und Link-Matches ergänzt. Er speichert keine
+  ROM-Bytes, Schreibwerte oder Dateipfade und sendet keine Telemetrie. Auch
+  Session-/UI-Abstürze erhalten ein lokales, pfadminimiertes Protokoll.
+- Das interne GBA-Kernzustandsschema wegen der neuen Serial-Transienten auf 5
+  angehoben. Ältere experimentelle GBA-Save-States werden klar abgelehnt.
+- ARM7-SBC-Borrow, DMA-Adressmaskierung, STOP-Taktstillstand, Serial-Reset und
+  das gespiegelte interne WRAM-Control-Register gehärtet. Der vollständige
+  GBA-Zustand enthält die neuen APU-, RTC- und Serial-Transienten.
+- Den PPU-Pfad weiter präzisiert: deaktivierte OBJ-Windows maskieren keine
+  Sprites mehr, halbtransparente OBJ erzwingen Alpha-Blending gegen ein
+  freigegebenes zweites Ziel, Bitmap-VRAM-Lücken liefern Open Bus und
+  Farboperationen verändern nicht länger den deckenden Framebuffer-Alpha-Kanal.
+- Bus und Taktmodell an weiteren Hardwaregrenzen gehärtet: korrekte Open-Bus-
+  Lanes für unbenutztes MMIO, lesbares WAITCNT-High-Byte, Prefetch-Neustart bei
+  WAITCNT-Schreibzugriffen, nichtsequenzieller Zugriff an 128-KiB-ROM-Grenzen,
+  EWRAM-Abschaltung sowie fortgeschriebene PPU-Zeilenzyklen.
+- EEPROM auf das finale ROM-Fenster begrenzt, vier Null-Dummybits korrigiert und
+  die Batterie-Datei dynamisch von 512 Byte auf 8 KiB erweiterbar gemacht.
+  Flash verlässt Identifikations-/Löschmodi nun auch über den direkten `F0`-
+  Resetbefehl. Vorhandene EEPROM-Dateigrößen werden beim Start wiedererkannt.
+- HLE-BIOS-`CpuFastSet` rundet Teilanforderungen korrekt auf acht Wörter auf;
+  `RegisterRamReset` setzt jetzt auch DMA, Timer, IRQ, WAITCNT und Prefetch zurück
+  und entfernt geplante Timer-Ereignisse. Der IRQ-Reset löscht IE und IF korrekt.
+- Upstream bleibt WIP. Vollständig cycle-exaktes Timing/Open Bus, weitere
+  Renderer-Kanten, fertiger Link-Host/Transport, PAR-v3-Codes und ein kommerzieller
+  Durchspielnachweis bleiben offen. Die Gesamtsuite steigt auf 290 Tests
+  (175 Core, 87 Runtime, 28 Windows-Smoke).
+
+## Unveröffentlicht – Eigener GBA-Datenpfad und MBC1M
+
+- Bereitgestelltes mGBA-Quellarchiv auf Architektur, Funktionen und Lizenzhinweise
+  geprüft; [Vergleich und Herkunft](docs/MGBA_REVIEW.md) dokumentiert. Kein nativer
+  mGBA-Kern und keine mechanische Übersetzung in den Produktcode aufgenommen.
+- Eigene ARM7-Arithmetik-, Flag-, Bedingungs- und Shiftbausteine samt neun Tests
+  ergänzt. Ein eigener erster ARM-/Thumb-1-Interpreter, GBA-Speicherbus und
+  Bitmap-Mode-3-Renderer führen nun ein generiertes ROM end-to-end aus. Der
+  plattformneutrale `AetherBoy.GbaProbe` erzeugt daraus ein 240×160-Prüfbild.
+  Kommerzielle GBA-Spiele sind noch nicht freigegeben.
+- MBC1M-Verdrahtung und konservative 1-MiB-Header-Erkennung in den normalen
+  GB-Ladeweg aufgenommen. Sieben Tests decken u. a. den 0x10-Banksonderfall ab.
+- Standard-MBC1-Zustände bleiben im bisherigen Format. MBC1M-Zustände erhalten
+  eine Kennung; Zustände anderer Verdrahtung werden abgelehnt.
+- 235 Tests bestanden; GB/GBC-Konformitätsauswahl erneut unverändert bei 67/70,
+  mit den drei bekannten informativen Abweichungen. Elf neue GBA-Prototyptests,
+  aber noch keine kommerziellen GBA-Spieltests.
+
+## Unveröffentlicht – GBA-Vorbereitung
+
+- Bildgeometrie von der festen GB-Auflösung entkoppelt: Runtime, Snapshots,
+  Frame-Puffer, Windows-Ausgabe, Filter und Skalierung unterstützen nun auch
+  das GBA-Format 240×160. Der produktive GB/GBC-Kern bleibt bei 160×144.
+- Separaten, nur lesenden GBA-Header-Inspector mit Größenlimit, bereinigten
+  Textfeldern, Header-Prüfstatus und vollständigem ROM-SHA-256 ergänzt.
+- Synthetische Header-, Runtime- und Rendering-Tests hinzugefügt. Diese prüfen
+  noch keine GBA-Emulation; es wurde kein GBA-Kern integriert.
+- GBA-ROMs und BIOS-Dateiname vom Git-Quellbaum ausgeschlossen. `.gba` bleibt
+  in der Oberfläche nicht freigegeben und wird an der Session-Grenze explizit
+  abgelehnt, solange kein passender Kern angebunden ist. Nächste Schritte: [GBA.md](GBA.md).
+
 ## Unveröffentlicht – Aether-Wave-UI
 
 ### Markenfundament
@@ -28,6 +142,34 @@ Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und no
 - Native MessageBoxen vollständig durch farbcodierte Aether-Signale für Information, Warnung, Entscheidung und Fehler ersetzt.
 - Neue Cartridge-Vault bündelt persistente zuletzt verwendete ROMs, markiert fehlende Dateien, akzeptiert Drag-and-drop und führt erst bei Bedarf in den nativen Dateibrowser.
 - Laufender Session-Status und gültige ROM-Drop-Ziele erhalten dezente Puls- und Signalübergänge; Animationen verändern keine Emulationstaktrate.
+
+### Controller
+
+- Windows Gaming Input als primäre Gamepad-Schnittstelle ergänzt; dadurch werden semantisch erkannte PlayStation- und generische HID-Controller neben Xbox-Controllern ohne Zusatztreiber unterstützt.
+- Bestehendes XInput-Polling als Rückfall erhalten und beide Quellen auf eine gemeinsame, testbare Gamepad-Zustands- und Mapping-Schicht vereinheitlicht.
+- Hot-Plug funktioniert auch ohne laufende ROM; Hauptfenster und Steuerungsdialog zeigen den aktuell erkannten Controller sowie die aktive Belegung an.
+- A, B, Start, Select, Quick Load und Quick Save lassen sich im Steuerungsdialog durch Anklicken und anschließenden Tastendruck direkt und persistent neu belegen.
+- D-Pad und linker Stick steuern die Richtung, Cross/A die Game-Boy-A-Taste, Circle/B oder Square/X die B-Taste, Options/Menu Start und Share/View Select; L1/R1 laden beziehungsweise speichern weiterhin per Flankenerkennung.
+
+### Phase 9.1 – Save Safety
+
+- Batterie-RAM wird nun spätestens alle 1.800 emulierten Frames und beim sicheren Beenden geschrieben, statt ausschließlich vom erfolgreichen Programmende abzuhängen.
+- Rohdatenkompatible `.sav`-Dateien erhalten atomare Write-Through-Ersetzung, drei rotierende Generationen und separate SHA-256-Integritätswächter mit Crash-Recovery für das Zwei-Dateien-Protokoll.
+- Trunkierte oder nach der ersten geschützten Sicherung gleich groß verfälschte Hauptdateien werden nicht mehr still teilweise geladen; AetherBoy fällt automatisch auf die jüngste gültige Generation zurück und repariert den Hauptstand.
+- Neues Save Safety Center zeigt aktuellen Stand und Backups mit Zeit, Größe und Schutzstatus. Eine gewählte Generation lässt sich kontrolliert wiederherstellen, während der zuvor aktive Stand als neues Backup erhalten bleibt.
+- Alte rohe `.sav`-Dateien ohne AetherBoy-Metadaten bleiben kompatibel. Sie erhalten beim nächsten Schreibvorgang automatisch den Integritätsschutz.
+- Gesamtsuite auf **189 Tests** erweitert: 148 Core-, 18 Runtime- und 23 Windows-Smoke-Tests; vollständiger Release-Build ohne Warnungen.
+
+### Phase 9.2 – Aether Control Center
+
+- Eigenständige rahmenlose Control-Center-Shell mit sieben klar getrennten Bereichen für Übersicht, Display, Audio, Eingabe, Saves, System und Diagnose ergänzt.
+- Filter, fünf DMG-Paletten, Integer-Fenstergrößen und Borderless-Fullscreen sind direkt erreichbar und werden live angewendet.
+- Echte persistente Master-Lautstärke von 0 bis 100 Prozent ergänzt; Audio-Master, alle vier Hardwarekanäle und Audio Inspector sind zentral steuerbar.
+- Gamepad-Live-Status, USB-Kennung, aktive Tastatur- und Controller-Belegung sowie direkter Einstieg in den Remap-Dialog zusammengeführt.
+- Save-State-Slots, Quick Save/Load und Save Safety zeigen ihren aktiven Zustand und den Zustand aller Batterie-Backup-Generationen an.
+- Frameskip und Boot-ROM-Autoerkennung sind sichtbar steuerbar; ein sicherer Reset setzt ausschließlich Einstellungen zurück und löscht keine ROMs oder Spielstände.
+- Diagnoseansicht zeigt Session, Framezahl, Mapper, Modell, ROM-/RAM-Größe, Region, ROM-SHA-256, lokalen Pfad und Save-Status und kopiert diese Daten nur auf ausdrückliche Aktion.
+- Palette, Filter, Save-Slot, Boot-ROM-Policy und Lautstärke sind nun über Neustarts hinweg persistent. Gesamtsuite auf **190 Tests** erweitert.
 
 ## 4.8.0-alpha.1 – Phase 8 (2026-08-09)
 

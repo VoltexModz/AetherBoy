@@ -224,7 +224,7 @@ namespace nanoboy
             {
                 AddExtension = true,
                 CheckFileExists = true,
-                Filter = "Game Boy ROM (*.gb;*.gbc)|*.gb;*.gbc",
+                Filter = "Game Boy ROM (*.gb;*.gbc;*.gba)|*.gb;*.gbc;*.gba|Game Boy Advance ROM (*.gba)|*.gba|Game Boy / Color ROM (*.gb;*.gbc)|*.gb;*.gbc",
                 Multiselect = false,
                 RestoreDirectory = true,
                 Title = "Game-Boy-ROM auswählen"

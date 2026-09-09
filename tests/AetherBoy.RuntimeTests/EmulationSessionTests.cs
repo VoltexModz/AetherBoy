@@ -358,7 +358,7 @@ internal sealed class RecordingMachineFactory : IEmulationMachineFactory
 internal sealed class RecordingMachine : IEmulationMachine
 {
     private readonly Exception? runFrameFailure;
-    private readonly int[] frame = new int[EmulationSnapshot.FramePixelCount];
+    private readonly int[] frame;
     private readonly byte[] waveRam = new byte[32];
     private readonly List<CheatSnapshot> cheats = new();
     private byte[] state = { 1, 2, 3 };
@@ -366,11 +366,15 @@ internal sealed class RecordingMachine : IEmulationMachine
     private int runFrameCount;
     private long videoFrameSequence = 1;
 
-    public RecordingMachine(Exception? runFrameFailure)
+    public RecordingMachine(Exception? runFrameFailure, VideoGeometry? videoGeometry = null)
     {
         this.runFrameFailure = runFrameFailure;
+        VideoGeometry = videoGeometry ?? VideoGeometry.GameBoy;
+        frame = new int[VideoGeometry.PixelCount];
         Record("Construct");
     }
+
+    public VideoGeometry VideoGeometry { get; }
 
     public event EventHandler<AudioSamplesAvailableEventArgs>? AudioSamplesAvailable;
 
@@ -504,7 +508,16 @@ internal sealed class RecordingMachine : IEmulationMachine
         var wave = new WaveChannelSnapshot(true, true, 440, 1, 0, false, waveRam);
         var noise = new NoiseChannelSnapshot(true, 0, 1, false, 0x7fff, 1f, 8, 0, true, 0, false);
         var audio = new AudioSnapshot(true, 44_100, pulse, pulse, wave, noise);
-        var rom = new RomSnapshot("Test", "ROM_NONE", 32_768, 0, false, false, false);
+        var rom = new RomSnapshot(
+            "Test",
+            "ROM_NONE",
+            32_768,
+            0,
+            false,
+            false,
+            false,
+            new string('0', 64),
+            new BatterySaveSnapshot(false, 0, -1, false));
 
         return new EmulationSnapshot(
             state,

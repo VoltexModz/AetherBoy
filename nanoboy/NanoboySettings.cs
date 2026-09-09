@@ -3,6 +3,7 @@ using System.Configuration;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
+using nanoboy.Input;
 
 namespace nanoboy
 {
@@ -102,31 +103,124 @@ namespace nanoboy
             set { nanoboy.Properties.Settings.Default.KeyRight = value; }
         }
 
+        public Keys KeyL
+        {
+            get { return nanoboy.Properties.Settings.Default.KeyL; }
+            set { nanoboy.Properties.Settings.Default.KeyL = value; }
+        }
+
+        public Keys KeyR
+        {
+            get { return nanoboy.Properties.Settings.Default.KeyR; }
+            set { nanoboy.Properties.Settings.Default.KeyR = value; }
+        }
+
+        public HostGamepadButtons GamepadA
+        {
+            get => ReadGamepadBinding(
+                nanoboy.Properties.Settings.Default.GamepadAButton,
+                GamepadBindings.Default.A);
+            set => nanoboy.Properties.Settings.Default.GamepadAButton = (int)value;
+        }
+
+        public HostGamepadButtons GamepadB
+        {
+            get => ReadGamepadBinding(
+                nanoboy.Properties.Settings.Default.GamepadBButton,
+                GamepadBindings.Default.B);
+            set => nanoboy.Properties.Settings.Default.GamepadBButton = (int)value;
+        }
+
+        public HostGamepadButtons GamepadStart
+        {
+            get => ReadGamepadBinding(
+                nanoboy.Properties.Settings.Default.GamepadStartButton,
+                GamepadBindings.Default.Start);
+            set => nanoboy.Properties.Settings.Default.GamepadStartButton = (int)value;
+        }
+
+        public HostGamepadButtons GamepadSelect
+        {
+            get => ReadGamepadBinding(
+                nanoboy.Properties.Settings.Default.GamepadSelectButton,
+                GamepadBindings.Default.Select);
+            set => nanoboy.Properties.Settings.Default.GamepadSelectButton = (int)value;
+        }
+
+        public HostGamepadButtons GamepadL
+        {
+            get => ReadGamepadBinding(
+                nanoboy.Properties.Settings.Default.GamepadLButton,
+                HostGamepadButtons.LeftShoulder);
+            set => nanoboy.Properties.Settings.Default.GamepadLButton = (int)value;
+        }
+
+        public HostGamepadButtons GamepadR
+        {
+            get => ReadGamepadBinding(
+                nanoboy.Properties.Settings.Default.GamepadRButton,
+                HostGamepadButtons.RightShoulder);
+            set => nanoboy.Properties.Settings.Default.GamepadRButton = (int)value;
+        }
+
+        public HostGamepadButtons GamepadQuickLoad
+        {
+            get => ReadGamepadBinding(
+                nanoboy.Properties.Settings.Default.GamepadQuickLoadButton,
+                GamepadBindings.Default.QuickLoad);
+            set => nanoboy.Properties.Settings.Default.GamepadQuickLoadButton = (int)value;
+        }
+
+        public HostGamepadButtons GamepadQuickSave
+        {
+            get => ReadGamepadBinding(
+                nanoboy.Properties.Settings.Default.GamepadQuickSaveButton,
+                GamepadBindings.Default.QuickSave);
+            set => nanoboy.Properties.Settings.Default.GamepadQuickSaveButton = (int)value;
+        }
+
+        public GamepadBindings GamepadBindings => new GamepadBindings(
+            GamepadA,
+            GamepadB,
+            GamepadStart,
+            GamepadSelect,
+            GamepadQuickLoad,
+            GamepadQuickSave);
+
         public int SampleRate
         {
             get { return nanoboy.Properties.Settings.Default.SampleRate; }
             set { nanoboy.Properties.Settings.Default.SampleRate = value; }
         }
 
-        private int _paletteIndex = 0;
         public int PaletteIndex
         {
-            get => _paletteIndex;
-            set => _paletteIndex = value;
+            get => Math.Clamp(nanoboy.Properties.Settings.Default.PaletteIndex, 0, 4);
+            set => nanoboy.Properties.Settings.Default.PaletteIndex = Math.Clamp(value, 0, 4);
         }
 
-        private int _saveSlot = 1;
         public int SaveSlot
         {
-            get => _saveSlot;
-            set => _saveSlot = value;
+            get => Math.Clamp(nanoboy.Properties.Settings.Default.SaveSlot, 1, 5);
+            set => nanoboy.Properties.Settings.Default.SaveSlot = Math.Clamp(value, 1, 5);
         }
 
-        private int _displayFilterIndex = 0;
         public int DisplayFilterIndex
         {
-            get => _displayFilterIndex;
-            set => _displayFilterIndex = value;
+            get => Math.Clamp(nanoboy.Properties.Settings.Default.DisplayFilterIndex, 0, 2);
+            set => nanoboy.Properties.Settings.Default.DisplayFilterIndex = Math.Clamp(value, 0, 2);
+        }
+
+        public bool BootRomEnable
+        {
+            get => nanoboy.Properties.Settings.Default.BootRomEnable;
+            set => nanoboy.Properties.Settings.Default.BootRomEnable = value;
+        }
+
+        public int AudioVolume
+        {
+            get => Math.Clamp(nanoboy.Properties.Settings.Default.AudioVolume, 0, 100);
+            set => nanoboy.Properties.Settings.Default.AudioVolume = Math.Clamp(value, 0, 100);
         }
 
         public System.Collections.Generic.List<string> RecentFiles { get; } = new System.Collections.Generic.List<string>();
@@ -150,6 +244,30 @@ namespace nanoboy
         {
             RecentFiles.AddRange(RecentRomStore.Load());
             nanoboy.Properties.Settings.Default.PropertyChanged += PropertyChanged;
+        }
+
+        private static HostGamepadButtons ReadGamepadBinding(
+            int storedValue,
+            HostGamepadButtons fallback)
+        {
+            const HostGamepadButtons allButtons =
+                HostGamepadButtons.DPadUp |
+                HostGamepadButtons.DPadDown |
+                HostGamepadButtons.DPadLeft |
+                HostGamepadButtons.DPadRight |
+                HostGamepadButtons.Start |
+                HostGamepadButtons.Select |
+                HostGamepadButtons.LeftStick |
+                HostGamepadButtons.RightStick |
+                HostGamepadButtons.LeftShoulder |
+                HostGamepadButtons.RightShoulder |
+                HostGamepadButtons.South |
+                HostGamepadButtons.East |
+                HostGamepadButtons.West |
+                HostGamepadButtons.North;
+
+            HostGamepadButtons binding = (HostGamepadButtons)storedValue & allButtons;
+            return binding == HostGamepadButtons.None ? fallback : binding;
         }
     }
 }

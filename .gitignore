@@ -8,6 +8,7 @@ Release_*/
 .vs/
 .idea/
 .vscode/
+/SenaVoiceStudio/
 *.suo
 *.user
 *.userosscache
@@ -29,12 +30,16 @@ ROMs/
 **/GB Emu/
 *.gb
 *.gbc
+*.gba
 *.sav
+*.sav.*
 *.rtc
+*.rtc.*
 *.ss[1-5]
 *.wav
 dmg_boot.bin
 gbc_boot.bin
+gba_bios.bin
 
 # Generated release artifacts and symbols
 *.pdb

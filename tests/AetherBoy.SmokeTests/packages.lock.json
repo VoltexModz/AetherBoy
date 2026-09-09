@@ -1,7 +1,7 @@
 {
   "version": 1,
   "dependencies": {
-    "net10.0-windows7.0": {
+    "net10.0-windows10.0.19041": {
       "Microsoft.Testing.Extensions.CodeCoverage": {
         "type": "Direct",
         "requested": "[18.9.0, )",
@@ -125,8 +125,8 @@
       "AetherBoy": {
         "type": "Project",
         "dependencies": {
-          "AetherBoy.Core": "[1.0.0, )",
-          "AetherBoy.Runtime": "[1.0.0, )",
+          "AetherBoy.Core": "[4.8.0-alpha.1, )",
+          "AetherBoy.Runtime": "[4.8.0-alpha.1, )",
           "NAudio.WinMM": "[2.3.0, )"
         }
       },
@@ -136,8 +136,12 @@
       "aetherboy.runtime": {
         "type": "Project",
         "dependencies": {
-          "AetherBoy.Core": "[1.0.0, )"
+          "AetherBoy.Core": "[4.8.0-alpha.1, )",
+          "AetherBoy.Vendored.GBADotnet.Core": "[4.8.0-alpha.1, )"
         }
+      },
+      "aetherboy.vendored.gbadotnet.core": {
+        "type": "Project"
       }
     }
   }
