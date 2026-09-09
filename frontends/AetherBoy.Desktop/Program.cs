@@ -74,6 +74,15 @@ internal static class Program
             }
 
             Console.WriteLine($"AetherBoy desktop backend: {videoDriver} ({desktop.DisplayName})");
+            if (args.Length == 1 && args[0].Equals("--audio-info", StringComparison.OrdinalIgnoreCase))
+            {
+                using var output = new SdlAudioOutput(LinuxFrontendOptions.SampleRate, 0.5f);
+                output.Submit(new float[441], LinuxFrontendOptions.SampleRate);
+                output.Clear();
+                Console.WriteLine($"AetherBoy audio backend: {output.DriverName}");
+                return 0;
+            }
+
             using var host = new WaylandEmulatorHost(desktop);
             return host.Run(args);
         }

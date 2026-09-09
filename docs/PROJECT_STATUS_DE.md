@@ -14,7 +14,7 @@ Speicherung, Eingabe und Tests stark überarbeitet. Für GBA existieren zwei
 Pfade: ein kleiner eigener Lern- und Regressionkern sowie ein produktiver,
 direkt im Repository gepflegter Fork des MIT-lizenzierten GBADotnet-Kerns.
 
-Der aktuelle Stand baut unter .NET 10 ohne Warnungen und besteht 290
+Der aktuelle Stand baut unter .NET 10 ohne Warnungen und besteht 305
 deterministische Tests. Das beweist viele definierte Hardware- und
 Anwendungsfälle, aber noch keinen vollständigen kommerziellen GBA-Durchspieltest.
 
@@ -154,7 +154,8 @@ Auf dieser Basis wurden unter anderem ergänzt oder korrigiert:
 - 175 Core-Tests.
 - 87 Runtime-Tests.
 - 28 Windows-Smoke-Tests.
-- Gesamt: 290 bestanden, 0 fehlgeschlagen.
+- 15 Linux-Frontendtests.
+- Gesamt: 305 bestanden, 0 fehlgeschlagen.
 - Nativer Ubuntu-Build und `linux-x64`-Publish: 0 Warnungen, 0 Fehler; der
   veröffentlichte Host erkannte Hyprland und öffnete unter WSLg einen echten
   Wayland-Fensterlauf.
@@ -179,9 +180,9 @@ Firmware für die automatischen Tests.
 - Spezialhardware wie Pocket Camera, HuC1/HuC3, MMM01 und weitere seltene
   Mapper ist nicht freigegeben.
 - Ältere experimentelle GBA-Save-States vor Kernschema 5 sind nicht kompatibel.
-- Der neue Linux-Desktopadapter besitzt noch keine Audioausgabe, kein
-  vollständiges Control Center, keine sichtbaren fünf Slots und keine
-  Rewind-Bedienung; Details stehen in `docs/LINUX_WAYLAND.md`.
+- Der Linux-Desktopadapter besitzt noch keine persistenten Einstellungen,
+  freie Eingabebelegung, Cartridge Vault, Cheats-, Diagnose-, Save-Safety- und
+  WAV-Werkzeuge oder Boot-ROM-Auswahl; Details stehen in `docs/LINUX_WAYLAND.md`.
 - AetherBoy ist Alpha-Software und noch kein versprochener Ersatz für etablierte
   Referenzemulatoren.
 
@@ -190,7 +191,7 @@ Firmware für die automatischen Tests.
 ```powershell
 dotnet restore ./nanoboy.sln --locked-mode --configfile ./NuGet.config
 dotnet build ./nanoboy.sln -c Release --no-restore
-dotnet test --solution ./nanoboy.sln -c Release --no-build --no-restore --minimum-expected-tests 290
+dotnet test --solution ./nanoboy.sln -c Release --no-build --no-restore --minimum-expected-tests 305
 dotnet run --project ./nanoboy/nanoboy.csproj -c Release --no-build
 ```
 

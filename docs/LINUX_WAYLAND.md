@@ -10,6 +10,7 @@ Anwendungs-ID lautet `io.github.VoltexModz.AetherBoy`.
 - eine native Wayland-Sitzung mit funktionierendem GPU-/Mesa- oder Herstellertreiber
 - .NET SDK 10.0.302 oder ein neuerer Patch derselben Feature-Band
 - ICU sowie die üblichen Systembibliotheken des .NET-Runtimes
+- PipeWire-, PulseAudio- oder ALSA-Clientbibliotheken für native Audioausgabe
 - für Hyprland: `xdg-desktop-portal-hyprland` und ein GTK- oder KDE-Portal als
   Dateiauswahl-Fallback
 
@@ -40,7 +41,9 @@ bash scripts/run-linux.sh "/pfad/zu/deinem-spiel.gba"
 ```
 
 Ohne ROM-Pfad öffnet sich die Oberfläche ebenfalls. Eine rechtmäßig verwendbare
-`.gb`, `.gbc` oder `.gba` kann anschließend auf das Fenster gezogen werden.
+`.gb`, `.gbc` oder `.gba` lässt sich über `O`, die Schaltfläche `OPEN ROM` oder
+Drag-and-drop öffnen. SDL verwendet dafür unter Linux den asynchronen
+XDG-Desktop-Portal-Dateidialog.
 
 Optional installiert das folgende Skript den Build, den Desktop-Eintrag und alle
 Icon-Größen nur für den aktuellen Benutzer unter `~/.local`:
@@ -69,6 +72,12 @@ Nur die Desktop-Erkennung prüfen, ohne SDL-Fenster oder ROM:
 dotnet run --project frontends/AetherBoy.Desktop/AetherBoy.Desktop.csproj -- --platform-info
 ```
 
+Wayland und das Standard-Audiogerät gemeinsam prüfen:
+
+```bash
+bash scripts/run-linux.sh --audio-info
+```
+
 ## Bedienung des ersten Linux-Hosts
 
 | Aktion | Tastatur |
@@ -79,12 +88,18 @@ dotnet run --project frontends/AetherBoy.Desktop/AetherBoy.Desktop.csproj -- --p
 | GBA L / R | Q / E |
 | Pause | Leertaste |
 | Turbo halten | Tabulator |
-| Schnellspeichern / laden, Slot 1 | F5 / F8 |
+| Control Center | C |
+| Save-Slot auswählen | 1–5 |
+| Schnellspeichern / laden | F5 / F8 |
+| Rewind-Schritt | F7 |
 | Vollbild | F11 |
 | Beenden | Escape |
 
 SDL3-Gamepads werden beim Start und über Hot-Plug erkannt. Batterie-Spielstände
-(`.sav`) und Slot 1 (`.ss1`) liegen neben der ROM.
+(`.sav`) und fünf Zustände (`.ss1` bis `.ss5`) liegen neben der ROM. Das Control
+Center bietet Displayfilter, Frameskip, DMG-Paletten, Audiopegel, vier
+Audiokanäle, Inputstatus, Slotwahl, Save/Load und Rewind. Während es geöffnet ist,
+wird eine laufende Sitzung automatisch pausiert.
 
 ## Hyprland-Profil
 
@@ -111,12 +126,19 @@ werden.
 
 ## Aktuelle Grenze
 
-Der Linux-Host beherrscht Bild, Tastatur/Gamepad, Pause, Turbo, Vollbild,
-Batterie-Saves und einen Save-State-Slot. Audio, das vollständige Control Center,
-alle fünf sichtbaren Slots, Rewind-Bedienung und ein nativer Portal-Öffnen-Dialog
-sind noch nicht auf dem Stand des Windows-Frontends. Der Emulator-Core selbst ist
-derselbe; die verbleibende Arbeit betrifft den Linux-Desktopadapter.
+Der Linux-Host beherrscht Bild einschließlich Sharp/Smooth/LCD Grid,
+Tastatur/Gamepad, native SDL3-Audioausgabe, Portal-Öffnen, Pause, Turbo,
+Vollbild, Batterie-Saves, fünf Save-State-Slots und Rewind. Noch nicht auf dem
+Stand des Windows-Frontends sind persistente Einstellungen, freie
+Eingabebelegung, Cartridge Vault, Cheats-, Diagnose-, Save-Safety- und
+WAV-Werkzeuge sowie Boot-ROM-Auswahl. Der Emulator-Core selbst ist derselbe; die
+verbleibende Arbeit betrifft den Linux-Desktopadapter.
 
 WSLg ist für einen Backend-Smoke-Test geeignet, aber kein Ersatz für einen Test
 unter echtem Hyprland. Fehlt WSLs Mesa/EGL-Stack, kann SDL den Wayland-Treiber
 korrekt auswählen und trotzdem beim Erzeugen des Renderers scheitern.
+
+Scheitert nur Audio mit einer fehlenden `libpipewire`, `libpulse` oder `libasound`,
+muss die passende Clientbibliothek der Distribution installiert werden. AetherBoy
+fängt diesen Fehler beim normalen Spielstart ab und läuft dann bewusst stumm
+weiter, statt die Emulationssitzung zu beenden.

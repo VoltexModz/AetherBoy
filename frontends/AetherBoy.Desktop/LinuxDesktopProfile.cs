@@ -37,7 +37,9 @@ internal sealed record LinuxDesktopProfile(
         _ => "UNKNOWN"
     };
 
-    public static LinuxDesktopProfile Detect(Func<string, string?>? readEnvironment = null)
+    public static LinuxDesktopProfile Detect(
+        Func<string, string?>? readEnvironment = null,
+        bool? isLinuxOverride = null)
     {
         readEnvironment ??= Environment.GetEnvironmentVariable;
         string sessionType = Read(readEnvironment, "XDG_SESSION_TYPE");
@@ -61,7 +63,7 @@ internal sealed record LinuxDesktopProfile(
                             : LinuxDesktopKind.Unknown;
 
         return new LinuxDesktopProfile(
-            RuntimeInformation.IsOSPlatform(OSPlatform.Linux),
+            isLinuxOverride ?? RuntimeInformation.IsOSPlatform(OSPlatform.Linux),
             hasWaylandDisplay,
             sessionType,
             currentDesktop,

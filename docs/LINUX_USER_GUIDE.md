@@ -14,6 +14,7 @@ while the emulator cores and save formats remain shared with the Windows app.
 - a native Wayland session
 - the .NET 10 SDK and runtime
 - a working Mesa or vendor GPU driver
+- PipeWire, PulseAudio or ALSA client libraries for native audio output
 - SDL3 runtime files are restored with the project
 
 Check your session:
@@ -56,8 +57,9 @@ Pass a ROM path directly:
 bash scripts/run-linux.sh "$HOME/Games/Pokemon.gbc"
 ```
 
-Or open AetherBoy without a game and drag a `.gb`, `.gbc` or `.gba` file onto
-the window:
+Or open AetherBoy without a game and press `O`, click `OPEN ROM`, or drag a
+`.gb`, `.gbc` or `.gba` file onto the window. The open button uses the native
+asynchronous XDG Desktop Portal path:
 
 ```bash
 bash scripts/run-linux.sh
@@ -67,6 +69,12 @@ To check desktop detection without opening a window:
 
 ```bash
 artifacts/AetherBoy-linux-x64/AetherBoy.Desktop --platform-info
+```
+
+To validate both Wayland and the default SDL audio device:
+
+```bash
+bash scripts/run-linux.sh --audio-info
 ```
 
 ## 4. Install in the application menu
@@ -100,12 +108,17 @@ If the command is not found, add `~/.local/bin` to your shell's `PATH`.
 | GBA L / R | Q / E | Left / right shoulder |
 | Pause | Space | — |
 | Turbo while held | Tab | — |
-| Quick Save / Load, slot 1 | F5 / F8 | — |
+| Control Center | C | — |
+| Select save-state slot | 1–5 | — |
+| Quick Save / Load | F5 / F8 | — |
+| Rewind one step | F7 | — |
 | Fullscreen | F11 | — |
 | Exit | Escape | — |
 
-Battery saves use `.sav`; quick states use `.ss1`. They are stored next to the
-ROM, so the ROM directory must be writable.
+Battery saves use `.sav`; quick states use `.ss1` through `.ss5`. They are
+stored next to the ROM, so the ROM directory must be writable. The Control
+Center exposes Sharp, Smooth and LCD Grid video, frameskip, five DMG palettes,
+master audio, all four hardware channels, input status and timeline controls.
 
 ## 6. Hyprland setup
 
@@ -154,6 +167,13 @@ Reconnect it after AetherBoy starts, verify that Linux creates an input device,
 and test it with another SDL3 application. Steam Input can claim or remap some
 controllers; test once with Steam closed if the mapping looks wrong.
 
+### SDL reports a missing audio library
+
+Install the PipeWire, PulseAudio or ALSA client library provided by your
+distribution. A normal AetherBoy session catches audio-device initialization
+errors and continues silently; `--audio-info` deliberately returns an error so
+the system setup can be diagnosed.
+
 ### Saves are not written
 
 The ROM directory must be writable. Avoid launching games directly from a
@@ -161,11 +181,13 @@ read-only archive or protected mounted directory.
 
 ## 8. Current Linux limitations
 
-The first native frontend supports gameplay video, keyboard/gamepad input,
-pause, turbo, fullscreen, battery saves and one visible quick-state slot. It
-does not yet expose audio output, the complete Control Center, all five visible
-slots, rewind controls or an in-app portal file picker. These are frontend gaps;
-the portable emulator core remains shared across Windows and Linux.
+The native frontend supports gameplay video, SDL3 audio, an XDG Portal open
+dialog, keyboard/gamepad input, pause, turbo, fullscreen, battery saves, all
+five quick-state slots, rewind and a four-page Control Center. It does not yet
+provide persistent Linux settings, free input remapping, Cartridge Vault,
+cheat/diagnostic/save-safety tools, WAV recording or boot-ROM selection. These
+are frontend gaps; the portable emulator core remains shared across Windows and
+Linux.
 
 Technical details and the German guide are available in
 [`LINUX_WAYLAND.md`](LINUX_WAYLAND.md).

@@ -21,8 +21,25 @@ if [[ "${XDG_SESSION_TYPE:-}" == "x11" || -z "${WAYLAND_DISPLAY:-}" ]]; then
 fi
 
 application="$repository_root/artifacts/AetherBoy-$runtime_id/AetherBoy.Desktop"
+needs_build=false
 if [[ ! -x "$application" ]]; then
-    printf 'No Linux build found; building it now.\n'
+    needs_build=true
+elif [[ -n "$(find \
+    "$repository_root/frontends/AetherBoy.Desktop" \
+    "$repository_root/nanoboy" \
+    "$repository_root/scripts/build-linux.sh" \
+    -type f \
+    ! -path '*/bin/*' \
+    ! -path '*/obj/*' \
+    \( -name '*.cs' -o -name '*.csproj' -o -name '*.props' -o -name '*.targets' -o -name 'packages.lock.json' -o -name 'build-linux.sh' \) \
+    -newer "$application" \
+    -print \
+    -quit)" ]]; then
+    needs_build=true
+fi
+
+if [[ "$needs_build" == true ]]; then
+    printf 'Linux build is missing or older than the source; building it now.\n'
     bash "$repository_root/scripts/build-linux.sh"
 fi
 

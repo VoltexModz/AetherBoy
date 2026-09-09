@@ -14,18 +14,28 @@ Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und no
 - Hyprland, KDE und GNOME werden getrennt erkannt. Hyprland erhält die stabile
   App-ID `io.github.VoltexModz.AetherBoy`, compositorseitige Dekoration und ein
   mitgeliefertes XDG-Portalprofil mit GTK-Dateiauswahl-Fallback.
+- Native SDL3-Audioausgabe mit F32-Stream, Masterpegel, vier Kanalschaltern,
+  begrenzter Warteschlange und Timeline-Flush ergänzt. Fehlende Linux-
+  Audiobibliotheken degradieren kontrolliert zu stummem Betrieb.
+- SDLs asynchronen Dateidialog direkt angebunden; unter Linux führt er über
+  XDG Desktop Portal. Rückgaben gelangen threadsicher in den SDL-Hauptloop,
+  während Erweiterung und Existenz weiterhin lokal validiert werden.
 - Tastatur, SDL3-Gamepad-Hot-Plug und Analogstick angebunden; GBA-L/R, Pause,
-  gehaltenes Turbo, Vollbild sowie Quick Save/Load auf Slot 1 funktionieren im
-  ersten nativen Host. Batterie-Saves und Zustände bleiben ROM-nah kompatibel.
+  gehaltenes Turbo und Vollbild funktionieren im nativen Host. Das neue
+  Aether Control Center schaltet Sharp/Smooth/LCD Grid, Frameskip, DMG-Paletten,
+  Audio, Kanäle, Inputstatus und Timeline-Werkzeuge.
+- Alle fünf `.ss1`–`.ss5`-Slots, atomisches Schreiben, Slotwahl und Rewind sind
+  über Control Center und Tastatur erreichbar. Batterie-Saves und Zustände
+  bleiben ROM-nah und mit dem Windows-Vertrag kompatibel.
 - Reproduzierbare Build-, Run- und benutzerlokale Installationsskripte für
   `linux-x64` und `linux-arm64`, Freedesktop-Desktopdatei sowie die vorhandenen
   AetherBoy-Icons in allen Größen ergänzt.
-- Linux-CI baut jetzt zusätzlich den nativen Desktop und prüft die
-  Hyprland-Profilerkennung ohne Display. Unter Ubuntu wurden Publish, echter
-  WSLg-Wayland-Fensterlauf sowie 175 Core- und 87 Runtime-Tests verifiziert;
-  die vollständigen 290 Windows-Tests bleiben grün.
-- Audioausgabe, vollständiges Control Center, alle fünf sichtbaren Slots,
-  Rewind-Bedienung und ein eigener Portal-Öffnen-Dialog bleiben als nächste
+- Linux-CI baut jetzt zusätzlich den nativen Desktop und prüft 15 neue Tests für
+  Wayland-/Hyprland-Erkennung, Frontendoptionen und atomare Zustandsdateien.
+  Unter Ubuntu wurden Publish, WSLg-Wayland-Fensterloop sowie 175 Core-, 87
+  Runtime- und 15 Frontendtests verifiziert; insgesamt sind 305 Tests grün.
+- Persistente Linux-Einstellungen, freie Eingabebelegung, Cartridge Vault,
+  Cheats-, Diagnose-, Save-Safety- und WAV-Werkzeuge bleiben als nächste
   Linux-Frontendschritte offen.
 
 ## Unveröffentlicht – Integriertes GBA-Backend

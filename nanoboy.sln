@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AetherBoy.Vendored.GBADotne
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AetherBoy.Desktop", "frontends\AetherBoy.Desktop\AetherBoy.Desktop.csproj", "{C93E0D67-929C-4B58-A438-2CD9849D7991}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AetherBoy.DesktopTests", "tests\AetherBoy.DesktopTests\AetherBoy.DesktopTests.csproj", "{E1F77470-7C06-4E40-B086-05ED049785CF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -69,6 +71,10 @@ Global
 		{C93E0D67-929C-4B58-A438-2CD9849D7991}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C93E0D67-929C-4B58-A438-2CD9849D7991}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C93E0D67-929C-4B58-A438-2CD9849D7991}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E1F77470-7C06-4E40-B086-05ED049785CF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E1F77470-7C06-4E40-B086-05ED049785CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E1F77470-7C06-4E40-B086-05ED049785CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E1F77470-7C06-4E40-B086-05ED049785CF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

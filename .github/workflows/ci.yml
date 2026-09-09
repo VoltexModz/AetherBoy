@@ -46,6 +46,7 @@ jobs:
             tests/AetherBoy.SmokeTests/packages.lock.json
             tests/AetherBoy.CoreTests/packages.lock.json
             tests/AetherBoy.RuntimeTests/packages.lock.json
+            tests/AetherBoy.DesktopTests/packages.lock.json
             tools/AetherBoy.Conformance/packages.lock.json
             tools/AetherBoy.GbaProbe/packages.lock.json
 
@@ -56,7 +57,7 @@ jobs:
         run: dotnet build .\nanoboy.sln --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Test
-        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 290
+        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 305
 
   portable:
     name: Linux / Core + Runtime + native Wayland host
@@ -81,6 +82,7 @@ jobs:
             third_party/GBADotnet.Core/packages.lock.json
             tests/AetherBoy.CoreTests/packages.lock.json
             tests/AetherBoy.RuntimeTests/packages.lock.json
+            tests/AetherBoy.DesktopTests/packages.lock.json
             tools/AetherBoy.Conformance/packages.lock.json
             tools/AetherBoy.GbaProbe/packages.lock.json
 
@@ -99,6 +101,9 @@ jobs:
       - name: Restore native Wayland host
         run: dotnet restore ./frontends/AetherBoy.Desktop/AetherBoy.Desktop.csproj --locked-mode --configfile ./NuGet.config
 
+      - name: Restore native Wayland frontend tests
+        run: dotnet restore ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --locked-mode --configfile ./NuGet.config
+
       - name: Build Core tests
         run: dotnet build ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
@@ -114,11 +119,17 @@ jobs:
       - name: Build native Wayland host
         run: dotnet build ./frontends/AetherBoy.Desktop/AetherBoy.Desktop.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
+      - name: Build native Wayland frontend tests
+        run: dotnet build ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+
       - name: Test Core
         run: dotnet test --project ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 175
 
       - name: Test Runtime
         run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 87
+
+      - name: Test native Wayland frontend logic
+        run: dotnet test --project ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 15
 
       - name: Smoke-test conformance CLI
         run: dotnet run --project ./tools/AetherBoy.Conformance/AetherBoy.Conformance.csproj --configuration Release --no-build -- --help
