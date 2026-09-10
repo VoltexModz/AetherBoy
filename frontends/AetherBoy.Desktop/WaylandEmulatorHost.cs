@@ -6,24 +6,27 @@ using SDL3;
 
 namespace AetherBoy.Desktop;
 
-internal sealed class WaylandEmulatorHost : IDisposable
+internal sealed partial class WaylandEmulatorHost : IDisposable
 {
     private enum ControlCenterPage
     {
+        Overview,
         Display,
         Audio,
         Input,
-        Saves
+        Saves,
+        System,
+        Diagnostics
     }
 
     private readonly record struct DialogSelection(string? Path, string? Error);
 
-    private const int LogicalWidth = 1180;
-    private const int LogicalHeight = 760;
-    private const int GameAreaX = 292;
-    private const int GameAreaY = 144;
-    private const int GameAreaWidth = 856;
-    private const int GameAreaHeight = 480;
+    private int LogicalWidth = 1180;
+    private int LogicalHeight = 760;
+    private const int GameAreaX = 40;
+    private const int GameAreaY = 134;
+    private int GameAreaWidth => LogicalWidth - 376;
+    private int GameAreaHeight => LogicalHeight - 264;
     private const short AxisThreshold = 16_000;
 
     private readonly LinuxDesktopProfile desktop;
@@ -75,7 +78,7 @@ internal sealed class WaylandEmulatorHost : IDisposable
     private int fileDialogOpen;
     private bool disposed;
 
-    public WaylandEmulatorHost(LinuxDesktopProfile desktop, string? settingsPath = null)
+    public WaylandEmulatorHost(LinuxDesktopProfile desktop, string? settingsPath = null, bool hidden = false)
     {
         this.desktop = desktop ?? throw new ArgumentNullException(nameof(desktop));
         this.settingsPath = settingsPath ?? LinuxSettingsStore.DefaultPath;
@@ -86,7 +89,7 @@ internal sealed class WaylandEmulatorHost : IDisposable
                 $"AetherBoy · {desktop.DisplayName}",
                 LogicalWidth,
                 LogicalHeight,
-                SDL.WindowFlags.Resizable | SDL.WindowFlags.HighPixelDensity,
+                SDL.WindowFlags.Resizable | SDL.WindowFlags.HighPixelDensity | (hidden ? SDL.WindowFlags.Hidden : 0),
                 out window,
                 out renderer))
         {
@@ -100,6 +103,8 @@ internal sealed class WaylandEmulatorHost : IDisposable
             SDL.RendererLogicalPresentation.Letterbox);
         SDL.SetRenderVSync(renderer, 1);
         textRenderer = new SdlTextRenderer(renderer);
+        LoadBrandMark();
+        SDL.SetWindowMinimumSize(window, 860, 554);
         OpenFirstAvailableGamepad();
     }
 
@@ -162,6 +167,7 @@ internal sealed class WaylandEmulatorHost : IDisposable
             frameTexture = IntPtr.Zero;
         }
 
+        if (brandTexture != IntPtr.Zero) SDL.DestroyTexture(brandTexture);
         textRenderer.Dispose();
         SDL.DestroyRenderer(renderer);
         SDL.DestroyWindow(window);
@@ -191,6 +197,7 @@ internal sealed class WaylandEmulatorHost : IDisposable
                 if (currentEvent.Button.Button == SDL.ButtonLeft)
                 {
                     draggingVolume = false;
+                    ReleaseMouseTurbo();
                     FlushSettingsIfDue(force: true);
                 }
                 break;
@@ -206,6 +213,7 @@ internal sealed class WaylandEmulatorHost : IDisposable
                 break;
             case SDL.EventType.WindowFocusLost:
                 windowFocused = false;
+                mouseTurbo = false;
                 draggingVolume = false;
                 rebindingAction = null;
                 FlushSettingsIfDue(force: true);
@@ -270,6 +278,23 @@ internal sealed class WaylandEmulatorHost : IDisposable
 
         if (controlCenterVisible && isPressed)
         {
+            if (keyEvent.Scancode == SDL.Scancode.Tab && !keyEvent.Repeat)
+            {
+                int direction = (keyEvent.Mod & SDL.Keymod.Shift) != 0 ? -1 : 1;
+                if ((keyEvent.Mod & SDL.Keymod.Ctrl) != 0)
+                    SelectControlCenterPage((ControlCenterPage)(((int)controlCenterPage + direction + 7) % 7));
+                else if (focusTargets.Count > 0)
+                    focusedControl = focusedControl < 0 ? (direction > 0 ? 0 : focusTargets.Count - 1)
+                        : (focusedControl + direction + focusTargets.Count) % focusTargets.Count;
+                return;
+            }
+            if (focusedControl >= 0 && focusedControl < focusTargets.Count &&
+                keyEvent.Scancode is SDL.Scancode.Return or SDL.Scancode.Space && !keyEvent.Repeat)
+            {
+                SDL.FRect target = focusTargets[focusedControl];
+                HandleMouseClick(target.X + target.W / 2, target.Y + target.H / 2);
+                return;
+            }
             if (controlCenterPage == ControlCenterPage.Audio)
             {
                 switch (keyEvent.Scancode)
@@ -304,7 +329,7 @@ internal sealed class WaylandEmulatorHost : IDisposable
 
         if (keyEvent.Scancode == options.Keys[LinuxInputAction.Turbo] && session is not null && !controlCenterVisible && pendingSession is null)
         {
-            session.SetTurboAsync(isPressed).GetAwaiter().GetResult();
+            session.SetTurboAsync(isPressed || mouseTurbo).GetAwaiter().GetResult();
         }
 
         if (!isPressed || keyEvent.Repeat)
@@ -341,9 +366,6 @@ internal sealed class WaylandEmulatorHost : IDisposable
             case SDL.Scancode.C:
                 ToggleControlCenter();
                 break;
-            case SDL.Scancode.Tab when controlCenterVisible:
-                SelectControlCenterPage((ControlCenterPage)(((int)controlCenterPage + 1) % 4));
-                break;
             case SDL.Scancode.F5:
                 QuickSave();
                 break;
@@ -377,33 +399,16 @@ internal sealed class WaylandEmulatorHost : IDisposable
 
     private void HandleMouseClick(float x, float y)
     {
-        if (!controlCenterVisible)
+        focusedControl = -1;
+        foreach (var command in shellCommands)
         {
-            if (Hit(x, y, 24, 134, 216, 46)) ShowRomDialog();
-            else if (Hit(x, y, 24, 192, 216, 44)) ToggleControlCenter();
-            else if (Hit(x, y, 292, 88, 144, 40)) TogglePause();
-            else if (Hit(x, y, 448, 88, 144, 40)) QuickSave();
-            else if (Hit(x, y, 604, 88, 144, 40)) QuickLoad();
-            else if (Hit(x, y, 1004, 88, 144, 40))
+            if (Hit(x, y, command.Bounds.X, command.Bounds.Y, command.Bounds.W, command.Bounds.H))
             {
-                isFullscreen = !isFullscreen;
-                SDL.SetWindowFullscreen(window, isFullscreen);
+                command.Action();
+                return;
             }
-            else if (session is null && Hit(x, y, 596, 396, 248, 46)) ShowRomDialog();
-            return;
         }
-
-        if (Hit(x, y, 1042, 78, 54, 32))
-        {
-            CloseControlCenter();
-            return;
-        }
-
-        if (Hit(x, y, 354, 124, 160, 36)) SelectControlCenterPage(ControlCenterPage.Display);
-        else if (Hit(x, y, 524, 124, 160, 36)) SelectControlCenterPage(ControlCenterPage.Audio);
-        else if (Hit(x, y, 694, 124, 160, 36)) SelectControlCenterPage(ControlCenterPage.Input);
-        else if (Hit(x, y, 864, 124, 160, 36)) SelectControlCenterPage(ControlCenterPage.Saves);
-        else HandleControlCenterAction(x, y);
+        if (controlCenterVisible) HandleControlCenterAction(x, y);
     }
 
     private void HandleControlCenterAction(float x, float y)
@@ -411,17 +416,17 @@ internal sealed class WaylandEmulatorHost : IDisposable
         switch (controlCenterPage)
         {
             case ControlCenterPage.Display:
-                if (Hit(x, y, 390, 230, 180, 42)) SetVideoFilter(LinuxVideoFilter.Sharp);
-                else if (Hit(x, y, 584, 230, 180, 42)) SetVideoFilter(LinuxVideoFilter.Smooth);
-                else if (Hit(x, y, 778, 230, 180, 42)) SetVideoFilter(LinuxVideoFilter.LcdGrid);
-                else if (Hit(x, y, 390, 340, 100, 40)) SetFrameskip(0);
-                else if (Hit(x, y, 504, 340, 100, 40)) SetFrameskip(1);
-                else if (Hit(x, y, 618, 340, 100, 40)) SetFrameskip(2);
+                if (Hit(x, y, 300, 230, 180, 42)) SetVideoFilter(LinuxVideoFilter.Sharp);
+                else if (Hit(x, y, 494, 230, 180, 42)) SetVideoFilter(LinuxVideoFilter.Smooth);
+                else if (Hit(x, y, 688, 230, 180, 42)) SetVideoFilter(LinuxVideoFilter.LcdGrid);
+                else if (Hit(x, y, 300, 340, 100, 40)) SetFrameskip(0);
+                else if (Hit(x, y, 414, 340, 100, 40)) SetFrameskip(1);
+                else if (Hit(x, y, 528, 340, 100, 40)) SetFrameskip(2);
                 else
                 {
                     for (int index = 0; index < 5; index++)
                     {
-                        if (Hit(x, y, 390 + (index * 114), 450, 100, 40))
+                        if (Hit(x, y, 300 + (index * 114), 450, 100, 40))
                         {
                             SetPalette(index);
                             break;
@@ -431,21 +436,21 @@ internal sealed class WaylandEmulatorHost : IDisposable
                 break;
 
             case ControlCenterPage.Audio:
-                if (Hit(x, y, 390, 224, 220, 44))
+                if (Hit(x, y, 300, 224, 220, 44))
                 {
                     options.AudioEnabled = !options.AudioEnabled;
                     MarkSettingsChanged();
                     TryUiAction(ApplyEmulatorConfiguration, options.AudioEnabled ? "AUDIO ENABLED" : "AUDIO MUTED");
                 }
-                else if (Hit(x, y, 390, 326, 72, 40))
+                else if (Hit(x, y, 300, 326, 72, 40))
                 {
                     SetVolume(options.AudioVolume - 1);
                 }
-                else if (Hit(x, y, 650, 326, 72, 40))
+                else if (Hit(x, y, 560, 326, 72, 40))
                 {
                     SetVolume(options.AudioVolume + 1);
                 }
-                else if (Hit(x, y, 390, 376, 570, 32))
+                else if (Hit(x, y, 300, 376, 570, 32))
                 {
                     draggingVolume = true;
                     SetVolumeFromPointer(x);
@@ -454,7 +459,7 @@ internal sealed class WaylandEmulatorHost : IDisposable
                 {
                     for (int index = 0; index < 4; index++)
                     {
-                        if (Hit(x, y, 390 + (index * 146), 480, 132, 40))
+                        if (Hit(x, y, 300 + (index * 146), 480, 132, 40))
                         {
                             ToggleAudioChannel(index);
                             break;
@@ -466,7 +471,7 @@ internal sealed class WaylandEmulatorHost : IDisposable
             case ControlCenterPage.Input:
                 for (int index = 0; index < BindingActions.Length; index++)
                 {
-                    float buttonX = 514 + (index / 6) * 330;
+                    float buttonX = 424 + (index / 6) * 330;
                     float buttonY = 246 + (index % 6) * 46;
                     if (Hit(x, y, buttonX, buttonY, 156, 36))
                     {
@@ -474,7 +479,7 @@ internal sealed class WaylandEmulatorHost : IDisposable
                         return;
                     }
                 }
-                if (Hit(x, y, 390, 548, 210, 40))
+                if (Hit(x, y, 300, 548, 210, 40))
                 {
                     options.Keys = new LinuxKeyBindings();
                     rebindingAction = null;
@@ -487,16 +492,16 @@ internal sealed class WaylandEmulatorHost : IDisposable
             case ControlCenterPage.Saves:
                 for (int index = 0; index < 5; index++)
                 {
-                    if (Hit(x, y, 390 + (index * 114), 232, 100, 42))
+                    if (Hit(x, y, 300 + (index * 114), 232, 100, 42))
                     {
                         SelectSaveSlot(index + 1);
                         return;
                     }
                 }
 
-                if (Hit(x, y, 390, 342, 180, 44)) QuickSave();
-                else if (Hit(x, y, 584, 342, 180, 44)) QuickLoad();
-                else if (Hit(x, y, 778, 342, 180, 44)) Rewind();
+                if (Hit(x, y, 300, 342, 180, 44)) QuickSave();
+                else if (Hit(x, y, 494, 342, 180, 44)) QuickLoad();
+                else if (Hit(x, y, 688, 342, 180, 44)) Rewind();
                 break;
         }
     }
@@ -519,7 +524,10 @@ internal sealed class WaylandEmulatorHost : IDisposable
             return;
         }
 
+        focusedControl = -1;
         controlCenterVisible = true;
+        controlCenterPage = ControlCenterPage.Overview;
+        mouseTurbo = false;
         pressedKeys.Clear();
         EmulationSession? currentSession = session;
         if (currentSession is not null)
@@ -552,6 +560,7 @@ internal sealed class WaylandEmulatorHost : IDisposable
     private void SetVideoFilter(LinuxVideoFilter filter)
     {
         options.VideoFilter = filter;
+        MarkSettingsChanged();
         if (frameTexture != IntPtr.Zero)
         {
             SDL.SetTextureScaleMode(frameTexture, options.TextureScaleMode);
@@ -563,12 +572,14 @@ internal sealed class WaylandEmulatorHost : IDisposable
     private void SetFrameskip(int frameskip)
     {
         options.Frameskip = Math.Clamp(frameskip, 0, 2);
+        MarkSettingsChanged();
         TryUiAction(ApplyEmulatorConfiguration, $"FRAMESKIP {options.Frameskip}");
     }
 
     private void SetPalette(int paletteIndex)
     {
         options.PaletteIndex = Math.Clamp(paletteIndex, 0, 4);
+        MarkSettingsChanged();
         if (session is not null)
         {
             TryUiAction(
@@ -588,6 +599,7 @@ internal sealed class WaylandEmulatorHost : IDisposable
             default: throw new ArgumentOutOfRangeException(nameof(index));
         }
 
+        MarkSettingsChanged();
         TryUiAction(ApplyEmulatorConfiguration, $"AUDIO CHANNEL {index + 1} UPDATED");
     }
 
@@ -1025,105 +1037,6 @@ internal sealed class WaylandEmulatorHost : IDisposable
         displayedFrameSequence = 0;
     }
 
-    private void DrawShell()
-    {
-        SDL.SetRenderDrawColor(renderer, 12, 15, 23, 255);
-        SDL.RenderClear(renderer);
-        Fill(0, 0, 264, LogicalHeight, 19, 23, 34);
-        Fill(263, 0, 1, LogicalHeight, 43, 49, 66);
-        Fill(24, 34, 6, 40, 176, 158, 245);
-        Label(44, 30, "AetherBoy", 25);
-        Text(44, 66, "Your pocket arcade.", 161, 173, 192);
-        DrawButton(24, 134, 216, 46, fileDialogOpen != 0 ? "File picker open..." : "Open ROM   [O]", true,
-            pendingSession is null && fileDialogOpen == 0);
-        DrawButton(24, 192, 216, 44, "Settings   [C]", false, pendingSession is null);
-
-        Text(24, 288, "PLAY CONTROLS", 176, 158, 245);
-        DrawKeyHint(328, $"{BindingLabel(LinuxInputAction.Up)}/{BindingLabel(LinuxInputAction.Down)}", "Move (see Input)");
-        DrawKeyHint(366, $"{BindingLabel(LinuxInputAction.A)} / {BindingLabel(LinuxInputAction.B)}", "A / B");
-        DrawKeyHint(404, BindingLabel(LinuxInputAction.Start), "Start");
-        DrawKeyHint(442, BindingLabel(LinuxInputAction.Select), "Select");
-        DrawKeyHint(480, $"{BindingLabel(LinuxInputAction.L)} / {BindingLabel(LinuxInputAction.R)}", "L / R");
-        DrawKeyHint(518, BindingLabel(LinuxInputAction.Turbo), "Hold for turbo");
-        Fill(24, 580, 216, 1, 43, 49, 66);
-        Text(24, 604, "F7  Rewind    1–5  Save slot", 161, 173, 192);
-        Text(24, 641, gamepad == IntPtr.Zero ? "Keyboard ready" : "Controller connected", 126, 214, 174);
-        Text(24, 707, "GB  /  GBC  /  GBA", 161, 173, 192);
-
-        EmulationSnapshot? snapshot = session?.LatestSnapshot;
-        string title = pendingRomPath is not null ? Path.GetFileNameWithoutExtension(pendingRomPath)
-            : romPath is not null ? Path.GetFileNameWithoutExtension(romPath) : "Ready when you are.";
-        Label(292, 27, textRenderer.Fit(title, 650, 24), 24);
-        string system = snapshot?.VideoGeometry == VideoGeometry.GameBoyAdvance ? "GAME BOY ADVANCE" : "GAME BOY / COLOR";
-        Text(292, 60, session is null ? "Open a cartridge and make yourself at home." : system, 161, 173, 192);
-        string state = pendingSession is not null ? "LOADING" : session is null ? "NO ROM"
-            : snapshot?.IsPaused == true ? "PAUSED" : "PLAYING";
-        Text(1040, 42, state, 126, 214, 174);
-        bool playable = session is not null && pendingSession is null;
-        DrawButton(292, 88, 144, 40, $"{(snapshot?.IsPaused == true ? "Resume" : "Pause")} [{BindingLabel(LinuxInputAction.Pause)}]", false, playable);
-        DrawButton(448, 88, 144, 40, "Save [F5]", false, playable);
-        DrawButton(604, 88, 144, 40, "Load [F8]", false, playable);
-        DrawButton(1004, 88, 144, 40, "Full screen [F11]", false);
-
-        Fill(292, 144, 856, 480, 6, 8, 13);
-        if (frameTexture != IntPtr.Zero && snapshot?.HasVideoFrame == true)
-        {
-            SDL.FRect destination = GetGameDestination(frameGeometry);
-            SDL.RenderTexture(renderer, frameTexture, IntPtr.Zero, in destination);
-            if (options.VideoFilter == LinuxVideoFilter.LcdGrid) DrawLcdGrid(in destination, frameGeometry);
-        }
-        else
-        {
-            // A small cartridge silhouette keeps the empty state about the game.
-            Fill(682, 244, 76, 86, 40, 45, 65);
-            Fill(694, 256, 52, 34, 176, 158, 245);
-            Fill(700, 308, 40, 14, 18, 22, 32);
-            Label(546, 348, "Your next adventure awaits.", 22);
-            DrawButton(596, 396, 248, 46, "Choose a ROM", true, pendingSession is null);
-            Text(559, 463, "or drop a .gb, .gbc or .gba file here", 161, 173, 192);
-        }
-        if (pendingSession is not null)
-        {
-            Fill(442, 328, 556, 112, 27, 32, 47);
-            Label(466, 347, "Loading cartridge...", 22);
-            Text(466, 388, "Preparing the game and its save data.", 190, 199, 215);
-        }
-        else if (snapshot?.IsPaused == true && !controlCenterVisible)
-        {
-            Fill(648, 350, 144, 58, 27, 32, 47);
-            Label(678, 365, "Paused", 20);
-        }
-        if (loadError is not null)
-        {
-            Fill(292, 638, 856, 96, 55, 30, 40);
-            Text(308, 646, "Action failed · " + textRenderer.Fit(loadError, 700), 255, 187, 193);
-            Text(308, 674, session is null ? "Open another ROM to try again. Details are in the terminal."
-                : "Your previous game is still open. Details are in the terminal.", 236, 205, 209);
-            Text(308, 704, "Esc  Dismiss", 236, 205, 209);
-        }
-        else
-        {
-            Text(292, 644, textRenderer.Fit(statusMessage, 850), 212, 220, 234);
-            Fill(292, 686, 856, 1, 43, 49, 66);
-            Text(292, 704, $"Slot {options.SaveSlot} / 5    ·    {options.VideoFilter}", 161, 173, 192);
-            string audio = !options.AudioEnabled ? "Muted" : audioOutput is null
-                ? session is null ? "Audio ready" : "Audio unavailable" : $"Volume {options.AudioVolume}%";
-            Text(620, 704, audio, 161, 173, 192);
-            Text(906, 704, "Native Wayland", 161, 173, 192);
-        }
-        if (controlCenterVisible) DrawControlCenter();
-    }
-
-    private void Label(float x, float y, string value, int size) =>
-        textRenderer.Draw(x, y, value, 236, 240, 248, size);
-
-    private void DrawKeyHint(float y, string key, string action)
-    {
-        Fill(24, y, 88, 28, 31, 37, 51);
-        textRenderer.Draw(32, y + 4, textRenderer.Fit(key, 72, 12), 212, 220, 234, 12);
-        textRenderer.Draw(124, y + 3, textRenderer.Fit(action, 116, 13), 185, 197, 215, 13);
-    }
-
     private static string KeyLabel(SDL.Scancode scan) =>
         SDL.GetKeyName(SDL.GetKeyFromScancode(scan, SDL.Keymod.None, false)) ?? SDL.GetScancodeName(scan);
 
@@ -1173,53 +1086,24 @@ internal sealed class WaylandEmulatorHost : IDisposable
         SDL.SetRenderDrawBlendMode(renderer, SDL.BlendMode.None);
     }
 
-    private void DrawControlCenter()
-    {
-        SDL.SetRenderDrawBlendMode(renderer, SDL.BlendMode.Blend);
-        FillAlpha(296, 28, 856, 704, 3, 5, 14, 238);
-        SDL.SetRenderDrawBlendMode(renderer, SDL.BlendMode.None);
-        Fill(320, 58, 802, 642, 18, 21, 42);
-        Fill(320, 58, 802, 5, 116, 69, 255);
-        Fill(720, 58, 402, 5, 0, 210, 255);
-        Text(354, 86, "AETHER CONTROL CENTER", 240, 242, 255);
-        DrawButton(1042, 78, 54, 32, "X", false);
-
-        DrawButton(354, 124, 160, 36, "DISPLAY", controlCenterPage == ControlCenterPage.Display);
-        DrawButton(524, 124, 160, 36, "AUDIO", controlCenterPage == ControlCenterPage.Audio);
-        DrawButton(694, 124, 160, 36, "INPUT", controlCenterPage == ControlCenterPage.Input);
-        DrawButton(864, 124, 160, 36, "SAVES", controlCenterPage == ControlCenterPage.Saves);
-
-        switch (controlCenterPage)
-        {
-            case ControlCenterPage.Display: DrawDisplayPage(); break;
-            case ControlCenterPage.Audio: DrawAudioPage(); break;
-            case ControlCenterPage.Input: DrawInputPage(); break;
-            case ControlCenterPage.Saves: DrawSavesPage(); break;
-        }
-
-        Text(354, 620, textRenderer.Fit(loadError ?? statusMessage, 720),
-            loadError is null ? (byte)212 : (byte)255, 190, 205);
-        Text(354, 666, "Tab: next section   ·   C / Esc: return to game", 161, 173, 192);
-    }
-
     private void DrawDisplayPage()
     {
-        Text(390, 198, "VIDEO FILTER", 161, 173, 192);
-        DrawButton(390, 230, 180, 42, "SHARP", options.VideoFilter == LinuxVideoFilter.Sharp);
-        DrawButton(584, 230, 180, 42, "SMOOTH", options.VideoFilter == LinuxVideoFilter.Smooth);
-        DrawButton(778, 230, 180, 42, "LCD GRID", options.VideoFilter == LinuxVideoFilter.LcdGrid);
+        Text(300, 198, "VIDEO FILTER", 161, 173, 192);
+        DrawButton(300, 230, 180, 42, "SHARP", options.VideoFilter == LinuxVideoFilter.Sharp);
+        DrawButton(494, 230, 180, 42, "SMOOTH", options.VideoFilter == LinuxVideoFilter.Smooth);
+        DrawButton(688, 230, 180, 42, "LCD GRID", options.VideoFilter == LinuxVideoFilter.LcdGrid);
 
-        Text(390, 310, "FRAMESKIP", 161, 173, 192);
+        Text(300, 310, "FRAMESKIP", 161, 173, 192);
         for (int value = 0; value <= 2; value++)
         {
-            DrawButton(390 + (value * 114), 340, 100, 40, value.ToString(), options.Frameskip == value);
+            DrawButton(300 + (value * 114), 340, 100, 40, value.ToString(), options.Frameskip == value);
         }
 
-        Text(390, 420, "DMG PALETTE", 161, 173, 192);
+        Text(300, 420, "DMG PALETTE", 161, 173, 192);
         for (int index = 0; index < 5; index++)
         {
             DrawButton(
-                390 + (index * 114),
+                300 + (index * 114),
                 450,
                 100,
                 40,
@@ -1230,27 +1114,27 @@ internal sealed class WaylandEmulatorHost : IDisposable
 
     private void DrawAudioPage()
     {
-        Text(390, 194, "NATIVE SDL3 AUDIO", 161, 173, 192);
+        Text(300, 194, "NATIVE SDL3 AUDIO", 161, 173, 192);
         DrawButton(
-            390,
+            300,
             224,
             220,
             44,
             options.AudioEnabled ? "AUDIO ON" : "AUDIO MUTED",
             options.AudioEnabled && audioOutput is not null);
 
-        Text(390, 302, "MASTER VOLUME", 161, 173, 192);
-        DrawButton(390, 326, 72, 40, "-1%", false, options.AudioVolume > 0);
-        Text(516, 340, $"{options.AudioVolume}%", 240, 242, 255);
-        DrawButton(650, 326, 72, 40, "+1%", false, options.AudioVolume < 100);
-        Fill(390, 389, 570, 6, 52, 61, 80);
-        Fill(390, 389, options.AudioVolume * 5.7f, 6, 176, 158, 245);
-        Fill(390 + options.AudioVolume * 5.7f - 7, 381, 14, 22, 216, 204, 255);
-        Text(390, 410, "0%", 161, 173, 192);
-        Text(450, 410, "Drag, or use Left / Right for 1% steps.", 161, 173, 192);
-        Text(928, 410, "100%", 161, 173, 192);
+        Text(300, 302, "MASTER VOLUME", 161, 173, 192);
+        DrawButton(300, 326, 72, 40, "-1%", false, options.AudioVolume > 0);
+        Text(426, 340, $"{options.AudioVolume}%", 240, 242, 255);
+        DrawButton(560, 326, 72, 40, "+1%", false, options.AudioVolume < 100);
+        Fill(300, 389, 570, 6, 52, 61, 80);
+        Fill(300, 389, options.AudioVolume * 5.7f, 6, 176, 158, 245);
+        Fill(300 + options.AudioVolume * 5.7f - 7, 381, 14, 22, 216, 204, 255);
+        Text(300, 410, "0%", 161, 173, 192);
+        Text(360, 410, "Drag, or use Left / Right for 1% steps.", 161, 173, 192);
+        Text(838, 410, "100%", 161, 173, 192);
 
-        Text(390, 452, "HARDWARE CHANNELS", 161, 173, 192);
+        Text(300, 452, "HARDWARE CHANNELS", 161, 173, 192);
         bool[] channels =
         {
             options.Channel1Enabled,
@@ -1260,35 +1144,35 @@ internal sealed class WaylandEmulatorHost : IDisposable
         };
         for (int index = 0; index < channels.Length; index++)
         {
-            DrawButton(390 + (index * 146), 480, 132, 40, $"CH {index + 1}", channels[index]);
+            DrawButton(300 + (index * 146), 480, 132, 40, $"CH {index + 1}", channels[index]);
         }
 
         string backend = audioOutput is null ? "NOT OPEN" : audioOutput.DriverName;
-        Text(390, 536, $"BACKEND  {Truncate(backend, 56)}", 218, 222, 242);
+        Text(300, 536, $"BACKEND  {Truncate(backend, 56)}", 218, 222, 242);
         if (!string.IsNullOrWhiteSpace(audioError))
         {
-            Text(390, 558, Truncate($"LAST ERROR  {audioError}", 80), 255, 132, 156);
+            Text(300, 558, Truncate($"LAST ERROR  {audioError}", 80), 255, 132, 156);
         }
     }
 
     private void DrawInputPage()
     {
-        Text(390, 188, "KEYBOARD CONTROLS", 176, 158, 245);
-        Text(390, 216, "Click a key, or use arrows + Enter. Esc cancels a change.", 161, 173, 192);
+        Text(300, 188, "KEYBOARD CONTROLS", 176, 158, 245);
+        Text(300, 216, "Click a key, or use arrows + Enter. Esc cancels a change.", 161, 173, 192);
         for (int index = 0; index < BindingActions.Length; index++)
         {
             LinuxInputAction action = BindingActions[index];
-            float x = 390 + (index / 6) * 330;
+            float x = 300 + (index / 6) * 330;
             float y = 246 + (index % 6) * 46;
             Text(x, y + 8, action is LinuxInputAction.L or LinuxInputAction.R ? $"{action} (GBA)" : action.ToString(), 218, 222, 242);
             DrawButton(x + 124, y, 156, 36,
                 rebindingAction == action ? "Press a key..." : BindingLabel(action),
                 rebindingAction == action || (rebindingAction is null && focusedBinding == index));
         }
-        DrawButton(390, 548, 210, 40, "Reset keyboard defaults", false);
+        DrawButton(300, 548, 210, 40, "Reset keyboard defaults", false);
         string controller = gamepad == IntPtr.Zero ? "No controller connected" : SDL.GetGamepadName(gamepad) ?? "Controller connected";
-        Text(626, 548, textRenderer.Fit(controller, 380), 161, 173, 192);
-        Text(626, 570, "Controller uses the standard layout.", 161, 173, 192);
+        Text(536, 548, textRenderer.Fit(controller, 380), 161, 173, 192);
+        Text(536, 570, "Controller uses the standard layout.", 161, 173, 192);
     }
 
     private string BindingLabel(LinuxInputAction action) => KeyLabel(options.Keys[action]);
@@ -1307,10 +1191,11 @@ internal sealed class WaylandEmulatorHost : IDisposable
         rebindingAction = null;
         draggingVolume = false;
         controlCenterPage = page;
+        focusedControl = -1;
         FlushSettingsIfDue(force: true);
     }
 
-    private void SetVolumeFromPointer(float x) => SetVolume((int)Math.Round((x - 390) / 5.7f));
+    private void SetVolumeFromPointer(float x) => SetVolume((int)Math.Round((x - 300) / 5.7f));
 
     private void SetVolume(int percent)
     {
@@ -1343,13 +1228,13 @@ internal sealed class WaylandEmulatorHost : IDisposable
 
     private void DrawSavesPage()
     {
-        Text(390, 198, "ACTIVE SAVE-STATE SLOT", 161, 173, 192);
+        Text(300, 198, "ACTIVE SAVE-STATE SLOT", 161, 173, 192);
         for (int index = 0; index < 5; index++)
         {
             int slot = index + 1;
             bool exists = romPath is not null && File.Exists(LinuxSaveStateStore.GetPath(romPath, slot));
             DrawButton(
-                390 + (index * 114),
+                300 + (index * 114),
                 232,
                 100,
                 42,
@@ -1357,34 +1242,18 @@ internal sealed class WaylandEmulatorHost : IDisposable
                 options.SaveSlot == slot);
         }
 
-        Text(390, 312, "TIMELINE", 161, 173, 192);
-        DrawButton(390, 342, 180, 44, "SAVE [F5]", false, session is not null);
-        DrawButton(584, 342, 180, 44, "LOAD [F8]", false, session is not null);
-        DrawButton(778, 342, 180, 44, "REWIND [F7]", false, session is not null);
+        Text(300, 312, "TIMELINE", 161, 173, 192);
+        DrawButton(300, 342, 180, 44, "SAVE [F5]", false, session is not null);
+        DrawButton(494, 342, 180, 44, "LOAD [F8]", false, session is not null);
+        DrawButton(688, 342, 180, 44, "REWIND [F7]", false, session is not null);
 
-        Text(390, 438, "BATTERY SAVE", 161, 173, 192);
+        Text(300, 438, "BATTERY SAVE", 161, 173, 192);
         EmulationSnapshot? snapshot = session?.LatestSnapshot;
         string battery = snapshot?.Rom?.BatterySave.IsEnabled == true
             ? $"ACTIVE · {snapshot.Rom.BatterySave.ExpectedLength} BYTES"
             : session is null ? "NO ROM LOADED" : "CARTRIDGE HAS NO BATTERY RAM";
-        Text(390, 470, battery, 218, 222, 242);
-        Text(390, 514, "STATES .SS1-.SS5 AND BATTERY .SAV LIVE NEXT TO ROM", 161, 173, 192);
-    }
-
-    private void DrawButton(
-        float x, float y, float width, float height, string label, bool selected, bool enabled = true)
-    {
-        bool hovered = enabled && Hit(mouseX, mouseY, x, y, width, height);
-        if (selected && enabled) Fill(x, y, width, height, hovered ? (byte)198 : (byte)176, hovered ? (byte)182 : (byte)158, 245);
-        else Fill(x, y, width, height, hovered ? (byte)49 : (byte)29, hovered ? (byte)57 : (byte)35, hovered ? (byte)77 : (byte)49);
-        if (hovered) Fill(x, y + height - 2, width, 2, 176, 158, 245);
-        int size = 13;
-        label = textRenderer.Fit(label, width - 16, size);
-        float textX = x + Math.Max(8, (width - textRenderer.Measure(label, size)) / 2);
-        byte r = !enabled ? (byte)121 : selected ? (byte)22 : (byte)222;
-        byte g = !enabled ? (byte)133 : selected ? (byte)20 : (byte)228;
-        byte b = !enabled ? (byte)151 : selected ? (byte)37 : (byte)241;
-        textRenderer.Draw(textX, y + (height - 19) / 2, label, r, g, b, size);
+        Text(300, 470, battery, 218, 222, 242);
+        Text(300, 514, "STATES .SS1-.SS5 AND BATTERY .SAV LIVE NEXT TO ROM", 161, 173, 192);
     }
 
     private static string Truncate(string value, int maximumLength) =>
@@ -1469,6 +1338,7 @@ internal sealed class WaylandEmulatorHost : IDisposable
     private void SelectSaveSlot(int slot)
     {
         options.SelectSaveSlot(slot);
+        MarkSettingsChanged();
         statusMessage = $"SAVE STATE SLOT {slot}";
     }
 

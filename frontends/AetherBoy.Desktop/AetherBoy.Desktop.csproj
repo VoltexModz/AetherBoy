@@ -34,6 +34,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="../../branding/fonts/*" Link="Assets/Fonts/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../branding/exports/aetherboy-mark-256.png" Link="Assets/aetherboy-mark.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="AetherBoy.DesktopTests" />
   </ItemGroup>
 

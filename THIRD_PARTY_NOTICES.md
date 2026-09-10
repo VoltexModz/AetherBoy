@@ -74,3 +74,12 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Before publishing binaries, audit the actual publish directory and retain every license or notice required by the resolved runtime packages.
+
+## Bundled Noto Sans UI fonts
+
+`branding/fonts/NotoSans-Regular.ttf` and `NotoSans-Bold.ttf` are unmodified
+Noto Sans fonts. Copyright 2022 The Noto Project Authors
+(https://github.com/notofonts/latin-greek-cyrillic). Distributed under the SIL Open
+Font License 1.1; see `branding/fonts/OFL.txt` (published as `Assets/Fonts/OFL.txt`).
+The generated UI glyph atlases and metrics accompany the fonts under that license.
+Regenerate them with `python3 scripts/build-font-atlas.py` using Pillow.

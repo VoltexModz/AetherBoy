@@ -95,6 +95,60 @@ public sealed class LinuxPreferencesTests
         });
     }
 
+    [TestMethod]
+    public void AllControlCenterPreferencesSurviveRestart()
+    {
+        WithSettingsPath(path =>
+        {
+            var options = new LinuxFrontendOptions
+            {
+                VideoFilter = LinuxVideoFilter.LcdGrid, Frameskip = 2, PaletteIndex = 4, SaveSlot = 5,
+                Channel1Enabled = false, Channel2Enabled = true, Channel3Enabled = false, Channel4Enabled = false,
+            };
+            LinuxSettingsStore.Save(path, options);
+            var loaded = LinuxSettingsStore.Load(path, out var error);
+            Assert.IsNull(error);
+            Assert.AreEqual(LinuxVideoFilter.LcdGrid, loaded.VideoFilter);
+            Assert.AreEqual(2, loaded.Frameskip);
+            Assert.AreEqual(4, loaded.PaletteIndex);
+            Assert.AreEqual(5, loaded.SaveSlot);
+            Assert.IsFalse(loaded.Channel1Enabled);
+            Assert.IsTrue(loaded.Channel2Enabled);
+            Assert.IsFalse(loaded.Channel3Enabled);
+            Assert.IsFalse(loaded.Channel4Enabled);
+        });
+    }
+
+    [TestMethod]
+    public void LegacyPreferencesKeepDefaultsForNewFields()
+    {
+        WithSettingsPath(path =>
+        {
+            File.WriteAllText(path, "{\"Version\":1,\"AudioVolume\":5}");
+            var loaded = LinuxSettingsStore.Load(path, out var error);
+            Assert.IsNull(error);
+            Assert.AreEqual(5, loaded.AudioVolume);
+            Assert.AreEqual(1, loaded.SaveSlot);
+            Assert.AreEqual(LinuxVideoFilter.Sharp, loaded.VideoFilter);
+            Assert.IsTrue(loaded.Channel1Enabled && loaded.Channel2Enabled && loaded.Channel3Enabled && loaded.Channel4Enabled);
+        });
+    }
+
+    [TestMethod]
+    public void OutOfRangeDisplayPreferencesAreNormalized()
+    {
+        WithSettingsPath(path =>
+        {
+            File.WriteAllText(path, "{\"VideoFilter\":999,\"Frameskip\":99,\"PaletteIndex\":-9,\"SaveSlot\":8}");
+            var loaded = LinuxSettingsStore.Load(path, out var error);
+            Assert.IsNull(error);
+            Assert.AreEqual(LinuxVideoFilter.Sharp, loaded.VideoFilter);
+            Assert.AreEqual(2, loaded.Frameskip);
+            Assert.AreEqual(0, loaded.PaletteIndex);
+            Assert.AreEqual(5, loaded.SaveSlot);
+        });
+    }
+
     private static void WithSettingsPath(Action<string> action)
     {
         string directory = Path.Combine(Path.GetTempPath(), "aetherboy-prefs-" + Guid.NewGuid().ToString("N"));

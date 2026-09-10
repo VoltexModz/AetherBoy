@@ -69,10 +69,17 @@ The host shows loading and recoverable errors in the window. When a replacement
 ROM fails to initialize, the previous game resumes. Local `file://` drops and
 filenames with spaces are supported; extract archives before opening them.
 
-The larger game stage displays GBA at 3× in the default 1180×760 layout.
-When SDL3_ttf and a system Noto Sans or DejaVu Sans font are installed, the UI
-uses cached antialiased text. Otherwise it falls back to SDL's bitmap text;
-neither an extra font download nor SDL3_ttf is required to launch.
+The Linux shell now follows the Windows Aether layout: title navigation, game
+stage, right session rail, bottom command deck, and the seven-section Control
+Center (Overview, Display, Audio, Input, Saves, System, Diagnostics). It adapts
+to tall tiling windows and wide windows, preserving the game's aspect ratio.
+At 1180×760 the stage fits GBA at 3× with Sharp filtering.
+
+The original logo, Noto Sans Regular/Bold, their license, and antialiased glyph
+atlases are shipped inside `Assets/`. No system fonts or font downloads are
+needed. SDL3_ttf is optional; without it the bundled atlas renders Western
+European UI text (unsupported characters in filenames use `?`). For other
+scripts, install SDL3_ttf and use the bundled TrueType font's available glyphs.
 
 To check desktop detection without opening a window:
 
@@ -123,7 +130,8 @@ If the command is not found, add `~/.local/bin` to your shell's `PATH`.
 | Rewind one step | F7 | — |
 | Fullscreen | F11 | — |
 | Close settings / dismiss error / leave fullscreen | Escape | — |
-| Next settings section | Tab, while settings are open | — |
+| Move focus / activate control | Tab / Shift+Tab, then Enter or Space in Control Center | — |
+| Next / previous settings section | Ctrl+Tab / Ctrl+Shift+Tab | — |
 | Exit | Window close button / compositor close shortcut | — |
 
 These are the default bindings. To change them, open **Settings (C) → Input**,
@@ -141,7 +149,8 @@ play no longer closes the application.
 **Settings (C) → Audio** provides a draggable 0–100% volume slider and **−1% / +1%**
 buttons. Left/Right also change the volume in 1% steps; Home selects 0% (silence)
 and End selects 100%. Low settings such as 1% or 5% are supported.
-Keyboard bindings, volume and mute save automatically to
+Keyboard bindings, volume, mute, display filter, frameskip, DMG palette, audio
+channel switches and save slot save automatically to
 `$XDG_CONFIG_HOME/aetherboy/settings.json`, normally
 `~/.config/aetherboy/settings.json`, and load at the next start.
 
@@ -213,11 +222,29 @@ read-only archive or protected mounted directory.
 
 The native frontend supports gameplay video, SDL3 audio, an XDG Portal open
 dialog, keyboard/gamepad input, pause, turbo, fullscreen, battery saves, all
-five quick-state slots, rewind and a four-page Control Center. It does not yet
-provide persistent display/channel settings, gamepad remapping, Cartridge Vault,
+five quick-state slots, rewind and a seven-section Control Center. It does not yet
+provide gamepad remapping, Cartridge Vault,
 cheat/diagnostic/save-safety tools, WAV recording or boot-ROM selection. These
 are frontend gaps; the portable emulator core remains shared across Windows and
 Linux.
 
 Technical details and the German guide are available in
 [`LINUX_WAYLAND.md`](LINUX_WAYLAND.md).
+
+## 9. Verify the Linux shell
+
+The regular DesktopTests cover preferences, paths and save-state handling. An
+opt-in Wayland test also renders every Control Center section, checks mouse and
+keyboard routes, uses a generated test ROM for pause/save/load/turbo, and verifies
+resizing. It uses a hidden window and temporary settings/ROM/save files.
+
+```bash
+AETHERBOY_UI_TESTS=1 dotnet test --project tests/AetherBoy.DesktopTests
+```
+
+Set `AETHERBOY_UI_CAPTURE_DIR` to an absolute directory to retain screenshots.
+Set `AETHERBOY_TEXT_RENDERER=atlas` to verify the bundled font fallback even on a
+system with SDL3_ttf installed. Neither variable is needed for normal use.
+
+See [Windows-to-Linux UI mapping](LINUX_UI_PARITY.md) for implementation details
+and the remaining Windows-only tools.

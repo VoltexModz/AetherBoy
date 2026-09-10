@@ -12,6 +12,15 @@ internal static class LinuxSettingsStore
         public int AudioVolume { get; set; } = 75;
         public bool AudioEnabled { get; set; } = true;
         public Dictionary<LinuxInputAction, SDL.Scancode>? Keys { get; set; }
+        public LinuxVideoFilter VideoFilter { get; set; }
+        public int Frameskip { get; set; }
+        public int PaletteIndex { get; set; }
+        public int SaveSlot { get; set; } = 1;
+        public bool Channel1Enabled { get; set; } = true;
+        public bool Channel2Enabled { get; set; } = true;
+        public bool Channel3Enabled { get; set; } = true;
+        public bool Channel4Enabled { get; set; } = true;
+
     }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -45,6 +54,14 @@ internal static class LinuxSettingsStore
             var options = new LinuxFrontendOptions
             {
                 AudioEnabled = saved.AudioEnabled,
+                VideoFilter = Enum.IsDefined(saved.VideoFilter) ? saved.VideoFilter : LinuxVideoFilter.Sharp,
+                Frameskip = Math.Clamp(saved.Frameskip, 0, 2),
+                PaletteIndex = Math.Clamp(saved.PaletteIndex, 0, 4),
+                SaveSlot = Math.Clamp(saved.SaveSlot, 1, 5),
+                Channel1Enabled = saved.Channel1Enabled,
+                Channel2Enabled = saved.Channel2Enabled,
+                Channel3Enabled = saved.Channel3Enabled,
+                Channel4Enabled = saved.Channel4Enabled,
                 Keys = LinuxKeyBindings.FromDictionary(saved.Keys),
             };
             options.SetVolume(saved.AudioVolume);
@@ -69,6 +86,14 @@ internal static class LinuxSettingsStore
                 JsonSerializer.Serialize(stream, new Settings
                 {
                     AudioEnabled = options.AudioEnabled,
+                    VideoFilter = options.VideoFilter,
+                    Frameskip = options.Frameskip,
+                    PaletteIndex = options.PaletteIndex,
+                    SaveSlot = options.SaveSlot,
+                    Channel1Enabled = options.Channel1Enabled,
+                    Channel2Enabled = options.Channel2Enabled,
+                    Channel3Enabled = options.Channel3Enabled,
+                    Channel4Enabled = options.Channel4Enabled,
                     AudioVolume = Math.Clamp(options.AudioVolume, 0, 100),
                     Keys = options.Keys.ToDictionary(),
                 }, JsonOptions);

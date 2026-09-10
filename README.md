@@ -58,7 +58,7 @@ Der vollständige Zustandsvertrag aus Phase 4 bleibt erhalten und wurde für die
 | GBA-Backend | integriert, experimentell | `.gba`, 240×160, ARM/Thumb, Modi 0–5, Sprites, OBJ-Window, Alpha-Blending und Mosaic, PSG plus Direct Sound, remappbare L/R, Frameskip, eigene Save States/Rewind, sichere Raw-/CodeBreaker-/GameShark-v1/v2-Codes, HLE oder optionales Benutzer-BIOS sowie SRAM/Flash/EEPROM und GPIO-RTC sind angebunden. Open-Bus-Lanes, WAITCNT/Prefetch-Grenzen, WRAM-Abschaltung und EEPROM-Größenwechsel sind gehärtet; offen bleiben vor allem vollständig cycle-exaktes Timing, weitere Renderer-Kanten, Action Replay/PAR v3, der Link-UI-Host und ein echter Durchspielnachweis. |
 | NAudio-Ausgabe | verbessert, experimentell | Registermasken, DIV-APU, Power-On-Phase, Frame-Sequencer, Längenzähler, Trigger, Sweep, DAC, NR50/NR51, modellabhängiger Hochpass sowie DMG/CGB-Wave-RAM-Verhalten sind getestet; seltene APU-Revisionseffekte und hörbare Langzeitvergleiche bleiben offen. |
 | Control Center | implementiert, experimentell | Sieben Bereiche bündeln Live-Status, Filter, DMG-Paletten, Fenstergröße, Audiopegel und Kanäle, Eingabebelegung, Save Safety, Frameskip, Boot-ROM-Policy, Diagnose und sicheren Settings-Reset. Änderungen werden lokal persistent gespeichert. |
-| Linux-Wayland-Frontend | implementiert, experimentell | Native SDL3-Ausgabe mit Portal-Öffnen, Audio, Sharp/Smooth/LCD Grid, Frameskip, Paletten, Gamepad, fünf State-Slots und Rewind. Persistente Linux-Einstellungen, freie Eingabebelegung und die erweiterten Windows-Werkzeuge fehlen noch. |
+| Linux-Wayland-Frontend | implementiert, experimentell | Native SDL3-Ausgabe mit Portal-Öffnen, Audio, Sharp/Smooth/LCD Grid, Frameskip, Paletten, Gamepad, fünf State-Slots und Rewind. Aether-Oberfläche nach Windows-Vorlage, sieben Control-Center-Bereiche, persistente Einstellungen und freie Tastaturbelegung. Erweiterte Windows-Werkzeuge und Gamepad-Remapping fehlen noch. |
 | WAV-Aufnahme | verbessert, experimentell | Schreiben und Header-Finalisierung sind synchronisiert und getestet; Datei-I/O und Stop laufen außerhalb des UI- und Emulations-Threads. Lange Aufnahmen und Gerätefehler benötigen noch breitere Praxistests. |
 | Batterie-Spielstände | implementiert, experimentell | Kompatible `.sav`-Rohdaten werden atomar und spätestens alle 1.800 Frames geschrieben. Drei rotierende Backups und separate SHA-256-Wächter erkennen Truncation sowie nach dem ersten geschützten Schreibvorgang auch gleich große Verfälschungen; ältere ungeschützte `.sav`-Dateien bleiben ladbar. |
 | Save States | implementiert für GB/GBC/GBA | Fünf Slots (`.ss1` bis `.ss5`) und F5/F8 sind für alle drei Systeme aktiv. Zustände sind SHA-256-geschützt und an die exakte ROM, das Hardwaremodell und – wenn verwendet – das BIOS gebunden; inkompatible Schemata werden abgelehnt. |
@@ -83,7 +83,10 @@ bash scripts/run-linux.sh "/pfad/zu/deinem-spiel.gba"
 
 Hyprland wird separat erkannt. Einstieg: [Linux User Guide (English)](docs/LINUX_USER_GUIDE.md) ·
 [Linux/Wayland und Hyprland (Deutsch)](docs/LINUX_WAYLAND.md). Der
-Linux-Desktopadapter ist noch nicht funktionsgleich mit dem Windows-Control-Center.
+Linux-Desktopadapter übernimmt jetzt Hauptfenster und Control-Center-Aufbau aus
+Windows. Logo, Schrift und Text-Atlanten sind im Projekt und im Build enthalten.
+Die verbleibenden Funktionsunterschiede sind in der [UI-Zuordnung](docs/LINUX_UI_PARITY.md)
+dokumentiert.
 
 ### Windows
 

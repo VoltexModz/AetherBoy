@@ -93,7 +93,10 @@ bash scripts/run-linux.sh --audio-info
 | Schnellspeichern / laden | F5 / F8 |
 | Rewind-Schritt | F7 |
 | Vollbild | F11 |
-| Beenden | Escape |
+| Zurück / Fehler schließen / Vollbild verlassen | Escape |
+| Beenden | Fensterschaltfläche × / Compositor-Shortcut |
+| Control-Center-Fokus / Ausführen | Tab / Umschalt+Tab, dann Enter oder Leertaste |
+| Control-Center-Bereich wechseln | Strg+Tab / Strg+Umschalt+Tab |
 
 SDL3-Gamepads werden beim Start und über Hot-Plug erkannt. Batterie-Spielstände
 (`.sav`) und fünf Zustände (`.ss1` bis `.ss5`) liegen neben der ROM. Das Control
@@ -124,21 +127,28 @@ Wer KDEs Dateidialog bevorzugt, ersetzt in der letzten Zeile der Konfiguration
 Portal-Konfiguration sollte nicht blind überschrieben, sondern zusammengeführt
 werden.
 
+## Oberfläche und Assets
+
+Die Linux-Oberfläche übernimmt den Aufbau aus `frmNano.AetherUi.cs` und
+`frmControlCenter.cs`: Hauptanzeige links, Session-Leiste rechts, Aktionen unten
+und ein Control Center mit sieben Bereichen. Das Control Center öffnet sich
+innerhalb desselben SDL-Fensters. Hohe Hyprland-Kacheln und breite Fenster nutzen
+zusätzlichen Platz; das Spielbild behält sein Seitenverhältnis.
+
+Logo, Noto Sans Regular/Bold, Schriftlizenz und Text-Atlanten liegen unter
+`branding/` und werden beim Build nach `Assets/` kopiert. Es ist weder eine
+Systemschrift noch ein Download beim Start nötig. SDL3_ttf bleibt optional;
+ohne diese Bibliothek liefert der gebündelte Atlas geglättete Schrift.
+
+Tastaturbelegung, Lautstärke, Mute, Displayfilter, Frameskip, DMG-Palette,
+Audiokanäle und Save-Slot werden lokal in `settings.json` gespeichert.
+
 ## Aktuelle Grenze
 
-Der Linux-Host beherrscht Bild einschließlich Sharp/Smooth/LCD Grid,
-Tastatur/Gamepad, native SDL3-Audioausgabe, Portal-Öffnen, Pause, Turbo,
-Vollbild, Batterie-Saves, fünf Save-State-Slots und Rewind. Noch nicht auf dem
-Stand des Windows-Frontends sind persistente Einstellungen, freie
-Eingabebelegung, Cartridge Vault, Cheats-, Diagnose-, Save-Safety- und
-WAV-Werkzeuge sowie Boot-ROM-Auswahl. Der Emulator-Core selbst ist derselbe; die
-verbleibende Arbeit betrifft den Linux-Desktopadapter.
+Die Linux-UI bietet noch keine freie Gamepad-Belegung, Cartridge Vault,
+Boot-ROM-Auswahl, Cheats, Windows Audio Inspector/WAV-Aufnahme oder vollständige
+Save-Safety-Verwaltung. System und Diagnostics zeigen den tatsächlichen
+Linux-Status; die fehlenden Werkzeuge werden nicht als fertige Funktionen angeboten.
 
-WSLg ist für einen Backend-Smoke-Test geeignet, aber kein Ersatz für einen Test
-unter echtem Hyprland. Fehlt WSLs Mesa/EGL-Stack, kann SDL den Wayland-Treiber
-korrekt auswählen und trotzdem beim Erzeugen des Renderers scheitern.
-
-Scheitert nur Audio mit einer fehlenden `libpipewire`, `libpulse` oder `libasound`,
-muss die passende Clientbibliothek der Distribution installiert werden. AetherBoy
-fängt diesen Fehler beim normalen Spielstart ab und läuft dann bewusst stumm
-weiter, statt die Emulationssitzung zu beenden.
+Die genaue Zuordnung der Windows- und Linux-Dateien sowie der native UI-Test
+stehen in [LINUX_UI_PARITY.md](LINUX_UI_PARITY.md).
