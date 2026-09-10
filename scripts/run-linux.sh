@@ -27,6 +27,8 @@ if [[ ! -x "$application" ]]; then
 elif [[ -n "$(find \
     "$repository_root/frontends/AetherBoy.Desktop" \
     "$repository_root/nanoboy" \
+    "$repository_root/third_party/GBADotnet.Core" \
+    "$repository_root/Directory.Build.props" \
     "$repository_root/scripts/build-linux.sh" \
     -type f \
     ! -path '*/bin/*' \

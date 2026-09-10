@@ -231,7 +231,7 @@ public sealed class GbaVendoredCoreHardeningTests
 
         core.R[0] = 0x0200_0000;
         core.R[1] = 0x0300_0000;
-        core.R[2] = (1u << 24) | 2;
+        core.R[2] = (1u << 26) | 2;
         Assert.IsTrue(HleBios.TryHandleSwi(core, 0x0B));
         CollectionAssert.AreEqual(
             Encoding.ASCII.GetBytes("AETHER!!"),

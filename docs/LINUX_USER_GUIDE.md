@@ -65,6 +65,15 @@ asynchronous XDG Desktop Portal path:
 bash scripts/run-linux.sh
 ```
 
+The host shows loading and recoverable errors in the window. When a replacement
+ROM fails to initialize, the previous game resumes. Local `file://` drops and
+filenames with spaces are supported; extract archives before opening them.
+
+The larger game stage displays GBA at 3× in the default 1180×760 layout.
+When SDL3_ttf and a system Noto Sans or DejaVu Sans font are installed, the UI
+uses cached antialiased text. Otherwise it falls back to SDL's bitmap text;
+neither an extra font download nor SDL3_ttf is required to launch.
+
 To check desktop detection without opening a window:
 
 ```bash
@@ -103,7 +112,7 @@ If the command is not found, add `~/.local/bin` to your shell's `PATH`.
 | Function | Keyboard | Gamepad |
 | --- | --- | --- |
 | Direction | Arrow keys | D-pad or left stick |
-| A / B | Z / X | South / East |
+| A / B | Z / X physical positions (Y / X on German layouts) | South / East |
 | Start / Select | Enter / Backspace | Start / Back |
 | GBA L / R | Q / E | Left / right shoulder |
 | Pause | Space | — |
@@ -113,12 +122,33 @@ If the command is not found, add `~/.local/bin` to your shell's `PATH`.
 | Quick Save / Load | F5 / F8 | — |
 | Rewind one step | F7 | — |
 | Fullscreen | F11 | — |
-| Exit | Escape | — |
+| Close settings / dismiss error / leave fullscreen | Escape | — |
+| Next settings section | Tab, while settings are open | — |
+| Exit | Window close button / compositor close shortcut | — |
+
+These are the default bindings. To change them, open **Settings (C) → Input**,
+click the key next to an action, then press its replacement. Alternatively,
+select a binding with the arrow keys and press Enter. Escape cancels capture.
+An occupied key swaps with the previous binding, so every action stays usable.
+Movement, A/B, Start/Select, GBA L/R, turbo and pause can all be changed.
+O, C, Escape, F5/F7/F8/F11, 1–5 and Super remain reserved for the app or desktop.
+The reset button restores keyboard defaults; gamepads retain the standard layout.
+
+The sidebar displays the assigned key labels for your current keyboard layout.
+Losing window focus releases held controls and turbo. Escape during ordinary
+play no longer closes the application.
+
+**Settings (C) → Audio** provides a draggable 0–100% volume slider and **−1% / +1%**
+buttons. Left/Right also change the volume in 1% steps; Home selects 0% (silence)
+and End selects 100%. Low settings such as 1% or 5% are supported.
+Keyboard bindings, volume and mute save automatically to
+`$XDG_CONFIG_HOME/aetherboy/settings.json`, normally
+`~/.config/aetherboy/settings.json`, and load at the next start.
 
 Battery saves use `.sav`; quick states use `.ss1` through `.ss5`. They are
 stored next to the ROM, so the ROM directory must be writable. The Control
 Center exposes Sharp, Smooth and LCD Grid video, frameskip, five DMG palettes,
-master audio, all four hardware channels, input status and timeline controls.
+master audio, all four hardware channels, keyboard bindings and timeline controls.
 
 ## 6. Hyprland setup
 
@@ -184,7 +214,7 @@ read-only archive or protected mounted directory.
 The native frontend supports gameplay video, SDL3 audio, an XDG Portal open
 dialog, keyboard/gamepad input, pause, turbo, fullscreen, battery saves, all
 five quick-state slots, rewind and a four-page Control Center. It does not yet
-provide persistent Linux settings, free input remapping, Cartridge Vault,
+provide persistent display/channel settings, gamepad remapping, Cartridge Vault,
 cheat/diagnostic/save-safety tools, WAV recording or boot-ROM selection. These
 are frontend gaps; the portable emulator core remains shared across Windows and
 Linux.

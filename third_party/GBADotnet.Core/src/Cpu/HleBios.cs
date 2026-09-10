@@ -248,8 +248,10 @@ internal static class HleBios
         uint destination = core.R[1];
         uint control = core.R[2];
         int count = (int)(control & 0x1F_FFFF);
-        bool fill = (control & (1u << 26)) != 0;
-        bool word = fast || (control & (1u << 24)) != 0;
+        // BIOS control: bit 24 selects fixed-source fill; bit 26 selects
+        // 32-bit units (CpuFastSet always transfers words).
+        bool fill = (control & (1u << 24)) != 0;
+        bool word = fast || (control & (1u << 26)) != 0;
         int width = word ? 4 : 2;
         source &= word ? 0xFFFF_FFFCu : 0xFFFF_FFFEu;
         destination &= word ? 0xFFFF_FFFCu : 0xFFFF_FFFEu;
@@ -370,7 +372,10 @@ internal static class HleBios
     {
         uint source = core.R[0] & 0xFFFF_FFFCu;
         uint header = Read32(core, source);
-        int length = ValidateCompressedHeader(header, 0x10);
+        // SWI 0x11/0x12 select LZ77 themselves. Hardware consumes the upper
+        // 24-bit length and does not require the advisory low-byte type tag.
+        // Some ROM hacks use a nonstandard tag for otherwise valid streams.
+        int length = GetDecompressedLength(header);
         source += 4;
         byte[] output = new byte[length];
         int written = 0;
@@ -521,8 +526,14 @@ internal static class HleBios
     {
         if ((header & 0xF0) != expectedType)
             throw new InvalidDataException($"The GBA BIOS stream has an invalid 0x{expectedType:X2} header.");
+        return GetDecompressedLength(header);
+    }
+
+    private static int GetDecompressedLength(uint header)
+    {
         int length = (int)(header >> 8);
-        if (length is <= 0 or > MaximumDecompressedLength)
+        // Empty assets (header 0x00000010, for example) are legal no-ops.
+        if (length > MaximumDecompressedLength)
             throw new InvalidDataException("The GBA BIOS stream has an invalid output length.");
         return length;
     }

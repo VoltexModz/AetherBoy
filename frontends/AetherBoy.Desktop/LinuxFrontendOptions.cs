@@ -17,6 +17,7 @@ internal sealed class LinuxFrontendOptions
     public LinuxVideoFilter VideoFilter { get; set; } = LinuxVideoFilter.Sharp;
     public bool AudioEnabled { get; set; } = true;
     public int AudioVolume { get; set; } = 75;
+    public LinuxKeyBindings Keys { get; set; } = new();
     public bool Channel1Enabled { get; set; } = true;
     public bool Channel2Enabled { get; set; } = true;
     public bool Channel3Enabled { get; set; } = true;
@@ -24,6 +25,8 @@ internal sealed class LinuxFrontendOptions
     public int Frameskip { get; set; }
     public int PaletteIndex { get; set; }
     public int SaveSlot { get; set; } = 1;
+
+    public void SetVolume(int percent) => AudioVolume = Math.Clamp(percent, 0, 100);
 
     public SDL.ScaleMode TextureScaleMode => VideoFilter == LinuxVideoFilter.Smooth
         ? SDL.ScaleMode.Linear

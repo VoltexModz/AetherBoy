@@ -4,6 +4,24 @@ Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und no
 
 ## Unveröffentlicht – Nativer Linux-/Wayland-Desktop
 
+- Linux-Tastaturbelegung im Control Center frei änderbar: Aktion anklicken und
+  neue Taste drücken, einschließlich Bewegung, GBA L/R, Turbo und Pause.
+  Belegte Tasten werden getauscht; App-Shortcuts bleiben geschützt.
+- Master-Lautstärke mit Schieberegler von 0 bis 100 Prozent und feinen
+  1-Prozent-Schritten ergänzt. Tastaturbelegung, Lautstärke und Stummschaltung
+  werden atomisch in der XDG-Konfiguration gespeichert und beim Start geladen.
+- GBA-Start ohne BIOS repariert: eigener ARM-IRQ-Stub leitet Hardware-Interrupts
+  an den Cartridge-Handler weiter und stellt Register/CPSR wieder her.
+  CpuSet/CpuFastSet verwenden die korrekten Kopier-/Füllbits. LZ77 akzeptiert
+  leere Daten sowie abweichende Typkennungen wie beim BIOS-Aufruf; ungültige
+  Rückverweise bleiben abgefangen. Synthetische Regressionstests benötigen
+  weder ein Spiel noch Nintendo-Firmware.
+- Linux-Spieloberfläche mit größerer Spielfläche, optionaler Systemschrift,
+  klaren Lade-/Fehlerzuständen und direkten Pause-/Save-/Load-Aktionen überarbeitet.
+  Fehlgeschlagene ROM-Wechsel erhalten die vorige Sitzung. Fokusverlust löst
+  gehaltene Tasten; Escape beendet das Spiel nicht mehr versehentlich.
+- Launcher erkennt Änderungen am vendorten GBA-Kern und baut bei Bedarf neu.
+
 - Eigenen `net10.0`-Linux-Host auf SDL3-Basis ergänzt. Er verwendet denselben
   Core und Runtime-Vertrag wie das Windows-Frontend, rendert GB/GBC mit 160×144
   und GBA mit 240×160 und lädt `.gb`, `.gbc` und `.gba` per Kommandozeile oder

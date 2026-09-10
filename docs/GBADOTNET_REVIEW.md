@@ -69,6 +69,25 @@ single-owner-thread contract already used by GB/GBC:
   path. Without it, AetherBoy's own HLE handles common BIOS services including
   memory transfer and compression. No firmware is included.
 
+The September 2026 ROM-start review added an original six-instruction ARM IRQ
+bridge for HLE boot. It follows the cartridge callback convention documented in
+[Tonc](https://gbadev.net/tonc/interrupts.html#the-interrupt-process); supplied
+BIOS images are never overwritten. CpuSet now interprets bit 24 as fixed-source
+fill and bit 26 as word width. LZ77 uses the SWI-selected algorithm and the
+upper 24-bit output length, accepting empty streams and nonstandard type tags
+as the [mGBA BIOS reference](https://github.com/mgba-emu/mgba/blob/master/src/gba/bios.c)
+does, while retaining bounds checks on back-references.
+
+The changed HLE BIOS contents intentionally change the BIOS digest in GBA save
+states: older HLE save states are rejected by the existing identity check.
+Ordinary battery `.sav` data remains compatible.
+
+The Linux replacement-ROM path pauses the previous owner and stabilizes GBA
+at an instruction boundary before starting a candidate. This matters because
+the vendored CPU still has static instruction scratch fields. Independently
+running concurrent GBA sessions remain an architectural follow-up; the IRQ
+bridge is not a fix for that separate issue.
+
 GBA cheats use a separate validated EWRAM/IWRAM engine instead of applying GB
 address rules. It accepts raw patches, common CodeBreaker programs and raw or
 encrypted GameShark v1/v2 RAM writes. Action Replay/PAR v3 and complex
