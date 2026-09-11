@@ -23,8 +23,11 @@ namespace nanoboy.Controls
             ArgumentNullException.ThrowIfNull(form);
 
             form.SuspendLayout();
+            form.AutoScaleMode = AutoScaleMode.Dpi;
+            form.AutoScaleDimensions = new SizeF(96, 96);
 
             Size contentSize = form.ClientSize;
+            IButtonControl? acceptButton = form.AcceptButton, cancelButton = form.CancelButton;
             Size requestedMinimumSize = form.MinimumSize;
             Size requestedMaximumSize = form.MaximumSize;
             bool fixedSize = requestedMinimumSize.Width > 0 &&
@@ -64,9 +67,37 @@ namespace nanoboy.Controls
             {
                 Name = "aetherDialogBody",
                 BackColor = AetherColors.Void,
-                Bounds = new Rectangle(1, HeaderHeight + 1, contentSize.Width - 2, contentSize.Height - 1),
-                Dock = DockStyle.Fill
+                Bounds = new Rectangle(1, HeaderHeight + 1, contentSize.Width - 2, contentSize.Height - 2),
+                Dock = DockStyle.None,
+                Location = Point.Empty
             };
+            var viewport = new Panel
+            {
+                Name = "aetherDialogViewport", Dock = DockStyle.Fill,
+                AutoScroll = true, BackColor = AetherColors.Void
+            };
+            viewport.Controls.Add(body);
+            void FitBody()
+            {
+                float factor = form.DeviceDpi / 96f;
+                body.Size = new Size(Math.Max((int)((contentSize.Width - 2) * factor), viewport.ClientSize.Width),
+                    Math.Max((int)((contentSize.Height - 2) * factor), viewport.ClientSize.Height));
+            }
+            viewport.SizeChanged += (_, _) => FitBody();
+            void FitDialog()
+            {
+                Rectangle work = Screen.FromHandle(form.Handle).WorkingArea;
+                form.MinimumSize = Size.Empty;
+                form.MaximumSize = Size.Empty;
+                Size ideal = new Size((int)(contentSize.Width * form.DeviceDpi / 96f),
+                    (int)((contentSize.Height + HeaderHeight) * form.DeviceDpi / 96f));
+                form.Size = new Size(Math.Min(ideal.Width, work.Width), Math.Min(ideal.Height, work.Height));
+                form.Location = new Point(Math.Clamp(form.Left, work.Left, work.Right - form.Width),
+                    Math.Clamp(form.Top, work.Top, work.Bottom - form.Height));
+                FitBody();
+            }
+            form.Shown += (_, _) => FitDialog();
+            form.DpiChanged += (_, _) => FitDialog();
 
             foreach (Control control in existingControls)
             {
@@ -175,8 +206,11 @@ namespace nanoboy.Controls
             titleLabel.MouseDown += dragWindow;
             descriptionLabel.MouseDown += dragWindow;
 
-            form.Controls.Add(body);
+            form.Controls.Add(viewport);
             form.Controls.Add(header);
+            // Moving buttons out of Form.Controls can clear WinForms' default-button references.
+            form.AcceptButton = acceptButton;
+            form.CancelButton = cancelButton;
             Style(body.Controls);
 
             form.KeyDown += (_, eventArgs) =>
@@ -188,6 +222,7 @@ namespace nanoboy.Controls
             };
             form.Disposed += (_, _) => mark.Dispose();
             form.ResumeLayout(performLayout: true);
+            nanoboy.Input.GamepadNavigation.Attach(form);
             return body;
         }
 
@@ -323,7 +358,27 @@ namespace nanoboy.Controls
                     AetherColors.Muted,
                     TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             };
-            listView.DrawItem += (_, _) => { };
+            listView.DrawItem += (_, eventArgs) =>
+            {
+                if (listView.View == View.Details) return; // Sub-items paint the details view.
+                if (listView.View != View.LargeIcon) { eventArgs.DrawDefault = true; return; }
+                Rectangle bounds = eventArgs.Bounds;
+                using var fill = new SolidBrush(eventArgs.Item.Selected
+                    ? Color.FromArgb(39, 32, 68) : AetherColors.SurfaceRaised);
+                eventArgs.Graphics.FillRectangle(fill, bounds);
+                ImageList? images = listView.LargeImageList;
+                int imageIndex = eventArgs.Item.ImageIndex;
+                int imageHeight = images?.ImageSize.Height ?? 0;
+                if (images != null && imageIndex >= 0 && imageIndex < images.Images.Count)
+                    images.Draw(eventArgs.Graphics, bounds.Left + (bounds.Width - images.ImageSize.Width) / 2,
+                        bounds.Top + 2, imageIndex);
+                TextRenderer.DrawText(eventArgs.Graphics, eventArgs.Item.Text, listView.Font,
+                    new Rectangle(bounds.Left + 3, bounds.Top + imageHeight + 5,
+                        Math.Max(1, bounds.Width - 6), Math.Max(1, bounds.Height - imageHeight - 5)),
+                    eventArgs.Item.Selected ? AetherColors.Cyan : AetherColors.Text,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
+                if (eventArgs.Item.Focused) eventArgs.DrawFocusRectangle();
+            };
             listView.DrawSubItem += (_, eventArgs) =>
             {
                 bool selected = eventArgs.Item.Selected;

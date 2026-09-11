@@ -9,6 +9,7 @@ using System.Text.Json;
 using AetherBoy.Runtime;
 using nanoboy.Input;
 using nanoboy.Storage;
+using nanoboy.Platform.Audio;
 
 namespace nanoboy.Diagnostics
 {
@@ -187,6 +188,21 @@ namespace nanoboy.Diagnostics
                 });
         }
 
+        internal void RecordHealthHint(SessionHealthHint hint, SessionHealthSample sample) =>
+            Record("session.health_hint", new { code = hint.Code, duration_ms = hint.DurationMs,
+                audio_advancing = hint.AudioAdvancing, suspected_only = true, sample = HealthContext(sample) });
+
+        internal void RecordProblemMarker(SessionHealthSample? sample, SessionHealthSample? recentPlaying = null) =>
+            Record("session.problem_marked", new { source = "user", sample = HealthContext(sample), recent_playing = HealthContext(recentPlaying) });
+
+        private static object? HealthContext(SessionHealthSample? sample) => sample == null ? null : new
+        {
+            state = sample.State.ToString(), emulated_frames = sample.EmulatedFrames,
+            video_frames = sample.VideoFrames, presented_frames = sample.PresentedFrames,
+            audio_frames = sample.AudioFrames, ui_age_ms = sample.UiAgeMs,
+            has_video = sample.HasVideo, uniform_frame = sample.UniformRgb.HasValue, suppressed = sample.Suppressed
+        };
+
         internal void RecordException(string eventName, Exception? exception)
         {
             if (exception is null)
@@ -206,7 +222,8 @@ namespace nanoboy.Diagnostics
                 });
         }
 
-        internal void RecordHeartbeat(EmulationSnapshot snapshot, NanoboySettings settings)
+        internal void RecordHeartbeat(EmulationSnapshot snapshot, NanoboySettings settings,
+            AudioOutputSnapshot? audio = null, string? renderer = null, long presentedFrames = 0, long supersededFrames = 0)
         {
             ArgumentNullException.ThrowIfNull(snapshot);
             ArgumentNullException.ThrowIfNull(settings);
@@ -231,7 +248,18 @@ namespace nanoboy.Diagnostics
                     model = snapshot.Rom is null ? "NONE" : GetModelName(snapshot.Rom),
                     diagnostic_event_count = snapshot.DiagnosticEvents.Count,
                     audio_enabled = settings.AudioEnable,
-                    frameskip = settings.Frameskip
+                    frameskip = settings.Frameskip,
+                    audio_backend = audio?.Backend,
+                    audio_target_latency_ms = audio?.TargetLatencyMs,
+                    audio_buffered_ms = audio?.BufferedMs,
+                    audio_underruns = audio?.Underruns,
+                    audio_dropped_samples = audio?.DroppedSamples,
+                    audio_reconnects = audio?.Reconnects,
+                    audio_error = audio?.ErrorCode,
+                    video_renderer = renderer,
+                    video_presented_frames = presentedFrames,
+                    video_superseded_frames = supersededFrames,
+                    video_vsync_requested = settings.VideoVSync
                 });
         }
 

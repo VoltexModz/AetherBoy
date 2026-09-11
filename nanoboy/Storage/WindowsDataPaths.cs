@@ -21,6 +21,7 @@ internal sealed class WindowsDataPaths
     internal string Settings => Path.Combine(Root, "Settings");
     internal string Firmware => Path.Combine(Root, "Firmware");
     internal string Recordings => Path.Combine(Root, "Recordings");
+    internal string Screenshots => Path.Combine(Root, "Screenshots");
     internal string Development => Path.Combine(Root, "development");
     internal string Sessions => Path.Combine(Development, "Sessions");
     internal string CrashLogs => Path.Combine(ProductInfo.IsDevelopmentBuild ? Development : Root, "Crashes");

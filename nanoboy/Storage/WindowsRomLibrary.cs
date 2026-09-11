@@ -81,7 +81,7 @@ internal sealed class WindowsRomLibrary
         return Path.Combine(paths.States, GetIdentity(romPath), $"game.ss{slot}");
     }
 
-    private string GetIdentity(string romPath)
+    internal string GetIdentity(string romPath)
     {
         string fullPath = Path.GetFullPath(romPath);
         string? directory = Path.GetDirectoryName(fullPath);

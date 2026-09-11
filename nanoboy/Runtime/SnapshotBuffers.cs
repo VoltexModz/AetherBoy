@@ -99,30 +99,44 @@ namespace AetherBoy.Runtime
     {
         private readonly float[] samples;
 
-        internal AudioSamplesAvailableEventArgs(ReadOnlySpan<float> samples, int sampleRate)
+        internal AudioSamplesAvailableEventArgs(ReadOnlySpan<float> samples, int sampleRate, int channels = 1)
         {
             if (sampleRate <= 0)
             {
                 throw new ArgumentOutOfRangeException(nameof(sampleRate));
             }
 
+            if (channels is not (1 or 2) || samples.Length % channels != 0)
+                throw new ArgumentException("Audio must contain complete mono or stereo frames.", nameof(channels));
             this.samples = samples.ToArray();
+            Channels = channels;
             SampleRate = sampleRate;
         }
 
         public int SampleRate { get; }
-        public int SampleCount => samples.Length;
+        public int Channels { get; }
+        // Existing consumers receive one mono value per frame, including the Linux frontend.
+        public int SampleCount => samples.Length / Channels;
+        public int InterleavedSampleCount => samples.Length;
+        public float[] GetInterleavedSamplesCopy() => (float[])samples.Clone();
 
-        public float[] GetSamplesCopy() => (float[])samples.Clone();
+        public float[] GetSamplesCopy()
+        {
+            var mono = new float[SampleCount];
+            CopySamplesTo(mono);
+            return mono;
+        }
 
         public void CopySamplesTo(Span<float> destination)
         {
-            if (destination.Length < samples.Length)
+            if (destination.Length < SampleCount)
             {
                 throw new ArgumentException("The destination is too small for the audio samples.", nameof(destination));
             }
 
-            samples.CopyTo(destination);
+            if (Channels == 1) samples.CopyTo(destination);
+            else for (int frame = 0; frame < SampleCount; frame++)
+                destination[frame] = (samples[frame * 2] + samples[frame * 2 + 1]) * 0.5f;
         }
     }
 }

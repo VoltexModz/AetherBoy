@@ -9,7 +9,8 @@
     <Product>AetherBoy</Product>
     <Title>AetherBoy for Wayland</Title>
     <Description>Native Wayland frontend for AetherBoy.</Description>
-    <Authors>AetherBoy contributors</Authors>
+    <Authors>NekoZDevTeam; AetherBoy contributors</Authors>
+    <Company>NekoZDevTeam</Company>
     <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>

@@ -55,8 +55,8 @@ namespace nanoboy.Controls
                 }
             }
 
-            int sampleCount = System.Math.Min(32, waveform.Length);
-            if (sampleCount > 0)
+            int sampleCount = System.Math.Min(64, waveform.Length);
+            if (sampleCount > 1)
             {
                 var points = new PointF[sampleCount];
                 float usableHeight = System.Math.Max(1, Height - 18);

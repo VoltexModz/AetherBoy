@@ -2,6 +2,106 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+Gesamtübergabe des Windows-Entwicklungspakets vom 11. September 2026:
+[Deutsch / English: Änderungen, Linux-Verträge, Prüfung und nächste Schritte](docs/WINDOWS_DEVELOPMENT_HANDOFF.md).
+CI-Mindestumfang: 440 Tests unter Windows, 126 Runtime-Tests unter Linux.
+Der neue Patch-Lab-UI-Test verwendet einen expliziten WinForms-Kontext und prüft
+unerlaubte Threadzugriffe, damit asynchrone Abschlussanzeigen zuverlässig getestet werden.
+
+## Unveröffentlicht – UPS im Windows Patch Lab
+
+- UPS1 für GB/GBC/GBA direkt im vorhandenen C#-Patcher, ohne neue Bibliothek.
+  Basis-, Patch- und Ergebnis-CRC32 verpflichtend; begrenzte Größen/Positionen.
+- Ausdrückliches Rückpatchen mit demselben UPS-Patch. Vergrößern und Verkleinern
+  erzeugen die exakte Ergebnisgröße. Kein stilles Rückpatchen bei bereits gepatchter ROM.
+- Original und Hack bleiben erhalten; beim Rückpatchen auf einen bekannten
+  Bibliothekseintrag bleiben dessen Titel, Favoriten, Spielzeit, Profile und Saves bestehen.
+- Ungültige IPS-/BPS-/UPS-Patches zeigen jetzt zuverlässig den Fehlergrund im
+  Dialog; defekte optionale Bibliotheksmetadaten verbergen keinen erfolgreichen Import.
+- English: UPS apply/explicit undo, all three CRCs, exact output lengths and
+  existing-library data preservation. No new dependency or Linux frontend changes.
+- [DE/EN-Bedienung und Testgrenzen](docs/WINDOWS_PATCH_LAB_DIAGNOSTICS.md).
+
+## Unveröffentlicht – Patch Lab, Beobachtung und GBA Inspector (8–10)
+
+- IPS-/BPS-Patcher in der Bibliothek: Originale unverändert, begrenzte Parser,
+  BPS-CRC32-Prüfungen, eigene Saves, Hash-Provenienz und eigener Bibliothekstitel.
+- Unabhängiger Development-Beobachter für verdächtige UI-/Emulations-/Bildhänger,
+  lange Starts und einfarbige Ausgaben. Keine automatische Crash-Einstufung;
+  Unterdrückung bei Pause/Fokusverlust, „Problem markieren“ in Quick Deck/Control
+  Center. Weiterhin nur lokale, datenarme Berichte.
+- GBA Inspector aktiviert: PSG, Direct Sound A/B, FIFO/Timer/Routing/Pegel,
+  beide entpackten Wave-Bänke und Stereo-WAV mit 65.536 Hz.
+- Shared runtime additions available for future Linux integration; Linux frontend
+  unchanged. No mGBA implementation imported in this package.
+- [DE/EN-Anleitung, Referenzen und Testgrenzen](docs/WINDOWS_PATCH_LAB_DIAGNOSTICS.md).
+
+## Unveröffentlicht – Windows-Controller, Aufnahme und Stereo (4–6)
+
+- Controller-Navigation für die Aether-Dialoge, kompakte Bildschirmtastatur und
+  eigene ROM-Dateiauswahl. Fokuswechsel/Wiederverbinden verlangen Neutralstellung;
+  Menüeingaben werden vom Spiel getrennt, Remapping sperrt die Menünavigation.
+- Quick Deck mit F10, QUICK oder L3+R3: pausierte Bedienung von Slots,
+  Speichern/Laden, Anzeigeoptionen und Zugängen zu Bibliothek/Control Center/Galerie.
+- F12 für native Spielbild-PNGs unter der lokalen Screenshots-Ablage. F9 für
+  Präsentations-FPS, Bildabstände/P95 und Audiopufferdaten, ohne automatische Uploads.
+- Stereo für GB/GBC-Routing und GBA-PCM über die Runtime bis zur Windows-Ausgabe;
+  frame-ausgerichtete Puffer und Stereo-WAV im bestehenden GB/GBC-Aufnahmedialog.
+- Gemeinsame Runtime erweitert, Mono-Kompatibilitätsaufrufe für Linux beibehalten.
+  GB/GBC-State-Leser akzeptiert alte Mono-Audiopayloads; neue Stereo-Payloads sind
+  nicht rückwärtskompatibel mit älteren Builds. Batterie- und GBA-State-Formate unverändert.
+- Neue Tests und DE/EN-Hinweise einschließlich Übergabe an Linux:
+  [Controller / Screenshots / Stereo](docs/WINDOWS_PLAYER_TOOLS_STEREO.md).
+
+## Unveröffentlicht – Windows-Spielkomfort
+
+- State-Galerie (F6) mit fünf manuellen Slots, separatem Fortsetzen-Slot,
+  prüfsummengebundenen lokalen PNG-Vorschauen und vorherigen Rohdateien als `.bak`.
+  Fortsetzen-Sicherung etwa alle 60 Sekunden und beim regulären Beenden/Spielwechsel.
+- Letztes erfolgreiches State-Laden einmalig rückgängig machen (Strg+F8), ohne
+  manuelle Slots zu verändern. Vorheriger Pausenstatus bleibt erhalten.
+- Cartridge Vault mit Suche, GB/GBC/GBA-Filtern, Favoriten, Spielzeit, letzter Sitzung,
+  Sortierung und Kachel-/Listenansicht. Die bestehende Owner-Draw-Logik zeichnet
+  jetzt auch Bildkacheln; Fortsetzen ist eine ausdrückliche Bibliotheksaktion.
+- Spielprofile im Control Center: nur geänderte Audio-/Video-/Eingabewerte
+  überschreiben globale Vorgaben. Boot-ROM und Save-Slot bleiben global.
+- Atomare Metadatenablage, lesbare JSON-Sicherung und isolierte Windows-Tests für
+  Speicher-/Profil-/Bibliotheksabläufe. Die bestehende Batterie-Backup-Aktivierung
+  berücksichtigt die gemeinsame Speicheroperationssperre.
+- Keine Änderungen an Core, Runtime oder Linux durch dieses Paket. Anleitung,
+  Datenschutz und Grenzen auf Deutsch/Englisch: [Windows-Spielkomfort](docs/WINDOWS_GAME_COMFORT.md).
+
+## Unveröffentlicht – Windows Audio, Video und Bedienung
+
+- WASAPI Shared/Event als Windows-Standardausgabe, WinMM-Rückfallpfad, automatische
+  Wiederverbindung mit dem Windows-Standardgerät. Geräteverwaltung läuft auf einem
+  eigenen Thread; ein fehlendes Gerät schaltet die Audio-Einstellung nicht dauerhaft ab.
+- Begrenzter Mono-Ringpuffer, Vorpuffer und 20/40/60/100-ms-Zielwerte (Standard 40 ms).
+  Live-Anzeige von Backend, Gerät, Puffer, Unterläufen und verworfenen Samples.
+- Direct2D-Hardwareausgabe mit VSync-Schalter, Sharp/Smooth/LCD Grid und optionalem
+  Integer Scaling. Geräteverlust führt zunächst zur GDI-Ausgabe; begrenzte automatische
+  Neuversuche, erneuter Versuch auch durch Aus-/Einschalten der GPU-Option.
+- Windows-Timerpräzision während aktiver Emulation und 8-ms-Abfrage des neuesten Bilds.
+  Die Emulationsgeschwindigkeit bleibt unabhängig von der Bildwiederholrate.
+- Echtes randloses Vollbild auf dem aktuellen Monitor (F11 / Alt+Enter), Esc zum
+  Zurückkehren, Wiederherstellung des Fensters. Per-Monitor-V2-DPI und bei Bedarf
+  scrollbar erreichbare Dialoginhalte statt abgeschnittener Einstellungen.
+- Save-State-Rückmeldung für laufende, erfolgreiche und fehlgeschlagene Aktionen;
+  Control Center zeigt Existenz und Änderungsdatum des gewählten Slots.
+- Lokale Development-Heartbeats enthalten Audio-/Videozähler, keine Audiosamples
+  oder Gerätenamen aus der Windows-Ausgabe. Abhängigkeiten und Lizenzhinweise aktualisiert.
+- Umfang, Bedienung, Verifikation und offene Hardware-/Spieltests sind auf Deutsch
+  und Englisch in [Windows Audio / Video / UI](docs/WINDOWS_AUDIO_VIDEO_UI.md) dokumentiert.
+
+## Unveröffentlicht – NekoZDevTeam
+
+- NekoZDevTeam als aktuelles Entwicklerteam in Windows-Titelleiste, Über-Fenster,
+  deutschen/englischen READMEs und den Metadaten beider Frontends sichtbar gemacht.
+- Über-Fenster mit aktuellem GB/GBC/GBA-Status und Herkunft der Codebasis ergänzt.
+  Projektlink führt direkt zum gemeinsamen GitHub-Repository. Der Coffee-Button
+  ist bereits sichtbar. Bis die bestätigte Unterstützungsadresse vorliegt, zeigt er
+  „Kommt bald“ und öffnet beim Anklicken einen Hinweis statt einer externen Seite.
+
 ## Unveröffentlicht – Zentrale Windows-Daten und Entwicklungsdiagnose
 
 - Die normale Windows-Anwendung zeichnet im Development-Kanal automatisch lokal

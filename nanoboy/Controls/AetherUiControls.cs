@@ -202,7 +202,7 @@ namespace nanoboy.Controls
                 TextFormatFlags.EndEllipsis |
                 TextFormatFlags.NoPadding);
 
-            if (Focused && ShowFocusCues)
+            if (Focused)
             {
                 Rectangle focusBounds = Rectangle.Inflate(bounds, -5, -5);
                 ControlPaint.DrawFocusRectangle(graphics, focusBounds, foreground, Color.Transparent);

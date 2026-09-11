@@ -4,6 +4,12 @@
 
 <h1 align="center">AetherBoy</h1>
 
+<p align="center"><strong>by NekoZDevTeam</strong></p>
+
+Windows development update: stereo/WASAPI, GPU presentation, state gallery and resume,
+controller Quick Deck, per-game profiles and IPS/BPS/UPS Patch Lab.
+[What's changed, usage and Linux developer handoff (DE/EN)](docs/WINDOWS_DEVELOPMENT_HANDOFF.md#english).
+
 <p align="center">
   <strong lang="en">English</strong> · <a href="README_DE.md" lang="de">Deutsch</a>
 </p>
@@ -79,6 +85,9 @@ Both frontends share the same platform-neutral Core and Runtime. The available d
 | **Battery saves, five state slots, rewind** | Available | Available |
 | **Cartridge Vault, cheat management, Save Safety Center** | Available, partly experimental | Not yet available as complete tools |
 | **WAV recording and boot ROM selection** | Available | Not yet available in the interface |
+| **Quick Deck, state gallery/resume, per-game profiles, screenshots** | Available | Separate frontend follow-up |
+| **IPS / BPS / UPS Patch Lab** | Integrated; UPS undo is explicit | Shared parser available, no patching UI yet |
+| **Stereo playback** | GB/GBC/GBA end-to-end | Current output uses the compatible mono downmix |
 
 See [Windows → Linux: UI status](docs/LINUX_UI_PARITY.md) for the detailed mapping.
 
@@ -186,8 +195,10 @@ Managed Windows data lives under `%LOCALAPPDATA%\AetherBoy`:
 | --- | --- |
 | `Roms/<SHA-256>/` | Imported ROM copies with readable filenames |
 | `Saves/<SHA-256>/` | `game.sav`, RTC, integrity files and rotating backups |
-| `States/<SHA-256>/` | `game.ss1` through `game.ss5` |
-| `Settings/` | `settings.json`, last readable backup and recent ROM history |
+| `States/<SHA-256>/` | `game.ss1`–`game.ss5`, `game.resume`, previews and previous-state backups |
+| `Settings/` | `settings.json`, backup, recent ROM history and `Profiles/<SHA-256>.json` |
+| `Library/` | Per-ROM title, favorites, playtime and preview metadata |
+| `Screenshots/<SHA-256>/` | Manually captured native-resolution gameplay PNGs |
 | `Firmware/` | Optional user-supplied boot ROMs/BIOS |
 | `Recordings/` | Default destination for manually saved WAV recordings |
 | `development/Sessions/` | Diagnostic session reports |
@@ -246,6 +257,10 @@ The default A/B bindings use physical key positions. AetherBoy displays the assi
 
 ROMs and boot ROMs are not included and are not required to build the project.
 
+New GB/GBC states include stereo audio history: new builds can read old mono states,
+but older builds cannot read the new extension. Battery saves and GBA state formats
+are unchanged by this update. [Compatibility details](docs/WINDOWS_DEVELOPMENT_HANDOFF.md#english).
+
 ## Compatibility and remaining work
 
 **GB / GBC:** MBC1, MBC1M, MBC2, MBC3 with RTC and MBC5 are implemented. According to the documented matrix, the selected Blargg sound suites pass 12/12 tests each on DMG and CGB. This does not replace full playthrough testing or represent an overall compatibility rate. Special mappers such as MMM01, MBC4, Pocket Camera and HuC1/HuC3 are rejected; exact pixel FIFO behavior and some timing effects remain unfinished.
@@ -260,7 +275,7 @@ Details and reproducible results: [Compatibility matrix](COMPATIBILITY.md) · [G
 
 The solution separates **Core**, **Runtime** and **desktop frontends**. A dedicated owner thread owns the emulation state; the interfaces communicate through typed commands and immutable snapshots. NuGet lockfiles and the pinned SDK keep builds reproducible.
 
-The [GitHub Actions CI](.github/workflows/ci.yml) builds and tests the solution on Windows, plus the Core, Runtime and native desktop host on Linux. Pushes to `main` and `development` are checked, and the Windows job requires at least **354 tests**. Linux CI checks frontend logic and platform detection; actual Wayland UI tests run separately in a suitable session.
+The [GitHub Actions CI](.github/workflows/ci.yml) builds and tests the solution on Windows, plus the Core, Runtime and native desktop host on Linux. Pushes to `main` and `development` are checked, and the Windows job requires at least **440 tests**. Linux CI checks frontend logic and platform detection; actual Wayland UI tests run separately in a suitable session.
 
 <details>
 <summary><strong>Test commands and development tools</strong></summary>
@@ -308,6 +323,7 @@ This learning and regression tool writes `artifacts/gba-prototype.bmp`. It is in
 
 | Topic | Start here |
 | --- | --- |
+| Current Windows development package | [DE/EN handoff, shared contracts, test results and follow-ups](docs/WINDOWS_DEVELOPMENT_HANDOFF.md) |
 | Project status and next steps | [English](docs/PROJECT_STATUS_EN.md) · [Deutsch](docs/PROJECT_STATUS_DE.md) |
 | Linux setup and usage | [User Guide (EN)](docs/LINUX_USER_GUIDE.md) · [Wayland / Hyprland (DE)](docs/LINUX_WAYLAND.md) |
 | Windows and Linux interfaces | [UI mapping and remaining features](docs/LINUX_UI_PARITY.md) |
@@ -319,7 +335,10 @@ Found a bug? Open an [issue](https://github.com/VoltexModz/AetherBoy/issues) wit
 
 ## License and origins
 
-AetherBoy began in 2014 as **nanoboy** by **Frédéric Meyer**, continued as **ChiiBoy Color**, and is now being modernized under the AetherBoy name. Authorship and copyright remain with the original authors and later contributors.
+**NekoZDevTeam** develops and maintains AetherBoy across Windows and Linux.
+We are bringing our former team name back to life through this shared project.
+
+AetherBoy began in 2014 as **nanoboy** by **Frédéric Meyer**, continued as **ChiiBoy Color**, and is now being modernized by NekoZDevTeam under the AetherBoy name. Authorship and copyright remain with the original authors and later contributors.
 
 The emulator code is licensed under **GPL-3.0-only**; see [LICENSE](LICENSE). Third-party components, particularly the MIT-licensed GBADotnet core and bundled fonts, have their own licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 

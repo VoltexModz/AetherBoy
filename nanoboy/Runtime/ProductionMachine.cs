@@ -315,7 +315,8 @@ namespace AetherBoy.Runtime
         {
             AudioSamplesAvailable?.Invoke(
                 this,
-                new AudioSamplesAvailableEventArgs(eventArgs.Buffer, eventArgs.SampleRate));
+                new AudioSamplesAvailableEventArgs(eventArgs.StereoBuffer ?? eventArgs.Buffer,
+                    eventArgs.SampleRate, eventArgs.StereoBuffer is null ? 1 : 2));
         }
 
         private void ThrowIfDisposed()

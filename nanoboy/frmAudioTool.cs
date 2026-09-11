@@ -30,6 +30,10 @@ namespace nanoboy
         private Task recordingStartTask = Task.CompletedTask;
         private Task<bool> recordingStopTask = Task.FromResult(true);
         private bool isClosing;
+        private Label directSoundStatus = null!;
+        private Label mixStatus = null!;
+        private float peakLeft, peakRight;
+        private long audioReceivedAt;
 
         public frmAudioTool()
         {
@@ -41,15 +45,14 @@ namespace nanoboy
             AetherDialog.Apply(
                 this,
                 "APU TELEMETRY // 06",
-                "Live-Inspektion der vier Hardwarekanäle und verlustfreie WAV-Aufnahme",
+                "GB/GBC: vier PSG-Kanäle · GBA: PSG + Direct Sound A/B · Stereo-WAV",
                 showMinimize: true);
         }
 
         private void ConfigureAetherLayout()
         {
-            ClientSize = new System.Drawing.Size(900, 590);
+            ClientSize = new System.Drawing.Size(900, 710);
             MinimumSize = Size;
-            MaximumSize = Size;
 
             groupBox1.Location = new System.Drawing.Point(24, 24);
             groupBox1.Size = new System.Drawing.Size(180, 220);
@@ -79,10 +82,18 @@ namespace nanoboy
             groupBox5.Size = new System.Drawing.Size(318, 238);
             groupBox5.Text = "NOISE CHANNEL // LFSR";
 
-            checkBox1.Location = new System.Drawing.Point(24, 536);
+            var directGroup = new GroupBox { Text = "DIRECT SOUND // GBA · LIVE SNAPSHOT",
+                Bounds = new System.Drawing.Rectangle(24, 514, 852, 102) };
+            directSoundStatus = new Label { Name = "audioDirectSoundStatus", AutoSize = false,
+                Bounds = new System.Drawing.Rectangle(16, 26, 820, 64), Text = "Kein GBA-Spiel aktiv." };
+            directGroup.Controls.Add(directSoundStatus); Controls.Add(directGroup);
+            mixStatus = new Label { Name = "audioStereoMixStatus", AutoSize = false,
+                Bounds = new System.Drawing.Rectangle(24, 668, 852, 28), Text = "Stereo-Mix: noch keine Audiodaten." };
+            Controls.Add(mixStatus);
+            checkBox1.Location = new System.Drawing.Point(24, 636);
             checkBox1.Text = "LIVE REFRESH";
 
-            btnRecordWav.Location = new System.Drawing.Point(646, 526);
+            btnRecordWav.Location = new System.Drawing.Point(646, 626);
             btnRecordWav.Size = new System.Drawing.Size(230, 42);
             btnRecordWav.Text = "AUDIO AUFNEHMEN  //  WAV";
             if (btnRecordWav is AetherButton recordButton)
@@ -104,6 +115,7 @@ namespace nanoboy
                 }
 
                 DetachSession();
+                Volatile.Write(ref audioReceivedAt, 0);
                 Volatile.Write(ref session, value);
                 if (value != null)
                 {
@@ -116,6 +128,18 @@ namespace nanoboy
             object? sender,
             AudioSamplesAvailableEventArgs eventArgs)
         {
+            if (ReferenceEquals(sender, Volatile.Read(ref session)))
+            {
+                float[] samples = eventArgs.GetInterleavedSamplesCopy();
+                float left = 0, right = 0;
+                for (int i = 0; i < samples.Length; i += eventArgs.Channels)
+                {
+                    left = Math.Max(left, Math.Abs(samples[i]));
+                    right = Math.Max(right, Math.Abs(samples[i + eventArgs.Channels - 1]));
+                }
+                Volatile.Write(ref peakLeft, left); Volatile.Write(ref peakRight, right);
+                Volatile.Write(ref audioReceivedAt, Environment.TickCount64);
+            }
             EmulationSession? sourceSession = Volatile.Read(ref recordingSession);
             if (!ReferenceEquals(sender, sourceSession) || !recorder.IsRecording)
             {
@@ -124,7 +148,7 @@ namespace nanoboy
 
             try
             {
-                recorder.AddSamples(eventArgs.GetSamplesCopy());
+                recorder.AddFrames(eventArgs);
             }
             catch (Exception exception)
             {
@@ -222,8 +246,17 @@ namespace nanoboy
             AudioSnapshot? audio = Volatile.Read(ref session)?.LatestSnapshot.Audio;
             if (audio == null)
             {
+                directSoundStatus.Text = "Kein Spiel aktiv.";
+                mixStatus.Text = "Stereo-Mix: keine Audiodaten.";
                 return;
             }
+
+            directSoundStatus.Text = audio.DirectSoundA is not null && audio.DirectSoundB is not null
+                ? DescribeDirectSound("A", audio.DirectSoundA) + "\r\n" + DescribeDirectSound("B", audio.DirectSoundB)
+                : "GB/GBC verwendet die vier PSG-Kanäle oben. Direct Sound gibt es nur bei GBA.";
+            bool freshAudio = Environment.TickCount64 - Volatile.Read(ref audioReceivedAt) < 500;
+            mixStatus.Text = $"MIX · L {(freshAudio ? Volatile.Read(ref peakLeft) : 0):P0} · R {(freshAudio ? Volatile.Read(ref peakRight) : 0):P0}" +
+                $" · letzter Audioblock · {audio.SampleRate:N0} Hz · WAV: Stereo vor Windows-Lautstärke";
 
             PulseChannelSnapshot channel1 = audio.Channel1;
             PulseChannelSnapshot channel2 = audio.Channel2;
@@ -235,7 +268,7 @@ namespace nanoboy
             levelDisplayControl2.Level =
                 (int)(channel2.Volume / 16f * levelDisplayControl2.Height);
             levelDisplayControl3.Level =
-                channel3.OutputLevel * levelDisplayControl3.Height;
+                channel3.Enabled && channel3.On ? (int)(channel3.OutputGain * levelDisplayControl3.Height) : 0;
             levelDisplayControl4.Level =
                 (int)(channel4.Volume / 16f * levelDisplayControl4.Height);
 
@@ -265,6 +298,7 @@ namespace nanoboy
                 channel3.SoundLength +
                 (!channel3.StopsWhenLengthExpires ? " (ignored)" : "");
             waveDataControl1.WaveForm = channel3.GetWaveRamCopy();
+            groupBox4.Text = audio.DirectSoundA == null ? "WAVE CHANNEL // 32 SAMPLES" : "WAVE CHANNEL // 2 BANKS · 64 SAMPLES";
 
             labelNClockFreq.Text = channel4.ClockFrequency.ToString();
             labelNDividingRatio.Text = channel4.DividingRatio.ToString();
@@ -282,6 +316,10 @@ namespace nanoboy
         {
             timer1.Enabled = checkBox1.Checked;
         }
+
+        private static string DescribeDirectSound(string name, DirectSoundChannelSnapshot channel) =>
+            $"FIFO {name} · Sample {channel.CurrentSample,4} · Füllung {channel.FifoSamples}/32 · Timer {channel.Timer} · " +
+            $"Pegel {(channel.FullVolume ? 100 : 50)}% · L {(channel.LeftEnabled ? "AN" : "AUS")} / R {(channel.RightEnabled ? "AN" : "AUS")} · Master {(channel.MasterEnabled ? "AN" : "AUS")}";
 
         private void DetachSession()
         {
@@ -366,7 +404,7 @@ namespace nanoboy
             btnRecordWav.Enabled = false;
             btnRecordWav.Text = "Aufnahme wird gestartet…";
 
-            recordingStartTask = Task.Run(() => recorder.Start(filePath, sampleRate));
+            recordingStartTask = Task.Run(() => recorder.Start(filePath, sampleRate, channels: 2));
             try
             {
                 await recordingStartTask.ConfigureAwait(true);

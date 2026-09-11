@@ -17,13 +17,17 @@ namespace nanoboy.Core.Audio
 
     public sealed class AudioAvailableEventArgs : EventArgs
     {
-        public AudioAvailableEventArgs(float[] buffer, int sampleRate)
+        public AudioAvailableEventArgs(float[] buffer, int sampleRate, float[] stereoBuffer = null)
         {
             Buffer = buffer ?? throw new ArgumentNullException(nameof(buffer));
             SampleRate = sampleRate;
+            if (stereoBuffer != null && stereoBuffer.Length != buffer.Length * 2)
+                throw new ArgumentException("Stereo buffer must match the mono frame count.", nameof(stereoBuffer));
+            StereoBuffer = stereoBuffer;
         }
 
         public float[] Buffer { get; }
+        public float[] StereoBuffer { get; }
         public int SampleRate { get; }
     }
 
@@ -62,6 +66,8 @@ namespace nanoboy.Core.Audio
 
         private readonly AudioSampleClock sampleClock;
         private readonly List<float> sampleBuffer;
+        private readonly List<float> stereoBuffer = new(2_048);
+        private float leftCapacitor, rightCapacitor;
         private readonly bool dmgMode;
         private int sampleRate;
         private int frameSequencerDivider;
@@ -122,8 +128,10 @@ namespace nanoboy.Core.Audio
                 sampleRate = value;
                 highPassChargeFactor = CalculateHighPassChargeFactor(value);
                 highPassCapacitor = 0f;
+                leftCapacitor = rightCapacitor = 0f;
                 sampleClock.Reset();
                 sampleBuffer.Clear();
+                stereoBuffer.Clear();
             }
         }
 
@@ -149,6 +157,7 @@ namespace nanoboy.Core.Audio
             }
 
             float sample = 0f;
+            float leftSample = 0f, rightSample = 0f;
             if (Enabled && Powered)
             {
                 float channel1 = Channel1.Enabled ? Channel1.Next(SampleRate) : 0f;
@@ -168,6 +177,8 @@ namespace nanoboy.Core.Audio
                 float leftGain = (((masterVolume >> 4) & 7) + 1) * (1f / 8f);
                 float rightGain = ((masterVolume & 7) + 1) * (1f / 8f);
                 sample = Math.Clamp((left * leftGain + right * rightGain) * 0.125f, -1f, 1f);
+                leftSample = Math.Clamp(left * leftGain * 0.25f, -1f, 1f);
+                rightSample = Math.Clamp(right * rightGain * 0.25f, -1f, 1f);
             }
 
             bool capacitorConnected =
@@ -175,6 +186,8 @@ namespace nanoboy.Core.Audio
                 (Channel1.DacEnabled || Channel2.DacEnabled ||
                  Channel3.DacEnabled || Channel4.DacEnabled);
             sampleBuffer.Add(ApplyHighPass(sample, capacitorConnected));
+            stereoBuffer.Add(FilterOutput(leftSample, capacitorConnected, ref leftCapacitor));
+            stereoBuffer.Add(FilterOutput(rightSample, capacitorConnected, ref rightCapacitor));
             if (sampleBuffer.Count < BufferSize)
             {
                 return;
@@ -182,8 +195,9 @@ namespace nanoboy.Core.Audio
 
             AudioAvailable?.Invoke(
                 this,
-                new AudioAvailableEventArgs(sampleBuffer.ToArray(), SampleRate));
+                new AudioAvailableEventArgs(sampleBuffer.ToArray(), SampleRate, stereoBuffer.ToArray()));
             sampleBuffer.Clear();
+            stereoBuffer.Clear();
         }
 
         internal void ResetTiming()
@@ -192,8 +206,10 @@ namespace nanoboy.Core.Audio
             frameSequencerStep = 0;
             skipNextFrameSequencerClock = false;
             highPassCapacitor = 0f;
+            leftCapacitor = rightCapacitor = 0f;
             sampleClock.Reset();
             sampleBuffer.Clear();
+            stereoBuffer.Clear();
         }
 
         internal void ResetHardware()
@@ -252,13 +268,16 @@ namespace nanoboy.Core.Audio
         }
 
         internal float ApplyHighPass(float input, bool capacitorConnected)
+            => FilterOutput(input, capacitorConnected, ref highPassCapacitor);
+
+        private float FilterOutput(float input, bool capacitorConnected, ref float capacitor)
         {
             if (!capacitorConnected) {
                 return 0f;
             }
 
-            float output = input - highPassCapacitor;
-            highPassCapacitor = input - output * highPassChargeFactor;
+            float output = input - capacitor;
+            capacitor = input - output * highPassChargeFactor;
             return Math.Clamp(output, -1f, 1f);
         }
 
@@ -344,6 +363,10 @@ namespace nanoboy.Core.Audio
                 WriteNestedPayload(writer, Channel2.CaptureStatePayload());
                 WriteNestedPayload(writer, Channel3.CaptureStatePayload());
                 WriteNestedPayload(writer, Channel4.CaptureStatePayload());
+                writer.Write(0x53544552); // Optional STER extension; earlier mono payloads remain readable.
+                writer.Write(leftCapacitor);
+                writer.Write(rightCapacitor);
+                foreach (float value in stereoBuffer) writer.Write(value);
             });
         }
 
@@ -393,6 +416,21 @@ namespace nanoboy.Core.Audio
                 Action restoreChannel2 = Channel2.PrepareStateRestore(ReadNestedPayload(reader));
                 Action restoreChannel3 = Channel3.PrepareStateRestore(ReadNestedPayload(reader));
                 Action restoreChannel4 = Channel4.PrepareStateRestore(ReadNestedPayload(reader));
+                float nextLeft = nextHighPassCapacitor, nextRight = nextHighPassCapacitor;
+                var nextStereo = new float[nextSampleCount * 2];
+                if (reader.BaseStream.Position < reader.BaseStream.Length)
+                {
+                    if (reader.ReadInt32() != 0x53544552) throw new InvalidOperationException("Unknown audio state extension.");
+                    nextLeft = reader.ReadSingle(); nextRight = reader.ReadSingle();
+                    if (!float.IsFinite(nextLeft) || !float.IsFinite(nextRight) || Math.Abs(nextLeft) > 1 || Math.Abs(nextRight) > 1)
+                        throw new InvalidOperationException("Invalid stereo capacitor state.");
+                    for (int n = 0; n < nextStereo.Length; n++)
+                    {
+                        nextStereo[n] = reader.ReadSingle();
+                        if (!float.IsFinite(nextStereo[n])) throw new InvalidOperationException("Invalid stereo sample.");
+                    }
+                }
+                else for (int n = 0; n < nextSampleCount; n++) nextStereo[n * 2] = nextStereo[n * 2 + 1] = nextSamples[n];
 
                 return (Action)(() => {
                     Enabled = nextEnabled;
@@ -400,6 +438,7 @@ namespace nanoboy.Core.Audio
                     masterVolume = nextMasterVolume;
                     outputRouting = nextOutputRouting;
                     highPassCapacitor = nextHighPassCapacitor;
+                    leftCapacitor = nextLeft; rightCapacitor = nextRight;
                     sampleRate = nextSampleRate;
                     highPassChargeFactor = CalculateHighPassChargeFactor(nextSampleRate);
                     BufferSize = nextBufferSize;
@@ -409,6 +448,7 @@ namespace nanoboy.Core.Audio
                     skipNextFrameSequencerClock = nextSkipFrameSequencerClock;
                     sampleBuffer.Clear();
                     sampleBuffer.AddRange(nextSamples);
+                    stereoBuffer.Clear(); stereoBuffer.AddRange(nextStereo);
                     restoreChannel1();
                     restoreChannel2();
                     restoreChannel3();
@@ -445,6 +485,7 @@ namespace nanoboy.Core.Audio
             disposed = true;
             AudioAvailable = null;
             sampleBuffer.Clear();
+            stereoBuffer.Clear();
         }
     }
 }

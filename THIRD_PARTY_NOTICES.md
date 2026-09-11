@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-This file records direct package dependencies declared by the repository as inspected on 2026-08-01. It does not relicense those components or replace their upstream license files.
+This file records package dependencies and provenance, updated through the Windows development package on 2026-09-11. It does not relicense those components or replace their upstream license files.
 
 ## Direct dependencies
 
@@ -31,6 +31,10 @@ compatibility screenshot or UI project is redistributed.
 | Scope | Package | Version | Declared license | Upstream |
 | --- | --- | ---: | --- | --- |
 | Windows frontend | NAudio.WinMM | 2.3.0 | MIT | <https://github.com/naudio/NAudio> |
+| Windows audio | NAudio.Wasapi | 2.3.0 | MIT | <https://github.com/naudio/NAudio> |
+| Windows GPU presentation | Vortice.Direct2D1 / DXGI / DirectX | 3.8.3 | MIT | <https://github.com/amerkoleci/Vortice.Windows> |
+| Windows GPU dependency | Vortice.Mathematics | 2.1.0 | MIT | <https://github.com/amerkoleci/Vortice.Mathematics> |
+| Windows COM dependencies | SharpGen.Runtime / Runtime.COM | 2.4.2-beta | MIT | <https://github.com/SharpGenTools/SharpGenTools> |
 | Linux Wayland frontend | SDL3-CS | 3.4.16 | Zlib | <https://github.com/edwardgushchin/SDL3-CS> |
 | Linux Wayland native runtime | SDL3-CS.Linux | 3.4.16 | Zlib | <https://github.com/edwardgushchin/SDL3-CS> |
 | Test/build | MSTest.Sdk | 4.3.2 | MIT | <https://github.com/microsoft/testfx> |
@@ -49,13 +53,29 @@ altered source versions to be marked, and requires the notice to remain in sourc
 distributions. The complete upstream notice is included in both resolved NuGet
 packages; its terms are not replaced by this summary.
 
-## NAudio.WinMM and NAudio.Core 2.3.0
+## NAudio.WinMM, NAudio.Wasapi and NAudio.Core 2.3.0
 
 The NuGet packages declare the MIT license, link to the NAudio repository, identify repository commit `c89fee940ee6f8d7374d18714a6b85d8b7a18ab0`, and record:
 
 Copyright © Mark Heath 2023
 
 Copyright © Mark Heath 2026
+
+## Vortice and SharpGen Windows presentation dependencies
+
+The resolved Vortice.Direct2D1, Vortice.DXGI and Vortice.DirectX 3.8.3 NuGet
+packages identify upstream commit `9e609cb9439c9872aa1b339f177e40ec96f77239`.
+These packages and Vortice.Mathematics 2.1.0 declare MIT and record:
+
+Copyright (c) Amer Koleci and Contributors
+
+SharpGen.Runtime and SharpGen.Runtime.COM 2.4.2-beta are dependencies selected
+by Vortice 3.8.3, not standalone core replacements. They declare MIT and record:
+
+(c) 2010-2017 Alexandre Mutel, 2017-2023 Jeremy Koritzinsky, 2023-2024 Amer Koleci
+
+The complete MIT text below applies with these notices. Direct2D, DXGI and WASAPI
+themselves are Windows system APIs; no Windows system DLL is bundled.
 
 ## MSTest.Sdk 4.3.2
 
@@ -74,6 +94,15 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Before publishing binaries, audit the actual publish directory and retain every license or notice required by the resolved runtime packages.
+
+## Patch Lab format references (no additional runtime dependency)
+
+The BPS format specification by byuu is marked public domain:
+https://github.com/Alcaro/Flips/blob/master/bps_spec.md
+The bounded C# IPS/BPS/UPS reader in `nanoboy/Runtime/Cartridges/RomPatcher.cs` is an
+AetherBoy implementation. The supplied mGBA source archive's feature list and
+IPS handling were reviewed for reference; no mGBA implementation or core was
+imported as part of the Patch Lab / diagnostics / Inspector package.
 
 ## Bundled Noto Sans UI fonts
 

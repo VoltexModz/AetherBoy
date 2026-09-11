@@ -11,12 +11,13 @@ namespace AetherBoy.Runtime.Audio
         private FileStream? fs;
         private BinaryWriter? writer;
         private int sampleRate;
+        private int channels = 1;
         private int sampleCount;
         private bool isRecording;
 
         public bool IsRecording => Volatile.Read(ref isRecording);
 
-        public void Start(string filePath, int rate = 44100)
+        public void Start(string filePath, int rate = 44100, int channels = 1)
         {
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -27,6 +28,7 @@ namespace AetherBoy.Runtime.Audio
             {
                 throw new ArgumentOutOfRangeException(nameof(rate), rate, "The sample rate must be between 8 kHz and 192 kHz.");
             }
+            if (channels is not (1 or 2)) throw new ArgumentOutOfRangeException(nameof(channels));
 
             if (!Monitor.TryEnter(sync))
             {
@@ -38,6 +40,7 @@ namespace AetherBoy.Runtime.Audio
             {
                 StopCore();
                 sampleRate = rate;
+                this.channels = channels;
                 sampleCount = 0;
                 FileStream? pendingStream = null;
                 BinaryWriter? pendingWriter = null;
@@ -52,7 +55,7 @@ namespace AetherBoy.Runtime.Audio
                         bufferSize: 16_384,
                         FileOptions.SequentialScan);
                     pendingWriter = new BinaryWriter(pendingStream, Encoding.UTF8, leaveOpen: true);
-                    WritePlaceholderHeader(pendingWriter, sampleRate);
+                    WritePlaceholderHeader(pendingWriter, sampleRate, channels);
 
                     fs = pendingStream;
                     writer = pendingWriter;
@@ -87,6 +90,7 @@ namespace AetherBoy.Runtime.Audio
 
             lock (sync)
             {
+                if (samples.Length % channels != 0) throw new ArgumentException("Incomplete PCM frame.", nameof(samples));
                 if (!Volatile.Read(ref isRecording) || writer == null)
                 {
                     return;
@@ -94,7 +98,7 @@ namespace AetherBoy.Runtime.Audio
 
                 foreach (float sample in samples)
                 {
-                    float clamped = Math.Max(-1.0f, Math.Min(1.0f, sample));
+                    float clamped = float.IsFinite(sample) ? Math.Clamp(sample, -1, 1) : 0;
                     short pcm = (short)(clamped * 32767f);
                     try
                     {
@@ -106,6 +110,25 @@ namespace AetherBoy.Runtime.Audio
                         AbortCore();
                         throw;
                     }
+                }
+            }
+        }
+
+        public void AddFrames(AudioSamplesAvailableEventArgs frames)
+        {
+            ArgumentNullException.ThrowIfNull(frames);
+            lock (sync)
+            {
+                if (!isRecording) return;
+                if (frames.SampleRate != sampleRate)
+                { AbortCore(); throw new InvalidOperationException("Sample rate changed during WAV recording."); }
+                if (channels == 1) AddSamples(frames.GetSamplesCopy());
+                else if (frames.Channels == 2) AddSamples(frames.GetInterleavedSamplesCopy());
+                else
+                {
+                    float[] mono = frames.GetSamplesCopy(), stereo = new float[mono.Length * 2];
+                    for (int n = 0; n < mono.Length; n++) stereo[n * 2] = stereo[n * 2 + 1] = mono[n];
+                    AddSamples(stereo);
                 }
             }
         }
@@ -182,7 +205,7 @@ namespace AetherBoy.Runtime.Audio
             }
         }
 
-        private static void WritePlaceholderHeader(BinaryWriter destination, int rate)
+        private static void WritePlaceholderHeader(BinaryWriter destination, int rate, int channels)
         {
             destination.Write(Encoding.ASCII.GetBytes("RIFF"));
             destination.Write(0);
@@ -190,10 +213,10 @@ namespace AetherBoy.Runtime.Audio
             destination.Write(Encoding.ASCII.GetBytes("fmt "));
             destination.Write(16);
             destination.Write((short)1);
-            destination.Write((short)1);
+            destination.Write((short)channels);
             destination.Write(rate);
-            destination.Write(checked(rate * sizeof(short)));
-            destination.Write((short)sizeof(short));
+            destination.Write(checked(rate * channels * sizeof(short)));
+            destination.Write((short)(channels * sizeof(short)));
             destination.Write((short)16);
             destination.Write(Encoding.ASCII.GetBytes("data"));
             destination.Write(0);

@@ -58,7 +58,7 @@ jobs:
         run: dotnet build .\nanoboy.sln --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Test
-        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 354
+        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 440
 
   portable:
     name: Linux / Core + Runtime + native Wayland host
@@ -127,7 +127,7 @@ jobs:
         run: dotnet test --project ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 175
 
       - name: Test Runtime
-        run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 87
+        run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 126
 
       - name: Test native Wayland frontend logic
         run: dotnet test --project ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 15

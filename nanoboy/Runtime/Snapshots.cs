@@ -70,12 +70,14 @@ namespace AetherBoy.Runtime
             int outputLevel,
             int soundLength,
             bool stopsWhenLengthExpires,
-            ReadOnlySpan<byte> waveRam)
+            ReadOnlySpan<byte> waveRam,
+            float? outputGain = null)
         {
             Enabled = enabled;
             On = on;
             Frequency = frequency;
             OutputLevel = outputLevel;
+            OutputGain = outputGain ?? (outputLevel switch { 1 => 1f, 2 => .5f, 3 => .25f, _ => 0f });
             SoundLength = soundLength;
             StopsWhenLengthExpires = stopsWhenLengthExpires;
             this.waveRam = waveRam.ToArray();
@@ -85,6 +87,7 @@ namespace AetherBoy.Runtime
         public bool On { get; }
         public int Frequency { get; }
         public int OutputLevel { get; }
+        public float OutputGain { get; }
         public int SoundLength { get; }
         public bool StopsWhenLengthExpires { get; }
         public int WaveRamLength => waveRam.Length;
@@ -115,6 +118,10 @@ namespace AetherBoy.Runtime
         int SoundLength,
         bool StopsWhenLengthExpires);
 
+    public sealed record DirectSoundChannelSnapshot(
+        int CurrentSample, int FifoSamples, bool FullVolume,
+        bool LeftEnabled, bool RightEnabled, int Timer, bool MasterEnabled);
+
     public sealed class AudioSnapshot
     {
         internal AudioSnapshot(
@@ -123,7 +130,9 @@ namespace AetherBoy.Runtime
             PulseChannelSnapshot channel1,
             PulseChannelSnapshot channel2,
             WaveChannelSnapshot channel3,
-            NoiseChannelSnapshot channel4)
+            NoiseChannelSnapshot channel4,
+            DirectSoundChannelSnapshot? directSoundA = null,
+            DirectSoundChannelSnapshot? directSoundB = null)
         {
             Enabled = enabled;
             SampleRate = sampleRate;
@@ -131,6 +140,8 @@ namespace AetherBoy.Runtime
             Channel2 = channel2 ?? throw new ArgumentNullException(nameof(channel2));
             Channel3 = channel3 ?? throw new ArgumentNullException(nameof(channel3));
             Channel4 = channel4 ?? throw new ArgumentNullException(nameof(channel4));
+            DirectSoundA = directSoundA;
+            DirectSoundB = directSoundB;
         }
 
         public bool Enabled { get; }
@@ -139,6 +150,8 @@ namespace AetherBoy.Runtime
         public PulseChannelSnapshot Channel2 { get; }
         public WaveChannelSnapshot Channel3 { get; }
         public NoiseChannelSnapshot Channel4 { get; }
+        public DirectSoundChannelSnapshot? DirectSoundA { get; }
+        public DirectSoundChannelSnapshot? DirectSoundB { get; }
     }
 
     public sealed record CheatSnapshot(Guid Id, string Name, string Code, bool Enabled);

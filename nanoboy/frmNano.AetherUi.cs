@@ -135,12 +135,13 @@ namespace nanoboy
                 DockStyle.Top,
                 24);
             var productSignal = CreateUiLabel(
-                "AETHER WAVE // CORE 4.8",
+                $"by {ProductInfo.TeamName}",
                 7.5f,
                 FontStyle.Bold,
                 AetherColors.Muted,
                 DockStyle.Top,
                 18);
+            productSignal.Name = "aetherTeamSignature";
             nameStack.Controls.Add(productSignal);
             nameStack.Controls.Add(productName);
             identity.Controls.Add(nameStack);
@@ -269,7 +270,7 @@ namespace nanoboy
                 34,
                 ContentAlignment.MiddleCenter);
             var copy = CreateUiLabel(
-                "Zieh eine .GB- oder .GBC-Datei hierher.",
+                "Zieh eine .GB-, .GBC- oder .GBA-Datei hierher.",
                 9f,
                 FontStyle.Regular,
                 AetherColors.Muted,
@@ -394,7 +395,7 @@ namespace nanoboy
             layout.Controls.Add(aetherSaveSafetyButton, 0, 12);
 
             var hint = CreateUiLabel(
-                "SPACE HOLD · TURBO\r\nF5 SAVE · F8 LOAD",
+                "F10 QUICK · F12 PNG\r\nF9 LIVE · F5/F8 STATE",
                 7.5f,
                 FontStyle.Bold,
                 AetherColors.Muted,
@@ -427,6 +428,9 @@ namespace nanoboy
             open.Click += (_, _) => OpenRomFromAetherUi();
             aetherControlCenterButton = CreateActionButton("CONTROL", AetherButtonKind.Secondary, 94);
             aetherControlCenterButton.Click += (_, _) => OpenControlCenter();
+            AetherButton quick = CreateActionButton("QUICK", AetherButtonKind.Secondary, 82);
+            quick.Name = "aetherQuickMenuButton";
+            quick.Click += (_, _) => _ = OpenQuickMenuAsync();
             aetherPauseButton = CreateActionButton("PAUSE", AetherButtonKind.Secondary, 92);
             aetherPauseButton.Click += aetherPauseButton_Click;
             aetherRewindButton = CreateActionButton("REWIND", AetherButtonKind.Secondary, 94);
@@ -452,6 +456,7 @@ namespace nanoboy
 
             commands.Controls.Add(open);
             commands.Controls.Add(aetherControlCenterButton);
+            commands.Controls.Add(quick);
             commands.Controls.Add(aetherPauseButton);
             commands.Controls.Add(aetherRewindButton);
             commands.Controls.Add(aetherSaveButton);
@@ -558,6 +563,7 @@ namespace nanoboy
 
         private void aetherPauseButton_Click(object? sender, EventArgs e)
         {
+            if (stateOperationInProgress) return;
             EmulationSession? currentSession = session;
             if (currentSession == null)
             {
@@ -571,6 +577,7 @@ namespace nanoboy
 
         private void aetherTurboButton_Click(object? sender, EventArgs e)
         {
+            if (stateOperationInProgress) return;
             EmulationSession? currentSession = session;
             if (currentSession == null)
             {
@@ -592,7 +599,7 @@ namespace nanoboy
             bool hasSession = session != null && snapshot != null;
             bool hasRom = snapshot?.Rom != null;
             aetherEmptyState.Visible = !hasRom;
-            gameView.Visible = hasRom;
+            gameView.Visible = hasRom || immersiveFullscreen;
             if (!hasRom)
             {
                 aetherEmptyState.BringToFront();
@@ -647,7 +654,7 @@ namespace nanoboy
                 SessionState.Starting or SessionState.Running or SessionState.Stopping;
 
             bool actionsEnabled = hasSession && state is not SessionState.Stopping and not SessionState.Stopped and not SessionState.Faulted;
-            aetherPauseButton.Enabled = actionsEnabled;
+            aetherPauseButton.Enabled = actionsEnabled && !stateOperationInProgress;
             EmulationFeature features = snapshot?.Rom is null
                 ? EmulationFeature.GameBoyStandard
                 : snapshot.Features;
@@ -660,7 +667,7 @@ namespace nanoboy
                 snapshot?.Rom?.BatterySave.IsEnabled == true &&
                 snapshot.Rom.BatterySave.ExpectedLength > 0 &&
                 !stateOperationInProgress;
-            aetherTurboButton.Enabled = actionsEnabled;
+            aetherTurboButton.Enabled = actionsEnabled && !stateOperationInProgress;
             menuSaveState.Enabled = supportsSaveStates;
             menuRewind.Enabled = supportsRewind;
             menuCheats.Enabled = (features & EmulationFeature.Cheats) != 0;
@@ -732,6 +739,7 @@ namespace nanoboy
 
         private void ToggleAetherMaximize()
         {
+            if (immersiveFullscreen) SetImmersiveFullscreen(false);
             WindowState = WindowState == FormWindowState.Maximized
                 ? FormWindowState.Normal
                 : FormWindowState.Maximized;
@@ -740,7 +748,7 @@ namespace nanoboy
 
         private void ToggleAetherFullscreen()
         {
-            ToggleAetherMaximize();
+            SetImmersiveFullscreen(!immersiveFullscreen);
         }
 
         private void frmNano_AetherResize(object? sender, EventArgs e)
@@ -761,13 +769,29 @@ namespace nanoboy
             int normalizedScale = Math.Clamp(scale, 1, 4);
             int displayWidth = gameView.VideoGeometry.Width * normalizedScale;
             int displayHeight = gameView.VideoGeometry.Height * normalizedScale;
-            return new Size(
+            Size logicalSize = new Size(
                 Math.Max(860, displayWidth + 330),
-                Math.Max(620, displayHeight + 202));
+                Math.Max(646, displayHeight + 228));
+            double dpiScale = IsHandleCreated ? DeviceDpi / 96d : 1d;
+            return new Size((int)Math.Round(logicalSize.Width * dpiScale),
+                (int)Math.Round(logicalSize.Height * dpiScale));
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            if (keyData == Keys.F10) { _ = OpenQuickMenuAsync(); return true; }
+            if (keyData == Keys.F12) { _ = CaptureScreenshotAsync(); return true; }
+            if (keyData == Keys.F9) { TogglePerformanceOverlay(); return true; }
+            if (keyData == Keys.F11 || keyData == (Keys.Alt | Keys.Enter))
+            {
+                ToggleAetherFullscreen();
+                return true;
+            }
+            if (keyData == Keys.Escape && immersiveFullscreen)
+            {
+                SetImmersiveFullscreen(false);
+                return true;
+            }
             if (keyData == (Keys.Control | Keys.O))
             {
                 OpenRomFromAetherUi();
@@ -777,6 +801,17 @@ namespace nanoboy
             if (keyData == Keys.F5)
             {
                 QuickSave();
+                return true;
+            }
+
+            if (keyData == Keys.F6)
+            {
+                OpenStateGallery();
+                return true;
+            }
+            if (keyData == (Keys.Control | Keys.F8))
+            {
+                _ = LoadCheckpointAsync(0, undo: true);
                 return true;
             }
 
@@ -791,7 +826,7 @@ namespace nanoboy
 
         protected override void WndProc(ref Message message)
         {
-            if (message.Msg == WmNcHitTest && WindowState == FormWindowState.Normal)
+            if (message.Msg == WmNcHitTest && WindowState == FormWindowState.Normal && !immersiveFullscreen)
             {
                 base.WndProc(ref message);
                 if ((int)message.Result != 1)

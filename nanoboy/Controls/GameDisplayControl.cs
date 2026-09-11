@@ -6,6 +6,7 @@ using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using AetherBoy.Runtime;
+using nanoboy.Platform.Video;
 
 namespace nanoboy.Controls
 {
@@ -25,6 +26,39 @@ namespace nanoboy.Controls
         private Bitmap frameBitmap;
         private readonly ImageAttributes edgeWrapAttributes;
         private GameDisplayFilter filter;
+        private readonly Direct2DPresenter gpu = new();
+        private bool gpuEnabled = true, vsyncEnabled = true, integerScaling, printing;
+        private long paintedFrames;
+        private bool pendingFrame;
+        internal PresentationStatistics FrameTimings { get; } = new();
+
+        [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public string RendererStatus => gpuEnabled ? gpu.Backend : "GDI CPU";
+        [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public string? RendererError => gpu.ErrorCode;
+        [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public long SupersededFrames { get; private set; }
+        [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public long PresentedFrames => paintedFrames;
+
+        [DefaultValue(true)]
+        public bool GpuEnabled
+        {
+            get => gpuEnabled;
+            set { if (gpuEnabled == value) return; gpuEnabled = value; gpu.Reset(); DoubleBuffered = !value; Invalidate(); }
+        }
+        [DefaultValue(true)]
+        public bool VSyncEnabled
+        {
+            get => vsyncEnabled;
+            set { if (vsyncEnabled == value) return; vsyncEnabled = value; gpu.Reset(); Invalidate(); }
+        }
+        [DefaultValue(false)]
+        public bool IntegerScaling
+        {
+            get => integerScaling;
+            set { integerScaling = value; Invalidate(); }
+        }
 
         [Browsable(false)]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -66,7 +100,7 @@ namespace nanoboy.Controls
                 ControlStyles.UserPaint,
                 true);
 
-            DoubleBuffered = true;
+            DoubleBuffered = false; // Direct2D presents to the HWND; a GDI backbuffer must not overwrite it.
             BackColor = Color.Black;
             TabStop = true;
 
@@ -110,6 +144,8 @@ namespace nanoboy.Controls
                     nameof(pixels));
             }
 
+            if (pendingFrame) SupersededFrames++;
+            pendingFrame = true;
             Rectangle bounds = new Rectangle(0, 0, VideoGeometry.Width, VideoGeometry.Height);
             BitmapData bitmapData = frameBitmap.LockBits(
                 bounds,
@@ -142,6 +178,8 @@ namespace nanoboy.Controls
 
         public void ClearFrame()
         {
+            FrameTimings.Reset();
+            pendingFrame = false;
             using (Graphics graphics = Graphics.FromImage(frameBitmap))
             {
                 graphics.Clear(Color.Black);
@@ -152,6 +190,12 @@ namespace nanoboy.Controls
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            if (!printing && gpuEnabled && ClientSize.Width > 0 && ClientSize.Height > 0 &&
+                gpu.TryDraw(Handle, ClientSize, frameBitmap, GetDestinationRectangle(ClientSize), filter, vsyncEnabled))
+            {
+                CountPresentation();
+                return;
+            }
             e.Graphics.Clear(BackColor);
 
             if (ClientSize.Width > 0 && ClientSize.Height > 0)
@@ -185,7 +229,33 @@ namespace nanoboy.Controls
                 }
             }
 
+            if (!printing) CountPresentation();
             base.OnPaint(e);
+        }
+
+        private void CountPresentation()
+        {
+            if (pendingFrame)
+            {
+                paintedFrames++;
+                FrameTimings.Presented(System.Diagnostics.Stopwatch.GetTimestamp() * 1000d / System.Diagnostics.Stopwatch.Frequency);
+            }
+            pendingFrame = false;
+        }
+
+        protected override void OnHandleDestroyed(EventArgs e)
+        {
+            gpu.Reset();
+            base.OnHandleDestroyed(e);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            // Printing/DrawToBitmap targets a supplied DC, never the on-screen swap chain.
+            bool previous = printing;
+            if (m.Msg is 0x0317 or 0x0318) printing = true;
+            try { base.WndProc(ref m); }
+            finally { printing = previous; }
         }
 
         protected override bool IsInputKey(Keys keyData)
@@ -210,6 +280,7 @@ namespace nanoboy.Controls
             {
                 edgeWrapAttributes.Dispose();
                 frameBitmap.Dispose();
+                gpu.Dispose();
             }
 
             base.Dispose(disposing);
@@ -220,6 +291,7 @@ namespace nanoboy.Controls
             float scale = Math.Min(
                 clientSize.Width / (float)VideoGeometry.Width,
                 clientSize.Height / (float)VideoGeometry.Height);
+            if (integerScaling && scale >= 1) scale = MathF.Floor(scale);
 
             int width = Math.Max(1, (int)Math.Round(VideoGeometry.Width * scale));
             int height = Math.Max(1, (int)Math.Round(VideoGeometry.Height * scale));

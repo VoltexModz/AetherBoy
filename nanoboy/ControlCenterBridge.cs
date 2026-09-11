@@ -15,6 +15,18 @@ namespace nanoboy
         public required Action<int> SetWindowScale { get; init; }
         public required Action ToggleFullscreen { get; init; }
         public required Action ApplyAudioSettings { get; init; }
+        public Action ApplyVideoSettings { get; init; } = () => { };
+        public Func<string> AudioOutputProvider { get; init; } = () => "No output";
+        public Func<string> VideoOutputProvider { get; init; } = () => "No output";
+        public Func<string> SaveFeedbackProvider { get; init; } = () => "Noch keine Save-State-Aktion.";
+        public Action OpenStateGallery { get; init; } = () => { };
+        public Action OpenQuickMenu { get; init; } = () => { };
+        public Action CaptureScreenshot { get; init; } = () => { };
+        public Action TogglePerformanceOverlay { get; init; } = () => { };
+        public Action MarkProblem { get; init; } = () => { };
+        public Func<string> HealthStatusProvider { get; init; } = () => "Keine Beobachtung aktiv.";
+        public Action ToggleGameProfile { get; init; } = () => { };
+        public Action ResetGameProfile { get; init; } = () => { };
         public required Action<int> SetFrameskip { get; init; }
         public required Action<int> SetSaveSlot { get; init; }
         public required Action OpenControls { get; init; }

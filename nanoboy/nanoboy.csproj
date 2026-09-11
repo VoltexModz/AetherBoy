@@ -4,14 +4,15 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <RootNamespace>nanoboy</RootNamespace>
     <AssemblyName>AetherBoy</AssemblyName>
     <Product>AetherBoy</Product>
     <Title>AetherBoy</Title>
     <Description>Experimental Game Boy, Game Boy Color and Game Boy Advance emulator for Windows.</Description>
-    <Authors>Frédéric Meyer; AetherBoy contributors</Authors>
-    <Company>AetherBoy contributors</Company>
-    <Copyright>Copyright © 2014 Frédéric Meyer and contributors</Copyright>
+    <Authors>Frédéric Meyer; NekoZDevTeam; AetherBoy contributors</Authors>
+    <Company>NekoZDevTeam</Company>
+    <Copyright>Copyright © 2014 Frédéric Meyer and contributors; © 2026 NekoZDevTeam contributors</Copyright>
     <Version>4.8.0-alpha.1</Version>
     <AssemblyVersion>4.8.0.0</AssemblyVersion>
     <FileVersion>4.8.0.0</FileVersion>
@@ -28,6 +29,8 @@
   <ItemGroup>
     <AssemblyMetadata Include="AetherBoyChannel" Value="$(AetherBoyChannel)" />
     <PackageReference Include="NAudio.WinMM" Version="2.3.0" />
+    <PackageReference Include="NAudio.Wasapi" Version="2.3.0" />
+    <PackageReference Include="Vortice.Direct2D1" Version="3.8.3" />
   </ItemGroup>
 
   <ItemGroup>

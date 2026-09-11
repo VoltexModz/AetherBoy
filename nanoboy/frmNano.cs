@@ -34,10 +34,12 @@ namespace nanoboy
         private HostGamepadState lastPadState;
         private string currentRomPath;
         private bool stateOperationInProgress;
+        private Platform.Video.WindowsFrameTiming frameTiming;
         private bool batteryRecoveryNoticeShown;
         private bool testerRomIdentityRecorded;
         private bool currentSessionUsesExternalBootRom;
         private readonly WindowsTesterSession? testerSession;
+        private readonly WindowsSessionHealthMonitor? healthMonitor;
         private static readonly TimeSpan SessionShutdownTimeout = TimeSpan.FromSeconds(2);
 
         public frmNano() : this(null)
@@ -48,10 +50,22 @@ namespace nanoboy
         {
             this.testerSession = testerSession;
             InitializeComponent();
+            AutoScaleMode = AutoScaleMode.Dpi;
+            AutoScaleDimensions = new SizeF(96, 96);
+            frameTiming = new Platform.Video.WindowsFrameTiming(components);
+            updateTimer.Interval = 8; // Sample the latest frame without a second 60-Hz clock beating against the core.
             Branding.AppBrand.ApplyIcon(this);
             Text = ProductInfo.DisplayName;
             Deactivate += frmNano_Deactivate;
             settings = new NanoboySettings();
+            settings.ProfileSaveFailed += exception =>
+            {
+                testerSession?.RecordException("profile.save_failed", exception);
+                AetherSignal.Show(this, "Die Änderung konnte nicht im Spielprofil gespeichert werden.\n" +
+                    "Die bisherigen Einstellungen bleiben erhalten.\n\n" + exception.Message,
+                    "Spielprofil nicht gespeichert", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            };
+            Disposed += (_, _) => settings.Dispose();
             LoadConfiguration();
             RebuildRecentFilesMenu();
             SelectSaveSlot(settings.SaveSlot);
@@ -59,12 +73,28 @@ namespace nanoboy
             SetDisplayFilter(settings.DisplayFilterIndex);
             DarkTheme.Apply(this);
             InitializeAetherShell();
+            InitializeWindowsExperience();
+            InitializePlayerTools();
+            if (testerSession != null)
+            {
+                healthMonitor = new WindowsSessionHealthMonitor(testerSession);
+                Disposed += (_, _) => healthMonitor.Dispose();
+            }
             testerSession?.RecordWindowReady(settings);
             updateTimer.Start();
         }
 
-        private bool StopSession()
+        private bool StopSession(bool ownsStateOperation = false)
         {
+            if (stateOperationInProgress && !ownsStateOperation) return false;
+            if (session != null && currentRomPath != null)
+            {
+                FlushGameActivity();
+                SaveResumeBeforeStop(session, currentRomPath);
+            }
+            stateGallery?.Close();
+            undoQuickLoad = null;
+            frameTiming.SetActive(false);
             turboPressed = false;
             input.Clear();
             keyboardAdvanceButtons = GameBoyAdvanceButtons.None;
@@ -111,6 +141,7 @@ namespace nanoboy
             {
                 session = null;
                 currentRomPath = null;
+                settings.UseGameProfile(null);
             }
 
             UpdateAetherSessionUi(null);
@@ -141,7 +172,7 @@ namespace nanoboy
 
             try
             {
-                output.Submit(eventArgs.GetSamplesCopy(), eventArgs.SampleRate);
+                output.Submit(eventArgs.GetInterleavedSamplesCopy(), eventArgs.SampleRate, eventArgs.Channels);
             }
             catch (ObjectDisposedException)
             {
@@ -207,12 +238,13 @@ namespace nanoboy
             if (library.ShowDialog(this) == DialogResult.OK &&
                 library.SelectedRomPath is string path)
             {
-                LoadRomFile(path);
+                LoadRomFile(path, library.ResumeRequested);
             }
         }
 
-        internal void LoadRomFile(string path)
+        internal void LoadRomFile(string path, bool resume = false)
         {
+            if (stateOperationInProgress) { SetSaveFeedback("Bitte die laufende Speicheraktion abwarten", true); return; }
             if (!File.Exists(path))
             {
                 testerSession?.RecordRomLoadRejected(path, "file_missing");
@@ -254,6 +286,20 @@ namespace nanoboy
             }
 
             AddRecentFile(path);
+            try { settings.UseGameProfile(path); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                settings.UseGameProfile(null);
+                AetherSignal.Show(this, "Spielprofil nicht lesbar; globale Einstellungen werden verwendet.\n\n" + ex.Message,
+                    "Spielprofil", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            pendingResume = resume;
+            gamepadAwaitNeutral = true;
+            pendingPlaySeconds = 0;
+            activityTimestamp = 0;
+            activityWasRunning = false;
+            lastLibraryFlush = 0;
+            lastResumeSave = Environment.TickCount64;
             input.Clear();
             turboPressed = false;
             sessionFaultReported = false;
@@ -298,6 +344,7 @@ namespace nanoboy
             {
                 testerSession?.RecordException("rom.start_failed", exception);
                 preparedAudioOutput?.Dispose();
+                settings.UseGameProfile(null);
                 UpdateAetherSessionUi(null);
                 Debug.WriteLine($"Could not start emulation session for '{path}': {exception}");
                 AetherSignal.Show(this,
@@ -319,6 +366,7 @@ namespace nanoboy
             lastPadState = GamepadInput.GetState();
             UpdateAetherGamepadUi(lastPadState);
             gameView.ClearFrame();
+            SetSaveFeedback("F5 speichern · F8 laden · F6 State-Galerie · F11 Vollbild", false);
 
             if (audiotoolwindow != null && !audiotoolwindow.IsDisposed)
             {
@@ -326,6 +374,7 @@ namespace nanoboy
             }
 
             UpdateAetherSessionUi(session.LatestSnapshot);
+            ApplyGameProfilePreferences();
             updateTimer.Start();
             gameView.Focus();
         }
@@ -367,7 +416,7 @@ namespace nanoboy
         {
             try
             {
-                output = new NAudioSoundOut(44_100, settings.AudioVolume / 100f);
+                output = new NAudioSoundOut(44_100, settings.AudioVolume / 100f, settings.AudioLatencyMs);
                 return true;
             }
             catch (Exception exception) when (
@@ -464,6 +513,18 @@ namespace nanoboy
                 SetWindowScale = ResizeWindow,
                 ToggleFullscreen = ToggleAetherFullscreen,
                 ApplyAudioSettings = ApplyAudioSettingsFromControlCenter,
+                ApplyVideoSettings = ApplyWindowsVideoSettings,
+                AudioOutputProvider = DescribeWindowsAudio,
+                VideoOutputProvider = DescribeWindowsVideo,
+                SaveFeedbackProvider = () => saveFeedback,
+                OpenStateGallery = OpenStateGallery,
+                ToggleGameProfile = () => ChangeGameProfile(false),
+                ResetGameProfile = () => ChangeGameProfile(true),
+                OpenQuickMenu = () => _ = OpenQuickMenuAsync(),
+                CaptureScreenshot = () => _ = CaptureScreenshotAsync(),
+                TogglePerformanceOverlay = TogglePerformanceOverlay,
+                MarkProblem = MarkSessionProblem,
+                HealthStatusProvider = () => healthMonitor?.Status ?? "Development-Diagnose ist nicht aktiv.",
                 SetFrameskip = SetFrameskip,
                 SetSaveSlot = SelectSaveSlot,
                 OpenControls = () => new frmControls(settings).ShowDialog(controlCenter),
@@ -549,11 +610,12 @@ namespace nanoboy
                 return;
             }
 
+            if (stateOperationInProgress) { SetSaveFeedback("Bitte die laufende Speicheraktion abwarten", true); return; }
             stateOperationInProgress = true;
             updateTimer.Stop();
             try
             {
-                if (!StopSession())
+                if (!StopSession(ownsStateOperation: true))
                 {
                     AetherSignal.Show(
                         owner,
@@ -569,6 +631,7 @@ namespace nanoboy
                     savePath,
                     rom.BatterySave.ExpectedLength,
                     selectedSaveData);
+                stateOperationInProgress = false; // Disk restore finished; the regular ROM-start guard applies again.
                 LoadRomFile(romPath);
                 if (session != null)
                 {
@@ -588,6 +651,7 @@ namespace nanoboy
                 Debug.WriteLine($"Could not restore battery save: {exception}");
                 if (session == null && File.Exists(romPath))
                 {
+                    stateOperationInProgress = false;
                     LoadRomFile(romPath);
                 }
 
@@ -624,164 +688,8 @@ namespace nanoboy
             UpdateAetherSlotButtons();
         }
 
-        private async void QuickSave()
-        {
-            EmulationSession currentSession = session;
-            string romPath = currentRomPath;
-            int slot = settings.SaveSlot;
-            if (currentSession == null || string.IsNullOrEmpty(romPath) || stateOperationInProgress)
-            {
-                return;
-            }
-            stateOperationInProgress = true;
-            try
-            {
-                byte[] state = await currentSession.CaptureStateAsync().ConfigureAwait(true);
-                if (!ReferenceEquals(session, currentSession))
-                {
-                    return;
-                }
-
-                await WriteStateFileAtomicAsync(GetStatePath(romPath, slot), state)
-                    .ConfigureAwait(true);
-                testerSession?.RecordOperation(
-                    "quick_save",
-                    slot,
-                    succeeded: true);
-            }
-            catch (Exception exception)
-            {
-                testerSession?.RecordException("quick_save.failed", exception);
-                testerSession?.RecordOperation(
-                    "quick_save",
-                    slot,
-                    succeeded: false);
-                Debug.WriteLine($"Could not save state: {exception}");
-                AetherSignal.Show(this,
-                    $"Der Spielstand konnte nicht gespeichert werden.\n\n{exception.Message}",
-                    "Save State fehlgeschlagen",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-            }
-            finally
-            {
-                stateOperationInProgress = false;
-            }
-        }
-
-        private async void QuickLoad()
-        {
-            EmulationSession currentSession = session;
-            string romPath = currentRomPath;
-            int slot = settings.SaveSlot;
-            if (currentSession == null || string.IsNullOrEmpty(romPath) || stateOperationInProgress)
-            {
-                return;
-            }
-            string statePath = GetStatePath(romPath, slot);
-            if (!File.Exists(statePath))
-            {
-                testerSession?.RecordOperation(
-                    "quick_load",
-                    slot,
-                    succeeded: false,
-                    reason: "slot_empty");
-                AetherSignal.Show(this,
-                    $"In Slot {slot} ist noch kein Spielstand vorhanden.",
-                    "Kein Save State",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-                return;
-            }
-
-            stateOperationInProgress = true;
-            try
-            {
-                byte[] state = await ReadStateFileAsync(statePath).ConfigureAwait(true);
-                if (!ReferenceEquals(session, currentSession))
-                {
-                    return;
-                }
-
-                await currentSession.RestoreStateAsync(state).ConfigureAwait(true);
-                displayedFrameSequence = 0;
-                testerSession?.RecordOperation(
-                    "quick_load",
-                    slot,
-                    succeeded: true);
-            }
-            catch (Exception exception)
-            {
-                testerSession?.RecordException("quick_load.failed", exception);
-                testerSession?.RecordOperation(
-                    "quick_load",
-                    slot,
-                    succeeded: false);
-                Debug.WriteLine($"Could not load state: {exception}");
-                AetherSignal.Show(this,
-                    $"Der Spielstand konnte nicht geladen werden. Der laufende Zustand blieb unverändert.\n\n{exception.Message}",
-                    "Save State ungültig",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-            }
-            finally
-            {
-                stateOperationInProgress = false;
-            }
-        }
-
-        private static string GetStatePath(string romPath, int slot) =>
-            WindowsRomLibrary.Default.GetStatePath(romPath, slot);
-
-        private static async Task<byte[]> ReadStateFileAsync(string path)
-        {
-            using FileStream stream = new(
-                path,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                64 * 1024,
-                FileOptions.Asynchronous | FileOptions.SequentialScan);
-            if (stream.Length <= 0 || stream.Length > EmulatorStateCodec.MaximumDocumentLength)
-            {
-                throw new InvalidDataException(
-                    $"Die Datei muss zwischen 1 und {EmulatorStateCodec.MaximumDocumentLength} Bytes groß sein.");
-            }
-
-            byte[] state = new byte[(int)stream.Length];
-            await stream.ReadExactlyAsync(state).ConfigureAwait(false);
-            return state;
-        }
-
-        private static async Task WriteStateFileAtomicAsync(string path, byte[] state)
-        {
-            string fullPath = Path.GetFullPath(path);
-            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-            string temporaryPath = fullPath + ".tmp";
-            try
-            {
-                using (FileStream stream = new(
-                    temporaryPath,
-                    FileMode.Create,
-                    FileAccess.Write,
-                    FileShare.None,
-                    64 * 1024,
-                    FileOptions.Asynchronous | FileOptions.WriteThrough))
-                {
-                    await stream.WriteAsync(state).ConfigureAwait(false);
-                    await stream.FlushAsync().ConfigureAwait(false);
-                }
-
-                File.Move(temporaryPath, fullPath, overwrite: true);
-            }
-            finally
-            {
-                if (File.Exists(temporaryPath))
-                {
-                    File.Delete(temporaryPath);
-                }
-            }
-        }
+        private async void QuickSave() => await SaveCheckpointAsync(settings.SaveSlot);
+        private async void QuickLoad() => await LoadCheckpointAsync(settings.SaveSlot);
 
         private async void menuRewind_Click(object sender, EventArgs e)
         {
@@ -809,6 +717,7 @@ namespace nanoboy
                 }
                 else
                 {
+                    Volatile.Read(ref audioOutput)?.ClearBuffer();
                     displayedFrameSequence = 0;
                     testerSession?.RecordOperation(
                         "rewind",
@@ -1033,6 +942,7 @@ namespace nanoboy
 
         private void ResetSettingsToDefaults()
         {
+            if (settings.HasGameProfile) settings.ResetGameProfile();
             nanoboy.Properties.Settings.Default.Reset();
             SetPalette(settings.PaletteIndex);
             SetDisplayFilter(settings.DisplayFilterIndex);
@@ -1083,16 +993,6 @@ namespace nanoboy
 
         private void menuAudioInspector_Click(object sender, EventArgs e)
         {
-            if (session?.LatestSnapshot.Rom?.IsGameBoyAdvance == true)
-            {
-                AetherSignal.Show(this,
-                    "Die GBA-Audioausgabe ist aktiv. Der Audio Inspector zeigt derzeit nur die vier klassischen GB/C-PSG-Kanäle; GBA-Kanaltelemetrie folgt mit dem Audio-Hardening.",
-                    "GBA Audio Inspector",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-                return;
-            }
-
             if (audiotoolwindow != null && !audiotoolwindow.IsDisposed)
             {
                 audiotoolwindow.Session = session;
@@ -1110,16 +1010,21 @@ namespace nanoboy
         #region "Update"
         private void updateTimer_Tick(object sender, EventArgs e)
         {
+            healthMonitor?.Pulse(session, stateOperationInProgress || quickMenuOpen ||
+                WindowState == FormWindowState.Minimized || Form.ActiveForm != this, gameView.PresentedFrames);
             PollGamepad();
 
             EmulationSession currentSession = session;
             if (currentSession == null)
             {
+                frameTiming.SetActive(false);
+                UpdatePerformanceOverlay(null);
                 return;
             }
 
             if (currentSession.State == SessionState.Faulted && !sessionFaultReported)
             {
+                frameTiming.SetActive(false);
                 sessionFaultReported = true;
                 DisposeAudioOutput(currentSession);
                 if (audiotoolwindow != null && !audiotoolwindow.IsDisposed)
@@ -1139,6 +1044,11 @@ namespace nanoboy
             }
 
             EmulationSnapshot snapshot = currentSession.LatestSnapshot;
+            TrackGameActivity(snapshot);
+            UpdatePerformanceOverlay(snapshot);
+            bool running = snapshot.State == SessionState.Running;
+            frameTiming.SetActive(running && WindowState != FormWindowState.Minimized && !snapshot.IsTurboEnabled);
+            Volatile.Read(ref audioOutput)?.SetSuspended(!running || snapshot.IsTurboEnabled || stateOperationInProgress);
             if (snapshot.State == SessionState.Starting)
                 return;
 
@@ -1149,7 +1059,8 @@ namespace nanoboy
                     currentSessionUsesExternalBootRom);
                 testerRomIdentityRecorded = true;
             }
-            testerSession?.RecordHeartbeat(snapshot, settings);
+            testerSession?.RecordHeartbeat(snapshot, settings, Volatile.Read(ref audioOutput)?.Snapshot,
+                gameView.RendererStatus, gameView.PresentedFrames, gameView.SupersededFrames);
 
             if (gameView.VideoGeometry != snapshot.VideoGeometry)
             {
@@ -1160,7 +1071,7 @@ namespace nanoboy
 
             if (currentSession.TryCopyLatestFrame(displayFrame, ref displayedFrameSequence))
             {
-                gameView.Present(displayFrame);
+                if (WindowState != FormWindowState.Minimized) gameView.Present(displayFrame);
             }
 
             UpdateAetherSessionUi(snapshot);
@@ -1178,11 +1089,24 @@ namespace nanoboy
             }
         }
 
-        private void PollGamepad()
+        private void PollGamepad() => ProcessGamepadState(GamepadInput.GetState(), Form.ActiveForm == this && ContainsFocus && Enabled);
+
+        private void MarkSessionProblem()
         {
-            HostGamepadState padState = GamepadInput.GetState();
+            bool recorded = healthMonitor?.MarkProblem() == true;
+            SetSaveFeedback(recorded ? "Problemzeitpunkt lokal im Testbericht markiert" :
+                "Diagnose nicht aktiv oder Zeitpunkt gerade erst markiert", !recorded);
+        }
+
+        internal void ProcessGamepadState(HostGamepadState padState, bool ownsInputFocus)
+        {
             testerSession?.RecordGamepadIfChanged(padState);
             UpdateAetherGamepadUi(padState);
+
+            if (!ownsInputFocus || stateOperationInProgress || quickMenuOpen)
+            {
+                ReleaseGamepadInput(); gamepadAwaitNeutral = true; lastPadState = padState; return;
+            }
 
             if (session == null)
             {
@@ -1193,6 +1117,7 @@ namespace nanoboy
 
             if (!padState.IsConnected)
             {
+                gamepadAwaitNeutral = true;
                 if (lastPadState.IsConnected)
                 {
                     ReleaseGamepadInput();
@@ -1201,6 +1126,15 @@ namespace nanoboy
                 lastPadState = padState;
                 return;
             }
+
+            if (gamepadAwaitNeutral)
+            {
+                gamepadAwaitNeutral = !GamepadNavigationInput.Neutral(padState);
+                lastPadState = padState; return;
+            }
+            const HostGamepadButtons menuChord = HostGamepadButtons.LeftStick | HostGamepadButtons.RightStick;
+            if (padState.IsButtonDown(menuChord) && !lastPadState.IsButtonDown(menuChord))
+            { lastPadState = padState; _ = OpenQuickMenuAsync(); return; }
 
             GamepadBindings bindings = settings.GamepadBindings;
             GameBoyButtons gamepadButtons = GamepadMapper.ToGameBoyButtons(padState, bindings);
@@ -1533,12 +1467,14 @@ namespace nanoboy
             if (size <= 0) size = 2;
             if (aetherShellInitialized)
             {
+                if (immersiveFullscreen) SetImmersiveFullscreen(false);
                 if (WindowState != FormWindowState.Normal)
                 {
                     WindowState = FormWindowState.Normal;
                 }
 
                 ClientSize = GetAetherClientSize(size);
+                if (IsHandleCreated) FitWindowToScreen();
                 settings.VideoScaleFactor = Math.Clamp(size, 1, 4);
                 UpdateEmulatorSettings();
                 return;
@@ -1561,6 +1497,7 @@ namespace nanoboy
 
         private void LoadConfiguration()
         {
+            ApplyWindowsVideoSettings();
             menuAudioQ1.Enabled = false;
             menuAudioQ2.Enabled = false;
             menuAudioQ3.Enabled = false;
@@ -1578,7 +1515,8 @@ namespace nanoboy
             menuSize2.Checked = settings.VideoScaleFactor == 2;
             menuSize3.Checked = settings.VideoScaleFactor == 3;
             menuSize4.Checked = settings.VideoScaleFactor == 4;
-            ResizeWindow(settings.VideoScaleFactor);
+            if (!aetherShellInitialized) ResizeWindow(settings.VideoScaleFactor);
+            else UpdateEmulatorSettings();
             menuFrameSkip0.Checked = settings.Frameskip == 0;
             menuFrameSkip1.Checked = settings.Frameskip == 1;
             menuFrameSkip2.Checked = settings.Frameskip == 2;
@@ -1618,6 +1556,7 @@ namespace nanoboy
             if (activeOutput != null)
             {
                 activeOutput.Volume = settings.AudioVolume / 100f;
+                activeOutput.LatencyMs = settings.AudioLatencyMs;
             }
 
             ObserveSessionCommand(currentSession.ConfigureAsync(CreateEmulatorConfiguration()));

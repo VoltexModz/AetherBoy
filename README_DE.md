@@ -4,6 +4,12 @@
 
 <h1 align="center">AetherBoy</h1>
 
+<p align="center"><strong>by NekoZDevTeam</strong></p>
+
+Windows-Entwicklungsupdate: Stereo/WASAPI, GPU-Ausgabe, State-Galerie und Fortsetzen,
+Controller-Quick-Deck, Spielprofile und IPS-/BPS-/UPS-Patch Lab.
+[Änderungen, Bedienung und Übergabe an die Linux-Entwicklung (DE/EN)](docs/WINDOWS_DEVELOPMENT_HANDOFF.md#deutsch).
+
 <p align="center">
   <a href="README.md" lang="en">English</a> · <strong lang="de">Deutsch</strong>
 </p>
@@ -79,6 +85,9 @@ Beide Frontends verwenden denselben plattformneutralen Core und dieselbe Runtime
 | **Batterie-Saves, fünf State-Slots, Rewind** | Vorhanden | Vorhanden |
 | **Cartridge Vault, Cheat-Verwaltung, Save Safety Center** | Vorhanden, teils experimentell | Noch nicht als vollständige Werkzeuge verfügbar |
 | **WAV-Aufnahme und Boot-ROM-Auswahl** | Vorhanden | Noch nicht in der Oberfläche verfügbar |
+| **Quick Deck, State-Galerie/Fortsetzen, Spielprofile, Screenshots** | Vorhanden | Eigener Frontend-Folgeschritt |
+| **IPS-/BPS-/UPS-Patch Lab** | Integriert; UPS-Rückpatchen ausdrücklich wählbar | Gemeinsamer Parser vorhanden, noch keine Patch-Oberfläche |
+| **Stereo-Ausgabe** | GB/GBC/GBA durchgängig | Ausgabe verwendet weiterhin den kompatiblen Mono-Downmix |
 
 Die genaue Zuordnung steht in [Windows → Linux: UI-Stand](docs/LINUX_UI_PARITY.md).
 
@@ -187,8 +196,10 @@ Alle verwalteten Windows-Daten liegen unter `%LOCALAPPDATA%\AetherBoy`:
 | --- | --- |
 | `Roms/<SHA-256>/` | Lokale Kopie jeder geöffneten ROM, mit lesbarem Dateinamen |
 | `Saves/<SHA-256>/` | `game.sav`, RTC, Integritätsdateien und rotierende Backups |
-| `States/<SHA-256>/` | `game.ss1` bis `game.ss5` |
-| `Settings/` | `settings.json`, letzte lesbare Sicherung und ROM-Verlauf |
+| `States/<SHA-256>/` | `game.ss1`–`game.ss5`, `game.resume`, Vorschauen und vorherige States als Backup |
+| `Settings/` | `settings.json`, Sicherung, ROM-Verlauf und `Profiles/<SHA-256>.json` |
+| `Library/` | Titel, Favoriten, Spielzeit und Vorschaumetadaten je ROM |
+| `Screenshots/<SHA-256>/` | Manuell aufgenommene Spielbild-PNGs in nativer Auflösung |
 | `Firmware/` | Optional selbst bereitgestellte Boot-ROMs/BIOS |
 | `Recordings/` | Standardziel für manuell gespeicherte WAV-Aufnahmen |
 | `development/Sessions/` | Diagnoseberichte pro Programmstart |
@@ -250,6 +261,10 @@ Die A/B-Vorgaben beziehen sich auf die physischen Tastenpositionen. AetherBoy ze
 
 ROMs und Boot-ROMs werden nicht mitgeliefert und sind zum Bauen nicht erforderlich.
 
+Neue GB/GBC-States enthalten Stereo-Audiohistorie: Neue Builds lesen alte Mono-States,
+ältere Builds jedoch nicht die neue Erweiterung. Batterie-Saves und GBA-State-Formate
+bleiben in diesem Update unverändert. [Kompatibilitätsdetails](docs/WINDOWS_DEVELOPMENT_HANDOFF.md#deutsch).
+
 ## Kompatibilität und offene Arbeit
 
 **GB / GBC:** MBC1, MBC1M, MBC2, MBC3 mit RTC und MBC5 sind implementiert. Die ausgewählten Blargg-Soundsuiten bestehen laut dokumentierter Matrix auf DMG und CGB jeweils 12/12 Tests. Das ersetzt keinen Durchspieltest und ist keine pauschale Kompatibilitätsquote. Spezialmapper wie MMM01, MBC4, Pocket Camera und HuC1/HuC3 werden abgelehnt; exakte Pixel-FIFO- und einzelne Timing-Effekte bleiben offen.
@@ -264,7 +279,7 @@ Details und reproduzierbare Ergebnisse: [Kompatibilitätsmatrix](COMPATIBILITY.m
 
 Die Lösung trennt **Core**, **Runtime** und **Desktop-Frontends**. Der Emulationszustand gehört einem dedizierten Owner-Thread; die Oberflächen kommunizieren über typisierte Befehle und unveränderliche Snapshots. NuGet-Lockfiles und das gepinnte SDK halten den Build reproduzierbar.
 
-Die [GitHub-Actions-CI](.github/workflows/ci.yml) baut und testet die Lösung auf Windows sowie Core, Runtime und den nativen Desktop-Host auf Linux. Pushes auf `main` und `development` werden geprüft; das Windows-Gate fordert mindestens **354 Tests**. Die Linux-CI prüft Frontend-Logik und Plattform-Erkennung; echte Wayland-UI-Tests laufen separat in einer geeigneten Sitzung.
+Die [GitHub-Actions-CI](.github/workflows/ci.yml) baut und testet die Lösung auf Windows sowie Core, Runtime und den nativen Desktop-Host auf Linux. Pushes auf `main` und `development` werden geprüft; das Windows-Gate fordert mindestens **440 Tests**. Die Linux-CI prüft Frontend-Logik und Plattform-Erkennung; echte Wayland-UI-Tests laufen separat in einer geeigneten Sitzung.
 
 <details>
 <summary><strong>Testbefehle und Entwicklungswerkzeuge</strong></summary>
@@ -312,6 +327,7 @@ Dieser Lern- und Regressionpfad schreibt `artifacts/gba-prototype.bmp`. Er ist v
 
 | Thema | Einstieg |
 | --- | --- |
+| Aktuelles Windows-Entwicklungspaket | [DE/EN-Übergabe, gemeinsame Schnittstellen, Tests und nächste Schritte](docs/WINDOWS_DEVELOPMENT_HANDOFF.md) |
 | Projektstand und nächste Schritte | [Deutsch](docs/PROJECT_STATUS_DE.md) · [English](docs/PROJECT_STATUS_EN.md) |
 | Linux einrichten und bedienen | [Wayland / Hyprland (DE)](docs/LINUX_WAYLAND.md) · [User Guide (EN)](docs/LINUX_USER_GUIDE.md) |
 | Windows- und Linux-Oberfläche | [UI-Zuordnung und offene Funktionen](docs/LINUX_UI_PARITY.md) |
@@ -323,7 +339,10 @@ Fehler gefunden? Ein [Issue](https://github.com/VoltexModz/AetherBoy/issues) mit
 
 ## Lizenz und Herkunft
 
-AetherBoy begann 2014 als **nanoboy** von **Frédéric Meyer**, wurde als **ChiiBoy Color** weitergeführt und wird heute unter dem Namen AetherBoy modernisiert. Urheberschaft und Copyright verbleiben bei den ursprünglichen Autoren und späteren Beitragenden.
+**NekoZDevTeam** entwickelt und pflegt AetherBoy für Windows und Linux.
+Mit diesem gemeinsamen Projekt lassen wir unseren früheren Teamnamen wieder aufleben.
+
+AetherBoy begann 2014 als **nanoboy** von **Frédéric Meyer**, wurde als **ChiiBoy Color** weitergeführt und wird heute von NekoZDevTeam unter dem Namen AetherBoy modernisiert. Urheberschaft und Copyright verbleiben bei den ursprünglichen Autoren und späteren Beitragenden.
 
 Der Emulatorcode steht unter **GPL-3.0-only**; siehe [LICENSE](LICENSE). Drittanbieterkomponenten, insbesondere der MIT-lizenzierte GBADotnet-Kern und die gebündelten Schriften, besitzen eigene Lizenzen: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 

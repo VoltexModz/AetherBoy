@@ -21,6 +21,7 @@ namespace nanoboy
         private AetherStatusDot gamepadStatusDot = null!;
         private readonly Dictionary<GamepadBindingSlot, AetherButton> gamepadBindingButtons = new();
         private GamepadBindingSlot? capturedGamepadBinding;
+        internal bool IsCapturingGamepad => capturedGamepadBinding != null;
         private HostGamepadState lastCapturedGamepadState;
         private TextBox txtKeyL = null!;
         private TextBox txtKeyR = null!;

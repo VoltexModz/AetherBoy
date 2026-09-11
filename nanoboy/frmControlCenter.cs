@@ -23,6 +23,11 @@ namespace nanoboy
         private readonly List<AetherButton> paletteButtons = new();
         private readonly List<AetherButton> scaleButtons = new();
         private readonly List<AetherButton> volumeButtons = new();
+        private readonly List<AetherButton> latencyButtons = new();
+        private AetherButton gpuButton = null!, vsyncButton = null!, integerButton = null!;
+        private Label videoDetails = null!, stateFeedback = null!;
+        private Label profileDetails = null!;
+        private AetherButton profileButton = null!, profileResetButton = null!;
         private readonly List<AetherButton> frameskipButtons = new();
         private readonly List<AetherButton> slotButtons = new();
         private readonly AetherButton[] channelButtons = new AetherButton[4];
@@ -53,7 +58,7 @@ namespace nanoboy
             Text = "Aether Control Center";
             StartPosition = FormStartPosition.CenterParent;
             ShowInTaskbar = false;
-            ClientSize = new Size(1_060, 680);
+            ClientSize = new Size(1_080, 780);
             MinimumSize = Size;
             MaximumSize = Size;
             Branding.AppBrand.ApplyIcon(this);
@@ -238,20 +243,32 @@ namespace nanoboy
             AddSelector(geometry, new[] { "1×", "2×", "3×", "4×" }, 18, 50, 128, scaleButtons, index => bridge.SetWindowScale(index + 1));
             AddActionButton(geometry, "BORDERLESS FULLSCREEN", 570, 50, 198, bridge.ToggleFullscreen, AetherButtonKind.Primary);
             geometry.Controls.Add(CreateSmallLabel(
-                "Integer-Faktoren bewahren harte Pixelkanten; das Display bleibt unabhängig von der Fenstergröße im korrekten Seitenverhältnis.",
+                "F11 / Alt+Enter: Vollbild · Esc: zurück. Integer Scaling hält Pixel ganzzahlig; das Seitenverhältnis bleibt erhalten.",
                 18,
                 102,
                 750,
                 30));
+            AetherSurfacePanel renderer = CreateCard(page, 0, 520, 788, 154, "WINDOWS PRESENTATION");
+            gpuButton = AddActionButton(renderer, "GPU", 18, 38, 230, () =>
+            { bridge.Settings.GpuRendering = !bridge.Settings.GpuRendering; bridge.ApplyVideoSettings(); RefreshAll(); });
+            vsyncButton = AddActionButton(renderer, "VSYNC", 270, 38, 230, () =>
+            { bridge.Settings.VideoVSync = !bridge.Settings.VideoVSync; bridge.ApplyVideoSettings(); RefreshAll(); });
+            integerButton = AddActionButton(renderer, "INTEGER", 522, 38, 230, () =>
+            { bridge.Settings.IntegerScaling = !bridge.Settings.IntegerScaling; bridge.ApplyVideoSettings(); RefreshAll(); });
+            gpuButton.Name = "controlCenterGpuButton";
+            vsyncButton.Name = "controlCenterVSyncButton";
+            integerButton.Name = "controlCenterIntegerButton";
+            videoDetails = CreateSmallLabel("", 18, 94, 746, 50);
+            renderer.Controls.Add(videoDetails);
             return page;
         }
 
         private Panel BuildAudioPage()
         {
             Panel page = CreatePage("controlCenterPageAudio", "AUDIO", "Master-Ausgabe, Kanäle und Pegel");
-            AetherSurfacePanel master = CreateCard(page, 0, 72, 788, 112, "MASTER OUTPUT // WINMM");
+            AetherSurfacePanel master = CreateCard(page, 0, 72, 788, 112, "MASTER OUTPUT // WASAPI + WINMM FALLBACK");
             audioMasterButton = AddActionButton(master, "AUDIO ON", 18, 48, 200, ToggleAudio, AetherButtonKind.Primary);
-            audioDetails = CreateSmallLabel("Dynamische Core-Rate · Mono Host Mix · 100 ms Ziel-Latenz", 242, 50, 510, 32);
+            audioDetails = CreateSmallLabel("", 242, 34, 510, 74);
             master.Controls.Add(audioDetails);
 
             AetherSurfacePanel channels = CreateCard(page, 0, 200, 788, 124, "CHANNEL MATRIX");
@@ -281,6 +298,17 @@ namespace nanoboy
             AetherSurfacePanel tools = CreateCard(page, 0, 486, 788, 86, "SIGNAL TOOL");
             AddActionButton(tools, "OPEN AUDIO INSPECTOR", 18, 36, 260, bridge.OpenAudioInspector, AetherButtonKind.Secondary);
             tools.Controls.Add(CreateSmallLabel("Live-Kanäle, Frequenzen und Wave-RAM ansehen oder als WAV aufnehmen.", 298, 38, 460, 30));
+            AetherSurfacePanel latency = CreateCard(page, 0, 588, 788, 144, "OUTPUT LATENCY // WINDOWS DEFAULT DEVICE");
+            AddSelector(latency, new[] { "20 MS", "40 MS", "60 MS", "100 MS" }, 18, 38, 170,
+                latencyButtons, index =>
+                {
+                    bridge.Settings.AudioLatencyMs = new[] { 20, 40, 60, 100 }[index];
+                    bridge.ApplyAudioSettings();
+                    RefreshAll();
+                });
+            latency.Controls.Add(CreateSmallLabel(
+                "40 ms Standard. Bei Knacken 60/100 ms wählen. Gerätewechsel folgt Windows automatisch.\r\nZielpuffer ≠ Gesamtlatenz; Vorpuffer, Resampling und Treiber kommen hinzu. Der Core liefert derzeit Mono.",
+                18, 92, 748, 44));
             return page;
         }
 
@@ -324,6 +352,11 @@ namespace nanoboy
             page.Controls.Add(CreateFootnote(
                 "Save States (.ss1–.ss5) und originale Batterie-Saves (.sav) sind getrennte Systeme. Save Safety schützt ausschließlich Batterie-RAM.",
                 516));
+            stateFeedback = CreateSmallLabel("", 0, 566, 788, 72);
+            stateFeedback.Name = "controlCenterStateFeedback";
+            page.Controls.Add(stateFeedback);
+            AddActionButton(page, "STATE-GALERIE / FORTSETZEN / RÜCKGÄNGIG", 0, 650, 540,
+                bridge.OpenStateGallery, AetherButtonKind.Primary).Name = "controlCenterStateGalleryButton";
             return page;
         }
 
@@ -347,6 +380,13 @@ namespace nanoboy
                 42,
                 476,
                 72));
+            AetherSurfacePanel profile = CreateCard(page, 0, 544, 788, 172, "SPIELPROFIL // GLOBALE WERTE BLEIBEN ERHALTEN");
+            profileButton = AddActionButton(profile, "PROFIL", 18, 40, 320, () => { bridge.ToggleGameProfile(); RefreshAll(); });
+            profileButton.Name = "controlCenterGameProfileButton";
+            profileResetButton = AddActionButton(profile, "ÜBERSCHREIBUNGEN ZURÜCKSETZEN", 360, 40, 400,
+                () => { bridge.ResetGameProfile(); RefreshAll(); });
+            profileDetails = CreateSmallLabel("", 18, 92, 748, 70);
+            profile.Controls.Add(profileDetails);
             return page;
         }
 
@@ -362,6 +402,7 @@ namespace nanoboy
                 ("SAVE STATES ÖFFNEN", paths.States, "Fünf Slots pro ROM-Inhalt", "States"),
                 ("EINSTELLUNGEN", paths.Settings, "Belegung, Bild, Audio und zuletzt gespielte Titel", "Settings"),
                 ("FIRMWARE-ORDNER", paths.Firmware, "Optional: dmg_boot.bin, gbc_boot.bin, gba_bios.bin", "Firmware"),
+                ("SCREENSHOTS ÖFFNEN", paths.Screenshots, "Unveränderte Spielbilder als PNG, getrennt nach ROM", "Screenshots"),
                 ("DEVELOPMENT-ORDNER", paths.Development, "Lokale Sitzungsberichte und Development-Crashlogs", "Development")
             };
             int y = 76;
@@ -426,6 +467,10 @@ namespace nanoboy
                 570,
                 786,
                 42));
+            AddActionButton(page, "SCREENSHOT · F12", 0, 630, 240, bridge.CaptureScreenshot).Name = "controlCenterScreenshotButton";
+            AddActionButton(page, "PERFORMANCE · F9", 258, 630, 252, bridge.TogglePerformanceOverlay).Name = "controlCenterOverlayButton";
+            AddActionButton(page, "QUICK DECK · F10", 528, 630, 240, bridge.OpenQuickMenu).Name = "controlCenterQuickMenuButton";
+            AddActionButton(page, "PROBLEM MARKIEREN", 0, 686, 300, bridge.MarkProblem).Name = "controlCenterMarkProblemButton";
             return page;
         }
 
@@ -433,6 +478,7 @@ namespace nanoboy
         {
             var page = new Panel
             {
+                AutoScroll = true,
                 BackColor = AetherColors.Void,
                 Name = name
             };
@@ -587,6 +633,15 @@ namespace nanoboy
             SelectIndex(paletteButtons, bridge.Settings.PaletteIndex);
             SelectIndex(scaleButtons, bridge.Settings.VideoScaleFactor - 1);
             SelectIndex(volumeButtons, (int)Math.Round(bridge.Settings.AudioVolume / 25d));
+            SelectIndex(latencyButtons, Array.IndexOf(new[] { 20, 40, 60, 100 }, bridge.Settings.AudioLatencyMs));
+            gpuButton.Selected = bridge.Settings.GpuRendering;
+            gpuButton.Text = bridge.Settings.GpuRendering ? "GPU · ON" : "CPU · GDI";
+            vsyncButton.Selected = bridge.Settings.VideoVSync;
+            vsyncButton.Enabled = bridge.Settings.GpuRendering;
+            vsyncButton.Text = bridge.Settings.VideoVSync ? "VSYNC · ON" : "VSYNC · OFF";
+            integerButton.Selected = bridge.Settings.IntegerScaling;
+            integerButton.Text = bridge.Settings.IntegerScaling ? "INTEGER · ON" : "INTEGER · OFF";
+            videoDetails.Text = bridge.VideoOutputProvider();
             SelectIndex(frameskipButtons, bridge.Settings.Frameskip);
             SelectIndex(slotButtons, bridge.Settings.SaveSlot - 1);
 
@@ -603,9 +658,7 @@ namespace nanoboy
             bool isGameBoyAdvance = snapshot?.Rom?.IsGameBoyAdvance == true;
             bool supportsAudioChannels = snapshot?.Rom is null ||
                 snapshot.Supports(EmulationFeature.AudioChannelControls);
-            audioDetails.Text = isGameBoyAdvance
-                ? "65.536 kHz · GBA PSG + Direct Sound · Stereo Core Mix"
-                : "44.1 kHz · Mono Core Mix · 100 ms Ziel-Latenz";
+            audioDetails.Text = bridge.AudioOutputProvider();
             for (int index = 0; index < channelButtons.Length; index++)
             {
                 channelButtons[index].Selected = channels[index];
@@ -674,8 +727,22 @@ namespace nanoboy
 
         private void RefreshSaves()
         {
+            stateFeedback.Text = bridge.SaveFeedbackProvider();
             RomSnapshot? rom = bridge.SnapshotProvider()?.Rom;
             string? romPath = bridge.RomPathProvider();
+            if (!string.IsNullOrEmpty(romPath))
+            {
+                string statePath = WindowsRomLibrary.Default.GetStatePath(romPath, bridge.Settings.SaveSlot);
+                try
+                {
+                    var stateFile = new FileInfo(statePath);
+                    stateFeedback.Text += stateFile.Exists
+                        ? $"\r\nSlot {bridge.Settings.SaveSlot}: Datei vorhanden · {stateFile.LastWriteTime:g} · {stateFile.Length:N0} Bytes"
+                        : $"\r\nSlot {bridge.Settings.SaveSlot}: noch leer";
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                { stateFeedback.Text += "\r\nSlot-Datei nicht lesbar."; }
+            }
             if (rom == null || string.IsNullOrEmpty(romPath))
             {
                 saveStatus.Text = "NO ACTIVE CARTRIDGE";
@@ -720,6 +787,10 @@ namespace nanoboy
 
         private void RefreshSystem()
         {
+            profileButton.Enabled = profileResetButton.Enabled = bridge.Settings.HasGameProfile;
+            profileButton.Selected = bridge.Settings.GameProfileEnabled;
+            profileButton.Text = bridge.Settings.GameProfileEnabled ? "SPIELPROFIL · AN" : "GLOBAL · PROFIL AKTIVIEREN";
+            profileDetails.Text = bridge.Settings.ProfileStatus + "\r\nVideo, Lautstärke und Belegung: nur geänderte Werte werden im aktiven Spielprofil gespeichert.\r\nBoot-ROM und State-Slot bleiben global.";
             string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
             bool dmgAvailable = File.Exists("dmg_boot.bin") || File.Exists(Path.Combine(baseDirectory, "dmg_boot.bin"));
             bool cgbAvailable = File.Exists("gbc_boot.bin") || File.Exists(Path.Combine(baseDirectory, "gbc_boot.bin"));
@@ -744,8 +815,12 @@ namespace nanoboy
             string audioRate = rom?.IsGameBoyAdvance == true ? "65,536 Hz" : "44,100 Hz";
             text.AppendLine($"AUDIO           {(bridge.Settings.AudioEnable ? "On" : "Off")} · {bridge.Settings.AudioVolume}% · {audioRate}");
             text.AppendLine($"VIDEO           Filter {bridge.Settings.DisplayFilterIndex} · Scale {bridge.Settings.VideoScaleFactor}× · Frameskip {bridge.Settings.Frameskip}");
+            text.AppendLine(bridge.AudioOutputProvider());
+            text.AppendLine(bridge.VideoOutputProvider());
             text.AppendLine($"INPUT           {(gamepad.IsConnected ? gamepad.DeviceName : "Keyboard")}");
             text.AppendLine($"DIAGNOSE        {(bridge.TesterModeProvider() ? "RECORDING LOCALLY" : "OFF")} · {ProductInfo.BuildChannel}");
+            text.AppendLine("BEOBACHTUNG     " + bridge.HealthStatusProvider());
+            text.AppendLine("LETZTE AKTION   " + bridge.SaveFeedbackProvider());
             if (bridge.TesterLogPathProvider() is string testerLogPath)
             {
                 text.AppendLine(

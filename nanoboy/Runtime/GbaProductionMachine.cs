@@ -364,16 +364,17 @@ namespace AetherBoy.Runtime
         {
             if (!audioEnabled || disposed || pcm.Length < 4)
                 return;
-            float[] mono = new float[pcm.Length / 4];
-            for (int frameIndex = 0, source = 0; frameIndex < mono.Length; frameIndex++, source += 4)
+            float[] stereo = new float[pcm.Length / 4 * 2];
+            for (int source = 0, target = 0; target < stereo.Length; source += 4, target += 2)
             {
                 short left = (short)(pcm[source] | pcm[source + 1] << 8);
                 short right = (short)(pcm[source + 2] | pcm[source + 3] << 8);
-                mono[frameIndex] = (left + right) / 65_536f;
+                stereo[target] = left / 32_768f;
+                stereo[target + 1] = right / 32_768f;
             }
             AudioSamplesAvailable?.Invoke(
                 this,
-                new AudioSamplesAvailableEventArgs(mono, CoreAudioSampleRate));
+                new AudioSamplesAvailableEventArgs(stereo, CoreAudioSampleRate, channels: 2));
         }
 
         private void ConfigurePsgChannels(EmulatorConfiguration configuration)
@@ -391,9 +392,15 @@ namespace AetherBoy.Runtime
             SoundChannel2 channel2 = (SoundChannel2)device.Apu._channels[1];
             SoundChannel3 channel3 = (SoundChannel3)device.Apu._channels[2];
             SoundChannel4 channel4 = (SoundChannel4)device.Apu._channels[3];
-            byte[] waveRam = new byte[32];
-            channel3._waveRamBanks[0].CopyTo(waveRam, 0);
-            channel3._waveRamBanks[1].CopyTo(waveRam, 16);
+            // The inspector contract is one 4-bit sample per byte, as on GB/GBC.
+            byte[] waveRam = new byte[64];
+            for (int bank = 0; bank < 2; bank++)
+            for (int index = 0; index < 16; index++)
+            {
+                byte packed = channel3._waveRamBanks[bank][index];
+                waveRam[bank * 32 + index * 2] = (byte)(packed >> 4);
+                waveRam[bank * 32 + index * 2 + 1] = (byte)(packed & 15);
+            }
 
             return new AudioSnapshot(
                 audioEnabled,
@@ -407,7 +414,8 @@ namespace AetherBoy.Runtime
                     channel3._force75PctVolume ? 3 : channel3._volume,
                     device.Apu.GetPsgLengthCounter(2),
                     channel3._lengthFlag,
-                    waveRam),
+                    waveRam, outputGain: channel3._force75PctVolume ? .75f :
+                        channel3._volume switch { 1 => 1f, 2 => .5f, 3 => .25f, _ => 0f }),
                 new NoiseChannelSnapshot(
                     device.Apu.IsPsgChannelHostEnabled(3),
                     channel4._shiftClockFrequency,
@@ -419,8 +427,15 @@ namespace AetherBoy.Runtime
                     channel4._envelope.EnvelopeStepTime,
                     channel4._envelope.IsIncrease,
                     device.Apu.GetPsgLengthCounter(3),
-                    channel4._lengthFlag));
+                    channel4._lengthFlag),
+                CaptureDirectSound(device.Apu._dmaChannels[0]),
+                CaptureDirectSound(device.Apu._dmaChannels[1]));
         }
+
+        private DirectSoundChannelSnapshot CaptureDirectSound(DmaChannel channel) => new(
+            channel.CurrentValue, Math.Clamp(channel.FifoWritePtr - channel.FifoReadPtr, 0, 32),
+            channel.FullVolume, channel.EnableLeft, channel.EnableRight, channel.SelectTimer1 ? 1 : 0,
+            device.Apu._psgFifoMasterEnable);
 
         private PulseChannelSnapshot CapturePulseSnapshot(
             int index,
