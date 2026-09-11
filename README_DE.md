@@ -10,6 +10,9 @@ Windows-Entwicklungsupdate: Stereo/WASAPI, GPU-Ausgabe, State-Galerie und Fortse
 Controller-Quick-Deck, Spielprofile und IPS-/BPS-/UPS-Patch Lab.
 [Änderungen, Bedienung und Übergabe an die Linux-Entwicklung (DE/EN)](docs/WINDOWS_DEVELOPMENT_HANDOFF.md#deutsch).
 
+Linux-Nachtrag: zentrale Saves, Stereo, Bibliothek/Recovery und Controller-Profile.
+[Linux-Übergabe an die Windows-Entwicklung und den nächsten ChatGPT](docs/LINUX_DEVELOPMENT_HANDOFF.md).
+
 <p align="center">
   <a href="README.md" lang="en">English</a> · <strong lang="de">Deutsch</strong>
 </p>
@@ -57,7 +60,7 @@ Die **Aether-Wave-Oberfläche** verbindet das Spielbild mit einer Live-Sessionle
   <img src="docs/images/aetherboy-control-center.png" alt="Aether Control Center unter Linux: Display-Einstellungen mit Sharp, Smooth, LCD Grid, Frameskip und DMG-Paletten" width="1000">
 </p>
 
-Sieben Bereiche bündeln Übersicht, Display, Audio, Eingabe, Spielstände, System und Diagnose. Die Aufnahme zeigt die Display-Einstellungen des Linux-Clients.
+Neun Bereiche bündeln Übersicht, Display, Audio, Eingabe, Spielstände, System und Diagnose. Die Aufnahme zeigt die Display-Einstellungen des Linux-Clients.
 
 </details>
 
@@ -81,13 +84,13 @@ Beide Frontends verwenden denselben plattformneutralen Core und dieselbe Runtime
 | **Frontend** | Windows Forms | SDL3, natives Wayland |
 | **Aether-Oberfläche und Control Center** | Vorhanden | Vorhanden, an Kachel- und Breitbildfenster angepasst |
 | **ROM öffnen** | Dateidialog und Drag-and-drop | XDG Desktop Portal, Dateipfad und Drag-and-drop |
-| **Tastatur / Gamepad** | Beide, mit Belegungseinstellungen | Beide; Tastatur frei belegbar, Gamepad mit Standardbelegung |
+| **Tastatur / Gamepad** | Beide, mit Belegungseinstellungen | Beide frei belegbar; Controller-Profile und Deadzone |
 | **Batterie-Saves, fünf State-Slots, Rewind** | Vorhanden | Vorhanden |
-| **Cartridge Vault, Cheat-Verwaltung, Save Safety Center** | Vorhanden, teils experimentell | Noch nicht als vollständige Werkzeuge verfügbar |
-| **WAV-Aufnahme und Boot-ROM-Auswahl** | Vorhanden | Noch nicht in der Oberfläche verfügbar |
+| **Cartridge Vault, Cheat-Verwaltung, Save Safety Center** | Vorhanden, teils experimentell | Linux-Bibliothek, Sitzungs-Cheats und Backup-Wiederherstellung vorhanden |
+| **WAV-Aufnahme und Boot-ROM-Auswahl** | Vorhanden | Unter Tools / System vorhanden |
 | **Quick Deck, State-Galerie/Fortsetzen, Spielprofile, Screenshots** | Vorhanden | Eigener Frontend-Folgeschritt |
 | **IPS-/BPS-/UPS-Patch Lab** | Integriert; UPS-Rückpatchen ausdrücklich wählbar | Gemeinsamer Parser vorhanden, noch keine Patch-Oberfläche |
-| **Stereo-Ausgabe** | GB/GBC/GBA durchgängig | Ausgabe verwendet weiterhin den kompatiblen Mono-Downmix |
+| **Stereo-Ausgabe** | GB/GBC/GBA durchgängig | GB/GBC/GBA durchgängig |
 
 Die genaue Zuordnung steht in [Windows → Linux: UI-Stand](docs/LINUX_UI_PARITY.md).
 
@@ -137,7 +140,7 @@ bash scripts/install-linux-user.sh
 aetherboy "/pfad/zu/deinem-spiel.gbc"
 ```
 
-Die Programmdateien liegen standardmäßig unter `~/.local/share/aetherboy`, der Starter unter `~/.local/bin/aetherboy`. Das Skript installiert außerdem den Desktop-Eintrag und die Icons. Für den Terminalaufruf muss `~/.local/bin` im `PATH` liegen. Bei einem ausschließlich benutzerlokal installierten .NET-SDK muss dessen Verzeichnis über `DOTNET_ROOT` auch für den installierten Starter erreichbar sein.
+Die Programmdateien liegen standardmäßig unter `~/.local/share/aetherboy/program`, der Starter unter `~/.local/bin/aetherboy`. Das Skript installiert außerdem den Desktop-Eintrag und die Icons. Für den Terminalaufruf muss `~/.local/bin` im `PATH` liegen. Der installierte Starter kennt auch den beim Installieren erkannten Runtime-Pfad. Updates bereiten einen neuen Release-Ordner vor dem Umschalten vor.
 
 <details>
 <summary><strong>Wayland prüfen und Startprobleme eingrenzen</strong></summary>
@@ -251,13 +254,15 @@ Die wichtigsten Standardbelegungen; Spieltasten lassen sich unter **Control Cent
 
 Die A/B-Vorgaben beziehen sich auf die physischen Tastenpositionen. AetherBoy zeigt die Belegung passend zum aktuellen Tastaturlayout an. Alle Shortcuts und die Tastaturnavigation stehen im [Linux User Guide](docs/LINUX_USER_GUIDE.md#5-controls).
 
+Prioritäten, unabhängige Kritik und reproduzierbare Tests: [Linux-Roadmap](docs/LINUX_ROADMAP.md), [UI-Kritik](docs/LINUX_CRITIQUE.md), [Playtest-Bericht](docs/LINUX_PLAYTEST.md).
+
 ## Spielstände und BIOS
 
-- **Batterie-Spielstände:** Unter Windows zentral in `AetherBoy\Saves`; unter Linux weiterhin neben der ROM. `.bak1` bis `.bak3` und `.guard`-Dateien schützen die Spielstände. Nur das jeweilige Save-Verzeichnis muss beschreibbar sein.
+- **Batterie-Spielstände:** Unter Windows zentral in `AetherBoy\Saves`; unter Linux in `$XDG_DATA_HOME/aetherboy/saves/<ROM-SHA256>`. `.bak1` bis `.bak3` und `.guard`-Dateien schützen die Spielstände. Nur das jeweilige Save-Verzeichnis muss beschreibbar sein.
 - **Save States:** fünf Slots von `.ss1` bis `.ss5`, gebunden an die exakte ROM, das Hardwaremodell und gegebenenfalls das BIOS. Inkompatible Zustandsversionen werden abgelehnt; eine automatische Migration älterer Schemata ist noch nicht vorhanden.
 - **Rewind:** ein sitzungsgebundener Puffer mit bis zu etwa zehn Sekunden Historie; für GBA zusätzlich durch ein Speicherbudget begrenzt.
 - **Linux-Einstellungen:** unter `$XDG_CONFIG_HOME/aetherboy/settings.json`, normalerweise `~/.config/aetherboy/settings.json`.
-- **GBA-BIOS:** ohne eigene Firmware greift der eingebaute HLE-Fallback. Der Kern unterstützt optional ein exakt 16 KiB großes `gba_bios.bin`; die Linux-Oberfläche bietet noch keine BIOS-Auswahl.
+- **GBA-BIOS:** ohne eigene Firmware greift der eingebaute HLE-Fallback. Der Kern unterstützt optional ein exakt 16 KiB großes `gba_bios.bin`; der Import erfolgt unter **Settings → System → Import boot ROM / BIOS**.
 
 ROMs und Boot-ROMs werden nicht mitgeliefert und sind zum Bauen nicht erforderlich.
 

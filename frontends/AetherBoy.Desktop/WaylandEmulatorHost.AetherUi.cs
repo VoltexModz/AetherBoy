@@ -15,7 +15,7 @@ internal sealed partial class WaylandEmulatorHost
         public static readonly SDL.Color Border = Rgb(47, 55, 83);
         public static readonly SDL.Color Text = Rgb(241, 244, 255);
         public static readonly SDL.Color Muted = Rgb(139, 148, 177);
-        public static readonly SDL.Color Violet = Rgb(139, 56, 255);
+        public static readonly SDL.Color Violet = Rgb(164, 92, 255);
         public static readonly SDL.Color Cyan = Rgb(41, 226, 237);
         public static readonly SDL.Color Danger = Rgb(255, 92, 132);
     }
@@ -25,12 +25,12 @@ internal sealed partial class WaylandEmulatorHost
     private int focusedControl = -1;
     private IntPtr brandTexture;
     private bool mouseTurbo;
-    private static readonly string[] PageNames = ["OVERVIEW", "DISPLAY", "AUDIO", "INPUT", "SAVES", "SYSTEM", "DIAGNOSTICS"];
+    private static readonly string[] PageNames = ["OVERVIEW", "DISPLAY", "AUDIO", "INPUT", "SAVES", "SYSTEM", "DIAGNOSTICS", "LIBRARY", "TOOLS"];
     private static readonly string[] PageDescriptions =
     [
-        "Live-Zustand und direkte Werkzeuge", "Bildcharakter, Palette und Fenstergeometrie",
-        "Lautstärke und Hardware-Kanäle", "Tastaturbelegung und Controller",
-        "Spielstände und Timeline", "Linux-Desktop und lokale Einstellungen", "Sitzung und technische Diagnose"
+        "Your session and frequently used actions", "Picture style, palettes and display options",
+        "Volume, channels and audio output", "Keyboard mapping and controller setup",
+        "Save slots, battery data and recovery", "Desktop, storage and firmware", "Session health and local reports", "Your cartridges, most recently played first", "Audio recording and session cheats"
     ];
 
     private static SDL.Color Rgb(byte r, byte g, byte b) => new() { R = r, G = g, B = b, A = 255 };
@@ -68,7 +68,7 @@ internal sealed partial class WaylandEmulatorHost
     {
         Paint(x, y, w, h, Colors.Border);
         Paint(x + 1, y + 1, w - 2, h - 2, stage ? Colors.Void : Colors.Surface);
-        SDL.FColor violet = new() { R = 139 / 255f, G = 56 / 255f, B = 1, A = 1 };
+        SDL.FColor violet = new() { R = 164 / 255f, G = 92 / 255f, B = 1, A = 1 };
         SDL.FColor cyan = new() { R = 41 / 255f, G = 226 / 255f, B = 237 / 255f, A = 1 };
         ReadOnlySpan<SDL.Vertex> edge =
         [
@@ -91,7 +91,7 @@ internal sealed partial class WaylandEmulatorHost
 
     private void DrawButton(float x, float y, float width, float height, string label, bool selected, bool enabled = true)
     {
-        bool keyboardFocused = enabled && controlCenterVisible && focusedControl == focusTargets.Count;
+        bool keyboardFocused = enabled && focusedControl == focusTargets.Count;
         if (enabled) focusTargets.Add(new SDL.FRect { X = x, Y = y, W = width, H = height });
         bool hovered = enabled && Hit(mouseX, mouseY, x, y, width, height);
         float cut = Math.Min(9, height / 4);
@@ -100,7 +100,7 @@ internal sealed partial class WaylandEmulatorHost
         SDL.FColor ColorAt(float t)
         {
             SDL.Color c = selected && enabled
-                ? Rgb((byte)(139 - 98 * t), (byte)(56 + 170 * t), (byte)(255 - 18 * t)) : flat;
+                ? Rgb((byte)(164 - 123 * t), (byte)(92 + 134 * t), (byte)(255 - 18 * t)) : flat;
             return new SDL.FColor { R = c.R / 255f, G = c.G / 255f, B = c.B / 255f, A = 1 };
         }
         Span<SDL.Vertex> vertices = stackalloc SDL.Vertex[6];
@@ -168,6 +168,7 @@ internal sealed partial class WaylandEmulatorHost
         SDL.GetWindowSize(window, out int width, out int height);
         if (width <= 0 || height <= 0) return;
         float scale = Math.Min(width / 1180f, height / 760f);
+        textRenderer.MinimumSize = Math.Max(14, (int)Math.Ceiling(12 / scale));
         int logicalWidth = (int)Math.Round(width / scale);
         int logicalHeight = (int)Math.Round(height / scale);
         if (logicalWidth == LogicalWidth && logicalHeight == LogicalHeight) return;
@@ -190,16 +191,13 @@ internal sealed partial class WaylandEmulatorHost
         Paint(0, 0, LogicalWidth, 78, Colors.Chrome);
         Mark(20, 12, 52);
         Ink(86, 16, "AETHERBOY", 21, bold: true);
-        Ink(86, 47, "AETHER WAVE // CORE 4.8", 10, Colors.Muted, true);
+        Ink(86, 47, "GB · GBC · GBA", 10, Colors.Muted, true);
         for (int i = 0; i < 3; i++) Paint(330 + i * 5, 22 + i * 8, 25, 3, Colors.Violet);
         Paint(330, 76, 110, 2, Colors.Violet);
-        ActionButton(642 + dx, 18, 82, 38, "SYSTEM", () => OpenControlPage(ControlCenterPage.System));
-        ActionButton(730 + dx, 18, 82, 38, "TUNE", () => OpenControlPage(ControlCenterPage.Display));
-        ActionButton(818 + dx, 18, 82, 38, "TOOLS", () => OpenControlPage(ControlCenterPage.Saves));
-        ActionButton(906 + dx, 18, 82, 38, "INFO", () => OpenControlPage(ControlCenterPage.Diagnostics));
-        ActionButton(1026 + dx, 18, 38, 38, "—", () => SDL.MinimizeWindow(window));
-        ActionButton(1072 + dx, 18, 38, 38, "□", Fullscreen);
-        ActionButton(1118 + dx, 18, 38, 38, "×", () => running = false);
+        ActionButton(568 + dx, 18, 132, 42, "LIBRARY", () => OpenControlPage(ControlCenterPage.Library));
+        ActionButton(708 + dx, 18, 132, 42, "DISPLAY", () => OpenControlPage(ControlCenterPage.Display));
+        ActionButton(848 + dx, 18, 132, 42, "SAVES", () => OpenControlPage(ControlCenterPage.Saves));
+        ActionButton(988 + dx, 18, 168, 42, "REPORTS", () => OpenControlPage(ControlCenterPage.Diagnostics));
 
         Panel(24, 100, 836 + dx, 548 + dy, stage: true);
         Ink(44, 113, $"DISPLAY // {frameGeometry.Width} × {frameGeometry.Height}", 10, Colors.Muted, true);
@@ -219,10 +217,10 @@ internal sealed partial class WaylandEmulatorHost
         else
         {
             Mark(centerX - 56, 223 + centerY, 112);
-            Center(centerX, 350 + centerY, "NO SIGNAL", 23, bold: true);
-            Center(centerX, 391 + centerY, "Zieh eine .GB-, .GBC- oder .GBA-Datei hierher.", 13, Colors.Muted);
+            Center(centerX, 350 + centerY, "Ready to play", 23, bold: true);
+            Center(centerX, 391 + centerY, "Drop a .gb, .gbc or .gba file here.", 13, Colors.Muted);
             ActionButton(centerX - 96, 452 + centerY, 192, 46, "OPEN ROM", ShowRomDialog, true, pendingSession is null && fileDialogOpen == 0);
-            Center(centerX, 516 + centerY, "O / STRG+O  //  DATEI ABLEGEN", 11, Colors.Violet, true);
+            Center(centerX, 516 + centerY, "O / CTRL+O  ·  OPEN A CARTRIDGE", 11, Colors.Violet, true);
         }
         if (pendingSession is not null)
         {
@@ -231,11 +229,12 @@ internal sealed partial class WaylandEmulatorHost
             Center(centerX, 368 + centerY, textRenderer.Fit(Path.GetFileName(pendingRomPath ?? ""), 410), 14, Colors.Muted);
         }
 
-        Panel(880 + dx, 100, 276, 548 + dy, "SESSION // SIGNAL");
+        Panel(880 + dx, 100, 276, 548 + dy, "CURRENT SESSION");
         Ink(906 + dx, 158, textRenderer.Fit(CartridgeTitle, 224, 17, true), 17, bold: true);
         Ink(906 + dx, 201, StateLabel, 13, Colors.Muted, true);
         Paint(902 + dx, 240, 232, 1, Colors.Border);
-        string audio = !options.AudioEnabled ? "MUTED" : audioError is not null ? "UNAVAILABLE" : "ON · 44.1K";
+        string audio = !options.AudioEnabled ? "MUTED" : audioError is not null ? "UNAVAILABLE"
+            : audioOutput is null ? "READY" : $"{audioOutput.SourceRate / 1000.0:0.0}K · {(audioOutput.Channels == 2 ? "STEREO" : "MONO")}";
         string[] keys = ["MODEL", "STATE", "FRAME", "AUDIO", "FILTER", "INPUT", "SLOT"];
         string[] values = [ModelLabel, StateLabel, session is null ? "—" : displayedFrameSequence.ToString(), audio,
             options.VideoFilter == LinuxVideoFilter.LcdGrid ? "LCD GRID" : options.VideoFilter.ToString().ToUpperInvariant(), InputLabel.ToUpperInvariant(), options.SaveSlot.ToString()];
@@ -253,17 +252,17 @@ internal sealed partial class WaylandEmulatorHost
             ActionButton(904 + dx + i * 47, 548 + dy, 40, 32, slot.ToString(), () => SelectSaveSlot(slot), options.SaveSlot == slot);
         }
         Ink(906 + dx, 601 + dy, $"{BindingLabel(LinuxInputAction.Turbo).ToUpperInvariant()} HOLD · TURBO", 10, Colors.Muted, true);
-        Ink(906 + dx, 619 + dy, "F5 SAVE · F8 LOAD", 10, Colors.Muted, true);
+        Ink(906 + dx, 619 + dy, textRenderer.Fit("F6 ACTIONS · F5/F8 SAVE", 228, 12, true), 12, Colors.Muted, true);
         Ink(24, 659 + dy, textRenderer.Fit(loadError ?? statusMessage, LogicalWidth - 48, 12), 12, loadError is null ? Colors.Muted : Colors.Danger);
         Paint(1, 688 + dy, LogicalWidth - 2, 71, Colors.Border);
         Paint(2, 689 + dy, LogicalWidth - 4, 69, Colors.Chrome);
         bool playable = session is not null && pendingSession is null;
         ActionButton(24, 704 + dy, 164, 40, fileDialogOpen != 0 ? "PICKER OPEN…" : "OPEN ROM", ShowRomDialog, true, pendingSession is null && fileDialogOpen == 0);
-        ActionButton(200, 704 + dy, 142, 40, "CONTROL", () => OpenControlPage(ControlCenterPage.Overview), enabled: pendingSession is null);
+        ActionButton(200, 704 + dy, 142, 40, "SETTINGS", () => OpenControlPage(ControlCenterPage.Overview), enabled: pendingSession is null);
         ActionButton(354, 704 + dy, 142, 40, snapshot?.IsPaused == true ? "RESUME" : "PAUSE", TogglePause, enabled: playable);
         ActionButton(508, 704 + dy, 142, 40, "REWIND", Rewind, enabled: playable);
         ActionButton(662, 704 + dy, 142, 40, "SAVE", QuickSave, enabled: playable);
-        ActionButton(816, 704 + dy, 142, 40, "LOAD", QuickLoad, enabled: playable);
+        ActionButton(816, 704 + dy, 142, 40, "LOAD", QuickLoad, enabled: playable && HasSelectedState);
         ActionButton(970, 704 + dy, 164 + dx, 40, "TURBO (HOLD)", HoldMouseTurbo, mouseTurbo, playable);
     }
 
@@ -271,16 +270,16 @@ internal sealed partial class WaylandEmulatorHost
     {
         Paint(0, 0, LogicalWidth, 84, Colors.Chrome);
         Mark(20, 14, 54);
-        Ink(92, 10, "CONTROL CENTER // CORE 4.8", 10, Colors.Cyan, true);
+        Ink(92, 10, "AETHERBOY SETTINGS", 10, Colors.Cyan, true);
         Ink(92, 27, "Aether Control Center", 22);
-        Ink(92, 59, "Alle lokalen Emulator-, Eingabe- und Systemfunktionen an einem Ort", 12, Colors.Muted);
+        Ink(92, 59, "Display, sound, controls and save data — all stored on this computer.", 12, Colors.Muted);
         ActionButton(LogicalWidth - 66, 23, 42, 36, "×", CloseControlCenter);
         Paint(0, 82, LogicalWidth, 2, Colors.Cyan);
         Paint(0, 82, 248, 2, Colors.Violet);
         Paint(0, 84, 248, LogicalHeight - 84, Colors.Chrome);
         Paint(247, 84, 1, LogicalHeight - 84, Colors.Border);
-        Ink(22, 109, "AETHER SYSTEM MATRIX", 11, Colors.Cyan, true);
-        Ink(26, 143, "CONTROL", 22);
+        Ink(22, 109, "PREFERENCES", 11, Colors.Cyan, true);
+        Ink(26, 143, "SETTINGS", 22);
         Ink(26, 176, "CENTER", 22);
         for (int i = 0; i < PageNames.Length; i++)
         {
@@ -293,10 +292,10 @@ internal sealed partial class WaylandEmulatorHost
             }
         }
         Ink(24, LogicalHeight - 87, "LOCAL CONTROL", 10, Colors.Muted, true);
-        Ink(24, LogicalHeight - 66, "NO CLOUD · NO TELEMETRY", 10, Colors.Muted, true);
+        Ink(24, LogicalHeight - 66, "ON THIS COMPUTER", 10, Colors.Muted, true);
         Ink(280, 108, PageNames[(int)controlCenterPage], 26);
         Ink(280, 150, PageDescriptions[(int)controlCenterPage], 13, Colors.Muted);
-        if (controlCenterPage != ControlCenterPage.Overview) Panel(278, 180, LogicalWidth - 302, 440);
+        if (controlCenterPage != ControlCenterPage.Overview) Panel(278, 180, LogicalWidth - 302, 456);
         switch (controlCenterPage)
         {
             case ControlCenterPage.Overview: DrawOverviewPage(); break;
@@ -306,30 +305,32 @@ internal sealed partial class WaylandEmulatorHost
             case ControlCenterPage.Saves: DrawSavesPage(); break;
             case ControlCenterPage.System: DrawSystemPage(); break;
             case ControlCenterPage.Diagnostics: DrawDiagnosticsPage(); break;
+            case ControlCenterPage.Library: DrawLibraryPage(); break;
+            case ControlCenterPage.Tools: DrawToolsPage(); break;
         }
         Ink(280, 648, textRenderer.Fit(loadError ?? statusMessage, 852, 12), 12, loadError is null ? Colors.Muted : Colors.Danger);
-        Ink(280, LogicalHeight - 69, "Lokal gespeichert · Tab: Fokus · Strg+Tab: Bereich · Enter: wählen · C / Esc: zurück", 12, Colors.Muted);
+        Ink(280, LogicalHeight - 69, "Tab: focus · Ctrl+Tab: section · Enter: select · Esc: back", 12, Colors.Muted);
     }
 
     private void DrawOverviewPage()
     {
-        Panel(278, 184, 878, 98, "SESSION SIGNAL");
-        Ink(302, 224, session is null ? "OFFLINE  //  READY FOR CARTRIDGE" : $"{StateLabel}  //  {ModelLabel}", 21);
+        Panel(278, 184, 878, 98, "CURRENT SESSION");
+        Ink(302, 224, session is null ? "Ready to open a cartridge" : $"{StateLabel}  //  {ModelLabel}", 21);
         Panel(278, 300, 282, 132, "CARTRIDGE");
         Ink(300, 351, textRenderer.Fit(CartridgeTitle, 240), 14);
         Ink(300, 379, session is null ? "DMG / CGB / GBA READY" : ModelLabel, 14);
-        Panel(576, 300, 282, 132, "INPUT ROUTE");
+        Panel(576, 300, 282, 132, "CONTROLS");
         Ink(598, 351, gamepad == IntPtr.Zero ? "KEYBOARD READY" : "GAMEPAD LIVE", 14);
         Ink(598, 379, textRenderer.Fit(InputLabel.ToUpperInvariant(), 238), 14);
         Panel(874, 300, 282, 132, "SAVE STATUS");
         Ink(896, 351, session is null ? "NO CARTRIDGE" : $"STATE SLOT {options.SaveSlot} / 5", 14);
         Ink(896, 379, session is null ? "NO SAVE ROUTE" : "LOCAL SAVE FILES", 14);
-        Panel(278, 450, 878, 168, "QUICK ACCESS // OPERATOR DECK");
-        ActionButton(300, 497, 264, 42, "CONTROL MAPPING", () => SelectControlCenterPage(ControlCenterPage.Input));
+        Panel(278, 450, 878, 168, "QUICK ACCESS");
+        ActionButton(300, 497, 264, 42, "INPUT SETTINGS", () => SelectControlCenterPage(ControlCenterPage.Input));
         ActionButton(582, 497, 264, 42, "SAVE CENTER", () => SelectControlCenterPage(ControlCenterPage.Saves));
         ActionButton(864, 497, 270, 42, "AUDIO", () => SelectControlCenterPage(ControlCenterPage.Audio));
         ActionButton(300, 558, 264, 42, "QUICK SAVE", QuickSave, true, session is not null);
-        ActionButton(582, 558, 264, 42, "QUICK LOAD", QuickLoad, enabled: session is not null);
+        ActionButton(582, 558, 264, 42, "QUICK LOAD", QuickLoad, enabled: HasSelectedState);
         ActionButton(864, 558, 270, 42, "FULLSCREEN", Fullscreen);
     }
 
@@ -337,28 +338,33 @@ internal sealed partial class WaylandEmulatorHost
     {
         Ink(300, 200, "NATIVE LINUX", 11, Colors.Cyan, true);
         Ink(300, 236, desktop.DisplayName, 20);
-        Ink(300, 284, "Gemeinsamer Emulator-Kern für Windows und Linux.", 14, Colors.Muted);
-        Ink(300, 318, "GB / GBC / GBA · SDL3 Video, Audio und Gamepads", 14);
-        Ink(300, 372, "LOKALE EINSTELLUNGEN", 11, Colors.Cyan, true);
+        Ink(300, 284, "One emulator core for Windows and Linux.", 14, Colors.Muted);
+        Ink(300, 318, "Game Boy · Game Boy Color · Game Boy Advance", 14);
+        Ink(300, 372, "PREFERENCES FILE", 11, Colors.Cyan, true);
         Ink(300, 404, textRenderer.Fit(settingsPath, 800), 14);
-        Ink(300, 444, "Logo, Noto-Schrift und Text-Atlas sind im Programm enthalten.", 14, Colors.Muted);
+        ActionButton(300, 440, 504, 42, options.PauseOnFocusLoss ? "AUTO-PAUSE WHEN UNFOCUSED: ON" : "AUTO-PAUSE WHEN UNFOCUSED: OFF", () =>
+        { options.PauseOnFocusLoss = !options.PauseOnFocusLoss; MarkSettingsChanged(); }, options.PauseOnFocusLoss);
         ActionButton(300, 506, 242, 44, "OPEN ROM", ShowRomDialog, true, fileDialogOpen == 0 && pendingSession is null);
-        ActionButton(562, 506, 242, 44, "FULLSCREEN", Fullscreen);
-        Ink(300, 575, "Boot-ROM-Auswahl, Cartridge Vault und Cheats: noch nicht in der Linux-UI.", 12, Colors.Muted);
+        ActionButton(562, 506, 242, 44, "OPEN DATA FOLDER", () => OpenFolder(dataPaths.Data));
+        ActionButton(300, 562, 242, 42, "IMPORT BOOT ROM / BIOS", ShowFirmwareDialog);
+        ActionButton(560, 562, 242, 42, options.UseFirmware ? "FIRMWARE ON" : "BUILT-IN BOOT", () =>
+        { options.UseFirmware = !options.UseFirmware; MarkSettingsChanged(); }, options.UseFirmware);
     }
 
     private void DrawDiagnosticsPage()
     {
-        Ink(300, 200, "LIVE DIAGNOSTICS", 11, Colors.Cyan, true);
-        Ink(300, 239, "VIDEO   " + (SDL.GetCurrentVideoDriver() ?? "unknown"), 14);
-        Ink(300, 278, "AUDIO   " + (audioOutput?.DriverName ?? (options.AudioEnabled ? "not open" : "muted")), 14);
-        Ink(300, 317, "STATE   " + StateLabel + "    FRAME   " + displayedFrameSequence, 14);
-        Ink(300, 356, "INPUT   " + textRenderer.Fit(InputLabel, 680), 14);
-        Ink(300, 395, "ROM   " + textRenderer.Fit(romPath ?? "NO CARTRIDGE", 730), 14);
-        Ink(300, 442, "LAST ERROR", 11, Colors.Cyan, true);
-        Ink(300, 471, textRenderer.Fit(loadError ?? audioError ?? "No errors reported.", 810), 13,
+        Ink(300, 200, "SESSION HEALTH", 14, Colors.Cyan, true);
+        Ink(300, 238, textRenderer.Fit("Build " + LinuxBuildInfo.Version, 790), 14);
+        Ink(300, 273, $"Video: {SDL.GetCurrentVideoDriver()} · VSync: {(vsyncEnabled ? "on" : "unavailable")}", 14);
+        Ink(300, 308, $"Audio: {audioOutput?.DriverName ?? "not open"} · Queue: {audioOutput?.QueuedMilliseconds ?? 0:0.0} ms", 14);
+        Ink(300, 343, $"{StateLabel} · Frame {displayedFrameSequence} · Dropped audio blocks: {audioOutput?.DroppedBlocks ?? 0}", 14);
+        Ink(300, 382, diagnostics.Enabled ? "Local session recording is on." : "Session recording is off.", 14, Colors.Muted);
+        Ink(300, 417, textRenderer.Fit(loadError ?? audioError ?? diagnostics.Error ?? "No errors reported.", 790), 14,
             loadError is null && audioError is null ? Colors.Muted : Colors.Danger);
-        Ink(300, 556, "Windows Audio Inspector, WAV-Aufnahme und Save-Safety-Verwaltung", 13, Colors.Muted);
-        Ink(300, 580, "sind noch nicht portiert. Vorhandene Spielstände werden weiter verwendet.", 13, Colors.Muted);
+        ActionButton(300, 474, 242, 44, "EXPORT REPORT ZIP", ExportDiagnostics, true, diagnostics.Enabled);
+        ActionButton(560, 474, 242, 44, "OPEN REPORTS", () => OpenFolder(dataPaths.State));
+        ActionButton(300, 535, 502, 42, options.RecordDiagnostics ? "RECORD NEXT SESSION: ON" : "RECORD NEXT SESSION: OFF", () =>
+        { options.RecordDiagnostics = !options.RecordDiagnostics; MarkSettingsChanged(); statusMessage = "Recording preference saved. Applies after restarting AetherBoy."; }, options.RecordDiagnostics);
+        Ink(300, 590, "Local technical events only. No ROM/save contents and no uploads.", 14, Colors.Muted);
     }
 }

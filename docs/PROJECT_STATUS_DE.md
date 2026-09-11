@@ -14,8 +14,9 @@ Speicherung, Eingabe und Tests stark überarbeitet. Für GBA existieren zwei
 Pfade: ein kleiner eigener Lern- und Regressionkern sowie ein produktiver,
 direkt im Repository gepflegter Fork des MIT-lizenzierten GBADotnet-Kerns.
 
-Der aktuelle Stand baut unter .NET 10 ohne Warnungen und besteht unter Windows
-mindestens 354 deterministische Tests. Das beweist viele definierte Hardware- und
+Der aktuelle Stand baut unter .NET 10 ohne Warnungen. Die zuvor dokumentierte
+Windows-Abnahme umfasst mindestens 354 bestandene deterministische Tests; der
+Linux-Ausbau wurde separat geprüft (siehe unten). Das beweist viele definierte Hardware- und
 Anwendungsfälle, aber noch keinen vollständigen kommerziellen GBA-Durchspieltest.
 
 ## Herkunft und verwendete Quellen
@@ -151,11 +152,16 @@ Auf dieser Basis wurden unter anderem ergänzt oder korrigiert:
 ## Verifikation
 
 - Release-Build: 0 Warnungen, 0 Fehler.
-- 175 Core-Tests.
-- 100 Runtime-Tests.
-- 38 Desktop-Integrationstests; davon 37 bestanden und ein reiner Wayland-UI-Test außerhalb einer Wayland-Sitzung übersprungen.
+- 181 Core-Tests.
+- 127 Runtime-Tests.
+- 57/57 Desktop-Tests unter CachyOS/Hyprland, einschließlich nativem UI,
+  synthetischen GB/GBC/GBA-Spielen und virtuellen SDL-Controllern.
+- Ubuntu 24.04 x64 mit eigenem Weston-Compositor im Container: 54 bestanden,
+  drei Audio-Playtests bewusst übersprungen, keine Fehler.
+- Unabhängige Bewertung: UI 8,2/10, Features 7,9/10. Details und Grenzen:
+  [Linux-Kritik](LINUX_CRITIQUE.md), [Playtest](LINUX_PLAYTEST.md).
 - 42 Windows-Smoke-Tests einschließlich zentraler Datenablage, Migration, Datenschutz und Live-Export der Entwicklungsdiagnose.
-- Aktueller Windows-Gesamtlauf: 355 Tests, 354 bestanden, 0 fehlgeschlagen und 1 übersprungen.
+- Zuvor dokumentierter Windows-Gesamtlauf (vor diesem Linux-Ausbau): 355 Tests, 354 bestanden, 0 fehlgeschlagen und 1 übersprungen.
 - Nativer Ubuntu-Build und `linux-x64`-Publish: 0 Warnungen, 0 Fehler; der
   veröffentlichte Host erkannte Hyprland und öffnete unter WSLg einen echten
   Wayland-Fensterlauf.
@@ -181,8 +187,8 @@ Firmware für die automatischen Tests.
   Mapper ist nicht freigegeben.
 - Ältere experimentelle GBA-Save-States vor Kernschema 5 sind nicht kompatibel.
 - Die zentrale AppData-Bibliothek und die automatische Development-Aufzeichnung
-  gelten derzeit für Windows. Linux nutzt seine XDG-Einstellungen und ROM-nahe
-  Spielstände; Details zum Frontend stehen in `docs/LINUX_WAYLAND.md`.
+  gelten derzeit für Windows. Linux besitzt inzwischen ebenfalls zentrale XDG-Spielstände,
+  lokale Diagnose und zusätzliche Werkzeuge; Details zum Frontend stehen in `docs/LINUX_WAYLAND.md`.
 - AetherBoy ist Alpha-Software und noch kein versprochener Ersatz für etablierte
   Referenzemulatoren.
 

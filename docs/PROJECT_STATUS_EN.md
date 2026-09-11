@@ -14,8 +14,9 @@ storage, input and tests have been substantially reworked. GBA has two paths: a
 small independent learning/regression core and a production source fork of the
 MIT-licensed GBADotnet core maintained directly in this repository.
 
-The current .NET 10 code builds without warnings and passes at least 354
-deterministic tests on Windows. This proves many defined hardware and application contracts, but it does
+The current .NET 10 code builds without warnings. The previously documented
+Windows verification includes at least 354 passing deterministic tests; the
+Linux expansion was checked separately (see below). This proves many defined hardware and application contracts, but it does
 not yet prove a complete playthrough of a commercial GBA game.
 
 ## Origins and sources used
@@ -148,11 +149,16 @@ Work on that foundation includes:
 ## Verification
 
 - Release build: 0 warnings, 0 errors.
-- 175 core tests.
-- 100 runtime tests.
-- 38 desktop integration tests: 37 passed, with one Wayland-only UI test skipped outside a Wayland session.
+- 181 core tests.
+- 127 runtime tests.
+- 57/57 desktop tests on CachyOS/Hyprland, including native UI, synthetic
+  GB/GBC/GBA games and virtual SDL controllers.
+- Ubuntu 24.04 x64 with a separate Weston compositor in a container: 54 passed,
+  three audio playtests deliberately skipped, no failures.
+- Independent rating: UI 8.2/10, features 7.9/10. Evidence and limitations:
+  [Linux critique](LINUX_CRITIQUE.md), [playtest](LINUX_PLAYTEST.md).
 - 42 Windows smoke tests, including central storage, migration, privacy and live-export coverage for development diagnostics.
-- Current Windows solution run: 355 tests, 354 passed, 0 failed and 1 skipped.
+- Previously documented Windows solution run (before this Linux expansion): 355 tests, 354 passed, 0 failed and 1 skipped.
 - Native Ubuntu build and `linux-x64` publish: 0 warnings, 0 errors. The
   published host detected its Hyprland profile and entered a genuine Wayland
   window loop under WSLg.
@@ -177,7 +183,7 @@ or Nintendo firmware is required by the automated test suite.
   mappers is not released.
 - Experimental GBA save states older than core schema 5 are incompatible.
 - The central AppData library and automatic development recording currently apply
-  to Windows. Linux uses its XDG settings and ROM-adjacent saves; see
+  to Windows in that commit. Linux now also has central XDG saves, local diagnostics and additional tools; see
   `docs/LINUX_WAYLAND.md` for frontend details.
 - AetherBoy is alpha software and is not yet claimed as a replacement for
   established reference emulators.

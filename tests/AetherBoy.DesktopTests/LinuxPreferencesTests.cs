@@ -20,6 +20,7 @@ public sealed class LinuxPreferencesTests
     [DataRow(SDL.Scancode.C)]
     [DataRow(SDL.Scancode.O)]
     [DataRow(SDL.Scancode.F5)]
+    [DataRow(SDL.Scancode.F6)]
     [DataRow(SDL.Scancode.Alpha1)]
     [DataRow(SDL.Scancode.Unknown)]
     public void ReservedKeysCannotReplaceGameControls(SDL.Scancode key)
@@ -50,7 +51,7 @@ public sealed class LinuxPreferencesTests
             LinuxSettingsStore.Save(path, loaded);
             Assert.AreEqual(0, LinuxSettingsStore.Load(path, out error).AudioVolume);
             Assert.IsNull(error);
-            Assert.HasCount(1, Directory.GetFiles(Path.GetDirectoryName(path)!));
+            Assert.HasCount(2, Directory.GetFiles(Path.GetDirectoryName(path)!));
         });
     }
 
@@ -70,6 +71,18 @@ public sealed class LinuxPreferencesTests
             Assert.AreEqual(SDL.Scancode.Z, options.Keys[LinuxInputAction.A]);
             Assert.AreEqual(json, File.ReadAllText(path));
         });
+    }
+
+    [TestMethod]
+    public void FormerF6BindingMigratesWithoutLosingOtherPreferences()
+    {
+        var keys = new LinuxKeyBindings().ToDictionary();
+        keys[LinuxInputAction.A] = SDL.Scancode.F6;
+        keys[LinuxInputAction.L] = SDL.Scancode.Z;
+        var migrated = LinuxKeyBindings.FromDictionary(keys);
+        Assert.AreEqual(SDL.Scancode.Z, migrated[LinuxInputAction.L]);
+        Assert.AreNotEqual(SDL.Scancode.F6, migrated[LinuxInputAction.A]);
+        Assert.AreEqual(12, migrated.ToDictionary().Values.Distinct().Count());
     }
 
     [TestMethod]

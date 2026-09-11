@@ -46,7 +46,7 @@ internal static class LinuxSaveStateStore
         }
 
         string path = GetPath(romPath, slot);
-        string temporaryPath = path + ".tmp";
+        string temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
             using (FileStream stream = new(

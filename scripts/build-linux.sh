@@ -33,5 +33,8 @@ dotnet publish "$project" \
     -p:ContinuousIntegrationBuild=true \
     --output "$output"
 
+install -m 0755 "$repository_root/scripts/launch-linux.sh" "$output/launch-linux.sh"
+printf '%s\n' "$(dirname -- "$(readlink -f -- "$(command -v dotnet)")")" > "$output/dotnet-root.txt"
+
 printf 'AetherBoy was published to %s\n' "$output"
 printf 'Run: bash scripts/run-linux.sh "/path/to/game.gba"\n'

@@ -39,8 +39,8 @@ The shell connects ROM opening/drag-and-drop, keyboard/gamepad input, pause,
 held turbo, rewind, quick save/load, five slots, fullscreen, display filtering,
 frameskip, DMG palettes, volume/mute and four hardware audio channels.
 Preferences persist in the existing version-1 settings format, with defaults for
-fields absent from older files. The seven Control Center sections are Overview,
-Display, Audio, Input, Saves, System and Diagnostics. Diagnostic values come from
+fields absent from older files. The nine Control Center sections are Overview, Display, Audio, Input, Saves,
+System, Diagnostics, Library and Tools. Diagnostic values come from
 the live Linux host.
 
 Control Center buttons are reachable through Tab/Shift+Tab with a visible focus
@@ -49,11 +49,13 @@ Input still supports arrow-key selection and rebinding; Audio supports 1% steps.
 
 ## Remaining Windows frontend gaps
 
-The visual port does not implement gamepad remapping, Cartridge Vault, boot-ROM
-selection, cheats management, Audio Inspector/WAV recording, or the full Windows
-Save Safety Center. The Linux save page exposes existing battery-save status,
-slots and timeline actions; it is deliberately labelled Save Center. These gaps
-are shown in System/Diagnostics. The portable runtime and save formats are shared.
+Linux now includes controller remapping/profiles, a searchable recent-cartridge
+library, firmware import, session cheats, WAV recording, local diagnostics and
+battery-backup recovery. Saves and states use content-addressed XDG storage.
+See [Linux roadmap](LINUX_ROADMAP.md) and [playtest report](LINUX_PLAYTEST.md).
+The full Windows Audio Inspector and its complete Cartridge Vault feature set
+remain distinct. Real-game compatibility, physical device changes, screen readers
+and multi-monitor DPI behavior require separate qualification.
 
 ## Verification
 

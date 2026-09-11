@@ -15,9 +15,11 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AetherBoyChannel Condition="'$(AetherBoyChannel)' == ''">development</AetherBoyChannel>
   </PropertyGroup>
 
   <ItemGroup>
+    <AssemblyMetadata Include="AetherBoyChannel" Value="$(AetherBoyChannel)" />
     <PackageReference Include="SDL3-CS" Version="3.4.16" ExcludeAssets="analyzers" />
     <PackageReference Include="SDL3-CS.Linux" Version="3.4.16" />
   </ItemGroup>

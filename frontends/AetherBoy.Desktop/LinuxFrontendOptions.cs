@@ -24,6 +24,10 @@ internal sealed class LinuxFrontendOptions
     public bool Channel4Enabled { get; set; } = true;
     public int Frameskip { get; set; }
     public int PaletteIndex { get; set; }
+    public Dictionary<string, LinuxGamepadProfile> Gamepads { get; set; } = new();
+    public bool RecordDiagnostics { get; set; } = LinuxBuildInfo.RecordByDefault;
+    public bool UseFirmware { get; set; } = true;
+    public bool PauseOnFocusLoss { get; set; } = true;
     public int SaveSlot { get; set; } = 1;
 
     public void SetVolume(int percent) => AudioVolume = Math.Clamp(percent, 0, 100);

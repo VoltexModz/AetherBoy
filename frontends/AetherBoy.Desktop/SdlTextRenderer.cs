@@ -5,6 +5,7 @@ namespace AetherBoy.Desktop;
 /// <summary>Bundled Noto text, with a bundled glyph atlas when SDL_ttf is unavailable.</summary>
 internal sealed class SdlTextRenderer : IDisposable
 {
+    public int MinimumSize { get; set; } = 14;
     private readonly IntPtr renderer;
     private readonly string? fontPath;
     private readonly SdlFontAtlas atlas;
@@ -40,6 +41,7 @@ internal sealed class SdlTextRenderer : IDisposable
 
     public float Measure(string text, int size = 14, bool bold = false)
     {
+        size = Math.Max(size, MinimumSize);
         IntPtr font = Font(size, bold);
         return font != IntPtr.Zero && TTF.GetStringSize(font, text, 0, out int width, out _)
             ? width : atlas.Measure(text, size, bold);
@@ -58,6 +60,7 @@ internal sealed class SdlTextRenderer : IDisposable
     public void Draw(float x, float y, string text, byte red, byte green, byte blue, int size = 14, bool bold = false)
     {
         if (string.IsNullOrEmpty(text)) return;
+        size = Math.Max(size, MinimumSize);
         IntPtr font = Font(size, bold);
         if (font != IntPtr.Zero)
         {

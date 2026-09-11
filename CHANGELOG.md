@@ -2,6 +2,29 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## Unveröffentlicht – Linux-Daten, Werkzeuge und Bedienqualität
+
+- Saves und States liegen getrennt nach ROM-Inhalts-Hash in der XDG-Datenablage.
+  Bestehende Save-Familien werden kopiert; Schreibbesitz verhindert konkurrierende
+  Instanzen, und eine lesbare Einstellungssicherung ermöglicht Wiederherstellung.
+- Installation verwendet geprüfte Release-Ordner und einen gemeinsamen Starter.
+  Isolierte Integrationstests prüfen fehlgeschlagene Updates, ungewöhnliche Pfade,
+  Desktop-Start ohne dotnet im PATH und Deinstallation mit Datenerhalt.
+- Bibliothek mit Suche und neu zugeordneten ROM-Pfaden, Save-Backup-Wiederherstellung
+  mit Vorher-Archiv, Import/Export, Firmware-Import, WAV-Aufnahme und vom Core
+  unterstützte Sitzungs-Cheats ergänzen das Control Center.
+- Controller erhalten GUID-Profile, freie Belegung, Gerätewechsel und Deadzone.
+  Fokus-Pause ist konfigurierbar; Menüfokus und Spieltasten sind getrennt.
+- Mindestschrift, Kontrast, kleine Fenster, Speicherplatzstatus und Hilfetexte
+  wurden nach unabhängiger Kritik überarbeitet. Dokumentierte Bewertung:
+  UI 8,2/10, Features 7,9/10; Prüfgrenzen stehen in `docs/LINUX_CRITIQUE.md`.
+- GBA-Stereo bleibt bis SDL erhalten; vorhandene Mono-Konsumenten bleiben
+  kompatibel. Idle-/Pause-Rendering wird gedrosselt. Begrenzte lokale Diagnose
+  mit ZIP-Export und Audio-Messwerten erleichtert Fehlersuche.
+- Native Wayland-, Datenintegritäts- und synthetische Spieltests ergänzen die
+  Linux-CI für x64 und ARM64. Reale Spielkompatibilität, hörbare Audioqualität
+  und physische Geräte bleiben getrennte Abnahmen; siehe `docs/LINUX_PLAYTEST.md`.
+
 Gesamtübergabe des Windows-Entwicklungspakets vom 11. September 2026:
 [Deutsch / English: Änderungen, Linux-Verträge, Prüfung und nächste Schritte](docs/WINDOWS_DEVELOPMENT_HANDOFF.md).
 CI-Mindestumfang: 440 Tests unter Windows, 126 Runtime-Tests unter Linux.

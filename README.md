@@ -10,6 +10,9 @@ Windows development update: stereo/WASAPI, GPU presentation, state gallery and r
 controller Quick Deck, per-game profiles and IPS/BPS/UPS Patch Lab.
 [What's changed, usage and Linux developer handoff (DE/EN)](docs/WINDOWS_DEVELOPMENT_HANDOFF.md#english).
 
+Linux follow-up: central saves, stereo, library/recovery tools and controller profiles.
+[Linux integration handoff for the Windows developer / next ChatGPT](docs/LINUX_DEVELOPMENT_HANDOFF.md).
+
 <p align="center">
   <strong lang="en">English</strong> · <a href="README_DE.md" lang="de">Deutsch</a>
 </p>
@@ -57,7 +60,7 @@ The **Aether Wave interface** brings together the game display, a live session s
   <img src="docs/images/aetherboy-control-center.png" alt="Aether Control Center on Linux: display settings with Sharp, Smooth, LCD Grid, frameskip and DMG palettes; some interface text is in German" width="1000">
 </p>
 
-Seven sections cover overview, display, audio, input, saves, system and diagnostics. This screenshot shows the Linux client's display settings.
+Nine sections cover overview, display, audio, input, saves, system and diagnostics. This screenshot shows the Linux client's display settings.
 
 </details>
 
@@ -81,13 +84,13 @@ Both frontends share the same platform-neutral Core and Runtime. The available d
 | **Frontend** | Windows Forms | SDL3, native Wayland |
 | **Aether interface and Control Center** | Available | Available, adapting to tiled and wide windows |
 | **Open ROM** | File dialog and drag-and-drop | XDG Desktop Portal, file path and drag-and-drop |
-| **Keyboard / gamepad** | Both, with remapping settings | Both; remappable keyboard, standard gamepad layout |
+| **Keyboard / gamepad** | Both, with remapping settings | Both; keyboard and controller profiles, remapping and deadzone |
 | **Battery saves, five state slots, rewind** | Available | Available |
-| **Cartridge Vault, cheat management, Save Safety Center** | Available, partly experimental | Not yet available as complete tools |
-| **WAV recording and boot ROM selection** | Available | Not yet available in the interface |
+| **Cartridge Vault, cheat management, Save Safety Center** | Available, partly experimental | Linux library, session cheats and backup recovery available |
+| **WAV recording and boot ROM selection** | Available | Available under Tools / System |
 | **Quick Deck, state gallery/resume, per-game profiles, screenshots** | Available | Separate frontend follow-up |
 | **IPS / BPS / UPS Patch Lab** | Integrated; UPS undo is explicit | Shared parser available, no patching UI yet |
-| **Stereo playback** | GB/GBC/GBA end-to-end | Current output uses the compatible mono downmix |
+| **Stereo playback** | GB/GBC/GBA end-to-end | GB/GBC/GBA end-to-end |
 
 See [Windows → Linux: UI status](docs/LINUX_UI_PARITY.md) for the detailed mapping.
 
@@ -137,7 +140,7 @@ bash scripts/install-linux-user.sh
 aetherboy "/path/to/your-game.gbc"
 ```
 
-Program files default to `~/.local/share/aetherboy`, with the launcher at `~/.local/bin/aetherboy`. The script also installs the desktop entry and icons. To launch from a terminal, `~/.local/bin` must be on your `PATH`. If .NET is installed only in a user-local SDK directory, that directory must also be available to the installed launcher through `DOTNET_ROOT`.
+Program files default to `~/.local/share/aetherboy/program`, with the launcher at `~/.local/bin/aetherboy`. The script also installs the desktop entry and icons. To launch from a terminal, `~/.local/bin` must be on your `PATH`. The installed launcher also finds the runtime recorded during installation, without requiring an interactive shell PATH. Updates prepare a new release before activation.
 
 <details>
 <summary><strong>Check Wayland and troubleshoot startup</strong></summary>
@@ -247,13 +250,15 @@ The main default bindings are listed below. Gameplay keys can be changed under *
 
 The default A/B bindings use physical key positions. AetherBoy displays the assigned keys for the current keyboard layout. See the [Linux User Guide](docs/LINUX_USER_GUIDE.md#5-controls) for all shortcuts and keyboard navigation.
 
+Linux implementation priorities, independent UI criticism and reproducible playtests: [Linux roadmap](docs/LINUX_ROADMAP.md), [review](docs/LINUX_CRITIQUE.md), [playtest report](docs/LINUX_PLAYTEST.md).
+
 ## Saves and BIOS
 
-- **Battery saves:** centralized under `AetherBoy\Saves` on Windows; still adjacent to the ROM on Linux. `.bak1` through `.bak3` and `.guard` integrity files protect saves. The selected save directory must be writable.
+- **Battery saves:** centralized under `AetherBoy\Saves` on Windows; under `$XDG_DATA_HOME/aetherboy/saves/<ROM-SHA256>` on Linux. `.bak1` through `.bak3` and `.guard` integrity files protect saves. The selected save directory must be writable.
 - **Save states:** five slots, `.ss1` through `.ss5`, bound to the exact ROM, hardware model and BIOS when applicable. Incompatible state versions are rejected; automatic migration of older schemas is not yet available.
 - **Rewind:** a session-local buffer holding up to roughly ten seconds of history; GBA also has a memory budget limit.
 - **Linux settings:** stored at `$XDG_CONFIG_HOME/aetherboy/settings.json`, normally `~/.config/aetherboy/settings.json`.
-- **GBA BIOS:** the built-in HLE fallback is used without external firmware. The core optionally supports an exactly 16 KiB `gba_bios.bin`; the Linux interface does not yet offer BIOS selection.
+- **GBA BIOS:** the built-in HLE fallback is used without external firmware. The core optionally supports an exactly 16 KiB `gba_bios.bin`; import it under **Settings → System → Import boot ROM / BIOS**.
 
 ROMs and boot ROMs are not included and are not required to build the project.
 

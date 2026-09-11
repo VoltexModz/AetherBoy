@@ -62,7 +62,7 @@ bash scripts/install-linux-user.sh
 aetherboy "/pfad/zu/deinem-spiel.gba"
 ```
 
-Dabei landen Programmdateien unter `~/.local/share/aetherboy`, der Starter unter
+Dabei landen Programmdateien unter `~/.local/share/aetherboy/program`, der Starter unter
 `~/.local/bin/aetherboy` und der Desktop-Eintrag unter
 `~/.local/share/applications`. Es werden keine Root-Rechte benötigt.
 
@@ -99,7 +99,10 @@ bash scripts/run-linux.sh --audio-info
 | Control-Center-Bereich wechseln | Strg+Tab / Strg+Umschalt+Tab |
 
 SDL3-Gamepads werden beim Start und über Hot-Plug erkannt. Batterie-Spielstände
-(`.sav`) und fünf Zustände (`.ss1` bis `.ss5`) liegen neben der ROM. Das Control
+(`.sav`) und fünf Zustände (`.ss1` bis `.ss5`) liegen unter
+`$XDG_DATA_HOME/aetherboy/saves/<SHA256>` beziehungsweise `states/<SHA256>`.
+Bestehende ROM-nahe Dateien werden beim ersten Öffnen familienweise kopiert;
+zentrale Dateien haben Vorrang und die Originale bleiben erhalten. Das Control
 Center bietet Displayfilter, Frameskip, DMG-Paletten, Audiopegel, vier
 Audiokanäle, Inputstatus, Slotwahl, Save/Load und Rewind. Während es geöffnet ist,
 wird eine laufende Sitzung automatisch pausiert.
@@ -131,7 +134,7 @@ werden.
 
 Die Linux-Oberfläche übernimmt den Aufbau aus `frmNano.AetherUi.cs` und
 `frmControlCenter.cs`: Hauptanzeige links, Session-Leiste rechts, Aktionen unten
-und ein Control Center mit sieben Bereichen. Das Control Center öffnet sich
+und ein Control Center mit neun Bereichen. Das Control Center öffnet sich
 innerhalb desselben SDL-Fensters. Hohe Hyprland-Kacheln und breite Fenster nutzen
 zusätzlichen Platz; das Spielbild behält sein Seitenverhältnis.
 
@@ -145,10 +148,11 @@ Audiokanäle und Save-Slot werden lokal in `settings.json` gespeichert.
 
 ## Aktuelle Grenze
 
-Die Linux-UI bietet noch keine freie Gamepad-Belegung, Cartridge Vault,
-Boot-ROM-Auswahl, Cheats, Windows Audio Inspector/WAV-Aufnahme oder vollständige
-Save-Safety-Verwaltung. System und Diagnostics zeigen den tatsächlichen
-Linux-Status; die fehlenden Werkzeuge werden nicht als fertige Funktionen angeboten.
+Controller-Belegung, Bibliothek, Firmware-Import, Sitzungs-Cheats, WAV-Aufnahme,
+Diagnoseexport und Backup-Wiederherstellung stehen jetzt zur Verfügung. Die
+[Linux-Roadmap](LINUX_ROADMAP.md) hält die Priorisierung, Umsetzung und verbleibenden
+Hardware-/Release-Abnahmen fest. F6 navigiert Hauptfenster-Aktionen, Tab bleibt
+standardmäßig Turbo. Der rechte Stick-Klick öffnet die Controller-Einstellungen.
 
 Die genaue Zuordnung der Windows- und Linux-Dateien sowie der native UI-Test
 stehen in [LINUX_UI_PARITY.md](LINUX_UI_PARITY.md).

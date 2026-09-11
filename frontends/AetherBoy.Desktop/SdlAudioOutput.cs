@@ -8,6 +8,13 @@ internal sealed class SdlAudioOutput : IDisposable
     private readonly object sync = new();
     private IntPtr stream;
     private int sampleRate;
+    private int channels = 1;
+    public long DroppedBlocks { get; private set; }
+    public long EmptyQueueObservations { get; private set; }
+    public int SourceRate { get { lock (sync) return sampleRate; } }
+    public int Channels { get { lock (sync) return channels; } }
+    public double QueuedMilliseconds { get { lock (sync) return disposed || stream == IntPtr.Zero ? 0 :
+        Math.Max(0, SDL.GetAudioStreamQueued(stream)) * 1000.0 / (sampleRate * channels * sizeof(float)); } }
     private float volume;
     private bool enabled = true;
     private bool disposed;
@@ -90,7 +97,7 @@ internal sealed class SdlAudioOutput : IDisposable
         }
     }
 
-    public void Submit(float[] samples, int sourceSampleRate)
+    public void Submit(float[] samples, int sourceSampleRate, int sourceChannels = 1)
     {
         ArgumentNullException.ThrowIfNull(samples);
         if (samples.Length == 0)
@@ -105,15 +112,22 @@ internal sealed class SdlAudioOutput : IDisposable
                 return;
             }
 
-            if (sourceSampleRate != sampleRate)
+            if (sourceChannels is < 1 or > 2 || samples.Length % sourceChannels != 0)
+                throw new ArgumentOutOfRangeException(nameof(sourceChannels));
+            if (sourceSampleRate != sampleRate || sourceChannels != channels)
             {
-                ReopenStream(sourceSampleRate);
+                ReopenStream(sourceSampleRate, sourceChannels);
             }
 
-            int maximumQueuedBytes = sampleRate * sizeof(float) / 8;
-            if (SDL.GetAudioStreamQueued(stream) > maximumQueuedBytes)
+            int queued = SDL.GetAudioStreamQueued(stream);
+            if (queued < 0) throw new InvalidOperationException("Cannot read SDL audio queue: " + SDL.GetError());
+            if (queued == 0) EmptyQueueObservations++;
+            int maximumQueuedBytes = sampleRate * channels * sizeof(float) / 8;
+            if (queued > maximumQueuedBytes)
             {
-                SDL.ClearAudioStream(stream);
+                // Let already queued sound drain instead of clearing the entire stream.
+                DroppedBlocks++;
+                return;
             }
 
             ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(samples.AsSpan());
@@ -153,7 +167,7 @@ internal sealed class SdlAudioOutput : IDisposable
         }
     }
 
-    private void ReopenStream(int newSampleRate)
+    private void ReopenStream(int newSampleRate, int newChannels)
     {
         if (newSampleRate is < 8_000 or > 192_000)
         {
@@ -163,6 +177,7 @@ internal sealed class SdlAudioOutput : IDisposable
         SDL.DestroyAudioStream(stream);
         stream = IntPtr.Zero;
         sampleRate = newSampleRate;
+        channels = newChannels;
         OpenStream();
     }
 
@@ -173,7 +188,7 @@ internal sealed class SdlAudioOutput : IDisposable
             Format = BitConverter.IsLittleEndian
                 ? SDL.AudioFormat.AudioF32LE
                 : SDL.AudioFormat.AudioF32BE,
-            Channels = 1,
+            Channels = channels,
             Freq = sampleRate
         };
         stream = SDL.OpenAudioDeviceStream(

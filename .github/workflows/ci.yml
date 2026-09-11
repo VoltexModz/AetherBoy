@@ -61,8 +61,12 @@ jobs:
         run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 440
 
   portable:
-    name: Linux / Core + Runtime + native Wayland host
-    runs-on: ubuntu-24.04
+    name: Linux / ${{ matrix.runner }} / Core + Runtime + Wayland
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
 
     steps:
@@ -124,13 +128,13 @@ jobs:
         run: dotnet build ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Test Core
-        run: dotnet test --project ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 175
+        run: dotnet test --project ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 181
 
       - name: Test Runtime
-        run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 126
+        run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 127
 
       - name: Test native Wayland frontend logic
-        run: dotnet test --project ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 15
+        run: dotnet test --project ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 52
 
       - name: Smoke-test conformance CLI
         run: dotnet run --project ./tools/AetherBoy.Conformance/AetherBoy.Conformance.csproj --configuration Release --no-build -- --help
@@ -145,3 +149,32 @@ jobs:
           WAYLAND_DISPLAY: wayland-ci
           HYPRLAND_INSTANCE_SIGNATURE: ci
         run: dotnet run --project ./frontends/AetherBoy.Desktop/AetherBoy.Desktop.csproj --configuration Release --no-build --no-restore -- --platform-info
+
+      - name: Install headless Wayland compositor
+        run: sudo apt-get update && sudo apt-get install -y weston desktop-file-utils libwayland-client0 libxkbcommon0 libegl1 libgl1 libdecor-0-0
+
+      - name: Test native UI on real headless Wayland
+        shell: bash
+        run: |
+          export XDG_RUNTIME_DIR="$(mktemp -d)"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          export WAYLAND_DISPLAY=wayland-aetherboy-ci
+          export XDG_SESSION_TYPE=wayland
+          export XDG_CURRENT_DESKTOP=Weston
+          export SDL_RENDER_DRIVER=software
+          weston --backend=headless-backend.so --renderer=pixman --socket="$WAYLAND_DISPLAY" --idle-time=0 --no-config > "$RUNNER_TEMP/weston.log" 2>&1 &
+          compositor_pid=$!
+          trap 'kill "$compositor_pid" 2>/dev/null || true; rm -rf "$XDG_RUNTIME_DIR"' EXIT
+          for attempt in {1..50}; do
+            test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" && break
+            kill -0 "$compositor_pid" || { cat "$RUNNER_TEMP/weston.log"; exit 1; }
+            sleep 0.1
+          done
+          test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
+          AETHERBOY_UI_TESTS=1 dotnet test --project tests/AetherBoy.DesktopTests -c Release --no-build --no-restore --minimum-expected-tests 54
+
+      - name: Verify Linux package scripts and publish
+        run: |
+          bash -n scripts/build-linux.sh scripts/run-linux.sh scripts/install-linux-user.sh scripts/launch-linux.sh scripts/uninstall-linux-user.sh
+          bash scripts/build-linux.sh
+          python3 scripts/test-linux-install.py

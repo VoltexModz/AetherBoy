@@ -70,7 +70,7 @@ ROM fails to initialize, the previous game resumes. Local `file://` drops and
 filenames with spaces are supported; extract archives before opening them.
 
 The Linux shell now follows the Windows Aether layout: title navigation, game
-stage, right session rail, bottom command deck, and the seven-section Control
+stage, right session rail, bottom command deck, and the nine-section Control
 Center (Overview, Display, Audio, Input, Saves, System, Diagnostics). It adapts
 to tall tiling windows and wide windows, preserving the game's aspect ratio.
 At 1180×760 the stage fits GBA at 3× with Sharp filtering.
@@ -101,7 +101,7 @@ bash scripts/install-linux-user.sh
 
 This installs only for the current user:
 
-- program files: `~/.local/share/aetherboy`
+- program files: `~/.local/share/aetherboy/program`
 - launcher: `~/.local/bin/aetherboy`
 - desktop entry: `~/.local/share/applications`
 - icons: `~/.local/share/icons/hicolor`
@@ -155,7 +155,9 @@ channel switches and save slot save automatically to
 `~/.config/aetherboy/settings.json`, and load at the next start.
 
 Battery saves use `.sav`; quick states use `.ss1` through `.ss5`. They are
-stored next to the ROM, so the ROM directory must be writable. The Control
+stored under `$XDG_DATA_HOME/aetherboy/saves/<SHA256>` and `states/<SHA256>`.
+Only the central data directory needs write access. Legacy files are copied once
+and never replace an existing central save family. The Control
 Center exposes Sharp, Smooth and LCD Grid video, frameskip, five DMG palettes,
 master audio, all four hardware channels, keyboard bindings and timeline controls.
 
@@ -216,17 +218,16 @@ the system setup can be diagnosed.
 ### Saves are not written
 
 The ROM directory must be writable. Avoid launching games directly from a
-read-only archive or protected mounted directory.
+central XDG data directory. Read-only ROM directories are supported.
 
 ## 8. Current Linux limitations
 
 The native frontend supports gameplay video, SDL3 audio, an XDG Portal open
 dialog, keyboard/gamepad input, pause, turbo, fullscreen, battery saves, all
-five quick-state slots, rewind and a seven-section Control Center. It does not yet
-provide gamepad remapping, Cartridge Vault,
-cheat/diagnostic/save-safety tools, WAV recording or boot-ROM selection. These
-are frontend gaps; the portable emulator core remains shared across Windows and
-Linux.
+five quick-state slots, rewind and a nine-section Control Center. Controller profiles/remapping, Library, firmware import, session cheats,
+WAV recording, diagnostic export and backup recovery are available. Physical
+controller/audio-device changes, suspend/resume, mixed-DPI and real-game long runs
+still need qualification. See the [playtest report](LINUX_PLAYTEST.md).
 
 Technical details and the German guide are available in
 [`LINUX_WAYLAND.md`](LINUX_WAYLAND.md).
@@ -248,3 +249,29 @@ system with SDL3_ttf installed. Neither variable is needed for normal use.
 
 See [Windows-to-Linux UI mapping](LINUX_UI_PARITY.md) for implementation details
 and the remaining Windows-only tools.
+
+## 10. Library, recovery, recording and reports
+
+- **Library:** previously opened cartridges, search, and open/relocate. Opening a
+  moved ROM repairs its stored path while keeping content-based save identity.
+- **Saves → Backups / Export:** inspect three backups, select one and confirm
+  restore. A restore restarts the cartridge, archives previous data and retains
+  normal rotating backups. Import accepts a size-checked raw `.sav`; choose the
+  matching game's data. ZIP exports include persisted battery/RTC and state files.
+- **Input → Controller setup:** remap buttons, set deadzone and choose another
+  connected controller. Right-stick click opens settings; D-pad moves focus,
+  South activates and East closes. Right-stick click cancels button remapping.
+- **System:** configure focus-loss pause and import DMG (256 B), CGB (2304 B), or
+  GBA (16384 B) firmware. It applies on the next cartridge start; firmware is optional.
+- **Tools:** record WAV audio or add/toggle/remove supported session cheats.
+  Start recording, then close settings to resume gameplay. Recording is capped
+  at 128 MiB and ends on cartridge/audio-format changes. Cheats are not persisted.
+- **Diagnostics:** inspect queue and frame counters, export a local ZIP and set
+  whether the next application session records diagnostic events. Reports are
+  capped at 8 MiB each and 20 sessions; they contain no ROM/save bytes or ROM paths.
+- **F6 / Shift+F6:** focus main-window actions, Enter activates. F6 is now reserved;
+  old F6 gameplay bindings migrate to a free default key, preserving other mappings.
+
+Run `bash scripts/uninstall-linux-user.sh` to remove the current program while
+keeping game data. Older releases are preserved until uninstall. Optional
+`AETHERBOY_BIN_HOME` selects an absolute launcher directory for isolated installs.

@@ -115,7 +115,7 @@ namespace AetherBoy.Runtime
 
         public int SampleRate { get; }
         public int Channels { get; }
-        // Existing consumers receive one mono value per frame, including the Linux frontend.
+        // Legacy mono consumers receive one value per frame; stereo consumers use the interleaved API.
         public int SampleCount => samples.Length / Channels;
         public int InterleavedSampleCount => samples.Length;
         public float[] GetInterleavedSamplesCopy() => (float[])samples.Clone();

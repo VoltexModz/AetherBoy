@@ -7,6 +7,7 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--version") { Console.WriteLine(LinuxBuildInfo.Version); return 0; }
         LinuxDesktopProfile desktop = LinuxDesktopProfile.Detect();
         if (args.Length == 1 && args[0].Equals("--platform-info", StringComparison.OrdinalIgnoreCase))
         {
@@ -56,10 +57,14 @@ internal static class Program
 
     private static int RunWaylandHost(LinuxDesktopProfile desktop, string[] args)
     {
+        using var diagnostics = new LinuxDiagnostics(LinuxDataPaths.Default,
+            LinuxSettingsStore.Load(LinuxSettingsStore.DefaultPath, out _).RecordDiagnostics &&
+            Environment.GetEnvironmentVariable("AETHERBOY_DIAGNOSTICS") != "0");
         SDL.SetHint("SDL_VIDEO_DRIVER", "wayland");
-        SDL.SetAppMetadata("AetherBoy", "4.8.0-alpha.1", LinuxDesktopProfile.ApplicationId);
+        SDL.SetAppMetadata("AetherBoy", LinuxBuildInfo.Version, LinuxDesktopProfile.ApplicationId);
         if (!SDL.Init(SDL.InitFlags.Video | SDL.InitFlags.Events | SDL.InitFlags.Gamepad))
         {
+            diagnostics.Record("startup_error", new { stage = "sdl_init" });
             return Fail($"SDL could not initialize: {SDL.GetError()}");
         }
 
@@ -83,11 +88,12 @@ internal static class Program
                 return 0;
             }
 
-            using var host = new WaylandEmulatorHost(desktop);
+            using var host = new WaylandEmulatorHost(desktop, diagnostics: diagnostics);
             return host.Run(args);
         }
         catch (Exception exception)
         {
+            diagnostics.Failure("startup_or_host", exception);
             return Fail(exception.Message);
         }
         finally
