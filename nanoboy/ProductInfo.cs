@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Linq;
 
 namespace nanoboy
 {
@@ -6,6 +7,13 @@ namespace nanoboy
     {
         public const string Name = "AetherBoy";
         public const string Status = "Alpha";
+
+        public static string BuildChannel => typeof(ProductInfo).Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(attribute => attribute.Key == "AetherBoyChannel")?.Value ?? "development";
+
+        public static bool IsDevelopmentBuild => string.Equals(BuildChannel, "development",
+            System.StringComparison.OrdinalIgnoreCase);
 
         public static string Version
         {

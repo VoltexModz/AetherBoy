@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - development
   workflow_dispatch:
 
 permissions:
@@ -57,7 +58,7 @@ jobs:
         run: dotnet build .\nanoboy.sln --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Test
-        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 305
+        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 354
 
   portable:
     name: Linux / Core + Runtime + native Wayland host

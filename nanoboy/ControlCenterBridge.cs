@@ -23,5 +23,9 @@ namespace nanoboy
         public required Action QuickSave { get; init; }
         public required Action QuickLoad { get; init; }
         public required Action ResetSettings { get; init; }
+        public required Func<bool> TesterModeProvider { get; init; }
+        public required Func<string?> TesterLogPathProvider { get; init; }
+        public required Action ExportTesterReport { get; init; }
+        public required Action OpenTesterFolder { get; init; }
     }
 }

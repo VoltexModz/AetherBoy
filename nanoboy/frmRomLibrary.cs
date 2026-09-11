@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 using nanoboy.Controls;
+using nanoboy.Storage;
 
 namespace nanoboy
 {
@@ -35,7 +37,7 @@ namespace nanoboy
                 Font = new Font("Segoe UI", 9.25f, FontStyle.Regular, GraphicsUnit.Point),
                 Location = new Point(26, 22),
                 Size = new Size(768, 42),
-                Text = "Starte ein zuletzt verwendetes Spiel, wähle eine Datei oder ziehe eine einzelne .GB/.GBC-ROM direkt in dieses Fenster."
+                Text = "Öffne eine .GB/.GBC/.GBA-ROM. AetherBoy kopiert sie in deine lokale Bibliothek – so bleibt sie auch ohne USB-Stick verfügbar."
             };
             Controls.Add(intro);
 
@@ -47,7 +49,7 @@ namespace nanoboy
                 Location = new Point(26, 76),
                 Size = new Size(400, 20),
                 Tag = "accent",
-                Text = "RECENT CARTRIDGES  //  LOCAL LIBRARY"
+                Text = "CARTRIDGE VAULT  //  LOKALE BIBLIOTHEK"
             };
             Controls.Add(libraryLabel);
 
@@ -88,7 +90,7 @@ namespace nanoboy
                 AccentEdge = true,
                 Location = new Point(24, 414),
                 Name = "romLibraryDropZone",
-                Size = new Size(404, 92)
+                Size = new Size(404, 42)
             };
             dropLabel = new Label
             {
@@ -96,11 +98,21 @@ namespace nanoboy
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Bold, GraphicsUnit.Point),
                 ForeColor = AetherColors.Muted,
                 Tag = "value",
-                Text = "DROP ZONE\r\nONE CARTRIDGE  //  .GB OR .GBC",
+                Text = "DROP ZONE  //  .GB / .GBC / .GBA",
                 TextAlign = ContentAlignment.MiddleCenter
             };
             dropZone.Controls.Add(dropLabel);
             Controls.Add(dropZone);
+
+            var folderButton = new AetherButton
+            {
+                Location = new Point(24, 464),
+                Name = "romLibraryOpenFolderButton",
+                Size = new Size(404, 42),
+                Text = "ROM-ORDNER ÖFFNEN"
+            };
+            folderButton.Click += (_, _) => WindowsDataPaths.OpenFolder(this, WindowsDataPaths.Default.Roms);
+            Controls.Add(folderButton);
 
             browseButton = new AetherButton
             {
@@ -138,7 +150,8 @@ namespace nanoboy
             CancelButton = cancelButton;
             AcceptButton = openButton;
 
-            Populate(recentFiles);
+            Populate(recentFiles.Concat(WindowsRomLibrary.Default.GetRoms())
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray());
             AetherDialog.Apply(
                 this,
                 "CARTRIDGE VAULT // 07",
@@ -267,7 +280,7 @@ namespace nanoboy
             dropLabel.ForeColor = active ? AetherColors.Cyan : AetherColors.Muted;
             dropLabel.Text = active
                 ? "SIGNAL LOCKED\r\nRELEASE TO LOAD CARTRIDGE"
-                : "DROP ZONE\r\nONE CARTRIDGE  //  .GB OR .GBC";
+                : "DROP ZONE  //  .GB / .GBC / .GBA";
             dropZone.Invalidate();
         }
 
@@ -277,7 +290,7 @@ namespace nanoboy
             {
                 AetherSignal.Show(
                     this,
-                    "Die ausgewählte Datei ist keine verfügbare .GB- oder .GBC-ROM.",
+                    "Die ausgewählte Datei ist keine verfügbare .GB-, .GBC- oder .GBA-ROM.",
                     "ROM nicht verfügbar",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);

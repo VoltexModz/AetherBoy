@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using nanoboy.Storage;
 
 namespace nanoboy
 {
@@ -54,6 +55,8 @@ namespace nanoboy
             {
                 string path = GetStorePath();
                 if (!File.Exists(path))
+                    path = Path.Combine(WindowsDataPaths.Default.Root, "recent-roms.txt");
+                if (!File.Exists(path))
                 {
                     return Array.Empty<string>();
                 }
@@ -101,10 +104,7 @@ namespace nanoboy
 
         private static string GetStorePath()
         {
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                ProductInfo.Name,
-                "recent-roms.txt");
+            return WindowsDataPaths.Default.RecentRoms;
         }
     }
 }

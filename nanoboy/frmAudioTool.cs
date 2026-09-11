@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using AetherBoy.Runtime;
 using AetherBoy.Runtime.Audio;
 using nanoboy.Controls;
+using nanoboy.Storage;
 
 namespace nanoboy
 {
@@ -182,7 +183,9 @@ namespace nanoboy
             using (var sfd = new SaveFileDialog())
             {
                 sfd.Filter = "WAV Audio (*.wav)|*.wav";
-                sfd.FileName = "nanoboy_audio.wav";
+                sfd.FileName = $"AetherBoy-{DateTime.Now:yyyyMMdd-HHmmss}.wav";
+                System.IO.Directory.CreateDirectory(WindowsDataPaths.Default.Recordings);
+                sfd.InitialDirectory = WindowsDataPaths.Default.Recordings;
                 if (sfd.ShowDialog() == DialogResult.OK)
                 {
                     await StartRecordingAsync(

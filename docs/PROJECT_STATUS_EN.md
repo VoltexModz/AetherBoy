@@ -1,6 +1,6 @@
 # AetherBoy – Project Status and Provenance
 
-Status date: 9 September 2026  
+Status date: 11 September 2026
 Version: 4.8.0-alpha.1  
 Branch: `development`
 
@@ -14,8 +14,8 @@ storage, input and tests have been substantially reworked. GBA has two paths: a
 small independent learning/regression core and a production source fork of the
 MIT-licensed GBADotnet core maintained directly in this repository.
 
-The current .NET 10 code builds without warnings and passes 305 deterministic
-tests. This proves many defined hardware and application contracts, but it does
+The current .NET 10 code builds without warnings and passes at least 354
+deterministic tests on Windows. This proves many defined hardware and application contracts, but it does
 not yet prove a complete playthrough of a commercial GBA game.
 
 ## Origins and sources used
@@ -149,10 +149,10 @@ Work on that foundation includes:
 
 - Release build: 0 warnings, 0 errors.
 - 175 core tests.
-- 87 runtime tests.
-- 28 Windows smoke tests.
-- 15 Linux frontend tests.
-- Total: 305 passed, 0 failed.
+- 100 runtime tests.
+- 38 desktop integration tests: 37 passed, with one Wayland-only UI test skipped outside a Wayland session.
+- 42 Windows smoke tests, including central storage, migration, privacy and live-export coverage for development diagnostics.
+- Current Windows solution run: 355 tests, 354 passed, 0 failed and 1 skipped.
 - Native Ubuntu build and `linux-x64` publish: 0 warnings, 0 errors. The
   published host detected its Hyprland profile and entered a genuine Wayland
   window loop under WSLg.
@@ -176,9 +176,9 @@ or Nintendo firmware is required by the automated test suite.
 - Special hardware such as Pocket Camera, HuC1/HuC3, MMM01 and other uncommon
   mappers is not released.
 - Experimental GBA save states older than core schema 5 are incompatible.
-- The Linux desktop adapter does not yet provide persistent settings, free input
-  remapping, Cartridge Vault, cheat/diagnostic/save-safety/WAV tools or boot-ROM
-  selection; see `docs/LINUX_WAYLAND.md`.
+- The central AppData library and automatic development recording currently apply
+  to Windows. Linux uses its XDG settings and ROM-adjacent saves; see
+  `docs/LINUX_WAYLAND.md` for frontend details.
 - AetherBoy is alpha software and is not yet claimed as a replacement for
   established reference emulators.
 
@@ -187,7 +187,7 @@ or Nintendo firmware is required by the automated test suite.
 ```powershell
 dotnet restore ./nanoboy.sln --locked-mode --configfile ./NuGet.config
 dotnet build ./nanoboy.sln -c Release --no-restore
-dotnet test --solution ./nanoboy.sln -c Release --no-build --no-restore --minimum-expected-tests 305
+dotnet test --solution ./nanoboy.sln -c Release --no-build --no-restore --minimum-expected-tests 354
 dotnet run --project ./nanoboy/nanoboy.csproj -c Release --no-build
 ```
 

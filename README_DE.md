@@ -171,6 +171,53 @@ dotnet build ./nanoboy.sln -c Release --no-restore
 dotnet run --project ./nanoboy/nanoboy.csproj -c Release --no-build
 ```
 
+### Windows: lokale Daten und Entwicklungsdiagnose
+
+Die normale Anwendung ist standardmäßig ein Development-Build, auch bei
+`-c Release`. Sie zeichnet lokale Sitzungsberichte automatisch auf. Es gibt
+keine separate Tester-Anwendung und keinen erforderlichen Startschalter.
+Der Buildkanal steht in der EXE; Git wird auf dem Rechner des Spielers nicht benötigt.
+Für spätere stabile Veröffentlichungen kann beim Bauen/Publishen
+`-p:AetherBoyChannel=stable` gesetzt werden; dann ist die Sitzungsaufzeichnung
+standardmäßig aus. `--tester-mode` bleibt als optionaler Diagnoseschalter kompatibel.
+
+Alle verwalteten Windows-Daten liegen unter `%LOCALAPPDATA%\AetherBoy`:
+
+| Unterordner | Inhalt |
+| --- | --- |
+| `Roms/<SHA-256>/` | Lokale Kopie jeder geöffneten ROM, mit lesbarem Dateinamen |
+| `Saves/<SHA-256>/` | `game.sav`, RTC, Integritätsdateien und rotierende Backups |
+| `States/<SHA-256>/` | `game.ss1` bis `game.ss5` |
+| `Settings/` | `settings.json`, letzte lesbare Sicherung und ROM-Verlauf |
+| `Firmware/` | Optional selbst bereitgestellte Boot-ROMs/BIOS |
+| `Recordings/` | Standardziel für manuell gespeicherte WAV-Aufnahmen |
+| `development/Sessions/` | Diagnoseberichte pro Programmstart |
+| `development/Crashes/` | Crashlogs der Development-Builds |
+
+Die ROM-Bibliothek bietet **ROM-Ordner öffnen**, das **Control Center → Ordner**
+zusätzlich Zugriff auf die übrigen Daten. Beim Öffnen einer externen ROM wird sie
+kopiert; das Original bleibt erhalten. Gleiche Inhalte werden wiederverwendet,
+unterschiedliche ROM-Hacks erhalten getrennte Saves. Auch ältere importierte
+Spiele bleiben in der Bibliothek auffindbar, unabhängig vom begrenzten Verlauf.
+
+Beim ersten Import werden vorhandene ROM-nahe `.sav`-, RTC-, Backup-, Guard- und
+`.ss1`–`.ss5`-Dateien mit übernommen. Bereits vorhandene zentrale Save-/State-Ordner
+haben Vorrang; ein erneuter Import überschreibt sie nicht. Alte Dateien werden
+nicht gelöscht. Einstellungen werden beim ersten Zugriff aus dem bisherigen
+WinForms-Speicherort übernommen. Beschädigte zentrale Einstellungen können aus
+der letzten lesbaren Sicherung geladen werden. Stabile Builds speichern Crashlogs
+unter `Crashes/`; vorhandene ältere `Logs/` und `TesterSessions/` bleiben erhalten.
+
+Diagnoseberichte enthalten Buildidentität, ROM-Header/Hash, Frame-Fortschritt,
+Controllerwechsel und Save-State-/Rewind-Ergebnisse. Sie enthalten keine ROM-Dateien,
+ROM-Pfade oder Save-Inhalte. Es gibt keinen Upload. Unter **Diagnostics** kann der
+aktive Bericht manuell als ZIP exportiert werden. Ein fortschreitender Framezähler
+beweist noch keine korrekte Spielgrafik und ersetzt keinen Spieltest.
+
+Für die Weitergabe per USB den vollständigen Publish-Ordner kopieren. Die EXE
+und ihre Abhängigkeiten gehören zusammen; persönliche Spieldaten bleiben auf
+dem jeweiligen Rechner. Der weitere Ausbau steht im [Windows-Plan](docs/WINDOWS_ROADMAP.md).
+
 Die historischen Datei- und Ordnernamen `nanoboy` bleiben im Quellbaum erhalten; das Produkt heißt **AetherBoy**.
 
 ## Steuerung unter Linux
@@ -195,7 +242,7 @@ Die A/B-Vorgaben beziehen sich auf die physischen Tastenpositionen. AetherBoy ze
 
 ## Spielstände und BIOS
 
-- **Batterie-Spielstände:** `.sav` neben der ROM, ergänzt um `.sav.bak1` bis `.sav.bak3` und `.guard`-Integritätsdateien. Das ROM-Verzeichnis muss beschreibbar sein.
+- **Batterie-Spielstände:** Unter Windows zentral in `AetherBoy\Saves`; unter Linux weiterhin neben der ROM. `.bak1` bis `.bak3` und `.guard`-Dateien schützen die Spielstände. Nur das jeweilige Save-Verzeichnis muss beschreibbar sein.
 - **Save States:** fünf Slots von `.ss1` bis `.ss5`, gebunden an die exakte ROM, das Hardwaremodell und gegebenenfalls das BIOS. Inkompatible Zustandsversionen werden abgelehnt; eine automatische Migration älterer Schemata ist noch nicht vorhanden.
 - **Rewind:** ein sitzungsgebundener Puffer mit bis zu etwa zehn Sekunden Historie; für GBA zusätzlich durch ein Speicherbudget begrenzt.
 - **Linux-Einstellungen:** unter `$XDG_CONFIG_HOME/aetherboy/settings.json`, normalerweise `~/.config/aetherboy/settings.json`.
@@ -217,7 +264,7 @@ Details und reproduzierbare Ergebnisse: [Kompatibilitätsmatrix](COMPATIBILITY.m
 
 Die Lösung trennt **Core**, **Runtime** und **Desktop-Frontends**. Der Emulationszustand gehört einem dedizierten Owner-Thread; die Oberflächen kommunizieren über typisierte Befehle und unveränderliche Snapshots. NuGet-Lockfiles und das gepinnte SDK halten den Build reproduzierbar.
 
-Die [GitHub-Actions-CI](.github/workflows/ci.yml) baut und testet die Lösung auf Windows sowie Core, Runtime und den nativen Desktop-Host auf Linux. Das Windows-Gate fordert mindestens **305 Tests**. Die Linux-CI prüft Frontend-Logik und Plattform-Erkennung; echte Wayland-UI-Tests laufen separat in einer geeigneten Sitzung.
+Die [GitHub-Actions-CI](.github/workflows/ci.yml) baut und testet die Lösung auf Windows sowie Core, Runtime und den nativen Desktop-Host auf Linux. Pushes auf `main` und `development` werden geprüft; das Windows-Gate fordert mindestens **354 Tests**. Die Linux-CI prüft Frontend-Logik und Plattform-Erkennung; echte Wayland-UI-Tests laufen separat in einer geeigneten Sitzung.
 
 <details>
 <summary><strong>Testbefehle und Entwicklungswerkzeuge</strong></summary>

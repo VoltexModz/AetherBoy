@@ -4,20 +4,32 @@ using System.IO;
 using System.Text;
 using System.Windows.Forms;
 using nanoboy.Controls;
+using nanoboy.Diagnostics;
+using nanoboy.Storage;
 
 namespace nanoboy
 {
     static class Program
     {
+        private const string TesterModeArgument = "--tester-mode";
+        private static WindowsTesterSession? activeTesterSession;
+
         [STAThread]
         static void Main(string[] args)
         {
             AppDomain.CurrentDomain.UnhandledException += (s, e) =>
             {
-                WriteCrashLog(e.ExceptionObject as Exception);
+                Exception? exception = e.ExceptionObject as Exception;
+                activeTesterSession?.RecordException(
+                    "application.unhandled_exception",
+                    exception);
+                WriteCrashLog(exception);
             };
             Application.ThreadException += (s, e) =>
             {
+                activeTesterSession?.RecordException(
+                    "application.ui_thread_exception",
+                    e.Exception);
                 WriteCrashLog(e.Exception);
                 AetherSignal.Show(
                     "AetherBoy wurde wegen eines unerwarteten Fehlers beendet. " +
@@ -29,10 +41,25 @@ namespace nanoboy
             };
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
+            WindowsTesterSession? testerSession = null;
             try
             {
                 ApplicationConfiguration.Initialize();
-                var mainWindow = new frmNano();
+                if (IsTesterModeRequested(args) &&
+                    !WindowsTesterSession.TryCreateDefault(
+                        out testerSession,
+                        out string? failureReason))
+                {
+                    AetherSignal.Show(
+                        "Die lokale Entwicklungsdiagnose konnte nicht gestartet werden. " +
+                        $"AetherBoy läuft ohne Aufzeichnung weiter.\n\n{failureReason}",
+                        "Entwicklungsdiagnose nicht verfügbar",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                }
+
+                activeTesterSession = testerSession;
+                var mainWindow = new frmNano(testerSession);
                 if (TryGetStartupRom(args, out string? startupRom))
                 {
                     mainWindow.Shown += (_, _) => mainWindow.LoadRomFile(startupRom);
@@ -42,21 +69,42 @@ namespace nanoboy
             }
             catch (Exception ex)
             {
+                activeTesterSession?.RecordException("application.startup_failed", ex);
                 WriteCrashLog(ex);
             }
+            finally
+            {
+                activeTesterSession = null;
+                testerSession?.Dispose();
+            }
         }
+
+        internal static bool IsTesterModeRequested(string[] args) =>
+            ProductInfo.IsDevelopmentBuild || Array.Exists(
+                args,
+                argument => string.Equals(
+                    argument,
+                    TesterModeArgument,
+                    StringComparison.OrdinalIgnoreCase));
 
         private static bool TryGetStartupRom(string[] args, out string? path)
         {
             path = null;
-            if (args.Length != 1 || string.IsNullOrWhiteSpace(args[0]))
+            string[] positionalArguments = Array.FindAll(
+                args,
+                argument => !string.Equals(
+                    argument,
+                    TesterModeArgument,
+                    StringComparison.OrdinalIgnoreCase));
+            if (positionalArguments.Length != 1 ||
+                string.IsNullOrWhiteSpace(positionalArguments[0]))
             {
                 return false;
             }
 
             try
             {
-                string candidate = Path.GetFullPath(args[0]);
+                string candidate = Path.GetFullPath(positionalArguments[0]);
                 if (!RomFiles.IsSupportedPath(candidate))
                 {
                     return false;
@@ -81,10 +129,7 @@ namespace nanoboy
 
             try
             {
-                string logDirectory = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    ProductInfo.Name,
-                    "Logs");
+                string logDirectory = WindowsDataPaths.Default.CrashLogs;
                 Directory.CreateDirectory(logDirectory);
 
                 string fileName = $"crash-{DateTime.UtcNow:yyyyMMdd-HHmmssfff}.log";

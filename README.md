@@ -171,6 +171,49 @@ dotnet build ./nanoboy.sln -c Release --no-restore
 dotnet run --project ./nanoboy/nanoboy.csproj -c Release --no-build
 ```
 
+### Windows local storage and development diagnostics
+
+The normal application defaults to the development channel, including `-c Release`
+builds. It records local sessions automatically; no separate tester application or
+startup switch is required. The channel is embedded in the EXE and needs no Git
+installation on the player's PC. Future stable releases can use
+`-p:AetherBoyChannel=stable` when building/publishing to disable automatic session
+recording. The optional `--tester-mode` switch remains supported for diagnostics.
+
+Managed Windows data lives under `%LOCALAPPDATA%\AetherBoy`:
+
+| Directory | Contents |
+| --- | --- |
+| `Roms/<SHA-256>/` | Imported ROM copies with readable filenames |
+| `Saves/<SHA-256>/` | `game.sav`, RTC, integrity files and rotating backups |
+| `States/<SHA-256>/` | `game.ss1` through `game.ss5` |
+| `Settings/` | `settings.json`, last readable backup and recent ROM history |
+| `Firmware/` | Optional user-supplied boot ROMs/BIOS |
+| `Recordings/` | Default destination for manually saved WAV recordings |
+| `development/Sessions/` | Diagnostic session reports |
+| `development/Crashes/` | Development crash logs |
+
+The library provides **ROM-Ordner öffnen** (open ROM folder); **Control Center →
+Ordner** opens all other data folders. Opening an external ROM copies it locally
+without changing the original. Identical content is reused, different ROM hacks
+have separate saves, and the library lists imports beyond the recent-file limit.
+
+The first import copies existing adjacent battery saves, RTC, backups, integrity
+guards and `.ss1`–`.ss5` files. Existing central save/state directories take
+precedence and are never overwritten by reimporting. Original files are retained.
+Settings migrate from the previous WinForms location on first access, and damaged
+central settings can recover from the last readable backup. Stable crash logs go
+to `Crashes/`; older `Logs/` and `TesterSessions/` folders remain untouched.
+
+Reports contain build identity, ROM header/hash, frame progress, controller changes
+and save-state/rewind results. They contain no ROM files, ROM paths or save contents
+and are never uploaded. **Diagnostics** can manually export the active report as
+a ZIP. Frame progress alone does not prove correct game rendering or compatibility.
+
+For USB distribution, copy the entire published application directory, including
+its dependencies. Personal game data stays on each player's PC. See the
+[Windows roadmap](docs/WINDOWS_ROADMAP.md) for the next development steps.
+
 The historical `nanoboy` file and directory names remain in the source tree; the product is called **AetherBoy**.
 
 ## Linux controls
@@ -195,7 +238,7 @@ The default A/B bindings use physical key positions. AetherBoy displays the assi
 
 ## Saves and BIOS
 
-- **Battery saves:** `.sav` files next to the ROM, accompanied by `.sav.bak1` through `.sav.bak3` and `.guard` integrity files. The ROM directory must be writable.
+- **Battery saves:** centralized under `AetherBoy\Saves` on Windows; still adjacent to the ROM on Linux. `.bak1` through `.bak3` and `.guard` integrity files protect saves. The selected save directory must be writable.
 - **Save states:** five slots, `.ss1` through `.ss5`, bound to the exact ROM, hardware model and BIOS when applicable. Incompatible state versions are rejected; automatic migration of older schemas is not yet available.
 - **Rewind:** a session-local buffer holding up to roughly ten seconds of history; GBA also has a memory budget limit.
 - **Linux settings:** stored at `$XDG_CONFIG_HOME/aetherboy/settings.json`, normally `~/.config/aetherboy/settings.json`.
@@ -217,7 +260,7 @@ Details and reproducible results: [Compatibility matrix](COMPATIBILITY.md) · [G
 
 The solution separates **Core**, **Runtime** and **desktop frontends**. A dedicated owner thread owns the emulation state; the interfaces communicate through typed commands and immutable snapshots. NuGet lockfiles and the pinned SDK keep builds reproducible.
 
-The [GitHub Actions CI](.github/workflows/ci.yml) builds and tests the solution on Windows, plus the Core, Runtime and native desktop host on Linux. The Windows gate requires at least **305 tests**. Linux CI checks frontend logic and platform detection; actual Wayland UI tests run separately in a suitable session.
+The [GitHub Actions CI](.github/workflows/ci.yml) builds and tests the solution on Windows, plus the Core, Runtime and native desktop host on Linux. Pushes to `main` and `development` are checked, and the Windows job requires at least **354 tests**. Linux CI checks frontend logic and platform detection; actual Wayland UI tests run separately in a suitable session.
 
 <details>
 <summary><strong>Test commands and development tools</strong></summary>

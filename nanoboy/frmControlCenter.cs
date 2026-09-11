@@ -10,6 +10,7 @@ using AetherBoy.Runtime;
 using nanoboy.Controls;
 using nanoboy.Core;
 using nanoboy.Input;
+using nanoboy.Storage;
 
 namespace nanoboy
 {
@@ -42,6 +43,8 @@ namespace nanoboy
         private Label saveFiles = null!;
         private Label bootRomStatus = null!;
         private RichTextBox diagnostics = null!;
+        private AetherButton testerExportButton = null!;
+        private AetherButton testerFolderButton = null!;
 
         public frmControlCenter(ControlCenterBridge bridge)
         {
@@ -73,6 +76,7 @@ namespace nanoboy
             AddPage("saves", BuildSavesPage());
             AddPage("system", BuildSystemPage());
             AddPage("diagnostics", BuildDiagnosticsPage());
+            AddPage("storage", BuildStoragePage());
 
             AetherDialog.Apply(
                 this,
@@ -130,6 +134,7 @@ namespace nanoboy
             AddNavigationButton(nav, "saves", "05  SAVES", 290);
             AddNavigationButton(nav, "system", "06  SYSTEM", 334);
             AddNavigationButton(nav, "diagnostics", "07  DIAGNOSTICS", 378);
+            AddNavigationButton(nav, "storage", "08  ORDNER", 422);
 
             var privacy = new Label
             {
@@ -345,6 +350,34 @@ namespace nanoboy
             return page;
         }
 
+        private Panel BuildStoragePage()
+        {
+            Panel page = CreatePage("controlCenterPageStorage", "LOKALE ORDNER", "Deine Bibliothek, Spielstände und Einstellungen");
+            WindowsDataPaths paths = WindowsDataPaths.Default;
+            var folders = new[]
+            {
+                ("AETHERBOY-ORDNER", paths.Root, "Alle lokalen Daten", "Root"),
+                ("ROM-ORDNER ÖFFNEN", paths.Roms, "Importierte Kopien deiner GB-, GBC- und GBA-ROMs", "Roms"),
+                ("SPIELSTÄNDE ÖFFNEN", paths.Saves, "Batterie-Saves, RTC und drei rotierende Sicherungen", "Saves"),
+                ("SAVE STATES ÖFFNEN", paths.States, "Fünf Slots pro ROM-Inhalt", "States"),
+                ("EINSTELLUNGEN", paths.Settings, "Belegung, Bild, Audio und zuletzt gespielte Titel", "Settings"),
+                ("FIRMWARE-ORDNER", paths.Firmware, "Optional: dmg_boot.bin, gbc_boot.bin, gba_bios.bin", "Firmware"),
+                ("DEVELOPMENT-ORDNER", paths.Development, "Lokale Sitzungsberichte und Development-Crashlogs", "Development")
+            };
+            int y = 76;
+            foreach (var (label, path, description, name) in folders)
+            {
+                AetherButton button = AddActionButton(page, label, 0, y, 286,
+                    () => WindowsDataPaths.OpenFolder(this, path));
+                button.Name = "controlCenterOpen" + name + "FolderButton";
+                page.Controls.Add(CreateSmallLabel(description, 306, y + 4, 478, 38));
+                y += 62;
+            }
+            page.Controls.Add(CreateSmallLabel(paths.Root + "\r\nROM-Originale bleiben beim Import erhalten. Bereits zentrale Spielstände haben Vorrang.",
+                0, y + 4, 788, 60));
+            return page;
+        }
+
         private Panel BuildDiagnosticsPage()
         {
             Panel page = CreatePage("controlCenterPageDiagnostics", "DIAGNOSTICS", "Reproduzierbare Laufzeit- und Cartridge-Daten");
@@ -358,17 +391,41 @@ namespace nanoboy
                 Name = "controlCenterDiagnosticsText",
                 ReadOnly = true,
                 ScrollBars = RichTextBoxScrollBars.Vertical,
-                Size = new Size(788, 450),
+                Size = new Size(788, 430),
                 WordWrap = false
             };
             page.Controls.Add(diagnostics);
-            AddActionButton(page, "COPY DIAGNOSTICS", 0, 540, 220, CopyDiagnostics, AetherButtonKind.Primary);
+            AetherButton copyButton = AddActionButton(
+                page,
+                "COPY DIAGNOSTICS",
+                0,
+                520,
+                220,
+                CopyDiagnostics,
+                AetherButtonKind.Primary);
+            copyButton.Name = "controlCenterCopyDiagnosticsButton";
+            testerExportButton = AddActionButton(
+                page,
+                "EXPORT TEST REPORT",
+                236,
+                520,
+                260,
+                bridge.ExportTesterReport);
+            testerExportButton.Name = "controlCenterExportTesterReportButton";
+            testerFolderButton = AddActionButton(
+                page,
+                "OPEN TEST FOLDER",
+                512,
+                520,
+                250,
+                bridge.OpenTesterFolder);
+            testerFolderButton.Name = "controlCenterOpenTesterFolderButton";
             page.Controls.Add(CreateSmallLabel(
-                "Enthält keine ROM-Daten. Dateipfad und Hash bleiben lokal und werden nur auf deine ausdrückliche Aktion kopiert.",
-                242,
-                538,
-                546,
-                44));
+                "Development-Build: automatische lokale Diagnose. Kein Upload, keine ROM-Bytes, keine Save-Inhalte und keine ROM-Pfade im Bericht.",
+                2,
+                570,
+                786,
+                42));
             return page;
         }
 
@@ -632,7 +689,7 @@ namespace nanoboy
                 return;
             }
 
-            string savePath = Path.ChangeExtension(romPath, "sav");
+            string savePath = WindowsRomLibrary.Default.GetSavePath(romPath);
             try
             {
                 IReadOnlyList<BatterySaveFile> files = BatterySaveStore.Inspect(
@@ -667,6 +724,9 @@ namespace nanoboy
             bool dmgAvailable = File.Exists("dmg_boot.bin") || File.Exists(Path.Combine(baseDirectory, "dmg_boot.bin"));
             bool cgbAvailable = File.Exists("gbc_boot.bin") || File.Exists(Path.Combine(baseDirectory, "gbc_boot.bin"));
             bool gbaAvailable = File.Exists("gba_bios.bin") || File.Exists(Path.Combine(baseDirectory, "gba_bios.bin"));
+            dmgAvailable |= File.Exists(Path.Combine(WindowsDataPaths.Default.Firmware, "dmg_boot.bin"));
+            cgbAvailable |= File.Exists(Path.Combine(WindowsDataPaths.Default.Firmware, "gbc_boot.bin"));
+            gbaAvailable |= File.Exists(Path.Combine(WindowsDataPaths.Default.Firmware, "gba_bios.bin"));
             string policy = bridge.Settings.BootRomEnable ? "AUTO-DETECT ENABLED" : "BYPASS ENABLED";
             bootRomStatus.Text =
                 $"{policy}\r\nDMG {(dmgAvailable ? "FOUND" : "MISSING")}  ·  CGB {(cgbAvailable ? "FOUND" : "MISSING")}  ·  GBA {(gbaAvailable ? "FULL BIOS FOUND" : "BUILT-IN HLE READY")}\r\nÄnderung gilt beim nächsten Cartridge-Start.";
@@ -685,6 +745,12 @@ namespace nanoboy
             text.AppendLine($"AUDIO           {(bridge.Settings.AudioEnable ? "On" : "Off")} · {bridge.Settings.AudioVolume}% · {audioRate}");
             text.AppendLine($"VIDEO           Filter {bridge.Settings.DisplayFilterIndex} · Scale {bridge.Settings.VideoScaleFactor}× · Frameskip {bridge.Settings.Frameskip}");
             text.AppendLine($"INPUT           {(gamepad.IsConnected ? gamepad.DeviceName : "Keyboard")}");
+            text.AppendLine($"DIAGNOSE        {(bridge.TesterModeProvider() ? "RECORDING LOCALLY" : "OFF")} · {ProductInfo.BuildChannel}");
+            if (bridge.TesterLogPathProvider() is string testerLogPath)
+            {
+                text.AppendLine(
+                    $"TEST LOG        {Path.GetFileName(Path.GetDirectoryName(testerLogPath))} / {Path.GetFileName(testerLogPath)}");
+            }
             text.AppendLine();
             if (rom == null)
             {
@@ -718,6 +784,8 @@ namespace nanoboy
             {
                 diagnostics.Text = nextDiagnostics;
             }
+            testerExportButton.Enabled = bridge.TesterModeProvider();
+            testerFolderButton.Enabled = bridge.TesterModeProvider();
         }
 
         private void ToggleAudio()

@@ -8,8 +8,10 @@ using System.Windows.Forms;
 using AetherBoy.Runtime;
 using nanoboy.Controls;
 using nanoboy.Core;
+using nanoboy.Diagnostics;
 using nanoboy.Input;
 using nanoboy.Platform.Audio;
+using nanoboy.Storage;
 
 namespace nanoboy
 {
@@ -33,10 +35,18 @@ namespace nanoboy
         private string currentRomPath;
         private bool stateOperationInProgress;
         private bool batteryRecoveryNoticeShown;
+        private bool testerRomIdentityRecorded;
+        private bool currentSessionUsesExternalBootRom;
+        private readonly WindowsTesterSession? testerSession;
         private static readonly TimeSpan SessionShutdownTimeout = TimeSpan.FromSeconds(2);
 
-        public frmNano()
+        public frmNano() : this(null)
         {
+        }
+
+        internal frmNano(WindowsTesterSession? testerSession)
+        {
+            this.testerSession = testerSession;
             InitializeComponent();
             Branding.AppBrand.ApplyIcon(this);
             Text = ProductInfo.DisplayName;
@@ -49,6 +59,7 @@ namespace nanoboy
             SetDisplayFilter(settings.DisplayFilterIndex);
             DarkTheme.Apply(this);
             InitializeAetherShell();
+            testerSession?.RecordWindowReady(settings);
             updateTimer.Start();
         }
 
@@ -103,6 +114,7 @@ namespace nanoboy
             }
 
             UpdateAetherSessionUi(null);
+            testerSession?.RecordOperation("session_stop", slot: null, succeeded: true);
 
             return true;
         }
@@ -152,6 +164,17 @@ namespace nanoboy
                 ? "gba_bios.bin"
                 : isColor ? "gbc_boot.bin" : "dmg_boot.bin";
             string localPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, bootFileName);
+            string managedPath = Path.Combine(WindowsDataPaths.Default.Firmware, bootFileName);
+            if (File.Exists(managedPath))
+            {
+                try { return File.ReadAllBytes(managedPath); }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    testerSession?.RecordException("firmware.read_failed", exception);
+                    Debug.WriteLine($"Could not read local firmware: {exception}");
+                    return null;
+                }
+            }
             if (File.Exists(bootFileName))
             {
                 try
@@ -190,7 +213,28 @@ namespace nanoboy
 
         internal void LoadRomFile(string path)
         {
-            if (!File.Exists(path)) return;
+            if (!File.Exists(path))
+            {
+                testerSession?.RecordRomLoadRejected(path, "file_missing");
+                return;
+            }
+
+            testerSession?.RecordRomLoadRequested(path);
+
+            try
+            {
+                string originalPath = Path.GetFullPath(path);
+                path = WindowsRomLibrary.Default.Import(originalPath);
+                settings.RecentFiles.RemoveAll(candidate => string.Equals(candidate, originalPath,
+                    StringComparison.OrdinalIgnoreCase));
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+            {
+                testerSession?.RecordException("rom.import_failed", exception);
+                AetherSignal.Show(this, $"Die ROM konnte nicht in die lokale Bibliothek übernommen werden.\n\n{exception.Message}",
+                    "ROM-Import fehlgeschlagen", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
 
             updateTimer.Stop();
             if (!StopSession())
@@ -201,6 +245,11 @@ namespace nanoboy
                     "Emulator beschäftigt",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
+                testerSession?.RecordOperation(
+                    "rom_load",
+                    slot: null,
+                    succeeded: false,
+                    reason: "session_shutdown_timeout");
                 return;
             }
 
@@ -209,6 +258,7 @@ namespace nanoboy
             turboPressed = false;
             sessionFaultReported = false;
             batteryRecoveryNoticeShown = false;
+            testerRomIdentityRecorded = false;
 
             bool isGameBoyAdvance = Path.GetExtension(path).Equals(
                 ".gba",
@@ -230,14 +280,23 @@ namespace nanoboy
             {
                 session = new EmulationSession(
                     path,
-                    Path.ChangeExtension(path, "sav"),
+                    WindowsRomLibrary.Default.GetSavePath(path),
                     bootRom,
                     configuration,
                     settings.PaletteIndex);
                 currentRomPath = Path.GetFullPath(path);
+                currentSessionUsesExternalBootRom = bootRom is not null;
+                if (session.LatestSnapshot.Rom is RomSnapshot initialRom)
+                {
+                    testerSession?.RecordRomStarted(
+                        initialRom,
+                        currentSessionUsesExternalBootRom);
+                    testerRomIdentityRecorded = true;
+                }
             }
             catch (Exception exception)
             {
+                testerSession?.RecordException("rom.start_failed", exception);
                 preparedAudioOutput?.Dispose();
                 UpdateAetherSessionUi(null);
                 Debug.WriteLine($"Could not start emulation session for '{path}': {exception}");
@@ -246,6 +305,7 @@ namespace nanoboy
                     "ROM konnte nicht geladen werden",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
+                updateTimer.Start();
                 return;
             }
 
@@ -411,7 +471,11 @@ namespace nanoboy
                 OpenAudioInspector = () => menuAudioInspector_Click(controlCenter, EventArgs.Empty),
                 QuickSave = QuickSave,
                 QuickLoad = QuickLoad,
-                ResetSettings = ResetSettingsToDefaults
+                ResetSettings = ResetSettingsToDefaults,
+                TesterModeProvider = () => testerSession is not null,
+                TesterLogPathProvider = () => testerSession?.LogFilePath,
+                ExportTesterReport = ExportTesterReport,
+                OpenTesterFolder = OpenTesterFolder
             });
             controlCenter.FormClosed += (_, _) => controlCenter = null;
             controlCenter.Show(this);
@@ -443,7 +507,7 @@ namespace nanoboy
                 return;
             }
 
-            string savePath = Path.ChangeExtension(romPath, "sav");
+            string savePath = WindowsRomLibrary.Default.GetSavePath(romPath);
             byte[] selectedSaveData;
             int generation;
             try
@@ -564,6 +628,7 @@ namespace nanoboy
         {
             EmulationSession currentSession = session;
             string romPath = currentRomPath;
+            int slot = settings.SaveSlot;
             if (currentSession == null || string.IsNullOrEmpty(romPath) || stateOperationInProgress)
             {
                 return;
@@ -577,11 +642,20 @@ namespace nanoboy
                     return;
                 }
 
-                await WriteStateFileAtomicAsync(GetStatePath(romPath, settings.SaveSlot), state)
+                await WriteStateFileAtomicAsync(GetStatePath(romPath, slot), state)
                     .ConfigureAwait(true);
+                testerSession?.RecordOperation(
+                    "quick_save",
+                    slot,
+                    succeeded: true);
             }
             catch (Exception exception)
             {
+                testerSession?.RecordException("quick_save.failed", exception);
+                testerSession?.RecordOperation(
+                    "quick_save",
+                    slot,
+                    succeeded: false);
                 Debug.WriteLine($"Could not save state: {exception}");
                 AetherSignal.Show(this,
                     $"Der Spielstand konnte nicht gespeichert werden.\n\n{exception.Message}",
@@ -599,15 +673,21 @@ namespace nanoboy
         {
             EmulationSession currentSession = session;
             string romPath = currentRomPath;
+            int slot = settings.SaveSlot;
             if (currentSession == null || string.IsNullOrEmpty(romPath) || stateOperationInProgress)
             {
                 return;
             }
-            string statePath = GetStatePath(romPath, settings.SaveSlot);
+            string statePath = GetStatePath(romPath, slot);
             if (!File.Exists(statePath))
             {
+                testerSession?.RecordOperation(
+                    "quick_load",
+                    slot,
+                    succeeded: false,
+                    reason: "slot_empty");
                 AetherSignal.Show(this,
-                    $"In Slot {settings.SaveSlot} ist noch kein Spielstand vorhanden.",
+                    $"In Slot {slot} ist noch kein Spielstand vorhanden.",
                     "Kein Save State",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
@@ -625,9 +705,18 @@ namespace nanoboy
 
                 await currentSession.RestoreStateAsync(state).ConfigureAwait(true);
                 displayedFrameSequence = 0;
+                testerSession?.RecordOperation(
+                    "quick_load",
+                    slot,
+                    succeeded: true);
             }
             catch (Exception exception)
             {
+                testerSession?.RecordException("quick_load.failed", exception);
+                testerSession?.RecordOperation(
+                    "quick_load",
+                    slot,
+                    succeeded: false);
                 Debug.WriteLine($"Could not load state: {exception}");
                 AetherSignal.Show(this,
                     $"Der Spielstand konnte nicht geladen werden. Der laufende Zustand blieb unverändert.\n\n{exception.Message}",
@@ -642,7 +731,7 @@ namespace nanoboy
         }
 
         private static string GetStatePath(string romPath, int slot) =>
-            Path.ChangeExtension(romPath, $"ss{slot}");
+            WindowsRomLibrary.Default.GetStatePath(romPath, slot);
 
         private static async Task<byte[]> ReadStateFileAsync(string path)
         {
@@ -667,6 +756,7 @@ namespace nanoboy
         private static async Task WriteStateFileAtomicAsync(string path, byte[] state)
         {
             string fullPath = Path.GetFullPath(path);
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
             string temporaryPath = fullPath + ".tmp";
             try
             {
@@ -706,6 +796,11 @@ namespace nanoboy
             {
                 if (!await currentSession.RewindAsync().ConfigureAwait(true))
                 {
+                    testerSession?.RecordOperation(
+                        "rewind",
+                        slot: null,
+                        succeeded: false,
+                        reason: "history_empty");
                     AetherSignal.Show(this,
                         "Es ist noch kein früherer Zustand im Rewind-Puffer vorhanden.",
                         "Rewind",
@@ -715,10 +810,19 @@ namespace nanoboy
                 else
                 {
                     displayedFrameSequence = 0;
+                    testerSession?.RecordOperation(
+                        "rewind",
+                        slot: null,
+                        succeeded: true);
                 }
             }
             catch (Exception exception)
             {
+                testerSession?.RecordException("rewind.failed", exception);
+                testerSession?.RecordOperation(
+                    "rewind",
+                    slot: null,
+                    succeeded: false);
                 Debug.WriteLine($"Could not rewind: {exception}");
                 AetherSignal.Show(this,
                     $"Zurückspulen ist fehlgeschlagen.\n\n{exception.Message}",
@@ -1024,6 +1128,7 @@ namespace nanoboy
                 }
 
                 Exception fault = currentSession.Fault;
+                testerSession?.RecordException("session.faulted", fault);
                 Program.WriteCrashLog(fault);
                 AetherSignal.Show(this,
                     $"Die Emulation wurde wegen eines Fehlers beendet.\n\n{fault?.Message}",
@@ -1036,6 +1141,15 @@ namespace nanoboy
             EmulationSnapshot snapshot = currentSession.LatestSnapshot;
             if (snapshot.State == SessionState.Starting)
                 return;
+
+            if (!testerRomIdentityRecorded && snapshot.Rom is RomSnapshot startedRom)
+            {
+                testerSession?.RecordRomStarted(
+                    startedRom,
+                    currentSessionUsesExternalBootRom);
+                testerRomIdentityRecorded = true;
+            }
+            testerSession?.RecordHeartbeat(snapshot, settings);
 
             if (gameView.VideoGeometry != snapshot.VideoGeometry)
             {
@@ -1067,6 +1181,7 @@ namespace nanoboy
         private void PollGamepad()
         {
             HostGamepadState padState = GamepadInput.GetState();
+            testerSession?.RecordGamepadIfChanged(padState);
             UpdateAetherGamepadUi(padState);
 
             if (session == null)
@@ -1295,6 +1410,85 @@ namespace nanoboy
             ObserveSessionCommand(currentSession.SetGameBoyAdvanceButtonsAsync(combined));
         }
         #endregion
+
+        private void ExportTesterReport()
+        {
+            if (testerSession is null)
+            {
+                AetherSignal.Show(
+                    this,
+                    "Development-Builds zeichnen die Entwicklungsdiagnose automatisch lokal auf.",
+                    "Entwicklungsdiagnose ist aus",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            using var dialog = new SaveFileDialog
+            {
+                AddExtension = true,
+                DefaultExt = "zip",
+                FileName = $"AetherBoy-TestReport-{DateTime.Now:yyyyMMdd-HHmm}.zip",
+                Filter = "AetherBoy test report (*.zip)|*.zip",
+                InitialDirectory = Environment.GetFolderPath(
+                    Environment.SpecialFolder.MyDocuments),
+                OverwritePrompt = true,
+                Title = "Lokalen AetherBoy-Testbericht exportieren"
+            };
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            try
+            {
+                string reportPath = testerSession.CreateBundle(dialog.FileName);
+                AetherSignal.Show(
+                    this,
+                    $"Der lokale Testbericht wurde gespeichert.\n\n{reportPath}",
+                    "Testbericht exportiert",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+            catch (Exception exception) when (
+                exception is ArgumentException or IOException or InvalidOperationException or UnauthorizedAccessException)
+            {
+                testerSession.RecordException("report.export_failed", exception);
+                AetherSignal.Show(
+                    this,
+                    $"Der Testbericht konnte nicht exportiert werden.\n\n{exception.Message}",
+                    "Export fehlgeschlagen",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
+        private void OpenTesterFolder()
+        {
+            if (testerSession is null)
+            {
+                return;
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo(testerSession.SessionDirectory)
+                {
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception exception) when (
+                exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                testerSession.RecordException("report.open_folder_failed", exception);
+                AetherSignal.Show(
+                    this,
+                    $"Der Testordner konnte nicht geöffnet werden.\n\n{exception.Message}",
+                    "Ordner nicht verfügbar",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+        }
 
         private void frmNano_FormClosing(object sender, FormClosingEventArgs e)
         {

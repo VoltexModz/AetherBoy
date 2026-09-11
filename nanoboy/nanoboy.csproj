@@ -22,9 +22,11 @@
     <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
     <ImplicitUsings>disable</ImplicitUsings>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <AetherBoyChannel Condition="'$(AetherBoyChannel)' == ''">development</AetherBoyChannel>
   </PropertyGroup>
 
   <ItemGroup>
+    <AssemblyMetadata Include="AetherBoyChannel" Value="$(AetherBoyChannel)" />
     <PackageReference Include="NAudio.WinMM" Version="2.3.0" />
   </ItemGroup>
 

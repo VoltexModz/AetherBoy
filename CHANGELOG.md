@@ -2,6 +2,34 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## Unveröffentlicht – Zentrale Windows-Daten und Entwicklungsdiagnose
+
+- Die normale Windows-Anwendung zeichnet im Development-Kanal automatisch lokal
+  auf, auch im Release-Build. Keine separate Tester-Anwendung erforderlich.
+  Ein eingebetteter Buildkanal steuert das Verhalten; stabile Veröffentlichungen
+  können `AetherBoyChannel=stable` setzen. `--tester-mode` bleibt optional verfügbar.
+- Zentrale Ablage unter `%LOCALAPPDATA%\AetherBoy`: ROM-Kopien nach Inhalts-Hash,
+  getrennte Saves und States, stabile JSON-Einstellungen und Firmware-Ordner.
+  Legacy-Saves, RTC, Integritätsdateien und Backups werden beim ersten ROM-Import
+  kopiert. Vorhandene zentrale Daten haben Vorrang, Originaldateien bleiben erhalten.
+- Die zuletzt gespeicherte lesbare WinForms-Konfiguration wird beim ersten Start
+  in die zentrale Einstellungsdatei übernommen, auch nach einem Wechsel des
+  EXE-Ordners. Eine beschädigte JSON-Datei kann aus der letzten lesbaren Sicherung
+  wiederhergestellt werden. Windows-Tests verwenden einen isolierten Datenordner.
+- Vollständige lokale ROM-Bibliothek sowie Ordnerzugriffe in Bibliothek und Control
+  Center ergänzt. Änderungen an der Slotwahl während eines asynchronen Quick Save
+  verändern dessen ursprünglich gewählten Zielslot nicht mehr.
+- Lokale JSONL-Sitzungsberichte erfassen Version, ROM-Header/Hash,
+  Frame-Fortschritt, Controllerwechsel, Save-State/Rewind-Ergebnisse und
+  datensparsame Fehlerklassen. ROM-Bytes, ROM-Pfade sowie Batterie- und
+  Save-State-Inhalte werden nicht gespeichert; es existiert kein Upload.
+- Das Windows-Control-Center zeigt den Aufzeichnungsstatus und kann den aktiven
+  Testordner öffnen oder README und Protokoll manuell als ZIP exportieren.
+  Der Export umfasst ausschließlich diese beiden Dateien. Development-Sitzungen
+  und Crashlogs liegen getrennt unter `development/Sessions` und `development/Crashes`.
+- Privacy-, ZIP- und UI-Smoke-Tests ergänzen den Windows-Gesamtlauf. CI prüft
+  jetzt auch direkte Pushes auf `development` und fordert mindestens 354 Tests.
+
 ## Unveröffentlicht – Nativer Linux-/Wayland-Desktop
 
 - Linux-Tastaturbelegung im Control Center frei änderbar: Aktion anklicken und

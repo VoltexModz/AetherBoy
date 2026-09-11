@@ -187,9 +187,30 @@ public sealed class FrontendBoundaryTests
                     .Find("controlCenterDiagnosticsText", true)
                     .Single() as RichTextBox
                     ?? throw new AssertFailedException("Diagnostics text is missing.");
+                Button exportTesterReport = center.Controls
+                    .Find("controlCenterExportTesterReportButton", true)
+                    .Single() as Button
+                    ?? throw new AssertFailedException("Tester report export is missing.");
+                Button openTesterFolder = center.Controls
+                    .Find("controlCenterOpenTesterFolderButton", true)
+                    .Single() as Button
+                    ?? throw new AssertFailedException("Tester report folder action is missing.");
                 Assert.IsTrue(diagnosticsPage.Visible);
                 StringAssert.Contains(diagnosticsText.Text, "AETHERBOY");
                 StringAssert.Contains(diagnosticsText.Text, "CARTRIDGE");
+                StringAssert.Contains(diagnosticsText.Text, "DIAGNOSE");
+                Assert.IsFalse(exportTesterReport.Enabled);
+                Assert.IsFalse(openTesterFolder.Enabled);
+
+                Button storageNav = (Button)center.Controls.Find("controlCenterNavStorage", true).Single();
+                storageNav.PerformClick();
+                Application.DoEvents();
+                foreach (string folder in new[] { "Roms", "Saves", "States", "Settings", "Firmware", "Development" })
+                {
+                    Button folderButton = (Button)center.Controls.Find("controlCenterOpen" + folder + "FolderButton", true).Single();
+                    Assert.IsTrue(folderButton.Visible);
+                    Assert.IsTrue(folderButton.Enabled);
+                }
 
             }
             finally
@@ -329,6 +350,7 @@ public sealed class FrontendBoundaryTests
             Assert.AreEqual("READY", list.Items[0].SubItems[2].Text);
             Assert.AreEqual("MISSING", list.Items[1].SubItems[2].Text);
             Assert.IsTrue(browse.Enabled);
+            Assert.AreEqual(1, form.Controls.Find("romLibraryOpenFolderButton", true).Length);
             Assert.IsNull(form.SelectedRomPath);
         }
         finally

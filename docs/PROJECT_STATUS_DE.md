@@ -1,6 +1,6 @@
 # AetherBoy – Projektstand und Herkunft
 
-Stand: 9. September 2026  
+Stand: 11. September 2026
 Version: 4.8.0-alpha.1  
 Branch: `development`
 
@@ -14,8 +14,8 @@ Speicherung, Eingabe und Tests stark überarbeitet. Für GBA existieren zwei
 Pfade: ein kleiner eigener Lern- und Regressionkern sowie ein produktiver,
 direkt im Repository gepflegter Fork des MIT-lizenzierten GBADotnet-Kerns.
 
-Der aktuelle Stand baut unter .NET 10 ohne Warnungen und besteht 305
-deterministische Tests. Das beweist viele definierte Hardware- und
+Der aktuelle Stand baut unter .NET 10 ohne Warnungen und besteht unter Windows
+mindestens 354 deterministische Tests. Das beweist viele definierte Hardware- und
 Anwendungsfälle, aber noch keinen vollständigen kommerziellen GBA-Durchspieltest.
 
 ## Herkunft und verwendete Quellen
@@ -152,10 +152,10 @@ Auf dieser Basis wurden unter anderem ergänzt oder korrigiert:
 
 - Release-Build: 0 Warnungen, 0 Fehler.
 - 175 Core-Tests.
-- 87 Runtime-Tests.
-- 28 Windows-Smoke-Tests.
-- 15 Linux-Frontendtests.
-- Gesamt: 305 bestanden, 0 fehlgeschlagen.
+- 100 Runtime-Tests.
+- 38 Desktop-Integrationstests; davon 37 bestanden und ein reiner Wayland-UI-Test außerhalb einer Wayland-Sitzung übersprungen.
+- 42 Windows-Smoke-Tests einschließlich zentraler Datenablage, Migration, Datenschutz und Live-Export der Entwicklungsdiagnose.
+- Aktueller Windows-Gesamtlauf: 355 Tests, 354 bestanden, 0 fehlgeschlagen und 1 übersprungen.
 - Nativer Ubuntu-Build und `linux-x64`-Publish: 0 Warnungen, 0 Fehler; der
   veröffentlichte Host erkannte Hyprland und öffnete unter WSLg einen echten
   Wayland-Fensterlauf.
@@ -180,9 +180,9 @@ Firmware für die automatischen Tests.
 - Spezialhardware wie Pocket Camera, HuC1/HuC3, MMM01 und weitere seltene
   Mapper ist nicht freigegeben.
 - Ältere experimentelle GBA-Save-States vor Kernschema 5 sind nicht kompatibel.
-- Der Linux-Desktopadapter besitzt noch keine persistenten Einstellungen,
-  freie Eingabebelegung, Cartridge Vault, Cheats-, Diagnose-, Save-Safety- und
-  WAV-Werkzeuge oder Boot-ROM-Auswahl; Details stehen in `docs/LINUX_WAYLAND.md`.
+- Die zentrale AppData-Bibliothek und die automatische Development-Aufzeichnung
+  gelten derzeit für Windows. Linux nutzt seine XDG-Einstellungen und ROM-nahe
+  Spielstände; Details zum Frontend stehen in `docs/LINUX_WAYLAND.md`.
 - AetherBoy ist Alpha-Software und noch kein versprochener Ersatz für etablierte
   Referenzemulatoren.
 
@@ -191,7 +191,7 @@ Firmware für die automatischen Tests.
 ```powershell
 dotnet restore ./nanoboy.sln --locked-mode --configfile ./NuGet.config
 dotnet build ./nanoboy.sln -c Release --no-restore
-dotnet test --solution ./nanoboy.sln -c Release --no-build --no-restore --minimum-expected-tests 305
+dotnet test --solution ./nanoboy.sln -c Release --no-build --no-restore --minimum-expected-tests 354
 dotnet run --project ./nanoboy/nanoboy.csproj -c Release --no-build
 ```
 
