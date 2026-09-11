@@ -2,6 +2,16 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## Unveröffentlicht – Linux Patch Lab
+
+- Library → Patch Lab verwendet den gemeinsamen IPS-/BPS-/UPS-Patcher mit
+  Dateiauswahl, Drag-and-drop, explizitem UPS-Rückpatchen und direktem Ergebnisstart.
+- Patchen läuft im Hintergrund; Ergebnisse liegen getrennt nach Inhalts-Hash.
+  Originale/Saves bleiben erhalten, bekannte Ergebnisse werden wiederverwendet.
+  Fehler und Abbruch der Dateiauswahl werden direkt im Ablauf behandelt.
+- Acht neue Tests prüfen Import, drei Formate, UPS-Undo, Original-/Save-Erhalt,
+  defekte Dateien, Katalogfehler und den nativen SDL-Bedienablauf.
+
 ## Unveröffentlicht – Linux-Daten, Werkzeuge und Bedienqualität
 
 - Saves und States liegen getrennt nach ROM-Inhalts-Hash in der XDG-Datenablage.

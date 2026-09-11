@@ -6,7 +6,7 @@ Stand / Date: **2026-09-11** · Branch: **development** · **4.8.0-alpha.1**
 vor Zusammenführung der Linux-Erweiterungen. Für den inzwischen kombinierten Stand
 bitte zusätzlich [Linux-Handoff an Windows und den nächsten ChatGPT](LINUX_DEVELOPMENT_HANDOFF.md)
 lesen. Linux besitzt jetzt unter anderem Stereo, zentrale XDG-Spielstände,
-Bibliothek, Save-Werkzeuge, Firmware-Auswahl und Controller-Profile. Frühere
+Bibliothek, Save-Werkzeuge, Firmware-Auswahl, Controller-Profile und Patch Lab. Frühere
 Aussagen unten über Mono-Ausgabe oder fehlende Linux-Werkzeuge sind historisch.
 The linked Linux handoff supersedes those earlier Linux-status statements and
 records the actual integration checks and remaining platform-specific work.

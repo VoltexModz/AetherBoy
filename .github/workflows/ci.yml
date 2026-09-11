@@ -134,7 +134,7 @@ jobs:
         run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 127
 
       - name: Test native Wayland frontend logic
-        run: dotnet test --project ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 52
+        run: dotnet test --project ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 59
 
       - name: Smoke-test conformance CLI
         run: dotnet run --project ./tools/AetherBoy.Conformance/AetherBoy.Conformance.csproj --configuration Release --no-build -- --help
@@ -171,7 +171,7 @@ jobs:
             sleep 0.1
           done
           test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
-          AETHERBOY_UI_TESTS=1 dotnet test --project tests/AetherBoy.DesktopTests -c Release --no-build --no-restore --minimum-expected-tests 54
+          AETHERBOY_UI_TESTS=1 dotnet test --project tests/AetherBoy.DesktopTests -c Release --no-build --no-restore --minimum-expected-tests 62
 
       - name: Verify Linux package scripts and publish
         run: |

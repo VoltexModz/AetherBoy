@@ -10,7 +10,7 @@ Windows-Entwicklungsupdate: Stereo/WASAPI, GPU-Ausgabe, State-Galerie und Fortse
 Controller-Quick-Deck, Spielprofile und IPS-/BPS-/UPS-Patch Lab.
 [Änderungen, Bedienung und Übergabe an die Linux-Entwicklung (DE/EN)](docs/WINDOWS_DEVELOPMENT_HANDOFF.md#deutsch).
 
-Linux-Nachtrag: zentrale Saves, Stereo, Bibliothek/Recovery und Controller-Profile.
+Linux-Nachtrag: zentrale Saves, Stereo, Bibliothek/Recovery, Controller-Profile und Patch Lab.
 [Linux-Übergabe an die Windows-Entwicklung und den nächsten ChatGPT](docs/LINUX_DEVELOPMENT_HANDOFF.md).
 
 <p align="center">
@@ -89,7 +89,7 @@ Beide Frontends verwenden denselben plattformneutralen Core und dieselbe Runtime
 | **Cartridge Vault, Cheat-Verwaltung, Save Safety Center** | Vorhanden, teils experimentell | Linux-Bibliothek, Sitzungs-Cheats und Backup-Wiederherstellung vorhanden |
 | **WAV-Aufnahme und Boot-ROM-Auswahl** | Vorhanden | Unter Tools / System vorhanden |
 | **Quick Deck, State-Galerie/Fortsetzen, Spielprofile, Screenshots** | Vorhanden | Eigener Frontend-Folgeschritt |
-| **IPS-/BPS-/UPS-Patch Lab** | Integriert; UPS-Rückpatchen ausdrücklich wählbar | Gemeinsamer Parser vorhanden, noch keine Patch-Oberfläche |
+| **IPS-/BPS-/UPS-Patch Lab** | Integriert; UPS-Rückpatchen ausdrücklich wählbar | Unter Library → Patch Lab; ausdrückliches UPS-Rückpatchen |
 | **Stereo-Ausgabe** | GB/GBC/GBA durchgängig | GB/GBC/GBA durchgängig |
 
 Die genaue Zuordnung steht in [Windows → Linux: UI-Stand](docs/LINUX_UI_PARITY.md).

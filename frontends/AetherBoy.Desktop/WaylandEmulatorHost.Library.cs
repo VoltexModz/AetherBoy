@@ -20,6 +20,7 @@ internal sealed partial class WaylandEmulatorHost
 
     private void DrawLibraryPage()
     {
+        if (showPatchLab) { DrawPatchLab(); return; }
         ActionButton(300, 198, 520, 44, editingSearch ? "Type to search: " + librarySearch :
             string.IsNullOrEmpty(librarySearch) ? "SEARCH CARTRIDGES" : "Search: " + librarySearch,
             () => { editingSearch = true; SDL.StartTextInput(window); }, editingSearch);
@@ -42,6 +43,7 @@ internal sealed partial class WaylandEmulatorHost
         ActionButton(300, 548, 160, 44, "PREVIOUS", () => libraryPage--, enabled: libraryPage > 0);
         ActionButton(476, 548, 160, 44, "NEXT", () => libraryPage++, enabled: (libraryPage + 1) * 4 < matches.Length);
         ActionButton(660, 548, 200, 44, "OPEN / RELOCATE", ShowRomDialog, true);
+        ActionButton(880, 548, 220, 44, "PATCH LAB", OpenPatchLab);
         Ink(300, 598, "Missing file? Open its new location; matching content keeps its saves.", 14, Colors.Muted);
     }
 

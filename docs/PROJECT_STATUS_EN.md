@@ -151,7 +151,7 @@ Work on that foundation includes:
 - Release build: 0 warnings, 0 errors.
 - 181 core tests.
 - 127 runtime tests.
-- 57/57 desktop tests on CachyOS/Hyprland, including native UI, synthetic
+- 65/65 desktop tests on CachyOS/Hyprland, including native UI, synthetic
   GB/GBC/GBA games and virtual SDL controllers.
 - Ubuntu 24.04 x64 with a separate Weston compositor in a container: 54 passed,
   three audio playtests deliberately skipped, no failures.

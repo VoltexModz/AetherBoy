@@ -10,7 +10,7 @@ Windows development update: stereo/WASAPI, GPU presentation, state gallery and r
 controller Quick Deck, per-game profiles and IPS/BPS/UPS Patch Lab.
 [What's changed, usage and Linux developer handoff (DE/EN)](docs/WINDOWS_DEVELOPMENT_HANDOFF.md#english).
 
-Linux follow-up: central saves, stereo, library/recovery tools and controller profiles.
+Linux follow-up: central saves, stereo, library/recovery tools, controller profiles and Patch Lab.
 [Linux integration handoff for the Windows developer / next ChatGPT](docs/LINUX_DEVELOPMENT_HANDOFF.md).
 
 <p align="center">
@@ -89,7 +89,7 @@ Both frontends share the same platform-neutral Core and Runtime. The available d
 | **Cartridge Vault, cheat management, Save Safety Center** | Available, partly experimental | Linux library, session cheats and backup recovery available |
 | **WAV recording and boot ROM selection** | Available | Available under Tools / System |
 | **Quick Deck, state gallery/resume, per-game profiles, screenshots** | Available | Separate frontend follow-up |
-| **IPS / BPS / UPS Patch Lab** | Integrated; UPS undo is explicit | Shared parser available, no patching UI yet |
+| **IPS / BPS / UPS Patch Lab** | Integrated; UPS undo is explicit | Available under Library → Patch Lab; explicit UPS undo |
 | **Stereo playback** | GB/GBC/GBA end-to-end | GB/GBC/GBA end-to-end |
 
 See [Windows → Linux: UI status](docs/LINUX_UI_PARITY.md) for the detailed mapping.

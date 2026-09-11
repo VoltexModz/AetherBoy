@@ -296,3 +296,19 @@ einschließlich kurzer nativer GB/GBC/GBA-Läufe. Der vollständige Build einsch
 Windows-Zielprojekt hat null Warnungen und Fehler; Windows wurde nicht ausgeführt.
 Keine erneuten 30-Minuten-Läufe. Die früheren Bewertungen und Messungen oben
 beschreiben weiterhin ihre jeweiligen Prüfstände.
+
+
+## Nachtrag: Linux Patch Lab auf Basis von `c1ffe10`
+
+Library → Patch Lab verbindet jetzt den vorhandenen gemeinsamen IPS/BPS/UPS-Patcher
+mit Dateiauswahl, Drag-and-drop und einem Hintergrundauftrag. Ergebnisse werden
+unter `Data/roms/<hash>/` abgelegt und können direkt geöffnet werden. Originale und
+Saves bleiben unverändert; bekannte Ergebnisse werden wiederverwendet. UPS-Undo
+ist ausdrücklich auswählbar. Patch-Erstellung und Downloads gehören nicht dazu.
+
+Acht neue Tests prüfen Import, Fehler, Save-Erhalt, UPS-Undo und native Bedienung;
+aktuell 65/65 Desktop-Tests bestanden. Zwei gezielte Captures zeigen normales und
+kleines Fenster ohne Überlappung. Die bisherige unabhängige UI-Gesamtnote wurde
+für diese neue Unterseite nicht neu erhoben. Anleitung und Übergabe stehen in
+[Linux User Guide](LINUX_USER_GUIDE.md#11-patch-lab-ips-bps-and-ups) und
+[Linux-Handoff](LINUX_DEVELOPMENT_HANDOFF.md).

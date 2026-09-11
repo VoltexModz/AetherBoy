@@ -275,3 +275,31 @@ and the remaining Windows-only tools.
 Run `bash scripts/uninstall-linux-user.sh` to remove the current program while
 keeping game data. Older releases are preserved until uninstall. Optional
 `AETHERBOY_BIN_HOME` selects an absolute launcher directory for isolated installs.
+
+
+## 11. Patch Lab: IPS, BPS and UPS
+
+Open **Control Center → Library → Patch Lab**. Choose the source `.gb`, `.gbc`
+or `.gba` cartridge and the `.ips`, `.bps` or `.ups` file. You can also drop
+both files onto this page, or select **Use Current Game** for the source.
+The source game keeps running or paused as before; applying a patch does not
+switch cartridges automatically.
+
+Select **Apply Patch**, wait for the result, then choose **Open Result** to play
+or **Open Result Folder** to find the file. New results are stored under
+`$XDG_DATA_HOME/aetherboy/roms/<hash>/` (default `~/.local/share/aetherboy/roms/`)
+and added to the library. Original ROMs and their saves are preserved. Different
+ROM contents use separate central saves; original save files are never copied
+into a patched game. An already known matching result is reused.
+
+For UPS undo, select the **patched** ROM and the same UPS file, change
+**UPS Direction** to **Restore Original**, then confirm with **Restore Original**.
+There is no automatic reversal. If the original is already in the library,
+its entry and saves are retained.
+
+BPS/UPS verify source, patch and result CRC32. IPS has no embedded checksums:
+choose the exact base ROM required by the patch author. Files are limited to
+32 MiB per ROM and 64 MiB per patch. ZIP files must be extracted first. Errors
+appear on the Patch Lab page; select corrected files and retry. Cancelling the
+file picker keeps the previous selection. This applies existing patches; it
+does not create patches or download games.

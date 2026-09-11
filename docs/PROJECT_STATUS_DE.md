@@ -154,7 +154,7 @@ Auf dieser Basis wurden unter anderem ergänzt oder korrigiert:
 - Release-Build: 0 Warnungen, 0 Fehler.
 - 181 Core-Tests.
 - 127 Runtime-Tests.
-- 57/57 Desktop-Tests unter CachyOS/Hyprland, einschließlich nativem UI,
+- 65/65 Desktop-Tests unter CachyOS/Hyprland, einschließlich nativem UI,
   synthetischen GB/GBC/GBA-Spielen und virtuellen SDL-Controllern.
 - Ubuntu 24.04 x64 mit eigenem Weston-Compositor im Container: 54 bestanden,
   drei Audio-Playtests bewusst übersprungen, keine Fehler.

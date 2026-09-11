@@ -146,6 +146,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
             DrainDialogSelections();
             CompletePendingLoad();
+            CompletePendingPatch();
             try { UpdateEmulation(); }
             catch (Exception exception) { ReportError(exception); }
             FlushSettingsIfDue();
@@ -171,6 +172,9 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         }
 
         disposed = true;
+        // Finish a started import before shutting down; its worker never touches SDL.
+        try { pendingPatch?.GetAwaiter().GetResult(); } catch { /* Reported during normal completion. */ }
+        pendingPatch = null;
         FlushSettingsIfDue(force: true);
         DisposeSession(pendingSession);
         pendingSession = null;
@@ -293,7 +297,9 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 string? droppedPath = Marshal.PtrToStringUTF8(currentEvent.Drop.Data);
                 if (!string.IsNullOrWhiteSpace(droppedPath))
                 {
-                    TryLoadRom(droppedPath);
+                    if (controlCenterVisible && controlCenterPage == ControlCenterPage.Library && showPatchLab)
+                        SelectPatchFile(droppedPath, LinuxRomPatchService.IsPatchPath(droppedPath) ? PatchSelection.Patch : PatchSelection.Source);
+                    else TryLoadRom(droppedPath);
                 }
                 break;
         }
@@ -1099,36 +1105,22 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         catch (Exception exception)
         {
             Interlocked.Exchange(ref fileDialogOpen, 0);
+            pickingPatch = PatchSelection.None;
+            pickingFirmware = pickingBatterySave = false;
             ReportError(exception);
         }
     }
 
     private void OnFileDialogCompleted(IntPtr userdata, IntPtr fileList, int filter)
     {
-        try
+        // Keep the dialog busy until the UI thread consumes its result, preserving its purpose.
+        if (fileList == IntPtr.Zero)
         {
-            if (fileList == IntPtr.Zero)
-            {
-                dialogSelections.Enqueue(new DialogSelection(null, SDL.GetError()));
-                return;
-            }
-
-            IntPtr firstPath = Marshal.ReadIntPtr(fileList);
-            if (firstPath != IntPtr.Zero)
-            {
-                dialogSelections.Enqueue(new DialogSelection(
-                    Marshal.PtrToStringUTF8(firstPath),
-                    null));
-            }
-            else
-            {
-                dialogSelections.Enqueue(new DialogSelection(null, null));
-            }
+            dialogSelections.Enqueue(new DialogSelection(null, SDL.GetError()));
+            return;
         }
-        finally
-        {
-            Interlocked.Exchange(ref fileDialogOpen, 0);
-        }
+        IntPtr firstPath = Marshal.ReadIntPtr(fileList);
+        dialogSelections.Enqueue(new DialogSelection(firstPath == IntPtr.Zero ? null : Marshal.PtrToStringUTF8(firstPath), null));
     }
 
     private void DrainDialogSelections()
@@ -1137,11 +1129,16 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         {
             if (!string.IsNullOrWhiteSpace(selection.Error))
             {
+                if (pickingPatch != PatchSelection.None) { patchFailed = true; patchMessage = "File picker failed: " + selection.Error; }
                 ReportError(new IOException(selection.Error));
             }
             else if (!string.IsNullOrWhiteSpace(selection.Path))
             {
-                if (pickingBatterySave)
+                if (pickingPatch != PatchSelection.None)
+                {
+                    SelectPatchFile(selection.Path, pickingPatch);
+                }
+                else if (pickingBatterySave)
                 {
                     try { SelectBatteryImport(selection.Path); } catch (Exception ex) { ReportError(ex); }
                 }
@@ -1153,10 +1150,13 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             }
             else
             {
-                statusMessage = "File picker closed. Drop a ROM here or press O to choose one.";
+                statusMessage = "File picker closed. Previous selection kept.";
+                if (pickingPatch != PatchSelection.None) patchMessage = statusMessage;
             }
             pickingFirmware = false;
             pickingBatterySave = false;
+            pickingPatch = PatchSelection.None;
+            Interlocked.Exchange(ref fileDialogOpen, 0);
         }
     }
 

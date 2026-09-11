@@ -76,7 +76,8 @@ public sealed class LinuxShellIntegrationTests
             Click(120, 645);
             Capture(host, "tools");
             Click(120, 395);
-            Click(985, 264);
+            Click(985, 208);
+            Assert.IsTrue(Field<bool>(host, "showController"));
             Capture(host, "controller");
             Click(410, 220);
             Click(120, 445);

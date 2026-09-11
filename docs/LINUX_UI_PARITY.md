@@ -51,7 +51,8 @@ Input still supports arrow-key selection and rebinding; Audio supports 1% steps.
 
 Linux now includes controller remapping/profiles, a searchable recent-cartridge
 library, firmware import, session cheats, WAV recording, local diagnostics and
-battery-backup recovery. Saves and states use content-addressed XDG storage.
+battery-backup recovery. Library → Patch Lab applies IPS/BPS/UPS through the shared
+parser, including explicit UPS undo and separate result storage. Saves and states use content-addressed XDG storage.
 See [Linux roadmap](LINUX_ROADMAP.md) and [playtest report](LINUX_PLAYTEST.md).
 The full Windows Audio Inspector and its complete Cartridge Vault feature set
 remain distinct. Real-game compatibility, physical device changes, screen readers

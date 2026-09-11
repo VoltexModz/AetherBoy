@@ -15,11 +15,11 @@ per Fast-forward übernommen und mit den lokalen Linux-Änderungen zusammengefü
 Konflikte in Audioverträgen, CI, Changelog und READMEs sind aufgelöst. Die neuen
 Windows-Funktionen und die gemeinsame Stereo-Implementierung bleiben erhalten.
 
-Beim Schreiben dieser Übergabe sind die Linux-Änderungen **lokal, noch nicht
-committed oder gepusht**. `7ef5b59` allein enthält sie daher nicht. Nach dem späteren
-Commit dessen tatsächliche ID mit `git log` ermitteln, keine ID aus dieser Datei
-als Linux-Liefercommit interpretieren. Vor weiteren Git-Aktionen `git status`
-prüfen. Ein lokaler Sicherungs-Stash vor der Zusammenführung wurde behalten.
+Der bisherige Linux-Ausbau wurde inzwischen als **`c1ffe10`** committed und ist
+im lokalen Tracking-Stand von `origin/development` enthalten. Das anschließend
+angeforderte Linux Patch Lab ist beim Schreiben dieses Nachtrags noch lokal,
+uncommitted und ungepusht. Vor weiterer Arbeit den tatsächlichen Git-Stand prüfen;
+`c1ffe10` allein enthält das neue Linux Patch Lab noch nicht.
 
 ## Was Linux jetzt besitzt
 
@@ -31,6 +31,7 @@ prüfen. Ein lokaler Sicherungs-Stash vor der Zusammenführung wurde behalten.
 | Audio | GB/GBC/GBA-Stereo über den gemeinsamen Vertrag bis SDL, Formatwechsel, Queue-/Drop-Zähler und Wiederholungsversuch nach Ausgabefehler |
 | Ressourcen | Gedrosseltes Zeichnen bei leerem Fenster/Pause; minimiert keine unnötige Darstellung; VSync-Ergebnis berücksichtigt |
 | Bibliothek | Suche, zuletzt gespielte ROMs, Öffnen und Neuzuordnung verschobener Dateien; Saves bleiben bei gleicher Inhaltsidentität erhalten |
+| Patch Lab | Library-Unterseite mit IPS/BPS/UPS, Dateiauswahl/Drag-and-drop, explizitem UPS-Undo, Hintergrundverarbeitung und Ergebnisstart |
 | Save-Werkzeuge | Backup-Inspektion, bestätigtes Restore mit Vorher-Archiv, Export und größengeprüfter roher `.sav`-Import |
 | Firmware | DMG-/CGB-Boot-ROM und GBA-BIOS importierbar; Auswahl beim nächsten ROM-Start; Größenprüfung, keine Echtheitsgarantie |
 | Controller | GUID-Profile, freie Belegung, Deadzone, Gerätewechsel, Menübedienung, Hotplug-Ersatz und konfigurierbare Fokus-Pause |
@@ -70,7 +71,8 @@ an einem nativen Capture geprüft. Tastatur- und Controller-Unterseite sind getr
   Originale bleiben erhalten. Eine laufende Sitzung behält ihre ROM-Schreibsperre
   auch bei Restore. Save-Werkzeuge dürfen diesen Schutz nicht umgehen.
 - Die Bibliothek referenziert vorhandene ROM-Dateien; sie ist noch kein vollständiger
-  importierender Windows-Vault. `.sav`-Import überträgt keine RTC-Begleitdatei.
+  importierender Windows-Vault. Patch-Ergebnisse werden dagegen kontrolliert unter
+  `Data/roms/<hash>/` importiert. `.sav`-Import überträgt keine RTC-Begleitdatei.
   Exporte persistierter Daten sind nicht automatisch ein Flush des laufenden Spiels.
 - Linux und Windows verwenden unterschiedliche Speicherpfade. Gleicher Hash bedeutet
   keine automatische Synchronisation, Save-Übertragung oder identische Metadaten.
@@ -90,6 +92,7 @@ aktiv; die UI-Präferenz greift beim nächsten Start. Diagnose-ZIP ist kein Save
 | --- | --- |
 | `frontends/AetherBoy.Desktop/LinuxDataPaths.cs`, `LinuxRomStorage.cs`, `LinuxSettingsStore.cs` | XDG, Identität, Migration, Schreibbesitz und Einstellungen |
 | `LinuxLibrary.cs`, `WaylandEmulatorHost.Library.cs` | Bibliothek, Relocate und Firmware |
+| `LinuxRomPatchService.cs`, `WaylandEmulatorHost.PatchLab.cs` | Linux-Patch-Import, Wiederverwendung bekannter Ergebnisse und native Oberfläche; Parser bleibt gemeinsam |
 | `WaylandEmulatorHost.SaveTools.cs` | Backup-/Import-/Export-Abläufe |
 | `LinuxGamepadProfile.cs`, `WaylandEmulatorHost.Controller.cs` | Geräteprofile und Controller-Bedienung |
 | `LinuxDiagnostics.cs`, `SdlAudioOutput.cs`, `LinuxWavRecorder.cs` | Diagnose, SDL-Ausgabe und Aufnahme |
@@ -136,6 +139,22 @@ Logs und Captures unter `artifacts/` sind lokal und Git-ignoriert; nach einem Pu
 sind sie auf dem anderen Rechner nicht automatisch vorhanden. Die Berichte im
 Repository dokumentieren die Ergebnisse; bei Bedarf gezielt reproduzieren.
 
+## Patch-Lab-Nachtrag
+
+Der aktuelle native Desktop-Kurzlauf besteht **65/65 Tests**, ohne Fehler oder
+Skips, einschließlich der acht neuen Fälle. CI-Warnungsgate und Linux-x64-Publish
+sind ebenfalls geprüft. Ubuntu/Weston im isolierten Container besteht 62 Tests
+mit drei bewusst übersprungenen Audio-Playtests; der reine Logiklauf besteht 59
+mit sechs nativen Skips. Die früheren 181 Core-/127 Runtime-Tests oben gehören
+zur gemeinsamen Basis; der portable Patcher wurde für diese UI-Anbindung nicht geändert.
+
+Acht neue Desktop-Tests prüfen alle drei Formate, explizites UPS-Rückpatchen mit
+unveränderten Originalmetadaten/Saves, keine Save-Migration in Hacks, defekte und
+übergroße Eingaben, korrupte bestehende Ergebnisse, Katalogfehler und native
+Dateiauswahl-Rückmeldungen/Drop/Apply/Open. Zwei gezielte Captures zeigen normales
+und kleines Fenster ohne Überlappungen. Echte Portal-Dialogbedienung wird dadurch
+nicht ersetzt. Anleitung: [Linux Patch Lab](LINUX_USER_GUIDE.md#11-patch-lab-ips-bps-and-ups).
+
 ## Starten und kurze Prüfung
 
 Im Projektverzeichnis unter Linux mit .NET gemäß `global.json`:
@@ -159,8 +178,8 @@ AETHERBOY_UI_TESTS=1 AETHERBOY_PLAYTEST=1 \
 ```
 
 CI-Mindestzahlen berücksichtigen Skips: Core 181, Runtime 127, Desktop ohne native
-Opt-ins 52, headless Wayland mit virtuellem Controller 54. Der vollständige native
-Kurzlauf mit Audio umfasst 57. Windows-CI behält den übernommenen Mindestwert 440;
+Opt-ins 59, headless Wayland mit virtuellem Controller/Patch Lab 62. Der vollständige
+native Kurzlauf mit Audio umfasst 65. Windows-CI behält den übernommenen Mindestwert 440;
 der tatsächliche kombinierte Windows-Testlauf muss dort noch erfolgen.
 
 ## Noch offen und sinnvolle Anschlussarbeit
@@ -172,15 +191,16 @@ der tatsächliche kombinierte Windows-Testlauf muss dort noch erfolgen.
    Langtests übernimmt wie vereinbart der Nutzer.
 3. Linux-Komfortfunktionen bei Bedarf ergänzen: Galerie/Fortsetzen, Lade-Rückgängig,
    Spielprofile, Favoriten/Spielzeit, native Screenshots und GBA-Audio-Inspector.
-4. Linux-Patch-Oberfläche kann den vorhandenen portablen IPS/BPS/UPS-Parser verwenden.
-   Originale erhalten, Ergebnisdaten nach Hash trennen und UPS-Rückpatchen explizit
-   wählen lassen. Windows-Importdienst nicht als portable Speicherlogik übernehmen.
+4. Das Linux Patch Lab ist jetzt implementiert; nicht erneut bauen. Für Änderungen
+   den gemeinsamen Parser beibehalten und Windows-Importdienste nicht in Linux
+   einbinden. Reale Hack-Kompatibilität bleibt eine eigene Spielprüfung.
 5. Flatpak/AppImage, eingebettete Runtime, Assistenztechnik und langsame
    Dateisysteme im UI bleiben eigene Folgearbeit.
 
 Linux besitzt bereits Save-Import/-Export; der in der Windows-Handoff offene
 Windows-Punkt 7 ist dadurch **nicht** automatisch erledigt. Ebenso bedeuten die
-neuen gemeinsamen Parser/Snapshots noch keine Linux-Patch-/Inspector-Oberfläche.
+gemeinsamen Inspector-Snapshots noch keine Linux-Inspector-Oberfläche; die
+Linux-Patch-Oberfläche ist inzwischen separat ergänzt.
 
 Für den nächsten ChatGPT: erst diesen Stand mit Code und Git abgleichen, dann
 den konkreten Nutzerauftrag bearbeiten. Keine bereits implementierten Funktionen
