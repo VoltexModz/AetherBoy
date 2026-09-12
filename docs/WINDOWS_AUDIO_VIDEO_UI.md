@@ -1,6 +1,7 @@
 # Windows: Audio, Video und Bedienung / Audio, video and UI
 
 Aktueller Gesamtstand / Current combined status: [DE/EN-Übergabe](WINDOWS_DEVELOPMENT_HANDOFF.md).
+Neuer bidirektionaler Abgleich / New bidirectional work: [Platform parity](PLATFORM_PARITY.md).
 Dieses Dokument beschreibt den ersten Ausgabe-Ausbau; spätere Pakete ergänzen
 Stereo und GBA-Aufnahme. This document describes the initial presentation package;
 later packages add stereo and GBA recording.
@@ -40,9 +41,10 @@ sind über die vorhandene Session-Grenze angebunden.
 
 Audio verwendet NAudio.Wasapi 2.3.0 im gemeinsamen, ereignisgesteuerten Modus.
 Ein eigener MTA-Thread verwaltet Geräte, Formatwechsel und Wiederverbindungen.
-Ein begrenzter Float-Ring ersetzt die Queue je Einzelsample. Überfüllung verwirft
-die ältesten Samples; nach Unterlauf wird kurz neu vorgepuffert. Pause/Turbo und
-Timeline-Wechsel leeren beziehungsweise sperren den Host-Puffer. Bereits an den
+Ein begrenzter Float-Ring ersetzt die Queue je Einzelsample. Seit dem Parity-Paket
+bleibt wartender Ton bei Überfüllung erhalten; neue Blöcke werden verworfen.
+Turbo gibt weiterhin Audio aus. Sitzungs-/Abschnittswechsel verwerfen veraltete
+Blöcke, Pause sperrt den Host-Puffer. Bereits an den
 Treiber übergebene Samples können noch kurz auslaufen. Dieser erste Ausbau lieferte
 noch Mono. Im gemeinsamen aktuellen Stand ist die durchgehende Stereo-Pipeline aus
 [Paket 4–6](WINDOWS_PLAYER_TOOLS_STEREO.md) enthalten.

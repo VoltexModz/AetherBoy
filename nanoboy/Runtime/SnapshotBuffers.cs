@@ -115,6 +115,20 @@ namespace AetherBoy.Runtime
 
         public int SampleRate { get; }
         public int Channels { get; }
+        /// <summary>Changes across pause, turbo, restore and session boundaries; never saved to disk.</summary>
+        public long PlaybackGeneration { get; }
+        public long PlaybackSession { get; }
+
+        private AudioSamplesAvailableEventArgs(AudioSamplesAvailableEventArgs source, long generation, long session)
+        {
+            samples = source.samples; // Immutable; keep the same owned sample block.
+            SampleRate = source.SampleRate;
+            Channels = source.Channels;
+            PlaybackGeneration = generation;
+            PlaybackSession = session;
+        }
+
+        internal AudioSamplesAvailableEventArgs WithPlaybackGeneration(long generation, long session = 0) => new(this, generation, session);
         // Legacy mono consumers receive one value per frame; stereo consumers use the interleaved API.
         public int SampleCount => samples.Length / Channels;
         public int InterleavedSampleCount => samples.Length;

@@ -88,7 +88,7 @@ public static class IORegs
     public const uint TM3CNT_L = 0x0400010C;
     public const uint TM3CNT_H = 0x0400010E;
     public const uint SIODATA32 = 0x04000120;
-//    public const uint SIOMULTI0 = 0x04000120;
+    public const uint SIOMULTI0 = 0x04000120;
     public const uint SIOMULTI1 = 0x04000122;
     public const uint SIOMULTI2 = 0x04000124;
     public const uint SIOMULTI3 = 0x04000126;
@@ -112,24 +112,19 @@ public static class IORegs
     public const uint UNDOCUMENTED_410 = 0x04000410;
     public const uint INTMEMCTRL = 0x04000800;
 
-    private readonly static Dictionary<uint, string> _cachedNameMapping = new();
+    private static readonly System.Collections.Frozen.FrozenDictionary<uint, string> _cachedNameMapping =
+        System.Collections.Frozen.FrozenDictionary.ToFrozenDictionary(
+            typeof(IORegs).GetFields(BindingFlags.Public | BindingFlags.Static)
+                .Where(field => field.IsLiteral)
+                .GroupBy(field => (uint)field.GetRawConstantValue()!),
+            group => group.Key,
+            group => string.Join(" / ", group.Select(field => field.Name).Order(StringComparer.Ordinal)));
 
     /// <summary>
     /// Used to provide better names for addresses whilst debugging.
     /// </summary>
     public static string? GetNameFromAddress(uint address)
     {
-        if (!_cachedNameMapping.Any())
-        {
-            var constants = typeof(IORegs)
-                .GetFields(BindingFlags.Public | BindingFlags.Static)
-                .Where(f => f.IsLiteral);
-            foreach (var constant in constants)
-            {
-                _cachedNameMapping.Add((uint)constant.GetRawConstantValue()!, constant.Name);
-            }
-        }
-
         return _cachedNameMapping.TryGetValue(address, out var name) ? name : null;
     }
 }

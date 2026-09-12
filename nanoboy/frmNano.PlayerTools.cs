@@ -20,7 +20,7 @@ public partial class frmNano
 
     private void InitializePlayerTools()
     {
-        GamepadNavigation.Attach(this, () => session == null);
+        GamepadNavigation.Attach(this, () => session == null && aetherCommandMenu is null);
         performanceOverlay = new Label { Name = "gamePerformanceOverlay", AutoSize = false, TabStop = false,
             Text = "PERFORMANCE · noch kein Bild", Bounds = new(10, 10, 390, 84),
             BackColor = Color.FromArgb(14, 17, 30), ForeColor = AetherColors.Cyan,
@@ -73,6 +73,7 @@ public partial class frmNano
     }
     private async Task OpenQuickMenuAsync()
     {
+        if (IsOnlineLink) { SetSaveFeedback("Online-Link: TOOLS öffnet Verbindung und Sitzungsspielstände · F12 Screenshot", false); return; }
         if (quickMenuOpen || stateOperationInProgress || IsDisposed) return;
         if (session == null) { OpenRomFromAetherUi(); return; }
         EmulationSession current = session;

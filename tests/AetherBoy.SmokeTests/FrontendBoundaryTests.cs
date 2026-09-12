@@ -200,7 +200,7 @@ public sealed class FrontendBoundaryTests
                 StringAssert.Contains(diagnosticsText.Text, "CARTRIDGE");
                 StringAssert.Contains(diagnosticsText.Text, "DIAGNOSE");
                 Assert.IsFalse(exportTesterReport.Enabled);
-                Assert.IsFalse(openTesterFolder.Enabled);
+                Assert.IsTrue(openTesterFolder.Enabled, "Previously recorded reports remain accessible when recording is off.");
 
                 Button storageNav = (Button)center.Controls.Find("controlCenterNavStorage", true).Single();
                 storageNav.PerformClick();

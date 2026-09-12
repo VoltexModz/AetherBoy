@@ -26,7 +26,7 @@ internal sealed partial class WaylandEmulatorHost
 
     private void ShowPatchDialog(PatchSelection selection)
     {
-        if (fileDialogOpen != 0 || pendingSession is not null || pendingPatch is not null) return;
+        if (fileDialogOpen != 0 || IsLoading || pendingPatch is not null) return;
         pickingPatch = selection;
         ShowRomDialog();
         statusMessage = selection == PatchSelection.Source ? "Choose the source .gb, .gbc or .gba cartridge." : "Choose an IPS, BPS or UPS patch.";
@@ -92,7 +92,7 @@ internal sealed partial class WaylandEmulatorHost
     private void DrawPatchLab()
     {
         CompletePendingPatch();
-        bool available = pendingPatch is null && fileDialogOpen == 0 && pendingSession is null;
+        bool available = pendingPatch is null && fileDialogOpen == 0 && !IsLoading;
         Ink(300, 198, "PATCH LAB · IPS / BPS / UPS", 16, Colors.Cyan, true);
         ActionButton(910, 190, 190, 40, "BACK TO LIBRARY", () => { showPatchLab = false; focusedControl = -1; });
         ActionButton(300, 244, 600, 44, patchSourcePath is null ? "1 · CHOOSE SOURCE ROM" : "SOURCE · " + Path.GetFileName(patchSourcePath),
@@ -118,7 +118,7 @@ internal sealed partial class WaylandEmulatorHost
             Ink(300, 520 + row * 19, remaining[..count], 14, patchFailed ? Colors.Danger : Colors.Muted);
             remaining = remaining[count..].TrimStart();
         }
-        ActionButton(300, 582, 250, 40, "OPEN RESULT", () => TryLoadRom(patchResult!.Path), enabled: patchResult is not null && pendingSession is null);
+        ActionButton(300, 582, 250, 40, "OPEN RESULT", () => TryLoadRom(patchResult!.Path), enabled: patchResult is not null && !IsLoading);
         ActionButton(570, 582, 250, 40, "CLEAR SELECTION", () =>
         { patchSourcePath = patchFilePath = null; patchResult = null; reverseUps = patchFailed = false; patchMessage = "Choose a source ROM and a patch."; }, enabled: available);
     }

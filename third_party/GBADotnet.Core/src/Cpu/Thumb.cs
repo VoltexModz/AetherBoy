@@ -18,11 +18,11 @@ internal unsafe static class Thumb
         // LSR{S} Rd,Rs,#Offset - 0x10 - 0x17
         &ASR_Imm, &ASR_Imm, &ASR_Imm, &ASR_Imm, &ASR_Imm, &ASR_Imm, &ASR_Imm, &ASR_Imm,
         // ADD{S} Rd,Rs,Rn      - 0x18 - 0x19
-        &ADD_Reg, &ADD_Reg, 
+        &ADD_Reg, &ADD_Reg,
         // SUB{S} Rd,Rs,Rn      - 0x1A - 0x1B
-        &SUB_Reg, &SUB_Reg, 
+        &SUB_Reg, &SUB_Reg,
         // ADD{S} Rd,Rs,#nn     - 0x1C - 0x1D
-        &ADD_Imm, &ADD_Imm, 
+        &ADD_Imm, &ADD_Imm,
         // SUB{S} Rd,Rs,#nn     - 0x1E - 0x1F
         &SUB_Imm, &SUB_Imm,
         // MOV{S} Rd,#nn        - 0x20 - 0x27
@@ -135,14 +135,14 @@ internal unsafe static class Thumb
     public static void BLT(Core core, ushort instruction) => BranchConditional(core, instruction, core.Cpsr.SignFlag != core.Cpsr.OverflowFlag, true);
     public static void BGT(Core core, ushort instruction) => BranchConditional(core, instruction, !core.Cpsr.ZeroFlag && (core.Cpsr.SignFlag == core.Cpsr.OverflowFlag), true);
     public static void BLE(Core core, ushort instruction) => BranchConditional(core, instruction, core.Cpsr.ZeroFlag || (core.Cpsr.SignFlag != core.Cpsr.OverflowFlag), true);
-    
+
     public static void BL_Low(Core core, ushort instruction)
     {
         var offset = ((int)((instruction & 0b111_1111_1111) << 21)) >> 9;
         core.R[14] = (uint)(core.R[15] + offset);
     }
 
-    private static uint _blR14;
+
     public static void BL_Hi(Core core, ushort instruction)
     {
         var offset = (instruction & 0b111_1111_1111) << 1;
@@ -153,14 +153,14 @@ internal unsafe static class Thumb
             core.Debugger.FireEvent(Debug.DebugEvent.BranchToZero, core);
         }
 #endif
-        _blR14 = (core.R[15] - 2) | 1;
+        core.InstructionState.Thumb._blR14 = (core.R[15] - 2) | 1;
         core.R[15] = newPc & 0xFFFF_FFFE;
         core.ClearPipeline();
         core.NextExecuteAction = &BL_Hi2;
     }
     public static void BL_Hi2(Core core, uint _)
     {
-        core.R[14] = _blR14;
+        core.R[14] = core.InstructionState.Thumb._blR14;
 
         core.MoveExecutePipelineToNextInstruction();
     }
@@ -302,15 +302,13 @@ internal unsafe static class Thumb
         core.MoveExecutePipelineToNextInstruction();
     }
 
-    private static int _aluDestination;
-    private static uint _cachedAluValue;
     public static void ALUCycle2(Core core, uint _)
     {
         core.nOPC = false;
         core.SEQ = 1;
         core.AIncrement = 0;
         core.nMREQ = false;
-        core.R[_aluDestination] = _cachedAluValue;
+        core.R[core.InstructionState.Thumb._aluDestination] = core.InstructionState.Thumb._cachedAluValue;
         core.MoveExecutePipelineToNextInstruction();
     }
 
@@ -336,24 +334,24 @@ internal unsafe static class Thumb
                 core.nMREQ = true;
                 core.nOPC = true;
                 core.SEQ = 0;
-                _aluDestination = rd;
-                _cachedAluValue = LSL(core.R[rd], (byte)core.R[rs], ref core.Cpsr);
+                core.InstructionState.Thumb._aluDestination = rd;
+                core.InstructionState.Thumb._cachedAluValue = LSL(core.R[rd], (byte)core.R[rs], ref core.Cpsr);
                 core.NextExecuteAction = &ALUCycle2;
                 break;
             case 0x3: // LSR
                 core.nMREQ = true;
                 core.nOPC = true;
                 core.SEQ = 0;
-                _aluDestination = rd;
-                _cachedAluValue = LSRRegister(core.R[rd], (byte)core.R[rs], ref core.Cpsr);
+                core.InstructionState.Thumb._aluDestination = rd;
+                core.InstructionState.Thumb._cachedAluValue = LSRRegister(core.R[rd], (byte)core.R[rs], ref core.Cpsr);
                 core.NextExecuteAction = &ALUCycle2;
                 break;
             case 0x4: // ASR
                 core.nMREQ = true;
                 core.nOPC = true;
                 core.SEQ = 0;
-                _aluDestination = rd;
-                _cachedAluValue = ASRRegister(core.R[rd], (byte)core.R[rs], ref core.Cpsr);
+                core.InstructionState.Thumb._aluDestination = rd;
+                core.InstructionState.Thumb._cachedAluValue = ASRRegister(core.R[rd], (byte)core.R[rs], ref core.Cpsr);
                 core.NextExecuteAction = &ALUCycle2;
                 break;
             case 0x5: // ADC
@@ -368,8 +366,8 @@ internal unsafe static class Thumb
                 core.nMREQ = true;
                 core.nOPC = true;
                 core.SEQ = 0;
-                _aluDestination = rd;
-                _cachedAluValue = ROR(core.R[rd], (byte)core.R[rs], ref core.Cpsr);
+                core.InstructionState.Thumb._aluDestination = rd;
+                core.InstructionState.Thumb._cachedAluValue = ROR(core.R[rd], (byte)core.R[rs], ref core.Cpsr);
                 core.NextExecuteAction = &ALUCycle2;
                 break;
             case 0x8: // TST
@@ -648,16 +646,16 @@ internal unsafe static class Thumb
     #region Load/Store/Push/Pop multiple
     private static void LoadStoreMultipleCommon(Core core, ushort instruction, uint initialAddress, bool nRW, uint writebackReg, delegate*<Core, uint, void> nextAction)
     {
-        LdmStmUtils.Reset();
-        LdmStmUtils._storeLoadMultipleDoWriteback = true;
+        LdmStmUtils.Reset(core);
+        core.InstructionState.LdmStm._storeLoadMultipleDoWriteback = true;
         var registerList = instruction & 0b1111_1111;
 
         for (var r = 0; r <= 7; r++)
         {
             if (((registerList >> r) & 0b1) == 0b1)
             {
-                LdmStmUtils._storeLoadMultipleState[LdmStmUtils._storeLoadMultiplePopCount] = (uint)r;
-                LdmStmUtils._storeLoadMultiplePopCount++;
+                core.InstructionState.LdmStm._storeLoadMultipleState[core.InstructionState.LdmStm._storeLoadMultiplePopCount] = (uint)r;
+                core.InstructionState.LdmStm._storeLoadMultiplePopCount++;
             }
         }
 
@@ -668,7 +666,7 @@ internal unsafe static class Thumb
         core.AIncrement = 0;
         core.nRW = nRW;
         core.NextExecuteAction = nextAction;
-        LdmStmUtils._writebackRegister = (int)writebackReg;
+        core.InstructionState.LdmStm._writebackRegister = (int)writebackReg;
     }
 
     public static void PUSH(Core core, ushort instruction)
@@ -678,18 +676,18 @@ internal unsafe static class Thumb
         // Check push LR
         if (((instruction >> 8) & 0b1) == 1)
         {
-            LdmStmUtils._storeLoadMultipleState[LdmStmUtils._storeLoadMultiplePopCount] = 14;
-            LdmStmUtils._storeLoadMultiplePopCount++;
+            core.InstructionState.LdmStm._storeLoadMultipleState[core.InstructionState.LdmStm._storeLoadMultiplePopCount] = 14;
+            core.InstructionState.LdmStm._storeLoadMultiplePopCount++;
         }
 
-        core.A = (uint)(core.R[13] - (4 * (LdmStmUtils._storeLoadMultiplePopCount + 1)));
-        LdmStmUtils._storeLoadMutipleFinalWritebackValue = core.A + 4;
+        core.A = (uint)(core.R[13] - (4 * (core.InstructionState.LdmStm._storeLoadMultiplePopCount + 1)));
+        core.InstructionState.LdmStm._storeLoadMutipleFinalWritebackValue = core.A + 4;
 
         LdmStmUtils.StmRegisterWriteCycle(core, instruction);
     }
 
     /// <summary>
-    /// POP is equivalent to LDMIA R13! for ARM but can only include the 
+    /// POP is equivalent to LDMIA R13! for ARM but can only include the
     /// bottom 8 registers and optionally R15.
     /// </summary>
     public static void POP(Core core, ushort instruction)
@@ -699,28 +697,28 @@ internal unsafe static class Thumb
         // Check pop PC
         if (((instruction >> 8) & 0b1) == 1)
         {
-            LdmStmUtils._storeLoadMultipleState[LdmStmUtils._storeLoadMultiplePopCount] = 15;
-            LdmStmUtils._storeLoadMultiplePopCount++;
+            core.InstructionState.LdmStm._storeLoadMultipleState[core.InstructionState.LdmStm._storeLoadMultiplePopCount] = 15;
+            core.InstructionState.LdmStm._storeLoadMultiplePopCount++;
         }
 
-        LdmStmUtils._storeLoadMutipleFinalWritebackValue = (uint)(core.R[13] + (4 * LdmStmUtils._storeLoadMultiplePopCount));
+        core.InstructionState.LdmStm._storeLoadMutipleFinalWritebackValue = (uint)(core.R[13] + (4 * core.InstructionState.LdmStm._storeLoadMultiplePopCount));
     }
 
     public static void STMIA(Core core, ushort instruction)
     {
         var rb = (uint)((instruction >> 8) & 0b111);
         LoadStoreMultipleCommon(core, instruction, core.R[rb] - 4, true, rb, &LdmStmUtils.StmRegisterWriteCycle);
-        if (LdmStmUtils._storeLoadMultiplePopCount == 0)
+        if (core.InstructionState.LdmStm._storeLoadMultiplePopCount == 0)
         {
-            LdmStmUtils._storeLoadMutipleFinalWritebackValue = core.R[rb] + 0x40;
-            LdmStmUtils._storeLoadMultiplePopCount = 1;
-            LdmStmUtils._storeLoadMultipleState[0] = 15;
+            core.InstructionState.LdmStm._storeLoadMutipleFinalWritebackValue = core.R[rb] + 0x40;
+            core.InstructionState.LdmStm._storeLoadMultiplePopCount = 1;
+            core.InstructionState.LdmStm._storeLoadMultipleState[0] = 15;
         }
         else
         {
-            LdmStmUtils._storeLoadMutipleFinalWritebackValue = (uint)(core.R[rb] + (4 * LdmStmUtils._storeLoadMultiplePopCount));
+            core.InstructionState.LdmStm._storeLoadMutipleFinalWritebackValue = (uint)(core.R[rb] + (4 * core.InstructionState.LdmStm._storeLoadMultiplePopCount));
         }
-        
+
         LdmStmUtils.StmRegisterWriteCycle(core, instruction);
     }
 
@@ -728,16 +726,16 @@ internal unsafe static class Thumb
     {
         var rb = (uint)((instruction >> 8) & 0b111);
         LoadStoreMultipleCommon(core, instruction, core.R[rb], false, rb, &LdmStmUtils.LdmRegisterReadCycle);
-        
-        if (LdmStmUtils._storeLoadMultiplePopCount == 0)
+
+        if (core.InstructionState.LdmStm._storeLoadMultiplePopCount == 0)
         {
-            LdmStmUtils._storeLoadMutipleFinalWritebackValue = core.R[rb] + 0x40;
-            LdmStmUtils._storeLoadMultiplePopCount = 1;
-            LdmStmUtils._storeLoadMultipleState[0] = 15;
+            core.InstructionState.LdmStm._storeLoadMutipleFinalWritebackValue = core.R[rb] + 0x40;
+            core.InstructionState.LdmStm._storeLoadMultiplePopCount = 1;
+            core.InstructionState.LdmStm._storeLoadMultipleState[0] = 15;
         }
         else
         {
-            LdmStmUtils._storeLoadMutipleFinalWritebackValue = (uint)(core.R[rb] + (4 * LdmStmUtils._storeLoadMultiplePopCount));
+            core.InstructionState.LdmStm._storeLoadMutipleFinalWritebackValue = (uint)(core.R[rb] + (4 * core.InstructionState.LdmStm._storeLoadMultiplePopCount));
         }
     }
 

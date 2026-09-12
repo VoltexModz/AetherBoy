@@ -97,7 +97,9 @@ internal sealed class SdlAudioOutput : IDisposable
         }
     }
 
-    public void Submit(float[] samples, int sourceSampleRate, int sourceChannels = 1)
+    private readonly AetherBoy.Runtime.Audio.AudioPlaybackCursor playback = new();
+
+    public void Submit(float[] samples, int sourceSampleRate, int sourceChannels = 1, long generation = 0, long session = 0)
     {
         ArgumentNullException.ThrowIfNull(samples);
         if (samples.Length == 0)
@@ -112,6 +114,13 @@ internal sealed class SdlAudioOutput : IDisposable
                 return;
             }
 
+            if (!playback.TryAccept(session, generation, out bool changed)) { DroppedBlocks++; return; }
+            if (changed)
+            {
+                if (!SDL.ClearAudioStream(stream))
+                    throw new InvalidOperationException("Cannot reset SDL audio queue: " + SDL.GetError());
+            }
+
             if (sourceChannels is < 1 or > 2 || samples.Length % sourceChannels != 0)
                 throw new ArgumentOutOfRangeException(nameof(sourceChannels));
             if (sourceSampleRate != sampleRate || sourceChannels != channels)
@@ -122,15 +131,17 @@ internal sealed class SdlAudioOutput : IDisposable
             int queued = SDL.GetAudioStreamQueued(stream);
             if (queued < 0) throw new InvalidOperationException("Cannot read SDL audio queue: " + SDL.GetError());
             if (queued == 0) EmptyQueueObservations++;
-            int maximumQueuedBytes = sampleRate * channels * sizeof(float) / 8;
-            if (queued > maximumQueuedBytes)
+            int acceptedFrames = AetherBoy.Runtime.Audio.AudioQueuePolicy.AcceptedFrames(
+                queued / (channels * sizeof(float)), samples.Length / channels, sampleRate / 8);
+            if (acceptedFrames == 0)
             {
                 // Let already queued sound drain instead of clearing the entire stream.
                 DroppedBlocks++;
                 return;
             }
 
-            ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(samples.AsSpan());
+            if (acceptedFrames < samples.Length / channels) DroppedBlocks++;
+            ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(samples.AsSpan(0, acceptedFrames * channels));
             if (!SDL.PutAudioStreamData(stream, bytes, bytes.Length))
             {
                 throw new InvalidOperationException($"SDL rejected emulator audio: {SDL.GetError()}");

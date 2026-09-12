@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text;
 using System.Windows.Forms;
 using AetherBoy.Runtime;
+using AetherBoy.Runtime.Video;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using nanoboy;
 using nanoboy.Controls;

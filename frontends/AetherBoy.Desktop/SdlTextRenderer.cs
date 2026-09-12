@@ -1,3 +1,4 @@
+using System.Globalization;
 using SDL3;
 
 namespace AetherBoy.Desktop;
@@ -52,9 +53,10 @@ internal sealed class SdlTextRenderer : IDisposable
         // Filenames and core errors are untrusted UI text.
         text = string.Concat(text.Select(c => char.IsControl(c) ? ' ' : c));
         if (Measure(text, size, bold) <= width) return text;
-        int length = text.Length;
-        while (length > 0 && Measure(text[..length] + "...", size, bold) > width) length--;
-        return text[..length] + "...";
+        int[] boundaries = StringInfo.ParseCombiningCharacters(text);
+        int count = boundaries.Length - 1;
+        while (count > 0 && Measure(text[..boundaries[count]] + "...", size, bold) > width) count--;
+        return text[..(count >= 0 ? boundaries[count] : 0)] + "...";
     }
 
     public void Draw(float x, float y, string text, byte red, byte green, byte blue, int size = 14, bool bold = false)

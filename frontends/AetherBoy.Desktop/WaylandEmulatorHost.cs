@@ -78,8 +78,8 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     private bool minimized;
     private LinuxRomStorage? storage;
     private LinuxRomStorage? pendingStorage;
-    private string? StateBasePath => storage?.StateBasePath;
-    private bool HasSelectedState => StateBasePath is not null && File.Exists(LinuxSaveStateStore.GetPath(StateBasePath, options.SaveSlot));
+    private string? StateBasePath => IsOnlineLink ? null : storage?.StateBasePath;
+    private bool HasSelectedState => !IsOnlineLink && StateCard(options.SaveSlot) is { Exists: true, Error: null };
     private string statusMessage = "OPEN OR DROP A ROM";
     private string? audioError;
     private bool running = true;
@@ -96,9 +96,11 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         this.settingsPath = settingsPath ?? LinuxSettingsStore.DefaultPath;
         dataPaths = settingsPath is null ? LinuxDataPaths.Default
             : LinuxDataPaths.Isolated(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(settingsPath))!, "storage"));
+        hiddenWindow = hidden;
         library = new LinuxLibrary(dataPaths);
         this.diagnostics = diagnostics ?? new LinuxDiagnostics(dataPaths, false);
         options = LinuxSettingsStore.Load(this.settingsPath, out string? settingsError);
+        globalProfile = LinuxGameProfile.Capture(options);
         loadError = settingsError;
         fileDialogCallback = OnFileDialogCompleted;
         if (!SDL.CreateWindowAndRenderer(
@@ -122,15 +124,19 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         LoadBrandMark();
         SDL.SetWindowMinimumSize(window, 860, 554);
         OpenFirstAvailableGamepad();
+        RefreshLibrary();
     }
 
     public int Run(string[] args)
     {
+        bool accessible = args.Contains("--accessible", StringComparer.Ordinal);
+        args = args.Where(arg => arg != "--accessible").ToArray();
         if (args.Length > 1)
         {
-            throw new ArgumentException("Usage: AetherBoy.Desktop [game.gb|game.gbc|game.gba]");
+            throw new ArgumentException("Usage: AetherBoy.Desktop [--accessible] [game.gb|game.gbc|game.gba]");
         }
 
+        if (accessible) OpenAccessibleControls();
         if (args.Length == 1)
         {
             TryLoadRom(args[0]);
@@ -147,15 +153,19 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             DrainDialogSelections();
             CompletePendingLoad();
             CompletePendingPatch();
+            CompletePendingScreenshot();
             try { UpdateEmulation(); }
             catch (Exception exception) { ReportError(exception); }
             FlushSettingsIfDue();
             UpdateDiagnostics();
+            UpdateComfort();
             if (!minimized)
             {
                 DrawShell();
                 SDL.RenderPresent(renderer);
+                RecordPresentation();
             }
+            UpdateAccessibleControls();
             // Idle/paused views do not need to redraw at the monitor's maximum rate.
             bool idle = session is null || session.LatestSnapshot.IsPaused || minimized;
             SDL.Delay(idle ? 50u : vsyncEnabled ? 0u : 2u);
@@ -171,10 +181,19 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             return;
         }
 
+        accessibleControls?.Dispose(); accessibleControls = null;
         disposed = true;
         // Finish a started import before shutting down; its worker never touches SDL.
+        try { libraryMutation?.GetAwaiter().GetResult(); } catch { }
         try { pendingPatch?.GetAwaiter().GetResult(); } catch { /* Reported during normal completion. */ }
         pendingPatch = null;
+        if (pendingScreenshot is not null)
+        {
+            try { pendingScreenshot.GetAwaiter().GetResult(); }
+            catch (Exception exception) { diagnostics.Failure("screenshot", exception); }
+            pendingScreenshot = null;
+        }
+        FinishRomPreparation();
         FlushSettingsIfDue(force: true);
         DisposeSession(pendingSession);
         pendingSession = null;
@@ -198,6 +217,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         }
 
         if (brandTexture != IntPtr.Zero) SDL.DestroyTexture(brandTexture);
+        ClearPreviewTextures();
         textRenderer.Dispose();
         SDL.DestroyRenderer(renderer);
         SDL.DestroyWindow(window);
@@ -209,13 +229,10 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         switch (type)
         {
             case SDL.EventType.TextInput:
-                if (editingSearch || editingCheat)
-                {
-                    string text = Marshal.PtrToStringUTF8((IntPtr)currentEvent.Text.Text) ?? "";
-                    string value = string.Concat(((editingCheat ? cheatCode : librarySearch) + text).Where(c => !char.IsControl(c)).Take(80));
-                    if (editingCheat) cheatCode = value; else librarySearch = value;
-                    libraryPage = 0;
-                }
+                ReceiveTextInput(Marshal.PtrToStringUTF8((IntPtr)currentEvent.Text.Text) ?? "");
+                break;
+            case SDL.EventType.TextEditing:
+                ReceiveTextComposition(Marshal.PtrToStringUTF8((IntPtr)currentEvent.Edit.Text) ?? "", currentEvent.Edit.Start, currentEvent.Edit.Length);
                 break;
             case SDL.EventType.WindowMinimized: minimized = true; break;
             case SDL.EventType.WindowRestored: minimized = false; break;
@@ -231,15 +248,17 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 SDL.ConvertEventToRenderCoordinates(renderer, ref logicalEvent);
                 if (logicalEvent.Button.Button == SDL.ButtonLeft)
                 {
-                    HandleMouseClick(logicalEvent.Button.X, logicalEvent.Button.Y);
+                    if (!HandleTextPointerDown(logicalEvent.Button.X, logicalEvent.Button.Y, (SDL.GetModState() & SDL.Keymod.Shift) != 0))
+                        HandleMouseClick(logicalEvent.Button.X, logicalEvent.Button.Y);
                 }
                 break;
             case SDL.EventType.MouseButtonUp:
                 if (currentEvent.Button.Button == SDL.ButtonLeft)
                 {
+                    draggingTextSelection = false;
                     draggingVolume = false;
                     ReleaseMouseTurbo();
-                    FlushSettingsIfDue(force: true);
+                    FlushSettingsIfDue();
                 }
                 break;
             case SDL.EventType.MouseMotion:
@@ -247,29 +266,38 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 SDL.ConvertEventToRenderCoordinates(renderer, ref motion);
                 mouseX = motion.Motion.X;
                 mouseY = motion.Motion.Y;
+                HandleTextPointerMotion(mouseX);
                 if (draggingVolume) SetVolumeFromPointer(mouseX);
                 break;
             case SDL.EventType.WindowMouseLeave:
                 mouseX = mouseY = -1;
                 break;
             case SDL.EventType.WindowFocusLost:
+                CancelTextComposition();
                 windowFocused = false;
                 if (options.PauseOnFocusLoss && session is not null && session.State == SessionState.Running)
                 { resumeAfterFocus = true; session.SetPausedAsync(true).GetAwaiter().GetResult(); audioOutput?.Clear(); }
                 mouseTurbo = false;
                 draggingVolume = false;
                 rebindingAction = null;
-                FlushSettingsIfDue(force: true);
+                FlushSettingsIfDue();
                 pressedKeys.Clear();
                 if (session is not null && session.State is SessionState.Running or SessionState.Paused)
                 {
-                    session.SetTurboAsync(false).GetAwaiter().GetResult();
+                    if (!IsOnlineLink) session.SetTurboAsync(false).GetAwaiter().GetResult();
                     PostInput(session);
                 }
                 break;
             case SDL.EventType.WindowFocusGained:
                 windowFocused = true;
-                if (resumeAfterFocus && session is not null && !controlCenterVisible) session.SetPausedAsync(false).GetAwaiter().GetResult();
+                // A replacement Runtime owner may already be running. Keep the focus
+                // resume request until its preparation has completed or been cancelled.
+                if (IsLoading) break;
+                if (resumeAfterFocus && session is not null)
+                {
+                    if (controlCenterVisible) resumeAfterControlCenter = true;
+                    else session.SetPausedAsync(false).GetAwaiter().GetResult();
+                }
                 resumeAfterFocus = false;
                 break;
             case SDL.EventType.GamepadButtonDown:
@@ -288,7 +316,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                     SDL.CloseGamepad(gamepad);
                     gamepad = IntPtr.Zero;
                     rebindingGamepad = null;
-                    if (session is not null) session.SetTurboAsync(false).GetAwaiter().GetResult();
+                    if (session is not null && !IsOnlineLink) session.SetTurboAsync(false).GetAwaiter().GetResult();
                     OpenFirstAvailableGamepad();
                     statusMessage = gamepad == IntPtr.Zero ? "Controller disconnected. Keyboard is ready." : "Switched to another controller.";
                 }
@@ -307,6 +335,19 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void HandleKeyboard(SDL.KeyboardEvent keyEvent, bool isPressed)
     {
+        if (IsLoading)
+        {
+            if (isPressed && !keyEvent.Repeat)
+            {
+                if (keyEvent.Scancode == SDL.Scancode.Escape) CancelRomLoad();
+                else if (keyEvent.Scancode is SDL.Scancode.Tab or SDL.Scancode.F6) { DrawShell(); focusedControl = focusTargets.Count - 1; }
+                else if (keyEvent.Scancode == SDL.Scancode.Return && focusedControl >= 0) CancelRomLoad();
+            }
+            return;
+        }
+        if (isPressed && !keyEvent.Repeat && keyEvent.Scancode == SDL.Scancode.F7 && (keyEvent.Mod & SDL.Keymod.Ctrl) != 0 && rebindingAction is null)
+        { OpenAccessibleControls(); return; }
+
         if (rebindingAction is { } action)
         {
             pressedKeys.Clear();
@@ -332,19 +373,15 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
         if (rebindingGamepad is not null && isPressed && keyEvent.Scancode == SDL.Scancode.Escape)
         { rebindingGamepad = null; statusMessage = "Controller change cancelled."; return; }
-        if (editingSearch || editingCheat)
-        {
-            if (isPressed && keyEvent.Scancode is SDL.Scancode.Return or SDL.Scancode.Escape or SDL.Scancode.Tab)
-            { editingSearch = false; editingCheat = false; SDL.StopTextInput(window); }
-            else if (isPressed && keyEvent.Scancode == SDL.Scancode.Backspace)
-            {
-                if (editingCheat && cheatCode.Length > 0) cheatCode = cheatCode[..^1];
-                if (editingSearch && librarySearch.Length > 0) librarySearch = librarySearch[..^1];
-            }
-            return;
-        }
+        if (HandleTextEditorKey(keyEvent, isPressed)) return;
         if (!controlCenterVisible && isPressed && !keyEvent.Repeat)
         {
+            if (keyEvent.Scancode == SDL.Scancode.F6 || (focusedControl >= 0 && keyEvent.Scancode == SDL.Scancode.Return))
+            {
+                bool hadFocus = focusedControl >= 0;
+                DrawShell();
+                if (hadFocus && focusedControl < 0 && keyEvent.Scancode == SDL.Scancode.Return) return;
+            }
             if (keyEvent.Scancode == SDL.Scancode.F6 && focusTargets.Count > 0)
             {
                 int direction = (keyEvent.Mod & SDL.Keymod.Shift) != 0 ? -1 : 1;
@@ -360,6 +397,18 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         }
         if (controlCenterVisible && isPressed)
         {
+            if (!keyEvent.Repeat && keyEvent.Scancode is SDL.Scancode.Tab or SDL.Scancode.F6 or SDL.Scancode.Return or SDL.Scancode.Space)
+            {
+                bool hadFocus = focusedControl >= 0;
+                // Reconcile dynamic/disabled controls before keyboard activation, even between two render ticks.
+                DrawShell();
+                if (hadFocus && focusedControl < 0 && keyEvent.Scancode is SDL.Scancode.Return or SDL.Scancode.Space) return;
+            }
+            if (keyEvent.Scancode == SDL.Scancode.F6 && !keyEvent.Repeat)
+            {
+                JumpControlCenterRegion();
+                return;
+            }
             if (keyEvent.Scancode == SDL.Scancode.Tab && !keyEvent.Repeat)
             {
                 int direction = (keyEvent.Mod & SDL.Keymod.Shift) != 0 ? -1 : 1;
@@ -413,7 +462,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             pressedKeys.Remove(keyEvent.Scancode);
         }
 
-        if (keyEvent.Scancode == options.Keys[LinuxInputAction.Turbo] && session is not null && !controlCenterVisible && pendingSession is null)
+        if (keyEvent.Scancode == options.Keys[LinuxInputAction.Turbo] && session is not null && !IsOnlineLink && !controlCenterVisible && !IsLoading)
         {
             session.SetTurboAsync(isPressed || mouseTurbo).GetAwaiter().GetResult();
         }
@@ -465,6 +514,15 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 isFullscreen = !isFullscreen;
                 SDL.SetWindowFullscreen(window, isFullscreen);
                 break;
+            case SDL.Scancode.F9:
+                TogglePerformanceOverlay();
+                break;
+            case SDL.Scancode.F12:
+                CaptureScreenshot();
+                break;
+            case SDL.Scancode.F10:
+                OpenOnlineLinkPage();
+                break;
             case SDL.Scancode.Alpha1:
                 SelectSaveSlot(1);
                 break;
@@ -485,6 +543,11 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void HandleMouseClick(float x, float y)
     {
+        if (IsLoading)
+        {
+            if (Hit(x, y, LogicalWidth / 2f - 105, LogicalHeight / 2f + 33, 210, 42)) CancelRomLoad();
+            return;
+        }
         focusedControl = -1;
         foreach (var command in shellCommands)
         {
@@ -494,12 +557,13 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 return;
             }
         }
+        if (IsLoading) return;
         if (controlCenterVisible) HandleControlCenterAction(x, y);
     }
 
     private void HandleControlCenterAction(float x, float y)
     {
-        if ((controlCenterPage == ControlCenterPage.Saves && showBackups) ||
+        if ((controlCenterPage == ControlCenterPage.Saves && (showBackups || showGallery)) ||
             (controlCenterPage == ControlCenterPage.Input && showController)) return;
         switch (controlCenterPage)
         {
@@ -514,7 +578,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 {
                     for (int index = 0; index < 5; index++)
                     {
-                        if (Hit(x, y, 300 + (index * 114), 450, 100, 40))
+                        if (Hit(x, y, 300 + (index * 164), 450, 152, 40))
                         {
                             SetPalette(index);
                             break;
@@ -596,7 +660,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void TogglePause()
     {
-        if (session is null || pendingSession is not null || controlCenterVisible) return;
+        if (session is null || IsLoading || controlCenterVisible) return;
         bool pause = !session.LatestSnapshot.IsPaused;
         session.SetPausedAsync(pause).GetAwaiter().GetResult();
         audioOutput?.Clear();
@@ -605,7 +669,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void ToggleControlCenter()
     {
-        if (pendingSession is not null) return;
+        if (IsLoading) return;
         if (controlCenterVisible)
         {
             CloseControlCenter();
@@ -620,7 +684,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         EmulationSession? currentSession = session;
         if (currentSession is not null)
         {
-            currentSession.SetTurboAsync(false).GetAwaiter().GetResult();
+            if (!IsOnlineLink) currentSession.SetTurboAsync(false).GetAwaiter().GetResult();
             resumeAfterControlCenter = !currentSession.LatestSnapshot.IsPaused;
             if (resumeAfterControlCenter)
             {
@@ -631,15 +695,17 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void CloseControlCenter()
     {
+        if (editingTitleIdentity is not null) { statusMessage = "Save or cancel the title before leaving."; return; }
         editingSearch = false;
         editingCheat = false;
+        titleEditVersion++; editingTitleIdentity = null;
         SDL.StopTextInput(window);
         focusedControl = -1;
         rebindingGamepad = null;
         rebindingAction = null;
         draggingVolume = false;
         pressedKeys.Clear();
-        FlushSettingsIfDue(force: true);
+        FlushSettingsIfDue();
         controlCenterVisible = false;
         EmulationSession? currentSession = session;
         if (resumeAfterControlCenter && currentSession is not null)
@@ -738,6 +804,9 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
         if (sessionState == SessionState.Faulted)
         {
+            // The preparation worker may still be awaiting this owner. Cancel it first;
+            // disposal on the following tick must not race those Runtime commands.
+            if (IsLoading) { CancelRomLoad(); return; }
             ReportError(currentSession.Fault ?? new InvalidOperationException("The emulator stopped."));
             CloseSession();
             romPath = null;
@@ -745,6 +814,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         }
 
         PostInput(currentSession);
+        UpdateOnlineAudioWait(currentSession);
         EmulationSnapshot snapshot = currentSession.LatestSnapshot;
         EnsureFrameTexture(snapshot.VideoGeometry);
         if (currentSession.TryCopyLatestFrame(framePixels, ref displayedFrameSequence))
@@ -781,7 +851,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     private GameBoyButtons ReadButtons()
     {
         GameBoyButtons buttons = GameBoyButtons.None;
-        if (controlCenterVisible || !windowFocused || fileDialogOpen != 0 || pendingSession is not null)
+        if (controlCenterVisible || !windowFocused || fileDialogOpen != 0 || IsLoading)
         {
             return buttons;
         }
@@ -821,7 +891,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     private GameBoyAdvanceButtons ReadAdvanceButtons()
     {
         GameBoyAdvanceButtons buttons = GameBoyAdvanceButtons.None;
-        if (controlCenterVisible || !windowFocused || fileDialogOpen != 0 || pendingSession is not null)
+        if (controlCenterVisible || !windowFocused || fileDialogOpen != 0 || IsLoading)
         {
             return buttons;
         }
@@ -841,51 +911,11 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         return buttons;
     }
 
-    private void TryLoadRom(string candidate)
-    {
-        if (pendingSession is not null) return;
-        try
-        {
-            string path = LinuxRomPath.Resolve(candidate);
-            if (session is not null && (path == romPath || storage?.Identity == LinuxRomStorage.Identify(path)))
-            {
-                loadError = null;
-                library.Remember(storage!.Identity, path);
-                romPath = path;
-                statusMessage = "Cartridge location updated. This ROM is already open.";
-                return;
-            }
-            pendingStorage = LinuxRomStorage.Open(dataPaths, path);
-            loadError = null;
-            pressedKeys.Clear();
-            resumeAfterLoad = session is not null && !session.LatestSnapshot.IsPaused;
-            if (session is not null)
-            {
-                session.SetTurboAsync(false).GetAwaiter().GetResult();
-                session.SetPausedAsync(true).GetAwaiter().GetResult();
-                // The vendored CPU has static instruction scratch registers.
-                // Finish any partial instruction before another owner starts;
-                // the old session can then safely resume if loading fails.
-                if (session.LatestSnapshot.Rom?.IsGameBoyAdvance == true)
-                    _ = session.CaptureStateAsync().GetAwaiter().GetResult();
-            }
-            audioOutput?.Clear();
-            pendingRomPath = path;
-            pendingSession = new EmulationSession(path, pendingStorage.SavePath,
-                bootRom: FirmwareFor(path), options.CreateEmulatorConfiguration(EnsureAudioOutput()), options.PaletteIndex);
-            statusMessage = "Loading " + Path.GetFileName(path) + "...";
-        }
-        catch (Exception exception)
-        {
-            pendingStorage?.Dispose();
-            pendingStorage = null;
-            ResumeAfterFailedLoad();
-            ReportError(exception);
-        }
-    }
+    private void TryLoadRom(string candidate) => BeginRomLoad(candidate);
 
     private void CompletePendingLoad()
     {
+        CompleteRomPreparation();
         EmulationSession? candidate = pendingSession;
         if (candidate is null || candidate.State == SessionState.Starting) return;
         pendingSession = null;
@@ -897,10 +927,14 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             pendingStorage = null;
             ResumeAfterFailedLoad();
             pendingRomPath = null;
+            pendingResumeIdentity = null;
             return;
         }
         CloseSession();
         session = candidate;
+        pendingGameProfile?.ApplyTo(options);
+        usingGameProfile = pendingGameProfile is not null;
+        pendingGameProfile = null;
         storage = pendingStorage;
         diagnostics.Record("rom_loaded", new { hash = storage?.Identity });
         pendingStorage = null;
@@ -912,22 +946,40 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         pendingRomPath = null;
         resumeAfterLoad = false;
         if (audioOutput is not null) session.AudioSamplesAvailable += OnAudioSamplesAvailable;
+        resumeAfterFocus = false;
         if (controlCenterVisible)
         {
             session.SetPausedAsync(true).GetAwaiter().GetResult();
             resumeAfterControlCenter = true;
         }
+        else if (!windowFocused && options.PauseOnFocusLoss)
+        {
+            session.SetPausedAsync(true).GetAwaiter().GetResult();
+            resumeAfterFocus = true;
+        }
+        ApplyEmulatorConfiguration();
+        if (frameTexture != IntPtr.Zero) SDL.SetTextureScaleMode(frameTexture, options.TextureScaleMode);
+        RequestDiskRefresh();
+        nextResumeAt = Environment.TickCount64 + 60_000;
+        lastPlayTick = Environment.TickCount64;
         displayedFrameSequence = 0;
         postedButtons = GameBoyButtons.None;
         postedAdvanceButtons = GameBoyAdvanceButtons.None;
-        statusMessage = storage?.MigrationNotice ?? "Playing. Saves are stored safely in your AetherBoy library.";
+        statusMessage = profileNotice ?? storage?.MigrationNotice ?? "Playing. Saves are stored safely in your AetherBoy library.";
         SDL.SetWindowTitle(window, $"AetherBoy · {Path.GetFileNameWithoutExtension(romPath)}");
+        bool continueRequested = pendingResumeIdentity == storage?.Identity;
+        pendingResumeIdentity = null;
+        if (continueRequested) LoadResume();
     }
 
     private void ResumeAfterFailedLoad()
     {
-        if (resumeAfterLoad && session is not null && session.State == SessionState.Paused)
-            session.SetPausedAsync(false).GetAwaiter().GetResult();
+        if ((resumeAfterLoad || resumeAfterFocus) && session is not null && session.State == SessionState.Paused)
+        {
+            if (controlCenterVisible) { resumeAfterControlCenter = true; resumeAfterFocus = false; }
+            else if (!windowFocused && options.PauseOnFocusLoss) resumeAfterFocus = true;
+            else { session.SetPausedAsync(false).GetAwaiter().GetResult(); resumeAfterFocus = false; }
+        }
         resumeAfterLoad = false;
     }
 
@@ -987,6 +1039,12 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void CloseSession()
     {
+        SaveResumeOnClose();
+        preserveResumeAfterFailure = false;
+        FlushSettingsIfDue(force: true);
+        globalProfile.ApplyTo(options);
+        usingGameProfile = false;
+        undoState = null; undoIdentity = null; playedSeconds = 0;
         StopRecording();
         EmulationSession? previous = session;
         session = null;
@@ -997,6 +1055,8 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         }
         storage?.Dispose();
         storage = null;
+        onlineLinkTransport?.Dispose(); onlineLinkTransport = null;
+        RequestDiskRefresh();
         audioOutput?.Clear();
     }
 
@@ -1042,9 +1102,11 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
         try
         {
+            if (!ReferenceEquals(sender, session)) return;
             float[] samples = eventArgs.GetInterleavedSamplesCopy();
             recorder?.Submit(samples, eventArgs.SampleRate, eventArgs.Channels);
-            output.Submit(samples, eventArgs.SampleRate, eventArgs.Channels);
+            output.Submit(samples, eventArgs.SampleRate, eventArgs.Channels,
+                eventArgs.PlaybackGeneration, eventArgs.PlaybackSession);
         }
         catch (Exception exception)
         {
@@ -1078,14 +1140,14 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void ShowRomDialog()
     {
-        if (pendingSession is not null) return;
+        if (IsLoading) return;
         if (Interlocked.CompareExchange(ref fileDialogOpen, 1, 0) != 0)
         {
             return;
         }
 
         pressedKeys.Clear();
-        if (session is not null) session.SetTurboAsync(false).GetAwaiter().GetResult();
+        if (session is not null && !IsOnlineLink) session.SetTurboAsync(false).GetAwaiter().GetResult();
         statusMessage = "Choose a ROM in the file picker. You can also drop a file here.";
         string? defaultLocation = romPath is null ? null : Path.GetDirectoryName(romPath);
         try
@@ -1241,7 +1303,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     private void DrawDisplayPage()
     {
         Text(300, 198, "VIDEO FILTER", 161, 173, 192);
-        DrawButton(300, 230, 180, 42, "SHARP · PIXEL PERFECT", options.VideoFilter == LinuxVideoFilter.Sharp);
+        DrawButton(300, 230, 180, 42, "SHARP", options.VideoFilter == LinuxVideoFilter.Sharp);
         DrawButton(494, 230, 180, 42, "SMOOTH", options.VideoFilter == LinuxVideoFilter.Smooth);
         DrawButton(688, 230, 180, 42, "LCD GRID", options.VideoFilter == LinuxVideoFilter.LcdGrid);
 
@@ -1253,16 +1315,22 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
         Text(300, 392, "Skip display frames to reduce load; game speed stays the same.", 161, 173, 192);
         Text(300, 420, "DMG PALETTE", 161, 173, 192);
+        uint[][] swatches = [
+            [0xFFF5F5F5, 0xFFA0A0A0, 0xFF505050, 0xFF000000],
+            [0xFF9BBC0F, 0xFF8BAC0F, 0xFF306230, 0xFF0F380F],
+            [0xFF00FFCD, 0xFF00A597, 0xFF00665E, 0xFF00332F],
+            [0xFFF5EA8C, 0xFFD4B055, 0xFF8C5620, 0xFF381900],
+            [0xFF00FFFF, 0xFFFF00FF, 0xFF800080, 0xFF000040]
+        ];
         for (int index = 0; index < 5; index++)
         {
-            DrawButton(
-                300 + (index * 114),
-                450,
-                100,
-                40,
-                new[] { "POCKET", "ORIGINAL", "LIGHT", "SEPIA", "CYBER" }[index],
-                options.PaletteIndex == index);
+            DrawButton(300 + index * 164, 450, 152, 40, new[] { "POCKET", "ORIGINAL", "LIGHT", "SEPIA", "CYBER" }[index], options.PaletteIndex == index);
+            for (int color = 0; color < 4; color++)
+            { uint rgba = swatches[index][color]; Fill(300 + index * 164 + color * 38, 500, 38, 20, (byte)(rgba >> 16), (byte)(rgba >> 8), (byte)rgba); }
         }
+        ActionButton(300, 565, 360, 44, $"TEXT: {TextSizeName}", CycleTextSize);
+        Ink(685, 578, "Text size applies to every game.", 14, Colors.Muted);
+
     }
 
     private void DrawAudioPage()
@@ -1311,7 +1379,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     private void DrawInputPage()
     {
         if (showController) { DrawControllerPage(); return; }
-        ActionButton(910, 188, 190, 40, "CONTROLLER SETUP", () => showController = true);
+        ActionButton(910, 188, 190, 40, "CONTROLLERS", () => showController = true);
         Text(300, 188, "KEYBOARD CONTROLS", 176, 158, 245);
         Text(300, 216, "Click a key, or use arrows + Enter. Esc cancels a change.", 161, 173, 192);
         for (int index = 0; index < BindingActions.Length; index++)
@@ -1324,7 +1392,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 rebindingAction == action ? "Press a key..." : BindingLabel(action),
                 rebindingAction == action || (rebindingAction is null && focusedControl < 0 && focusedBinding == index));
         }
-        DrawButton(300, 548, 210, 40, "Reset keyboard defaults", false);
+        DrawButton(300, 548, 210, 40, "RESET KEYS", false);
         string controller = gamepad == IntPtr.Zero ? "No controller connected" : SDL.GetGamepadName(gamepad) ?? "Controller connected";
         Text(536, 548, textRenderer.Fit(controller, 380), 161, 173, 192);
         Text(536, 570, "Use Controller setup to change mapping.", 161, 173, 192);
@@ -1344,17 +1412,24 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void SelectControlCenterPage(ControlCenterPage page)
     {
+        if (editingTitleIdentity is not null) { statusMessage = "Save or cancel the title before changing sections."; return; }
+        showController = false;
+        showBackups = false;
+        showGallery = false;
+        showPatchLab = false;
         rebindingAction = null;
         editingSearch = false;
         editingCheat = false;
+        titleEditVersion++; editingTitleIdentity = null;
         SDL.StopTextInput(window);
         rebindingGamepad = null;
         if (page == ControlCenterPage.Library) RefreshLibrary();
+        if (page == ControlCenterPage.Saves) RequestDiskRefresh();
         draggingVolume = false;
         controlCenterPage = page;
         statusMessage = "";
         focusedControl = -1;
-        FlushSettingsIfDue(force: true);
+        FlushSettingsIfDue();
     }
 
     private void SetVolumeFromPointer(float x) => SetVolume((int)Math.Round((x - 300) / 5.7f));
@@ -1374,40 +1449,32 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     private void MarkSettingsChanged()
     {
         settingsDirty = true;
+        settingsGeneration++;
         settingsChangedAt = Environment.TickCount64;
-    }
-
-    private void FlushSettingsIfDue(bool force = false)
-    {
-        if (!settingsDirty || (!force && Environment.TickCount64 - settingsChangedAt < 300)) return;
-        settingsDirty = false;
-        try { LinuxSettingsStore.Save(settingsPath, options); }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            ReportError(new IOException("Preferences could not be saved: " + exception.Message, exception));
-        }
     }
 
     private void DrawSavesPage()
     {
+        if (IsOnlineLink) { DrawOnlineLinkPage(); return; }
         if (showBackups) { DrawBackupPage(); return; }
+        if (showGallery) { DrawStateGallery(); return; }
         ActionButton(890, 232, 210, 42, "BACKUPS / EXPORT", () => showBackups = true);
         Text(300, 198, "ACTIVE SAVE-STATE SLOT", 161, 173, 192);
         for (int index = 0; index < 5; index++)
         {
             int slot = index + 1;
-            bool exists = romPath is not null && File.Exists(LinuxSaveStateStore.GetPath(StateBasePath!, slot));
+            bool exists = StateCard(slot)?.Exists == true;
             DrawButton(
                 300 + (index * 114),
                 232,
                 100,
                 42,
-                exists ? $"{slot} SAVED" : $"{slot} EMPTY",
+                StateCard(slot) is null ? $"{slot} ..." : StateCard(slot)?.Error is not null ? $"{slot} ERROR" : exists ? $"{slot} SAVED" : $"{slot} EMPTY",
                 options.SaveSlot == slot);
         }
 
-        string selectedPath = StateBasePath is null ? "" : LinuxSaveStateStore.GetPath(StateBasePath, options.SaveSlot);
-        Text(300, 286, HasSelectedState ? $"Slot {options.SaveSlot} saved {File.GetLastWriteTime(selectedPath):yyyy-MM-dd HH:mm}" : $"Slot {options.SaveSlot} is empty. Save here with F5.", 161, 173, 192);
+        var selectedCard = StateCard(options.SaveSlot);
+        Text(300, 286, selectedCard is null ? "Loading save information…" : selectedCard.Error is not null ? "State cannot be read. Refresh or select another slot." : selectedCard.Exists ? $"Slot {options.SaveSlot} saved {selectedCard.SavedAt:yyyy-MM-dd HH:mm}" : $"Slot {options.SaveSlot} is empty. Save here with F5.", 161, 173, 192);
         DrawButton(300, 342, 180, 44, "SAVE [F5]", false, session is not null);
         DrawButton(494, 342, 180, 44, "LOAD [F8]", false, HasSelectedState);
         DrawButton(688, 342, 180, 44, "REWIND [F7]", false, session is not null);
@@ -1419,69 +1486,21 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             : session is null ? "NO ROM LOADED" : "CARTRIDGE HAS NO BATTERY RAM";
         Text(300, 470, battery, 218, 222, 242);
         Text(300, 514, "Saves follow cartridge content, even when you move the ROM.", 161, 173, 192);
+        ActionButton(565, 560, 250, 42, "GALLERY / RESUME", () => { showGallery = true; focusedControl = -1; RequestDiskRefresh(); });
+        ActionButton(835, 560, 270, 42, "UNDO LAST LOAD", UndoLoad, enabled: undoState is not null && stateOperation is null);
         ActionButton(300, 560, 242, 42, "OPEN SAVE FOLDER", () => OpenFolder(storage is null ? Path.Combine(dataPaths.Data, "saves") : Path.GetDirectoryName(storage.SavePath)!));
     }
 
     private static string Truncate(string value, int maximumLength) =>
         value.Length <= maximumLength ? value : value[..Math.Max(0, maximumLength - 3)] + "...";
 
-    private void QuickSave()
-    {
-        if (session is null || romPath is null || pendingSession is not null)
-        {
-            return;
-        }
-
-        try
-        {
-            byte[] state = session.CaptureStateAsync().GetAwaiter().GetResult();
-            LinuxSaveStateStore.WriteAtomic(StateBasePath!, options.SaveSlot, state);
-            diagnostics.Record("state_saved", new { slot = options.SaveSlot });
-            statusMessage = $"STATE SAVED · SLOT {options.SaveSlot}";
-        }
-        catch (Exception exception)
-        {
-            diagnostics.Failure("save_state", exception);
-            statusMessage = $"SAVE FAILED · {exception.Message}";
-            Console.Error.WriteLine(exception);
-        }
-    }
-
-    private void QuickLoad()
-    {
-        if (session is null || romPath is null || pendingSession is not null)
-        {
-            return;
-        }
-
-        string path = LinuxSaveStateStore.GetPath(StateBasePath!, options.SaveSlot);
-        if (!File.Exists(path))
-        {
-            statusMessage = $"NO STATE IN SLOT {options.SaveSlot}";
-            return;
-        }
-
-        try
-        {
-            session.RestoreStateAsync(LinuxSaveStateStore.Read(StateBasePath!, options.SaveSlot))
-                .GetAwaiter()
-                .GetResult();
-            audioOutput?.Clear();
-            displayedFrameSequence = 0;
-            diagnostics.Record("state_loaded", new { slot = options.SaveSlot });
-            statusMessage = $"STATE LOADED · SLOT {options.SaveSlot}";
-        }
-        catch (Exception exception)
-        {
-            diagnostics.Failure("load_state", exception);
-            statusMessage = $"LOAD FAILED · {exception.Message}";
-            Console.Error.WriteLine(exception);
-        }
-    }
+    private void QuickSave() => QueueSaveState(options.SaveSlot);
+    private void QuickLoad() => QueueLoadState(options.SaveSlot);
 
     private void Rewind()
     {
-        if (session is null)
+        if (IsOnlineLink) { statusMessage = "Rewind is disabled during Online Link."; return; }
+        if (session is null || stateOperation is not null || IsLoading)
         {
             return;
         }
@@ -1494,6 +1513,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 return;
             }
 
+            undoState = null; undoIdentity = null;
             audioOutput?.Clear();
             displayedFrameSequence = 0;
             diagnostics.Record("rewind");
@@ -1587,6 +1607,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void Text(float x, float y, string value, byte red, byte green, byte blue)
     {
+        DescribeAccessibleText(x, y, value);
         textRenderer.Draw(x, y, textRenderer.Fit(value, LogicalWidth - x - 24), red, green, blue);
     }
 }

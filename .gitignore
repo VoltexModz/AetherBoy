@@ -20,6 +20,7 @@ packages/
 .local-tools/
 
 # Logs, dumps, and local profiling data
+**/TestResults/
 *.log
 *.dmp
 *.trace

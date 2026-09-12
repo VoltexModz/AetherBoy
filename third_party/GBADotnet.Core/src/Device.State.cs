@@ -9,7 +9,7 @@ namespace GameboyAdvanced.Core;
 public unsafe partial class Device
 {
     private const uint StateMagic = 0x53414241; // "ABAS" in little endian.
-    private const ushort StateSchemaVersion = 5;
+    private const ushort StateSchemaVersion = 6;
     private const int StateDigestLength = 32;
     private const int MaximumBoundaryWaitCycles = CPU_CYCLES_PER_FRAME * 2;
 
@@ -20,6 +20,7 @@ public unsafe partial class Device
     /// </summary>
     public byte[] CaptureState()
     {
+        SerialController.EnsureStandaloneState();
         StabilizeForStateCapture();
 
         using var bodyStream = new MemoryStream(capacity: 768 * 1024);
@@ -55,6 +56,7 @@ public unsafe partial class Device
     /// <summary>Restores a state produced by <see cref="CaptureState"/>.</summary>
     public void RestoreState(byte[] state)
     {
+        SerialController.EnsureStandaloneState();
         ArgumentNullException.ThrowIfNull(state);
         if (state.Length <= StateDigestLength)
             throw new InvalidDataException("The GBA state is truncated.");
@@ -71,7 +73,7 @@ public unsafe partial class Device
         if (reader.ReadUInt32() != StateMagic)
             throw new InvalidDataException("The file is not an AetherBoy GBA core state.");
         ushort version = reader.ReadUInt16();
-        if (version != StateSchemaVersion)
+        if (version is not (5 or StateSchemaVersion))
         {
             throw new NotSupportedException(
                 $"GBA state schema {version} is unsupported; expected {StateSchemaVersion}.");
@@ -90,7 +92,7 @@ public unsafe partial class Device
         ReadTimerState(reader);
         ReadInterruptState(reader);
         ReadGamepadState(reader);
-        SerialController.ReadState(reader);
+        SerialController.ReadState(reader, version);
         ReadGamePakState(reader);
         Scheduler.ReadState(reader);
         InstructionBufferPtr = reader.ReadByte();

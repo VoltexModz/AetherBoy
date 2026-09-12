@@ -362,6 +362,9 @@ namespace nanoboy.Core
                         break;
                     case 0x01:
                         serialData = value;
+                        if (serialTransferActive && serial is ISerialScheduledDevice scheduledData) {
+                            scheduledData.SerialDataWritten();
+                        }
                         break;
                     case 0x02:
                         serialControl = (byte)(value & (rom.HasColorFeatures ? 0x03 : 0x01));
@@ -622,7 +625,15 @@ namespace nanoboy.Core
 
         internal void TickSerial()
         {
+            if (serial is ISerialScheduledDevice scheduled) {
+                scheduled.TickSerialCycle();
+                return;
+            }
             if (!serialTransferActive || (serialControl & 0x01) == 0) {
+                return;
+            }
+
+            if (serial is ISerialClockArbiter arbiter && !arbiter.CanDriveClock) {
                 return;
             }
 
@@ -642,12 +653,43 @@ namespace nanoboy.Core
         /// </summary>
         public bool TryClockSerialBit(bool incomingBit, out bool outgoingBit)
         {
+            return TryClockSerialBit(incomingBit, allowInternalClock: false, out outgoingBit);
+        }
+
+        internal ISerialDevice SerialDevice => serial;
+        internal bool HasInternalSerialClock => serialTransferActive && (serialControl & 0x01) != 0;
+        internal byte SerialData => serialData;
+        internal byte SerialControl => serialControl;
+        internal int SerialBitsRemaining => serialBitsRemaining;
+        internal bool SerialCpuDoubleSpeed => cpu.IsDoubleSpeed;
+        internal int SerialClockPeriodDots =>
+            ((rom.HasColorFeatures && (serialControl & 2) != 0) ? 16 : 512) /
+            (cpu.IsDoubleSpeed ? 2 : 1);
+
+        // Abort on a network fault without inventing a completed transfer/IRQ.
+        internal void AbortLinkedSerialTransfer()
+        {
+            if (serialTransferActive) {
+                AbortSerialTransfer();
+            }
+        }
+
+        // Only the coordinated local cable may override an internally selected
+        // clock. Its arbiter suppresses that peer's own TickSerial clock source.
+        internal bool TryClockLinkedSerialBit(bool incomingBit, out bool outgoingBit)
+        {
+            return TryClockSerialBit(incomingBit, allowInternalClock: true, out outgoingBit);
+        }
+
+        private bool TryClockSerialBit(bool incomingBit, bool allowInternalClock, out bool outgoingBit)
+        {
             outgoingBit = false;
-            if (!serialTransferActive || (serialControl & 0x01) != 0) {
+            if (!serialTransferActive || (!allowInternalClock && (serialControl & 0x01) != 0)) {
                 return false;
             }
 
             outgoingBit = (serialData & 0x80) != 0;
+            serialClock = 0;
             AdvanceSerialBit(incomingBit);
             return true;
         }

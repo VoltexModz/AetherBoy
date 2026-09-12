@@ -50,6 +50,9 @@ namespace nanoboy
         private RichTextBox diagnostics = null!;
         private AetherButton testerExportButton = null!;
         private AetherButton testerFolderButton = null!;
+        private AetherButton recordingPreferenceButton = null!;
+        private AetherButton problemMarkerButton = null!;
+        private Label recordingStatus = null!, recordingPreferenceStatus = null!;
 
         public frmControlCenter(ControlCenterBridge bridge)
         {
@@ -87,6 +90,9 @@ namespace nanoboy
                 this,
                 "CONTROL CENTER // 09.2",
                 "Alle lokalen Emulator-, Eingabe- und Sicherheitsfunktionen an einem Ort");
+            // This pane has its own Aether card and scroll actions, not native white chrome.
+            diagnostics.BorderStyle = BorderStyle.None;
+            diagnostics.ScrollBars = RichTextBoxScrollBars.None;
 
             liveTimer = new System.Windows.Forms.Timer { Interval = 300 };
             liveTimer.Tick += (_, _) => RefreshAll();
@@ -218,7 +224,7 @@ namespace nanoboy
             AddActionButton(actions, "FULLSCREEN", 510, 104, 230, bridge.ToggleFullscreen);
 
             page.Controls.Add(CreateFootnote(
-                "Das Control Center arbeitet ausschließlich lokal. Änderungen werden sofort angewendet und persistent gespeichert.",
+                "Alle Einstellungen bleiben lokal. Firmware gilt beim erneuten ROM-Öffnen, die Diagnose-Aufzeichnung ab dem nächsten Programmstart.",
                 522));
             return page;
         }
@@ -307,7 +313,7 @@ namespace nanoboy
                     RefreshAll();
                 });
             latency.Controls.Add(CreateSmallLabel(
-                "40 ms Standard. Bei Knacken 60/100 ms wählen. Gerätewechsel folgt Windows automatisch.\r\nZielpuffer ≠ Gesamtlatenz; Vorpuffer, Resampling und Treiber kommen hinzu. Der Core liefert derzeit Mono.",
+                "40 ms Standard. Bei Knacken 60/100 ms wählen. Gerätewechsel folgt Windows automatisch.\r\nZielpuffer ≠ Gesamtlatenz; Vorpuffer, Resampling und Treiber kommen hinzu. GB/GBC: Mono · GBA: Stereo.",
                 18, 92, 748, 44));
             return page;
         }
@@ -368,14 +374,17 @@ namespace nanoboy
             frames.Controls.Add(CreateSmallLabel("Frameskip verändert nur die Bildausgabe, nicht die emulierte Hardwarezeit.", 18, 91, 748, 28));
 
             AetherSurfacePanel boot = CreateCard(page, 0, 218, 788, 142, "BOOT ROM POLICY");
-            bootRomButton = AddActionButton(boot, "BOOT ROM · AUTO", 18, 48, 230, ToggleBootRom, AetherButtonKind.Secondary);
-            bootRomStatus = CreateSmallLabel(string.Empty, 270, 42, 492, 72);
+            bootRomButton = AddActionButton(boot, "BOOT ROM · AUTO", 18, 40, 230, ToggleBootRom, AetherButtonKind.Secondary);
+            AddActionButton(boot, "FIRMWARE VERWALTEN", 18, 90, 230,
+                () => { bridge.OpenFirmwareManager(); RefreshAll(); }).Name = "controlCenterFirmwareManagerButton";
+            bootRomStatus = CreateSmallLabel(string.Empty, 270, 36, 492, 98);
+            bootRomStatus.Name = "controlCenterFirmwareStatus";
             boot.Controls.Add(bootRomStatus);
 
             AetherSurfacePanel reset = CreateCard(page, 0, 376, 788, 152, "SETTINGS RECOVERY");
             AddActionButton(reset, "RESET ALL SETTINGS", 18, 50, 240, ResetSettings, AetherButtonKind.Danger);
             reset.Controls.Add(CreateSmallLabel(
-                "Setzt Video, Audio, Eingabe, Save-Slot und Boot-ROM-Verhalten auf sichere Standardwerte zurück. ROMs und Spielstände werden nicht gelöscht.",
+                "Setzt Video, Audio, Eingabe, Save-Slot und Boot-ROM-Verhalten zurück. Die Diagnose-Aufzeichnungswahl, ROMs und Spielstände bleiben erhalten.",
                 286,
                 42,
                 476,
@@ -421,26 +430,41 @@ namespace nanoboy
 
         private Panel BuildDiagnosticsPage()
         {
-            Panel page = CreatePage("controlCenterPageDiagnostics", "DIAGNOSTICS", "Reproduzierbare Laufzeit- und Cartridge-Daten");
+            Panel page = CreatePage("controlCenterPageDiagnostics", "DIAGNOSTICS", "Lokale Aufzeichnung, transparente Freigabe und Laufzeit-Werkzeuge");
+            AetherSurfacePanel recording = CreateCard(page, 0, 72, 788, 150, "LOCAL RECORDER // DEINE ENTSCHEIDUNG");
+            recordingStatus = CreateSmallLabel("", 18, 34, 750, 48);
+            recordingStatus.Name = "controlCenterRecordingStatus";
+            recording.Controls.Add(recordingStatus);
+            recordingPreferenceButton = AddActionButton(recording, "NÄCHSTER START · AUFZEICHNUNG", 18, 88, 334,
+                ToggleRecordingPreference);
+            recordingPreferenceButton.Name = "controlCenterRecordNextSessionButton";
+            recordingPreferenceStatus = CreateSmallLabel("", 370, 78, 396, 64);
+            recordingPreferenceStatus.Name = "controlCenterRecordingPreferenceStatus";
+            recording.Controls.Add(recordingPreferenceStatus);
+
+            AetherSurfacePanel summary = CreateCard(page, 0, 238, 788, 236, "SHAREABLE SUMMARY // OHNE DATEIPFADE");
             diagnostics = new RichTextBox
             {
                 BackColor = AetherColors.SurfaceRaised,
-                BorderStyle = BorderStyle.FixedSingle,
+                BorderStyle = BorderStyle.None,
                 Font = new Font("Cascadia Mono", 9f, FontStyle.Regular, GraphicsUnit.Point),
                 ForeColor = AetherColors.Text,
-                Location = new Point(0, 72),
+                Location = new Point(18, 38),
                 Name = "controlCenterDiagnosticsText",
                 ReadOnly = true,
                 ScrollBars = RichTextBoxScrollBars.Vertical,
-                Size = new Size(788, 430),
-                WordWrap = false
+                Size = new Size(704, 182),
+                DetectUrls = false,
+                WordWrap = true
             };
-            page.Controls.Add(diagnostics);
+            summary.Controls.Add(diagnostics);
+            AddActionButton(summary, "↑", 738, 38, 32, () => ScrollDiagnostics(-8)).AccessibleName = "Diagnose nach oben scrollen";
+            AddActionButton(summary, "↓", 738, 178, 32, () => ScrollDiagnostics(8)).AccessibleName = "Diagnose nach unten scrollen";
             AetherButton copyButton = AddActionButton(
                 page,
                 "COPY DIAGNOSTICS",
                 0,
-                520,
+                490,
                 220,
                 CopyDiagnostics,
                 AetherButtonKind.Primary);
@@ -449,7 +473,7 @@ namespace nanoboy
                 page,
                 "EXPORT TEST REPORT",
                 236,
-                520,
+                490,
                 260,
                 bridge.ExportTesterReport);
             testerExportButton.Name = "controlCenterExportTesterReportButton";
@@ -457,20 +481,21 @@ namespace nanoboy
                 page,
                 "OPEN TEST FOLDER",
                 512,
-                520,
+                490,
                 250,
                 bridge.OpenTesterFolder);
             testerFolderButton.Name = "controlCenterOpenTesterFolderButton";
             page.Controls.Add(CreateSmallLabel(
-                "Development-Build: automatische lokale Diagnose. Kein Upload, keine ROM-Bytes, keine Save-Inhalte und keine ROM-Pfade im Bericht.",
+                "Nur lokal, kein automatischer Upload. Berichte enthalten Build-/Gerätedaten, ROM-Kennung und Laufzeit-Ereignisse; keine ROM-/Save-Inhalte oder Dateipfade. Minimale Crashlogs bleiben auch ohne Sitzungsaufzeichnung aktiv. Vorhandene Berichte bleiben erhalten.",
                 2,
-                570,
+                602,
                 786,
-                42));
-            AddActionButton(page, "SCREENSHOT · F12", 0, 630, 240, bridge.CaptureScreenshot).Name = "controlCenterScreenshotButton";
-            AddActionButton(page, "PERFORMANCE · F9", 258, 630, 252, bridge.TogglePerformanceOverlay).Name = "controlCenterOverlayButton";
-            AddActionButton(page, "QUICK DECK · F10", 528, 630, 240, bridge.OpenQuickMenu).Name = "controlCenterQuickMenuButton";
-            AddActionButton(page, "PROBLEM MARKIEREN", 0, 686, 300, bridge.MarkProblem).Name = "controlCenterMarkProblemButton";
+                70));
+            AddActionButton(page, "SCREENSHOT · F12", 0, 546, 184, bridge.CaptureScreenshot).Name = "controlCenterScreenshotButton";
+            AddActionButton(page, "PERFORMANCE · F9", 200, 546, 184, bridge.TogglePerformanceOverlay).Name = "controlCenterOverlayButton";
+            AddActionButton(page, "QUICK DECK · F10", 400, 546, 184, bridge.OpenQuickMenu).Name = "controlCenterQuickMenuButton";
+            problemMarkerButton = AddActionButton(page, "PROBLEM MARKIEREN", 600, 546, 184, bridge.MarkProblem);
+            problemMarkerButton.Name = "controlCenterMarkProblemButton";
             return page;
         }
 
@@ -791,16 +816,9 @@ namespace nanoboy
             profileButton.Selected = bridge.Settings.GameProfileEnabled;
             profileButton.Text = bridge.Settings.GameProfileEnabled ? "SPIELPROFIL · AN" : "GLOBAL · PROFIL AKTIVIEREN";
             profileDetails.Text = bridge.Settings.ProfileStatus + "\r\nVideo, Lautstärke und Belegung: nur geänderte Werte werden im aktiven Spielprofil gespeichert.\r\nBoot-ROM und State-Slot bleiben global.";
-            string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            bool dmgAvailable = File.Exists("dmg_boot.bin") || File.Exists(Path.Combine(baseDirectory, "dmg_boot.bin"));
-            bool cgbAvailable = File.Exists("gbc_boot.bin") || File.Exists(Path.Combine(baseDirectory, "gbc_boot.bin"));
-            bool gbaAvailable = File.Exists("gba_bios.bin") || File.Exists(Path.Combine(baseDirectory, "gba_bios.bin"));
-            dmgAvailable |= File.Exists(Path.Combine(WindowsDataPaths.Default.Firmware, "dmg_boot.bin"));
-            cgbAvailable |= File.Exists(Path.Combine(WindowsDataPaths.Default.Firmware, "gbc_boot.bin"));
-            gbaAvailable |= File.Exists(Path.Combine(WindowsDataPaths.Default.Firmware, "gba_bios.bin"));
-            string policy = bridge.Settings.BootRomEnable ? "AUTO-DETECT ENABLED" : "BYPASS ENABLED";
+            string policy = bridge.Settings.BootRomEnable ? "EXTERNE FIRMWARE · AUTO" : "INTEGRIERTER START · BYPASS";
             bootRomStatus.Text =
-                $"{policy}\r\nDMG {(dmgAvailable ? "FOUND" : "MISSING")}  ·  CGB {(cgbAvailable ? "FOUND" : "MISSING")}  ·  GBA {(gbaAvailable ? "FULL BIOS FOUND" : "BUILT-IN HLE READY")}\r\nÄnderung gilt beim nächsten Cartridge-Start.";
+                $"{policy}\r\n{bridge.FirmwareStatusProvider()}\r\nÄnderung gilt beim erneuten ROM-Öffnen, nicht beim Reset.";
         }
 
         private void RefreshDiagnostics()
@@ -820,7 +838,7 @@ namespace nanoboy
             text.AppendLine($"INPUT           {(gamepad.IsConnected ? gamepad.DeviceName : "Keyboard")}");
             text.AppendLine($"DIAGNOSE        {(bridge.TesterModeProvider() ? "RECORDING LOCALLY" : "OFF")} · {ProductInfo.BuildChannel}");
             text.AppendLine("BEOBACHTUNG     " + bridge.HealthStatusProvider());
-            text.AppendLine("LETZTE AKTION   " + bridge.SaveFeedbackProvider());
+            text.AppendLine("NÄCHSTER START " + bridge.DiagnosticsPreferenceStatusProvider());
             if (bridge.TesterLogPathProvider() is string testerLogPath)
             {
                 text.AppendLine(
@@ -833,7 +851,7 @@ namespace nanoboy
             }
             else
             {
-                text.AppendLine($"TITLE           {SafeTitle(rom)}");
+                // A ROM title can fall back to a private filename; the hash identifies this report.
                 text.AppendLine($"MODEL           {GetModelName(rom)}");
                 text.AppendLine($"MAPPER          {rom.CartridgeType}");
                 text.AppendLine($"ROM SIZE        {rom.RomSize:N0} bytes");
@@ -841,7 +859,6 @@ namespace nanoboy
                 text.AppendLine($"REGION          {(rom.IsJapanese ? "Japan" : "International")}");
                 text.AppendLine($"SGB             {(rom.HasSuperGameBoyFeatures ? "Yes" : "No")}");
                 text.AppendLine($"ROM SHA-256      {rom.RomSha256}");
-                text.AppendLine($"ROM PATH        {bridge.RomPathProvider()}");
                 text.AppendLine($"BATTERY SAVE    {GetSaveSummary(rom).Replace("\r\n", " · ")}");
             }
             if (snapshot?.DiagnosticEvents.Count > 0)
@@ -851,16 +868,39 @@ namespace nanoboy
                 foreach (GbaDiagnosticEventSnapshot entry in snapshot.DiagnosticEvents.TakeLast(12))
                 {
                     string address = entry.Address.HasValue ? $" @ {entry.Address.Value:X8}" : string.Empty;
-                    text.AppendLine($"{entry.Category,-16} C{entry.Cycle:N0}{address} · {entry.Message}");
+                    // Free-form messages can contain paths. Share only structured core context.
+                    text.AppendLine($"{entry.Category,-16} C{entry.Cycle:N0}{address}");
                 }
             }
             string nextDiagnostics = text.ToString();
             if (!string.Equals(diagnostics.Text, nextDiagnostics, StringComparison.Ordinal))
             {
+                int firstLine = (int)SendMessage(diagnostics.Handle, 0x00CE /* EM_GETFIRSTVISIBLELINE */, IntPtr.Zero, IntPtr.Zero);
+                int selectionStart = diagnostics.SelectionStart, selectionLength = diagnostics.SelectionLength;
                 diagnostics.Text = nextDiagnostics;
+                int start = Math.Min(selectionStart, diagnostics.TextLength);
+                diagnostics.Select(start, Math.Min(selectionLength, diagnostics.TextLength - start));
+                int currentLine = (int)SendMessage(diagnostics.Handle, 0x00CE, IntPtr.Zero, IntPtr.Zero);
+                ScrollDiagnostics(firstLine - currentLine);
             }
-            testerExportButton.Enabled = bridge.TesterModeProvider();
-            testerFolderButton.Enabled = bridge.TesterModeProvider();
+            bool isRecording = bridge.TesterModeProvider();
+            testerExportButton.Enabled = bridge.TesterReportAvailableProvider();
+            testerFolderButton.Enabled = true;
+            problemMarkerButton.Enabled = isRecording;
+            recordingStatus.Text = isRecording
+                ? "AKTUELL · ZEICHNET LOKAL AUF\r\n" + bridge.TesterRecordingStatusProvider()
+                : "AKTUELL · KEINE SITZUNGSAUFZEICHNUNG\r\n" + bridge.TesterRecordingStatusProvider();
+            recordingStatus.ForeColor = isRecording ? AetherColors.Success : AetherColors.Muted;
+            bool recordNext = bridge.RecordNextSessionProvider();
+            recordingPreferenceButton.Selected = recordNext;
+            recordingPreferenceButton.Text = recordNext ? "NÄCHSTER START · AUFZEICHNUNG AN" : "NÄCHSTER START · AUFZEICHNUNG AUS";
+            recordingPreferenceStatus.Text = bridge.DiagnosticsPreferenceStatusProvider();
+        }
+
+        private void ToggleRecordingPreference()
+        {
+            bridge.SetRecordNextSession(!bridge.RecordNextSessionProvider());
+            RefreshAll();
         }
 
         private void ToggleAudio()
@@ -900,7 +940,7 @@ namespace nanoboy
         {
             DialogResult result = AetherSignal.Show(
                 this,
-                "Alle Emulator-, Audio-, Video- und Eingabeeinstellungen auf Standard zurücksetzen?\n\nROMs, Batterie-Saves und Save States bleiben unangetastet.",
+                "Alle Emulator-, Audio-, Video- und Eingabeeinstellungen auf Standard zurücksetzen?\n\nDie Diagnose-Aufzeichnungswahl, ROMs, Batterie-Saves und Save States bleiben unangetastet.",
                 "Einstellungen zurücksetzen",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning);
@@ -931,6 +971,12 @@ namespace nanoboy
                     MessageBoxIcon.Warning);
             }
         }
+
+        private void ScrollDiagnostics(int lines) =>
+            SendMessage(diagnostics.Handle, 0x00B6 /* EM_LINESCROLL */, IntPtr.Zero, (IntPtr)lines);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
 
         private static string SafeTitle(RomSnapshot rom) =>
             string.IsNullOrWhiteSpace(rom.Title) ? "UNTITLED CARTRIDGE" : rom.Title.Trim().ToUpperInvariant();

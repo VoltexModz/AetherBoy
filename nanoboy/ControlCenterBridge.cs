@@ -27,6 +27,11 @@ namespace nanoboy
         public Func<string> HealthStatusProvider { get; init; } = () => "Keine Beobachtung aktiv.";
         public Action ToggleGameProfile { get; init; } = () => { };
         public Action ResetGameProfile { get; init; } = () => { };
+        public Action OpenFirmwareManager { get; init; } = () => { };
+        public Func<string> FirmwareStatusProvider { get; init; } = () => "Firmwareverwaltung nicht angebunden.";
+        public Func<bool> RecordNextSessionProvider { get; init; } = () => ProductInfo.IsDevelopmentBuild;
+        public Func<string> DiagnosticsPreferenceStatusProvider { get; init; } = () => "Änderungen gelten ab dem nächsten Programmstart.";
+        public Func<bool, bool> SetRecordNextSession { get; init; } = _ => false;
         public required Action<int> SetFrameskip { get; init; }
         public required Action<int> SetSaveSlot { get; init; }
         public required Action OpenControls { get; init; }
@@ -36,6 +41,8 @@ namespace nanoboy
         public required Action QuickLoad { get; init; }
         public required Action ResetSettings { get; init; }
         public required Func<bool> TesterModeProvider { get; init; }
+        public Func<bool> TesterReportAvailableProvider { get; init; } = () => false;
+        public Func<string> TesterRecordingStatusProvider { get; init; } = () => "Keine Sitzungsaufzeichnung verfügbar.";
         public required Func<string?> TesterLogPathProvider { get; init; }
         public required Action ExportTesterReport { get; init; }
         public required Action OpenTesterFolder { get; init; }

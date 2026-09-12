@@ -63,6 +63,7 @@ public struct Pipeline
 /// </summary>
 public unsafe class Core
 {
+    internal CpuInstructionState InstructionState = new();
     internal readonly BaseDebugger Debugger;
     internal readonly GbaDiagnosticLog Diagnostics;
     private readonly InterruptRegisters _interruptRegisters;
@@ -159,6 +160,7 @@ public unsafe class Core
 
     internal void RestoreInstructionBoundary()
     {
+        InstructionState = new CpuInstructionState();
         NextExecuteAction = &ExecuteFirstInstructionCycle;
         IsAtInstructionBoundary = true;
         IsFirstInstructionCycle = true;
@@ -181,6 +183,7 @@ public unsafe class Core
 
     internal void Reset(bool skipBios)
     {
+        InstructionState = new CpuInstructionState();
         UseHleBios = skipBios;
         A = 0x0;
         D = 0x0;

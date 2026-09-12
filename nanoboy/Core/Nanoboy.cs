@@ -8,9 +8,13 @@ namespace nanoboy.Core
         public Memory Memory;
         private int dotOvershoot;
         private int doubleSpeedCpuPhase;
+        private readonly Action<int> advanceInstructionCycles;
+        private bool instructionDoubleSpeed;
+        private int instructionDots;
 
         public Nanoboy(ROM rom, byte[] bootRom = null)
         {
+            advanceInstructionCycles = AdvanceInstructionCycles;
             Cpu = new CPU();
             Memory = new Memory(Cpu, rom);
             Cpu.Memory = Memory;
@@ -35,69 +39,7 @@ namespace nanoboy.Core
 
             while (dotsExecuted < dotBudget)
             {
-                if (Memory.HDMA.ConsumeCpuStallDot())
-                {
-                    int stalledCpuCycles = Cpu.IsDoubleSpeed ? 2 : 1;
-                    for (int cycle = 0; cycle < stalledCpuCycles; cycle++)
-                    {
-                        Memory.Timer.Tick();
-                        Memory.HDMA.TickOamDma();
-                        Memory.TickSerial();
-                    }
-                    Memory.Video.Tick();
-                    Memory.Audio.Tick();
-                    dotsExecuted++;
-                    continue;
-                }
-
-                // A speed switch takes effect after STOP. The instruction itself still
-                // belongs to the clock domain that was active when it started.
-                bool doubleSpeed = Cpu.IsDoubleSpeed;
-                Cpu.CycleSink = cycles =>
-                {
-                    for (int cpuCycle = 0; cpuCycle < cycles; cpuCycle++)
-                    {
-                        Memory.Timer.Tick();
-                        Memory.HDMA.TickOamDma();
-                        Memory.TickSerial();
-
-                        if (doubleSpeed)
-                        {
-                            doubleSpeedCpuPhase++;
-                            if (doubleSpeedCpuPhase < 2)
-                            {
-                                continue;
-                            }
-
-                            doubleSpeedCpuPhase = 0;
-                        }
-                        else
-                        {
-                            doubleSpeedCpuPhase = 0;
-                        }
-
-                        Memory.Video.Tick();
-                        Memory.Audio.Tick();
-                        dotsExecuted++;
-                    }
-                };
-                int cpuCycles;
-                try
-                {
-                    cpuCycles = Memory.Interrupt.ServicePending();
-                    if (cpuCycles == 0) {
-                        cpuCycles = Cpu.Tick();
-                    }
-                }
-                finally
-                {
-                    Cpu.CycleSink = null;
-                }
-
-                if (cpuCycles <= 0)
-                {
-                    throw new InvalidOperationException("The CPU returned a non-positive cycle count.");
-                }
+                dotsExecuted += StepClockedInstruction();
             }
 
             // Instructions are atomic in the current CPU. Carry their small dot
@@ -105,6 +47,75 @@ namespace nanoboy.Core
             dotOvershoot = dotsExecuted - dotBudget;
 
             Memory.Video.FrameReady = false;
+        }
+
+        /// <summary>
+        /// Advances one instruction, interrupt service, or HDMA stall dot on the owner
+        /// thread. Returns elapsed 4 MHz base dots (not double-speed CPU T-cycles).
+        /// A stopped CPU returns zero without advancing its hardware; a paired scheduler
+        /// must allow its peer to advance and keep processing input to wake it.
+        /// Do not interleave this stepping mode with Frame's frame-overshoot accounting.
+        /// </summary>
+        public int StepInstruction() => Cpu.IsStopped ? 0 : StepClockedInstruction();
+
+        private int StepClockedInstruction()
+        {
+            if (Memory.HDMA.ConsumeCpuStallDot())
+            {
+                int stalledCpuCycles = Cpu.IsDoubleSpeed ? 2 : 1;
+                for (int cycle = 0; cycle < stalledCpuCycles; cycle++)
+                {
+                    Memory.Timer.Tick();
+                    Memory.HDMA.TickOamDma();
+                    Memory.TickSerial();
+                }
+                Memory.Video.Tick();
+                Memory.Audio.Tick();
+                return 1;
+            }
+
+            // STOP's speed switch belongs to the clock domain active on instruction entry.
+            instructionDoubleSpeed = Cpu.IsDoubleSpeed;
+            instructionDots = 0;
+            Cpu.CycleSink = advanceInstructionCycles;
+            int cpuCycles;
+            try
+            {
+                cpuCycles = Memory.Interrupt.ServicePending();
+                if (cpuCycles == 0)
+                    cpuCycles = Cpu.Tick();
+            }
+            finally
+            {
+                Cpu.CycleSink = null;
+            }
+
+            if (cpuCycles <= 0 || instructionDots <= 0)
+                throw new InvalidOperationException("The CPU returned a non-positive cycle count.");
+            return instructionDots;
+        }
+
+        private void AdvanceInstructionCycles(int cycles)
+        {
+            for (int cpuCycle = 0; cpuCycle < cycles; cpuCycle++)
+            {
+                Memory.Timer.Tick();
+                Memory.HDMA.TickOamDma();
+                Memory.TickSerial();
+                if (instructionDoubleSpeed)
+                {
+                    if (++doubleSpeedCpuPhase < 2)
+                        continue;
+                    doubleSpeedCpuPhase = 0;
+                }
+                else
+                {
+                    doubleSpeedCpuPhase = 0;
+                }
+                Memory.Video.Tick();
+                Memory.Audio.Tick();
+                instructionDots++;
+            }
         }
 
         public void Reset()

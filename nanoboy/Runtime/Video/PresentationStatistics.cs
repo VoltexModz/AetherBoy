@@ -2,14 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace nanoboy.Platform.Video;
+namespace AetherBoy.Runtime.Video;
 
-internal readonly record struct PresentationMetrics(double FramesPerSecond, double AverageMs, double P95Ms);
-internal sealed class PresentationStatistics
+public readonly record struct PresentationMetrics(double FramesPerSecond, double AverageMs, double P95Ms);
+public sealed class PresentationStatistics
 {
     private readonly Queue<double> intervals = new();
     private double? last;
-    internal void Presented(double milliseconds)
+    public void Presented(double milliseconds)
     {
         if (last is double previous)
         {
@@ -19,12 +19,12 @@ internal sealed class PresentationStatistics
         }
         last = milliseconds;
     }
-    internal PresentationMetrics Read(double milliseconds)
+    public PresentationMetrics Read(double milliseconds)
     {
         if (last is null || milliseconds - last > 500 || intervals.Count == 0) return default;
         double[] sorted = intervals.Order().ToArray();
         double average = sorted.Average();
         return new(1000 / average, average, sorted[(int)Math.Ceiling(sorted.Length * .95) - 1]);
     }
-    internal void Reset() { last = null; intervals.Clear(); }
+    public void Reset() { last = null; intervals.Clear(); }
 }

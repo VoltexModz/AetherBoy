@@ -61,7 +61,17 @@ public sealed class WindowsSettingsProvider : SettingsProvider, IApplicationSett
         Write(values);
     }
 
-    public void Reset(SettingsContext context) => Write(new Dictionary<string, string?>());
+    public void Reset(SettingsContext context)
+    {
+        // Resetting emulator preferences must not silently revoke a diagnostic privacy choice.
+        Dictionary<string, string?>? current = Read(file) ?? Read(file + ".bak");
+        var reset = new Dictionary<string, string?>();
+        if (current != null && current.TryGetValue("DiagnosticsRecording", out string? recording))
+            reset["DiagnosticsRecording"] = recording;
+        else if (current == null && (File.Exists(file) || File.Exists(file + ".bak")))
+            reset["DiagnosticsRecording"] = "False"; // Unknown prior choice: keep recording off.
+        Write(reset);
+    }
     public void Upgrade(SettingsContext context, SettingsPropertyCollection properties) { }
     public SettingsPropertyValue GetPreviousVersion(SettingsContext context, SettingsProperty property) =>
         new(property);

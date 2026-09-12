@@ -532,11 +532,14 @@ internal sealed class RecordingMachine : IEmulationMachine
 
     public void Dispose()
     {
+        BeforeDispose?.Invoke();
         Record("Dispose");
         Interlocked.Increment(ref disposeCount);
         PaletteApplicationEntered.Dispose();
         AllowPaletteApplication.Dispose();
     }
+
+    internal Action? BeforeDispose { get; set; }
 
     public void ClearOperations()
     {

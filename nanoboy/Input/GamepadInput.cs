@@ -86,6 +86,47 @@ namespace nanoboy.Input
 
     public static class GamepadInput
     {
+        /// <summary>
+        /// Selects the first two connected local controllers from one backend only.
+        /// WGI uses a dense device collection; XInput slots can contain holes and are
+        /// compacted in slot order. Never combine WGI and XInput by player index: the
+        /// same physical pad can be WGI device 0 and XInput slot 1 simultaneously.
+        /// </summary>
+        public static (HostGamepadState First, HostGamepadState Second) GetLocalPairStates()
+        {
+            ReadOnlySpan<HostGamepadState> modern =
+                [WindowsGamepadSource.GetState(0), WindowsGamepadSource.GetState(1)];
+            if (modern[0].IsConnected || modern[1].IsConnected)
+                return SelectLocalPairStates(modern, ReadOnlySpan<HostGamepadState>.Empty);
+
+            ReadOnlySpan<HostGamepadState> fallback =
+            [
+                FromXInput(XInputGamepad.GetState(0)),
+                FromXInput(XInputGamepad.GetState(1)),
+                FromXInput(XInputGamepad.GetState(2)),
+                FromXInput(XInputGamepad.GetState(3))
+            ];
+            return SelectLocalPairStates(modern, fallback);
+        }
+
+        internal static (HostGamepadState First, HostGamepadState Second) SelectLocalPairStates(
+            ReadOnlySpan<HostGamepadState> modern,
+            ReadOnlySpan<HostGamepadState> fallback)
+        {
+            bool useModern = false;
+            foreach (var state in modern)
+                if (state.IsConnected) { useModern = true; break; }
+            ReadOnlySpan<HostGamepadState> source = useModern ? modern : fallback;
+            HostGamepadState first = HostGamepadState.Disconnected;
+            foreach (var state in source)
+            {
+                if (!state.IsConnected) continue;
+                if (!first.IsConnected) first = state;
+                else return (first, state);
+            }
+            return (first, HostGamepadState.Disconnected);
+        }
+
         public static HostGamepadState GetState(int playerIndex = 0)
         {
             if (playerIndex < 0)

@@ -666,6 +666,7 @@ public sealed class GbaVendoredCoreHardeningTests
     public void GbaNormalSerialTransferCompletesAtInternalClockAndRaisesIrq()
     {
         Device device = CreateDevice();
+        device.SerialController.WriteHalfWord(IORegs.RCNT, 0);
         device.SerialController.WriteByte(IORegs.SIODATA8, 0x35);
         device.SerialController.WriteByte(IORegs.SIOCNT + 1, 0x40);
         device.SerialController.WriteByte(IORegs.SIOCNT, 0x83);
@@ -686,6 +687,7 @@ public sealed class GbaVendoredCoreHardeningTests
     public void ActiveGbaSerialTransferResumesAtExactCycleAfterStateRestore()
     {
         Device device = CreateDevice();
+        device.SerialController.WriteHalfWord(IORegs.RCNT, 0);
         device.SerialController.WriteByte(IORegs.SIODATA8, 0xA5);
         device.SerialController.WriteByte(IORegs.SIOCNT + 1, 0x40);
         device.SerialController.WriteByte(IORegs.SIOCNT, 0x81);
@@ -709,6 +711,7 @@ public sealed class GbaVendoredCoreHardeningTests
     public void GbaThirtyTwoBitSerialModeUsesModeConfiguredByHalfWordWrite()
     {
         Device device = CreateDevice();
+        device.SerialController.WriteHalfWord(IORegs.RCNT, 0);
         device.SerialController.WriteWord(IORegs.SIODATA32, 0x1234_5678);
         device.SerialController.WriteHalfWord(IORegs.SIOCNT, 0x5083);
 
@@ -725,6 +728,7 @@ public sealed class GbaVendoredCoreHardeningTests
     public void SerialResetCancelsAnInFlightTransferEvent()
     {
         Device device = CreateDevice();
+        device.SerialController.WriteHalfWord(IORegs.RCNT, 0);
         device.SerialController.WriteByte(IORegs.SIODATA8, 0x42);
         device.SerialController.WriteByte(IORegs.SIOCNT + 1, 0x40);
         device.SerialController.WriteByte(IORegs.SIOCNT, 0x83);
@@ -743,6 +747,8 @@ public sealed class GbaVendoredCoreHardeningTests
     {
         Device master = CreateDevice();
         Device peer = CreateDevice();
+        master.SerialController.WriteHalfWord(IORegs.RCNT, 0);
+        peer.SerialController.WriteHalfWord(IORegs.RCNT, 0);
         using var link = new LocalSerialLink(master.SerialController, peer.SerialController);
         master.SerialController.WriteByte(IORegs.SIODATA8, 0x35);
         peer.SerialController.WriteByte(IORegs.SIODATA8, 0xA7);
@@ -764,6 +770,8 @@ public sealed class GbaVendoredCoreHardeningTests
     {
         Device master = CreateDevice();
         Device peer = CreateDevice();
+        master.SerialController.WriteHalfWord(IORegs.RCNT, 0);
+        peer.SerialController.WriteHalfWord(IORegs.RCNT, 0);
         using var link = new LocalSerialLink(master.SerialController, peer.SerialController);
         master.SerialController.WriteWord(IORegs.SIODATA32, 0x1234_5678);
         peer.SerialController.WriteWord(IORegs.SIODATA32, 0xA1B2_C3D4);

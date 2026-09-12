@@ -6,11 +6,40 @@
 
 <p align="center"><strong>by NekoZDevTeam</strong></p>
 
+Windows ↔ Linux: gemeinsame Turbo-Audio-/Screenshot-/Performance-Grundlage und
+eigene Windows-Menüs. [Umgesetzt, geprüft und noch offen: Funktionsabgleich (DE/EN)](docs/PLATFORM_PARITY.md).
+Vollständige 1:1-Funktionsgleichheit ist noch in Arbeit.
+
+Neu unter Windows: Firmware Station für eigene Boot-ROMs/BIOS und steuerbare,
+begrenzte lokale Diagnose. [Bedienung, Datenschutz und Übergabe (DE/EN)](docs/WINDOWS_FIRMWARE_DIAGNOSTICS.md).
+
+Experimentelles Local Link Lab unter Windows: zwei GB-/GBC- oder zwei GBA-Spielinstanzen in einer
+gemeinsamen lokalen Sitzung, mit getrennten Spielständen. Dieses Lab bleibt lokal;
+echte Spiele und die Linux-Local-Link-Oberfläche müssen noch qualifiziert beziehungsweise angebunden werden.
+[Anleitung, Grenzen und Linux-Übergabe (DE/EN)](docs/LOCAL_LINK_LAB.md).
+[GBA-Kabel-/CPU-Ausbau](docs/GBA_LOCAL_LINK_HANDOFF.md) ·
+[Neuester Linux-Beitrag und Integrationsprüfung](docs/LINUX_UPSTREAM_INTEGRATION_REVIEW.md).
+
+Neu als separater **GB/GBC-Online-Link-Prototyp** für Windows und Linux: ein eigenes
+Spiel je Rechner, private Sitzungsspielstände und verschlüsseltes WebRTC über einen
+lokalen Browserhelfer. Noch kein bestätigter Pokémon-Tausch;
+Internet-Verbindungen können STUN/TURN-Konfiguration benötigen.
+[Anleitung, Schutzmaßnahmen und Grenzen (DE/EN)](docs/ONLINE_LINK_HANDOFF.md).
+
+Neu: **GBA-Pokémon-Gen3-Onlineprofil für Entwicklungstests** über denselben
+Windows-/Linux-Transport mit eigener Spielprotokoll-Anbindung. Nur exakt erkannte
+Originalfassungen und ausdrückliche Entwicklungsfreigabe; kein geprüfter Tauschrelease
+oder universelles GBA-Internetkabel. Beide Oberflächen können protokollierte
+Sitzungskopien prüfen und einen sauber beendeten Stand bewusst mit Sicherung übernehmen.
+[GBA-Anleitung, Spielstandschutz und offene Abnahme (DE/EN)](docs/GBA_ONLINE_HANDOFF.md).
+
 Windows-Entwicklungsupdate: Stereo/WASAPI, GPU-Ausgabe, State-Galerie und Fortsetzen,
 Controller-Quick-Deck, Spielprofile und IPS-/BPS-/UPS-Patch Lab.
 [Änderungen, Bedienung und Übergabe an die Linux-Entwicklung (DE/EN)](docs/WINDOWS_DEVELOPMENT_HANDOFF.md#deutsch).
 
-Linux-Nachtrag: zentrale Saves, Stereo, Bibliothek/Recovery, Controller-Profile und Patch Lab.
+Linux-Nachtrag: zentrale Saves, Stereo, State-Galerie/Fortsetzen/Undo, Spielprofile,
+Favoriten/Spielzeit, Controller-Profile und Patch Lab. Neue Texteingabe, optionale
+GTK-Zugänglichkeit und abbrechbares Laden ergänzen den nativen Client.
 [Linux-Übergabe an die Windows-Entwicklung und den nächsten ChatGPT](docs/LINUX_DEVELOPMENT_HANDOFF.md).
 
 <p align="center">
@@ -88,9 +117,12 @@ Beide Frontends verwenden denselben plattformneutralen Core und dieselbe Runtime
 | **Batterie-Saves, fünf State-Slots, Rewind** | Vorhanden | Vorhanden |
 | **Cartridge Vault, Cheat-Verwaltung, Save Safety Center** | Vorhanden, teils experimentell | Linux-Bibliothek, Sitzungs-Cheats und Backup-Wiederherstellung vorhanden |
 | **WAV-Aufnahme und Boot-ROM-Auswahl** | Vorhanden | Unter Tools / System vorhanden |
-| **Quick Deck, State-Galerie/Fortsetzen, Spielprofile, Screenshots** | Vorhanden | Eigener Frontend-Folgeschritt |
+| **State-Galerie/Fortsetzen und Spielprofile** | Vorhanden | Jetzt vorhanden, einschließlich Lade-Undo und globaler Profilvererbung |
+| **Native Screenshots / Performance** | Gemeinsame Runtime-Dienste | F12 / F9 und Tools; native Bedienprobe für den vereinten Stand noch offen |
+| **Quick Deck / Audio Inspector** | Vorhanden | Noch kein vollständiges Gegenstück |
 | **IPS-/BPS-/UPS-Patch Lab** | Integriert; UPS-Rückpatchen ausdrücklich wählbar | Unter Library → Patch Lab; ausdrückliches UPS-Rückpatchen |
 | **Stereo-Ausgabe** | GB/GBC/GBA durchgängig | GB/GBC/GBA durchgängig |
+| **Lokales GB/GBC/GBA-Link-Kabel** | Experimentelles Zwei-Spieler-Lab, keine kommerzielle Spielabnahme | Gemeinsame Core/Runtime verfügbar, native Link-Oberfläche fehlt |
 
 Die genaue Zuordnung steht in [Windows → Linux: UI-Stand](docs/LINUX_UI_PARITY.md).
 
@@ -254,7 +286,7 @@ Die wichtigsten Standardbelegungen; Spieltasten lassen sich unter **Control Cent
 
 Die A/B-Vorgaben beziehen sich auf die physischen Tastenpositionen. AetherBoy zeigt die Belegung passend zum aktuellen Tastaturlayout an. Alle Shortcuts und die Tastaturnavigation stehen im [Linux User Guide](docs/LINUX_USER_GUIDE.md#5-controls).
 
-Prioritäten, unabhängige Kritik und reproduzierbare Tests: [Linux-Roadmap](docs/LINUX_ROADMAP.md), [UI-Kritik](docs/LINUX_CRITIQUE.md), [Playtest-Bericht](docs/LINUX_PLAYTEST.md).
+Prioritäten, unabhängige Kritik und reproduzierbare Tests: [Linux-Roadmap](docs/LINUX_ROADMAP.md), [Kritik Runde 3](docs/LINUX_CRITIQUE_ROUND3.md), [Playtest Runde 3](docs/LINUX_PLAYTEST_ROUND3.md), [Fixliste](docs/LINUX_FIX_LOG.md). Pakete mit eingebetteter .NET-Runtime: [Linux-Distribution](docs/LINUX_DISTRIBUTION.md). Das optionale zugängliche Control Center öffnet mit Ctrl+F7; F7 bleibt Rewind.
 
 ## Spielstände und BIOS
 
@@ -276,7 +308,7 @@ bleiben in diesem Update unverändert. [Kompatibilitätsdetails](docs/WINDOWS_DE
 
 **GBA:** Ein vendorter, MIT-lizenzierter [GBADotnet-Kern](third_party/GBADotnet.Core/README.md) ist an Bild, Eingabe, Audio, SRAM/Flash/EEPROM/RTC, Save States und Rewind angebunden. Vollständig zyklusgenaues Timing, weitere Renderer-Grenzfälle und breitere Praxistests stehen noch aus.
 
-**Weitere Grenzen:** Game Genie ist deaktiviert. Cheats sind nur teilweise unterstützt; Action Replay/PAR v3 fehlt. Serial-/Link-Grundlagen sind vorhanden, ein vollständiger Link- oder Netzwerk-Multiplayer-Workflow jedoch noch nicht. Der Debugger bleibt experimentell.
+**Weitere Grenzen:** Game Genie ist deaktiviert. Cheats sind nur teilweise unterstützt; Action Replay/PAR v3 fehlt. Das experimentelle [Local Link Lab für GB/GBC/GBA](docs/LOCAL_LINK_LAB.md) unter Windows ist noch nicht mit kommerziellen Spielen validiert. Separate [GB/GBC-Online-Link](docs/ONLINE_LINK_HANDOFF.md)- und [GBA-Pokémon-Gen3-Onlineprofile](docs/GBA_ONLINE_HANDOFF.md) sind Entwicklungstests, kein bestätigter Pokémon-Tauschrelease. Universelles GBA-Netzwerk, GBA-Wireless, Joybus und Vier-Spieler-Link fehlen; GBA lässt sich nicht mit GB/GBC koppeln. Der Debugger bleibt experimentell.
 
 Details und reproduzierbare Ergebnisse: [Kompatibilitätsmatrix](COMPATIBILITY.md) · [GBA-Status](GBA.md) · [Projektstatus](docs/PROJECT_STATUS_DE.md).
 
@@ -284,7 +316,7 @@ Details und reproduzierbare Ergebnisse: [Kompatibilitätsmatrix](COMPATIBILITY.m
 
 Die Lösung trennt **Core**, **Runtime** und **Desktop-Frontends**. Der Emulationszustand gehört einem dedizierten Owner-Thread; die Oberflächen kommunizieren über typisierte Befehle und unveränderliche Snapshots. NuGet-Lockfiles und das gepinnte SDK halten den Build reproduzierbar.
 
-Die [GitHub-Actions-CI](.github/workflows/ci.yml) baut und testet die Lösung auf Windows sowie Core, Runtime und den nativen Desktop-Host auf Linux. Pushes auf `main` und `development` werden geprüft; das Windows-Gate fordert mindestens **440 Tests**. Die Linux-CI prüft Frontend-Logik und Plattform-Erkennung; echte Wayland-UI-Tests laufen separat in einer geeigneten Sitzung.
+Die [GitHub-Actions-CI](.github/workflows/ci.yml) baut und testet die Lösung auf Windows sowie Core, Runtime und den nativen Desktop-Host auf Linux. Pushes auf `main` und `development` werden geprüft; der Workflow sichert Mindest-Testzahlen ab. Die Linux-CI prüft Frontend-Logik und Plattform-Erkennung, anschließend native UI und Zugänglichkeit in isoliertem Weston/D-Bus. Echte Hardware- und Spieltests bleiben getrennte Abnahmen.
 
 <details>
 <summary><strong>Testbefehle und Entwicklungswerkzeuge</strong></summary>

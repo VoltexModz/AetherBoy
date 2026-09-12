@@ -16,6 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Netplay\WebRtcBridge.html" LogicalName="AetherBoy.Runtime.Netplay.WebRtcBridge.html" />
+    <EmbeddedResource Include="Netplay\WebRtcBridge.js" LogicalName="AetherBoy.Runtime.Netplay.WebRtcBridge.js" />
+  </ItemGroup>
+
+  <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>AetherBoy.RuntimeTests</_Parameter1>
     </AssemblyAttribute>

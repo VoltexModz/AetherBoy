@@ -56,7 +56,7 @@ public partial class frmNano
     {
         EmulationSession? current = session;
         string? rom = currentRomPath;
-        if (current == null || rom == null || stateOperationInProgress ||
+        if (current == null || rom == null || stateOperationInProgress || IsOnlineLink ||
             !current.LatestSnapshot.Supports(EmulationFeature.SaveStates)) return;
         stateOperationInProgress = true;
         try
@@ -82,7 +82,7 @@ public partial class frmNano
     {
         EmulationSession? current = session;
         string? rom = currentRomPath;
-        if (current == null || rom == null || stateOperationInProgress) return;
+        if (current == null || rom == null || stateOperationInProgress || IsOnlineLink) return;
         if (undo && undoQuickLoad == null) { SetSaveFeedback("Kein Schnellladen zum Rückgängigmachen", true); return; }
         stateOperationInProgress = true;
         bool wasPaused = current.LatestSnapshot.IsPaused;
@@ -129,6 +129,7 @@ public partial class frmNano
 
     private void SaveResumeBeforeStop(EmulationSession current, string rom)
     {
+        if (current.OnlineLink is not null) return;
         if (current.State is not (SessionState.Running or SessionState.Paused) ||
             !current.LatestSnapshot.Supports(EmulationFeature.SaveStates) || current.LatestSnapshot.EmulatedFrameCount < 1 || pendingResume) return;
         try
@@ -150,6 +151,7 @@ public partial class frmNano
 
     private void TrackGameActivity(EmulationSnapshot snapshot)
     {
+        if (IsOnlineLink) { pendingResume = false; activityWasRunning = false; return; }
         long now = Stopwatch.GetTimestamp();
         bool running = snapshot.State == SessionState.Running && !stateOperationInProgress;
         if (running && activityWasRunning && activityTimestamp != 0)
@@ -194,6 +196,7 @@ public partial class frmNano
 
     private void OpenStateGallery()
     {
+        if (IsOnlineLink) { SetSaveFeedback("Save States sind im Online-Link gesperrt", true); return; }
         if (currentRomPath == null || session == null) return;
         if (stateGallery is { IsDisposed: false }) { stateGallery.Activate(); return; }
         stateGallery = new frmStateGallery(currentRomPath, SaveCheckpointAsync, LoadCheckpointAsync,

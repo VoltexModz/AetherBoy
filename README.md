@@ -6,11 +6,37 @@
 
 <p align="center"><strong>by NekoZDevTeam</strong></p>
 
+Windows ↔ Linux: shared turbo-audio, screenshot and performance services, plus
+custom Windows menus. [Delivered changes and remaining parity work (DE/EN)](docs/PLATFORM_PARITY.md).
+Full 1:1 feature parity is still in progress.
+
+New on Windows: Firmware Station for user-provided boot ROMs/BIOS and configurable,
+bounded local diagnostics. [Usage, privacy and developer handoff (DE/EN)](docs/WINDOWS_FIRMWARE_DIAGNOSTICS.md).
+
+Experimental Windows Local Link Lab: run two GB/GBC or two GBA games in one coordinated
+local session, with separate player saves. This lab is local-only and has no verified
+commercial-game support yet; Linux local-link UI integration is pending.
+[Quick start, limitations and Linux handoff (DE/EN)](docs/LOCAL_LINK_LAB.md).
+[GBA serial/CPU integration](docs/GBA_LOCAL_LINK_HANDOFF.md) ·
+[Latest Linux contribution and integration review](docs/LINUX_UPSTREAM_INTEGRATION_REVIEW.md).
+
+New, separate **GB/GBC Online Link prototype** for Windows and Linux: one local game
+per player, private session saves and a browser-assisted encrypted WebRTC connection.
+No verified Pokémon trade yet; Internet traversal may require
+explicit STUN/TURN configuration. [Setup, safety and limits (DE/EN)](docs/ONLINE_LINK_HANDOFF.md).
+
+New **GBA Pokémon Gen3 online development profile** uses the same Windows/Linux
+transport with an original game-protocol adapter. Exact identified original builds
+only, explicit development consent, no verified trading release or generic GBA WAN
+support. Both frontends can review journaled session saves and explicitly adopt a
+clean copy with a retained backup. [GBA setup, save safety and acceptance gates (DE/EN)](docs/GBA_ONLINE_HANDOFF.md).
+
 Windows development update: stereo/WASAPI, GPU presentation, state gallery and resume,
 controller Quick Deck, per-game profiles and IPS/BPS/UPS Patch Lab.
 [What's changed, usage and Linux developer handoff (DE/EN)](docs/WINDOWS_DEVELOPMENT_HANDOFF.md#english).
 
-Linux follow-up: central saves, stereo, library/recovery tools, controller profiles and Patch Lab.
+Linux follow-up: central saves, stereo, state gallery/resume/undo, per-game settings,
+favorites/playtime, controller profiles and Patch Lab.
 [Linux integration handoff for the Windows developer / next ChatGPT](docs/LINUX_DEVELOPMENT_HANDOFF.md).
 
 <p align="center">
@@ -88,9 +114,12 @@ Both frontends share the same platform-neutral Core and Runtime. The available d
 | **Battery saves, five state slots, rewind** | Available | Available |
 | **Cartridge Vault, cheat management, Save Safety Center** | Available, partly experimental | Linux library, session cheats and backup recovery available |
 | **WAV recording and boot ROM selection** | Available | Available under Tools / System |
-| **Quick Deck, state gallery/resume, per-game profiles, screenshots** | Available | Separate frontend follow-up |
+| **State gallery/resume and per-game profiles** | Available | Available, including undo after state load |
+| **Quick Deck** | Available | Separate frontend follow-up |
+| **Native screenshots / performance overlay** | Available | F12 / F9 and Tools, shared services |
 | **IPS / BPS / UPS Patch Lab** | Integrated; UPS undo is explicit | Available under Library → Patch Lab; explicit UPS undo |
 | **Stereo playback** | GB/GBC/GBA end-to-end | GB/GBC/GBA end-to-end |
+| **Local GB/GBC/GBA link** | Experimental two-player Local Link Lab; same hardware family only, no commercial-game validation yet | Shared Core/Runtime available; native UI pending |
 
 See [Windows → Linux: UI status](docs/LINUX_UI_PARITY.md) for the detailed mapping.
 
@@ -129,7 +158,7 @@ bash scripts/run-linux.sh "/path/to/your-game.gba"
 | x86-64 | `artifacts/AetherBoy-linux-x64/` |
 | ARM64 | `artifacts/AetherBoy-linux-arm64/` |
 
-The build requires an installed **.NET 10 runtime** to run; the runtime is not bundled into the output. The SDK already includes it. `run-linux.sh` rebuilds automatically when the build is missing or older than the source files.
+The default build requires an installed **.NET 10 runtime** to run. For archives with an embedded runtime, see [Linux distribution](docs/LINUX_DISTRIBUTION.md). The SDK already includes it. `run-linux.sh` rebuilds automatically when the build is missing or older than the source files.
 
 ### Install in the application menu
 
@@ -245,12 +274,13 @@ The main default bindings are listed below. Gameplay keys can be changed under *
 | Select save-state slot | 1–5 | — |
 | Quick save / quick load | F5 / F8 | — |
 | Rewind one step | F7 | — |
+| Native accessible Control Center | Ctrl+F7 (optional GTK3) | — |
 | Fullscreen | F11 | — |
 | Close settings / leave fullscreen | Escape | — |
 
 The default A/B bindings use physical key positions. AetherBoy displays the assigned keys for the current keyboard layout. See the [Linux User Guide](docs/LINUX_USER_GUIDE.md#5-controls) for all shortcuts and keyboard navigation.
 
-Linux implementation priorities, independent UI criticism and reproducible playtests: [Linux roadmap](docs/LINUX_ROADMAP.md), [review](docs/LINUX_CRITIQUE.md), [playtest report](docs/LINUX_PLAYTEST.md).
+Linux implementation priorities, independent UI criticism and reproducible playtests: [Linux roadmap](docs/LINUX_ROADMAP.md), [current review](docs/LINUX_CRITIQUE_ROUND3.md), [current playtest report](docs/LINUX_PLAYTEST_ROUND3.md), [tracked fixes](docs/LINUX_FIX_LOG.md).
 
 ## Saves and BIOS
 
@@ -272,7 +302,7 @@ are unchanged by this update. [Compatibility details](docs/WINDOWS_DEVELOPMENT_H
 
 **GBA:** A vendored, MIT-licensed [GBADotnet core](third_party/GBADotnet.Core/README.md) is connected to video, input, audio, SRAM/Flash/EEPROM/RTC, save states and rewind. Fully cycle-accurate timing, additional renderer edge cases and broader real-world testing remain outstanding.
 
-**Other limitations:** Game Genie is disabled. Cheat support is partial; Action Replay/PAR v3 is not supported. Serial/link foundations exist, but a complete link or network multiplayer workflow is not yet available. The debugger remains experimental.
+**Other limitations:** Game Genie is disabled. Cheat support is partial; Action Replay/PAR v3 is not supported. The Windows GB/GBC/GBA Local Link Lab is experimental and has not been validated with commercial games. Separate [GB/GBC Online Link](docs/ONLINE_LINK_HANDOFF.md) and [GBA Pokémon Gen3 online](docs/GBA_ONLINE_HANDOFF.md) development profiles are not verified Pokémon trading releases. Generic GBA network multiplayer, GBA wireless, Joybus and four-player link remain unavailable. GBA cannot link to GB/GBC. The debugger remains experimental.
 
 Details and reproducible results: [Compatibility matrix](COMPATIBILITY.md) · [GBA status](GBA.md) · [Project status](docs/PROJECT_STATUS_EN.md).
 
@@ -280,7 +310,7 @@ Details and reproducible results: [Compatibility matrix](COMPATIBILITY.md) · [G
 
 The solution separates **Core**, **Runtime** and **desktop frontends**. A dedicated owner thread owns the emulation state; the interfaces communicate through typed commands and immutable snapshots. NuGet lockfiles and the pinned SDK keep builds reproducible.
 
-The [GitHub Actions CI](.github/workflows/ci.yml) builds and tests the solution on Windows, plus the Core, Runtime and native desktop host on Linux. Pushes to `main` and `development` are checked, and the Windows job requires at least **440 tests**. Linux CI checks frontend logic and platform detection; actual Wayland UI tests run separately in a suitable session.
+The [GitHub Actions CI](.github/workflows/ci.yml) builds and tests the solution on Windows, plus the Core, Runtime and native desktop host on Linux. Pushes to `main` and `development` are checked; the workflow enforces minimum test counts. Linux CI checks frontend logic and platform detection, then runs native UI/accessibility tests on isolated Weston and D-Bus. Real hardware and gameplay remain separate checks.
 
 <details>
 <summary><strong>Test commands and development tools</strong></summary>

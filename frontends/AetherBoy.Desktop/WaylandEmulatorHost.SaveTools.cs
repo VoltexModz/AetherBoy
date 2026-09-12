@@ -13,12 +13,15 @@ internal sealed partial class WaylandEmulatorHost
 
     private void DrawBackupPage()
     {
+        if (IsOnlineLink) { DrawOnlineLinkPage(); return; }
         ActionButton(300, 198, 180, 42, "BACK TO SLOTS", () => { showBackups = false; pendingBatteryRestore = null; });
         var battery = session?.LatestSnapshot.Rom?.BatterySave;
         if (battery?.IsEnabled != true || storage is null)
         { Ink(300, 280, "Open a cartridge with battery-backed save data first.", 16); return; }
         Ink(300, 260, "Restore restarts the game. Your current save is backed up first.", 14, Colors.Muted);
-        var files = BatterySaveStore.Inspect(storage.SavePath, battery.ExpectedLength);
+        var files = diskSnapshot?.Backups ?? [];
+        if (diskSnapshot is null) Ink(300, 430, "Loading backup information…", 14, Colors.Muted);
+        else if (diskSnapshot.Error is not null) Ink(300, 430, textRenderer.Fit(diskSnapshot.Error, 800), 14, Colors.Danger);
         foreach (var file in files.Where(file => file.Generation != BatterySaveGeneration.Current))
         {
             int generation = (int)file.Generation;
@@ -45,6 +48,7 @@ internal sealed partial class WaylandEmulatorHost
 
     private void SelectBatteryImport(string path)
     {
+        if (IsOnlineLink) throw new InvalidOperationException("Battery imports are disabled during Online Link.");
         int expected = session?.LatestSnapshot.Rom?.BatterySave.ExpectedLength ?? 0;
         if (expected <= 0 || new FileInfo(path).Length != expected)
             throw new InvalidDataException($"Battery save must contain exactly {expected} bytes.");
@@ -55,7 +59,7 @@ internal sealed partial class WaylandEmulatorHost
 
     private void RestoreBattery()
     {
-        if (pendingBatteryRestore is null || storage is null || session is null || pendingSession is not null) return;
+        if (pendingBatteryRestore is null || storage is null || session is null || IsLoading || stateOperation is not null) return;
         byte[] bytes = pendingBatteryRestore;
         pendingBatteryRestore = null;
         int expected = session.LatestSnapshot.Rom!.BatterySave.ExpectedLength;
@@ -70,7 +74,10 @@ internal sealed partial class WaylandEmulatorHost
 
     private void RestartAroundSaveOperation(Action operation)
     {
+        if (IsOnlineLink) throw new InvalidOperationException("Battery restore and restart are disabled during Online Link.");
         if (session is null || storage is null || romPath is null) return;
+        FinishStateWork();
+        undoState = null; undoIdentity = null;
         EmulationSession old = session;
         old.AudioSamplesAvailable -= OnAudioSamplesAvailable;
         // Dispose must succeed before data is modified. Keep storage's exclusive ownership.
@@ -86,6 +93,7 @@ internal sealed partial class WaylandEmulatorHost
             session.SetPausedAsync(controlCenterVisible).GetAwaiter().GetResult();
             resumeAfterControlCenter = controlCenterVisible;
             displayedFrameSequence = 0;
+            RequestDiskRefresh();
         }
     }
 

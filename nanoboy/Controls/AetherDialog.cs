@@ -18,7 +18,8 @@ namespace nanoboy.Controls
             Form form,
             string section,
             string description,
-            bool showMinimize = false)
+            bool showMinimize = false,
+            Func<bool>? gamepadNavigationEnabled = null)
         {
             ArgumentNullException.ThrowIfNull(form);
 
@@ -222,7 +223,7 @@ namespace nanoboy.Controls
             };
             form.Disposed += (_, _) => mark.Dispose();
             form.ResumeLayout(performLayout: true);
-            nanoboy.Input.GamepadNavigation.Attach(form);
+            nanoboy.Input.GamepadNavigation.Attach(form, gamepadNavigationEnabled);
             return body;
         }
 

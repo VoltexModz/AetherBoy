@@ -87,7 +87,8 @@ namespace AetherBoy.Runtime
             string romPath,
             string savePath,
             EmulatorConfiguration configuration,
-            byte[]? bootRom = null)
+            byte[]? bootRom = null,
+            bool initializeRewind = true)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(romPath);
             ArgumentException.ThrowIfNullOrWhiteSpace(savePath);
@@ -144,7 +145,10 @@ namespace AetherBoy.Runtime
                     saveStatus.ExpectedLength,
                     (int)saveStatus.LoadedFrom,
                     saveStatus.InvalidPrimaryDetected));
-            rewindManager.Initialize(CaptureEncodedState());
+            // Paired machines must both begin at the unadvanced hardware state:
+            // state capture can run cycles while seeking an instruction boundary.
+            if (initializeRewind)
+                rewindManager.Initialize(CaptureEncodedState());
         }
 
         public VideoGeometry VideoGeometry => AetherBoy.Runtime.VideoGeometry.GameBoyAdvance;
@@ -165,12 +169,49 @@ namespace AetherBoy.Runtime
         {
             ThrowIfDisposed();
             device.RunFrame();
+            CompleteFrame(captureRewind: true);
+        }
+
+        // Only the paired owner calls these methods. A GBA device can yield after
+        // every hardware cycle, so two linked devices need not run whole frames
+        // independently or wait on host-time networking callbacks.
+        internal void RunLocalLinkCycle()
+        {
+            ThrowIfDisposed();
+            device.RunCycle();
+        }
+
+        internal void CompleteLocalLinkFrame()
+        {
+            ThrowIfDisposed();
+            CompleteFrame(captureRewind: false);
+        }
+
+        internal RomSnapshot LocalLinkRom => romSnapshot;
+
+        internal SerialController OnlineSerial => device.SerialController;
+
+        internal bool RunOnlineCycle()
+        {
+            ThrowIfDisposed();
+            var before = device.Cpu.Cycles;
+            device.RunCycle();
+            return before != device.Cpu.Cycles; // STOP leaves the entire emulated clock frozen.
+        }
+
+        internal void FlushLocalLinkSave() => FlushPersistentState();
+
+        private void CompleteFrame(bool captureRewind)
+        {
             SynchronizeEepromSaveLength();
             cheatEngine.Apply(device);
             if (frameskip == 0 || frameCounter == frameskip)
                 PublishFrame(device.GetFrame());
             frameCounter = (frameCounter + 1) % (frameskip + 1);
-            rewindManager.CaptureFrame(CaptureEncodedState);
+            // A unilateral rewind snapshot cannot describe both cable endpoints.
+            // Linked sessions intentionally do not capture or restore it.
+            if (captureRewind)
+                rewindManager.CaptureFrame(CaptureEncodedState);
 
             framesSincePersistentFlush++;
             if (framesSincePersistentFlush >= PersistentFlushIntervalFrames)

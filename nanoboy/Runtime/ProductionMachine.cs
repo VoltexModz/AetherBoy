@@ -54,7 +54,8 @@ namespace AetherBoy.Runtime
             byte[]? bootRom,
             EmulatorConfiguration configuration,
             int paletteIndex,
-            int persistentFlushIntervalFrames = PersistentFlushIntervalFrames)
+            int persistentFlushIntervalFrames = PersistentFlushIntervalFrames,
+            bool initializeRewind = true)
         {
             if (persistentFlushIntervalFrames <= 0)
             {
@@ -93,7 +94,19 @@ namespace AetherBoy.Runtime
                     batterySave.ExpectedLength,
                     (int)batterySave.LoadedFrom,
                     batterySave.InvalidPrimaryDetected));
-            rewindManager.Initialize(emulator);
+            if (initializeRewind) rewindManager.Initialize(emulator);
+        }
+
+        // Used only by the owner-thread online wrapper, never by network callbacks.
+        internal Memory OnlineMemory => emulator.Memory;
+        internal int StepOnlineInstruction() => emulator.StepInstruction();
+        internal void CompleteOnlineFrame()
+        {
+            if (++framesSincePersistentFlush >= persistentFlushIntervalFrames)
+            {
+                emulator.Memory.ROM.MBC.FlushPersistentState();
+                framesSincePersistentFlush = 0;
+            }
         }
 
         public event EventHandler<AudioSamplesAvailableEventArgs>? AudioSamplesAvailable;

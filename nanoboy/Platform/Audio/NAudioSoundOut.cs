@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
+using AetherBoy.Runtime.Audio;
 
 namespace nanoboy.Platform.Audio;
 
@@ -19,6 +20,7 @@ internal sealed class GameBoyWaveProvider : WaveProvider32
     private bool primed, suspended;
     private float volume = 1;
     private long underruns, droppedSamples;
+    private readonly AudioPlaybackCursor playback = new();
 
     public GameBoyWaveProvider(int sampleRate, int latencyMs = 40, int channels = 1)
     {
@@ -48,23 +50,26 @@ internal sealed class GameBoyWaveProvider : WaveProvider32
     public void Clear() { lock (sync) ClearCore(); }
     private void ClearCore() { count = 0; readIndex = 0; primed = false; }
 
-    public void Enqueue(float[] buffer)
+    public void Enqueue(float[] buffer, long generation = 0, long session = 0)
     {
         ArgumentNullException.ThrowIfNull(buffer);
         if (buffer.Length % WaveFormat.Channels != 0) throw new ArgumentException("Incomplete audio frame.", nameof(buffer));
         lock (sync)
         {
+            if (!playback.TryAccept(session, generation, out bool changed)) { droppedSamples += buffer.Length; return; }
+            if (changed)
+            {
+                ClearCore();
+            }
             if (suspended) return;
-            int source = Math.Max(0, buffer.Length - samples.Length);
-            int incoming = buffer.Length - source;
-            int discard = Math.Max(0, count + incoming - samples.Length);
-            readIndex = (readIndex + discard) % samples.Length;
-            count -= discard;
-            droppedSamples += source + discard;
+            int incoming = AudioQueuePolicy.AcceptedFrames(count / WaveFormat.Channels,
+                buffer.Length / WaveFormat.Channels, samples.Length / WaveFormat.Channels) * WaveFormat.Channels;
+            droppedSamples += buffer.Length - incoming;
+            if (incoming == 0) return;
             int writeIndex = (readIndex + count) % samples.Length;
             int first = Math.Min(incoming, samples.Length - writeIndex);
-            Array.Copy(buffer, source, samples, writeIndex, first);
-            Array.Copy(buffer, source + first, samples, 0, incoming - first);
+            Array.Copy(buffer, 0, samples, writeIndex, first);
+            Array.Copy(buffer, first, samples, 0, incoming - first);
             count += incoming;
         }
     }
@@ -103,6 +108,7 @@ internal sealed class GameBoyWaveProvider : WaveProvider32
 /// </summary>
 public sealed class NAudioSoundOut : IDisposable
 {
+    private readonly AudioPlaybackCursor playback = new();
     private readonly object sync = new();
     private readonly AutoResetEvent changed = new(false);
     private readonly Thread worker;
@@ -167,7 +173,7 @@ public sealed class NAudioSoundOut : IDisposable
     public void SetSuspended(bool value) { lock (sync) { suspended = value; wave.SetSuspended(value); } }
     public void ClearBuffer() { lock (sync) wave.Clear(); }
 
-    public void Submit(float[] buffer, int sampleRate, int channels = 1)
+    public void Submit(float[] buffer, int sampleRate, int channels = 1, long playbackGeneration = 0, long playbackSession = 0)
     {
         ArgumentNullException.ThrowIfNull(buffer);
         if (sampleRate is < 8000 or > 192000) throw new ArgumentOutOfRangeException(nameof(sampleRate));
@@ -175,6 +181,7 @@ public sealed class NAudioSoundOut : IDisposable
         lock (sync)
         {
             if (disposed) return;
+            if (!playback.TryAccept(playbackSession, playbackGeneration, out _)) return;
             if (sampleRate != this.sampleRate || channels != this.channels)
             {
                 this.sampleRate = sampleRate;
@@ -184,7 +191,7 @@ public sealed class NAudioSoundOut : IDisposable
                 revision++;
                 changed.Set();
             }
-            wave.Enqueue(buffer);
+            wave.Enqueue(buffer, playbackGeneration, playbackSession);
         }
     }
 

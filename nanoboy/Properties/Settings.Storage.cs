@@ -6,6 +6,11 @@ namespace nanoboy.Properties;
 [SettingsProvider(typeof(WindowsSettingsProvider))]
 internal sealed partial class Settings
 {
+    // Empty means the build default: development records locally, stable does not.
+    // Kept outside NanoboySettings' per-ROM overrides because privacy is application-wide.
+    [UserScopedSetting, DefaultSettingValue("")]
+    public string DiagnosticsRecording { get => (string)this[nameof(DiagnosticsRecording)]; set => this[nameof(DiagnosticsRecording)] = value; }
+
     [UserScopedSetting, DefaultSettingValue("False")]
     public bool PerformanceOverlay { get => (bool)this[nameof(PerformanceOverlay)]; set => this[nameof(PerformanceOverlay)] = value; }
     [UserScopedSetting, DefaultSettingValue("40")]

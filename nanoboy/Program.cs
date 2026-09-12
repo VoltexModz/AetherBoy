@@ -11,8 +11,10 @@ namespace nanoboy
 {
     static class Program
     {
-        private const string TesterModeArgument = "--tester-mode";
+        private const string TesterModeArgument = WindowsDiagnosticsPolicy.TesterModeArgument;
         private static WindowsTesterSession? activeTesterSession;
+
+        internal static WindowsDiagnosticsDecision? StartupDiagnosticsDecision { get; private set; }
 
         [STAThread]
         static void Main(string[] args)
@@ -45,7 +47,18 @@ namespace nanoboy
             try
             {
                 ApplicationConfiguration.Initialize();
-                if (IsTesterModeRequested(args) &&
+                StartupDiagnosticsDecision = WindowsDiagnosticsPreferences.Default.GetStatus(args);
+                if (StartupDiagnosticsDecision.PreferenceReadError is string preferenceError)
+                {
+                    AetherSignal.Show(
+                        "Die Diagnoseeinstellung konnte nicht gelesen werden. " +
+                        "AetherBoy läuft vorsichtshalber ohne Sitzungsaufzeichnung weiter. " +
+                        $"Lokale Fehlerberichte bleiben aktiv.\n\n{preferenceError}",
+                        "Diagnoseeinstellung nicht verfügbar",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                }
+                if (StartupDiagnosticsDecision.RecordingRequested &&
                     !WindowsTesterSession.TryCreateDefault(
                         out testerSession,
                         out string? failureReason))
@@ -80,12 +93,10 @@ namespace nanoboy
         }
 
         internal static bool IsTesterModeRequested(string[] args) =>
-            ProductInfo.IsDevelopmentBuild || Array.Exists(
-                args,
-                argument => string.Equals(
-                    argument,
-                    TesterModeArgument,
-                    StringComparison.OrdinalIgnoreCase));
+            // Compatibility helper intentionally excludes player settings and the environment.
+            // Application startup uses the persisted policy above instead.
+            WindowsDiagnosticsPolicy.Resolve(ProductInfo.IsDevelopmentBuild, null, null,
+                WindowsDiagnosticsPolicy.HasTesterModeArgument(args)).RecordingRequested;
 
         private static bool TryGetStartupRom(string[] args, out string? path)
         {

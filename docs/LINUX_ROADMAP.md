@@ -1,8 +1,52 @@
 # Linux-Ausbau
 
-Planungsstand: 11. September 2026, nach Aktualisierung von `development` auf
-`d983ed4` (`feat(windows): centralize app data and development diagnostics`).
+Aktueller Stand: **12. September 2026**, Runde 3 auf `22a77ef` plus lokale Änderungen.
+Ursprünglicher Plan: 11. September nach Aktualisierung auf `d983ed4`
+(`feat(windows): centralize app data and development diagnostics`).
 Die Ausgangsanalyse unten beschreibt den Stand vor diesem Ausbau. Der aktuelle Umsetzungsstand steht in der folgenden Tabelle.
+
+## Restkritik / Runde 3 — aktueller Stand
+
+Der Folgeauftrag wird anhand fester Fix-IDs nachverfolgt. Vollständige
+Problem-/Lösungszuordnung: [Linux-Fixliste](LINUX_FIX_LOG.md).
+
+| Rang | Fix | Wichtigkeit | Lieferstand |
+| --- | --- | ---: | --- |
+| 1 | R3-05 GBA-Owner bei Fokuswechsel und Laden schützen | 10/10 | Implementiert; deterministische native Regression |
+| 2 | R3-01/02 Texteditor, Clipboard, IME und Eingabefokus | 9/10 | Implementiert für Titel, Suche und Cheats |
+| 3 | R3-03 Semantische GTK-/ATK-/AT-SPI-Bedienung | 9/10 | Optionaler nativer Bedienpfad implementiert; tatsächliche Schnittstellen geprüft |
+| 4 | R3-04/07 Abbrechbare ROM-Vorbereitung und Busy-Guards | 9/10 | Implementiert, höchstens ein Hintergrundauftrag |
+| 5 | R3-06 Einstellungen ohne blockierendes regelmäßiges Schreiben | 8/10 | Implementiert; Snapshot/Generation/Retry, sichere Abschlussgrenzen |
+| 6 | R3-08 Headerabstand | 6/10 | Bereits korrigiert und visuell geprüft |
+| Manuell | Reale Geräte, Misch-DPI, Orca/IME, ARM64 und lange Spiele | 9/10 | Offen; keine automatisierte Behauptung einer Hardwareabnahme |
+
+**Abschluss:** 108 Headless-Tests bestanden, 3 Audio-Skips, 0 Fehler.
+Unabhängige Bewertung **UI 9,1/10 / Features 8,9/10**; beide Zielwerte im
+geprüften Softwareumfang erreicht. x64-/ARM64-Pakete und normaler Start-Build
+aktualisiert; ARM64-Ausführung bleibt offen.
+
+Aktuelle Ergebnisse: [Playtest Runde 3](LINUX_PLAYTEST_ROUND3.md),
+[Kritik Runde 3](LINUX_CRITIQUE_ROUND3.md). Frühere Pläne und Bewertungen unten
+bleiben historische Nachweise. Offene Hardwareprüfungen und bewusste synchrone
+Sicherungsgrenzen stehen ausdrücklich in der Fixliste.
+
+## Komfortrunde 2 — 12. September 2026
+
+Auf Basis von `22a77ef`, lokal implementiert:
+
+| Rang | Verbesserung | Wichtigkeit |
+| --- | --- | ---: |
+| 1 | Datei-/Backup-Metadaten aus dem Renderpfad; begrenzte Worker | 10/10 |
+| 2 | Resume, State-Galerie und Undo nach Laden | 9/10 |
+| 3 | Getrennte Spielprofile mit globaler Vererbung | 8/10 |
+| 4 | Favoriten, Titel, Systemfilter und aktive Spielzeit | 8/10 |
+| 5 | Schriftstufen, echte Palettenmuster und Inhaltsnavigation | 8/10 |
+| 6 | Geprüfte x64-/ARM64-Archive mit eingebetteter Runtime | 7/10 |
+
+Historische Abnahme dieser Runde: [Kritik Runde 2](LINUX_CRITIQUE_ROUND2.md),
+[Playtest Runde 2](LINUX_PLAYTEST_ROUND2.md). Ziele: Features >8, UI >9.
+Die folgenden Abschnitte bleiben als historischer Plan erhalten. Langläufe
+übernimmt weiterhin der Nutzer.
 
 ## Priorisierung und Umsetzungsstand
 

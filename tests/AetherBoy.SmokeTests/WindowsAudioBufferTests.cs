@@ -39,7 +39,7 @@ public sealed class WindowsAudioBufferTests
     }
 
     [TestMethod]
-    public void OverflowDropsOldestAndBoundsLatency()
+    public void OverflowPreservesQueuedSoundAndBoundsLatencyLikeLinux()
     {
         var wave = new GameBoyWaveProvider(10000, 40);
         wave.Enqueue(Enumerable.Repeat(-0.5f, 800).ToArray());
@@ -48,7 +48,40 @@ public sealed class WindowsAudioBufferTests
         Assert.AreEqual(1000L, wave.Metrics.DroppedSamples);
         float[] output = new float[800];
         wave.Read(output, 0, 800);
-        Assert.IsTrue(output.All(sample => sample == 0.5f));
+        Assert.IsTrue(output.All(sample => sample == -0.5f));
+    }
+
+    [TestMethod]
+    [DataRow(44100, 1)]
+    [DataRow(65536, 2)]
+    public void TurboToNormalDropsOldGenerationAndNeverReplaysExhaustedAudio(int rate, int channels)
+    {
+        var wave = new GameBoyWaveProvider(rate, 40, channels);
+        int length = rate / 25 * channels;
+        wave.Enqueue(Enumerable.Repeat(.1f, length).ToArray(), 1);
+        wave.Enqueue(Enumerable.Repeat(.2f, length).ToArray(), 2);
+        wave.Enqueue(Enumerable.Repeat(.9f, length).ToArray(), 1); // Late pre-transition callback.
+        float[] output = new float[length];
+        wave.Read(output, 0, length);
+        Assert.IsTrue(output.All(sample => sample == .2f));
+        wave.Read(output, 0, length);
+        Assert.IsTrue(output.All(sample => sample == 0), "Empty queue must be silence, never the last tone.");
+        wave.Enqueue(Enumerable.Repeat(.3f, length).ToArray(), 3);
+        wave.Read(output, 0, length);
+        Assert.IsTrue(output.All(sample => sample == .3f));
+    }
+
+    [TestMethod]
+    public void TurboOverproductionDoesNotReplaceEveryQueuedFragment()
+    {
+        var wave = new GameBoyWaveProvider(10000);
+        var ramp = Enumerable.Range(0, 800).Select(n => n / 1000f).ToArray();
+        wave.Enqueue(ramp);
+        for (int n = 0; n < 40; n++) wave.Enqueue(Enumerable.Repeat(-.9f, 200).ToArray());
+        var output = new float[800];
+        wave.Read(output, 0, output.Length);
+        CollectionAssert.AreEqual(ramp, output);
+        Assert.AreEqual(8000L, wave.Metrics.DroppedSamples);
     }
 
     [TestMethod]

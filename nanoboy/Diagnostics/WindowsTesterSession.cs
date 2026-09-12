@@ -6,6 +6,8 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using AetherBoy.Runtime;
 using nanoboy.Input;
 using nanoboy.Storage;
@@ -16,6 +18,15 @@ namespace nanoboy.Diagnostics
     internal sealed class WindowsTesterSession : IDisposable
     {
         private const int SchemaVersion = 1;
+        internal const int DefaultQueueCapacity = 256;
+        internal const long DefaultMaximumLogBytes = 8 * 1024 * 1024;
+        private const string ReportReadme =
+            "AetherBoy local tester report\r\n\r\n" +
+            "Structured runtime events for manual playtesting. ROM identity uses SHA-256, model and sizes; titles are omitted.\r\n" +
+            "This report contains build/platform details and controller device names/IDs, which may be user-customized.\r\n" +
+            "It contains no ROM bytes, ROM file paths, save-state data, battery-save data or telemetry.\r\n" +
+            "Nothing is uploaded automatically. Exporting or sharing the ZIP is always a manual action.\r\n" +
+            "Recording is bounded. Overflow drops incoming events; a full log stops accepting events. Old reports are not deleted.\r\n";
         private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -23,13 +34,32 @@ namespace nanoboy.Diagnostics
         };
 
         private readonly object sync = new();
-        private readonly StreamWriter writer;
+        private readonly object exportSync = new();
+        private readonly FileStream writer;
+        private readonly Queue<QueuedEvent> queue = new();
+        private readonly SemaphoreSlim signal = new(0, 1);
+        private readonly Task writerTask;
+        private readonly int queueCapacity;
+        private readonly long maximumLogBytes;
+        private readonly Action? beforeWrite;
+        private readonly TimeSpan flushTimeout;
+        private readonly TimeSpan shutdownTimeout;
         private readonly DateTimeOffset startedUtc;
         private DateTimeOffset lastHeartbeatUtc;
         private string? lastGamepadIdentity;
         private bool disposed;
+        private bool sizeLimitReached;
+        private string? errorCode;
+        private long acceptedSequence, completedSequence, droppedEvents, writtenBytes;
+        private FlushRequest? pendingFlush;
 
-        internal WindowsTesterSession(string rootDirectory)
+        private sealed record QueuedEvent(long Sequence, byte[] Bytes);
+        private sealed record ReportSnapshot(byte[] Log, long DroppedEvents, bool SizeLimitReached);
+        private sealed record FlushRequest(long TargetSequence, TaskCompletionSource<ReportSnapshot> Completion);
+
+        internal WindowsTesterSession(string rootDirectory, int queueCapacity = DefaultQueueCapacity,
+            long maximumLogBytes = DefaultMaximumLogBytes, Action? beforeWrite = null,
+            TimeSpan? flushTimeout = null, TimeSpan? shutdownTimeout = null)
         {
             if (string.IsNullOrWhiteSpace(rootDirectory))
             {
@@ -38,33 +68,27 @@ namespace nanoboy.Diagnostics
                     nameof(rootDirectory));
             }
 
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(queueCapacity);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumLogBytes);
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(maximumLogBytes, DefaultMaximumLogBytes);
+            this.queueCapacity = queueCapacity;
+            this.maximumLogBytes = maximumLogBytes;
+            this.beforeWrite = beforeWrite;
+            this.flushTimeout = flushTimeout ?? TimeSpan.FromSeconds(5);
+            this.shutdownTimeout = shutdownTimeout ?? TimeSpan.FromSeconds(2);
+
             startedUtc = DateTimeOffset.UtcNow;
             string sessionName = $"{startedUtc:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}"[..25];
             SessionDirectory = Path.Combine(Path.GetFullPath(rootDirectory), sessionName);
             Directory.CreateDirectory(SessionDirectory);
 
             LogFilePath = Path.Combine(SessionDirectory, "session.jsonl");
-            writer = new StreamWriter(
-                new FileStream(
-                    LogFilePath,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.Read,
-                    16 * 1024,
-                    FileOptions.WriteThrough),
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false))
-            {
-                AutoFlush = true
-            };
-
             File.WriteAllText(
                 Path.Combine(SessionDirectory, "README.txt"),
-                "AetherBoy local tester report\r\n" +
-                "\r\n" +
-                "This folder contains structured runtime events for manual playtesting.\r\n" +
-                "It contains no ROM bytes, ROM file paths, save-state data, battery-save data or telemetry.\r\n" +
-                "Nothing is uploaded automatically. Exporting or sharing the ZIP is always a manual action.\r\n",
+                ReportReadme,
                 new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            writer = new FileStream(LogFilePath, FileMode.CreateNew, FileAccess.Write,
+                FileShare.Read, 16 * 1024, FileOptions.SequentialScan);
 
             Record(
                 "application.started",
@@ -83,11 +107,19 @@ namespace nanoboy.Diagnostics
                     process_architecture = RuntimeInformation.ProcessArchitecture.ToString(),
                     framework = RuntimeInformation.FrameworkDescription
                 });
+            writerTask = Task.Run(WriteLoop);
         }
 
         public string SessionDirectory { get; }
 
         public string LogFilePath { get; }
+
+        internal bool IsRecording { get { lock (sync) return !disposed && errorCode is null && !sizeLimitReached; } }
+        internal string? ErrorCode { get { lock (sync) return errorCode; } }
+        internal bool SizeLimitReached { get { lock (sync) return sizeLimitReached; } }
+        internal long DroppedEvents { get { lock (sync) return droppedEvents; } }
+        internal int PendingEvents { get { lock (sync) return queue.Count; } }
+        internal Task WriterCompletion => writerTask;
 
         internal static bool TryCreateDefault(
             out WindowsTesterSession? session,
@@ -160,7 +192,6 @@ namespace nanoboy.Diagnostics
                 new
                 {
                     identity_ready = true,
-                    title = SafeInline(rom.Title, 32),
                     model = GetModelName(rom),
                     cartridge_type = SafeInline(rom.CartridgeType, 64),
                     rom_size = rom.RomSize,
@@ -292,6 +323,12 @@ namespace nanoboy.Diagnostics
 
         internal string CreateBundle(string destinationPath)
         {
+            // One export barrier at a time; emulator producers never acquire this lock.
+            lock (exportSync) return CreateBundleCore(destinationPath);
+        }
+
+        private string CreateBundleCore(string destinationPath)
+        {
             if (string.IsNullOrWhiteSpace(destinationPath))
             {
                 throw new ArgumentException("A destination path is required.", nameof(destinationPath));
@@ -313,35 +350,37 @@ namespace nanoboy.Diagnostics
                     "The report destination has no parent directory.");
             }
 
-            Directory.CreateDirectory(destinationDirectory);
             Record("report.exported", new { format = "zip", automatic_upload = false });
+            FlushRequest checkpoint;
             lock (sync)
             {
                 ThrowIfDisposed();
-                writer.Flush();
+                if (errorCode is not null) throw new IOException("The diagnostic writer failed (" + errorCode + ").");
+                if (pendingFlush is not null) throw new IOException("A previous diagnostic export is still being flushed. Try again.");
+                checkpoint = new FlushRequest(acceptedSequence,
+                    new TaskCompletionSource<ReportSnapshot>(TaskCreationOptions.RunContinuationsAsynchronously));
+                pendingFlush = checkpoint;
+                WakeWriterUnsafe();
             }
+
+            ReportSnapshot snapshot;
+            try { snapshot = checkpoint.Completion.Task.WaitAsync(flushTimeout).GetAwaiter().GetResult(); }
+            catch (TimeoutException) { throw new IOException("The diagnostic writer did not finish the export in time. Try again."); }
+
+            Directory.CreateDirectory(destinationDirectory);
 
             string temporaryPath = fullDestination + $".{Guid.NewGuid():N}.tmp";
             try
             {
                 using (ZipArchive archive = ZipFile.Open(temporaryPath, ZipArchiveMode.Create))
                 {
-                    foreach (string name in new[] { "README.txt", "session.jsonl" })
-                    {
-                        string file = Path.Combine(SessionDirectory, name);
-                        ZipArchiveEntry entry = archive.CreateEntry(
-                            Path.GetFileName(file),
-                            CompressionLevel.Optimal);
-                        using Stream target = entry.Open();
-                        using var source = new FileStream(
-                            file,
-                            FileMode.Open,
-                            FileAccess.Read,
-                            FileShare.ReadWrite | FileShare.Delete,
-                            16 * 1024,
-                            FileOptions.SequentialScan);
-                        source.CopyTo(target);
-                    }
+                    using (Stream target = archive.CreateEntry("session.jsonl", CompressionLevel.Optimal).Open())
+                        target.Write(snapshot.Log);
+                    using var readme = new StreamWriter(archive.CreateEntry("README.txt", CompressionLevel.Optimal).Open(),
+                        new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                    readme.Write(ReportReadme);
+                    readme.Write($"\r\nSnapshot: {snapshot.Log.Length} log bytes; dropped events: {snapshot.DroppedEvents}; " +
+                        $"size limit reached: {snapshot.SizeLimitReached}.\r\n");
                 }
 
                 File.Move(temporaryPath, fullDestination, overwrite: true);
@@ -360,54 +399,144 @@ namespace nanoboy.Diagnostics
         {
             lock (sync)
             {
-                if (disposed)
+                if (disposed) return;
+                EnqueueUnsafe(SerializeEvent("application.closed", new
                 {
-                    return;
-                }
-
+                    duration_seconds = Math.Max(0, (long)(DateTimeOffset.UtcNow - startedUtc).TotalSeconds)
+                }));
                 disposed = true;
-                try
-                {
-                    WriteEventUnsafe(
-                        "application.closed",
-                        new
-                        {
-                            duration_seconds = Math.Max(
-                                0,
-                                (long)(DateTimeOffset.UtcNow - startedUtc).TotalSeconds)
-                        });
-                    writer.Dispose();
-                }
-                catch (Exception exception) when (
-                    exception is IOException or UnauthorizedAccessException or ObjectDisposedException)
-                {
-                    // Closing diagnostics must never prevent application shutdown.
-                }
+                WakeWriterUnsafe();
             }
+            // The worker retains ownership of its stream if an OS write takes too long.
+            // Never dispose that stream concurrently with a pending write.
+            if (!writerTask.Wait(shutdownTimeout))
+                lock (sync) errorCode ??= "shutdown_timeout";
         }
 
         private void Record(string eventName, object? details)
         {
             try
             {
+                byte[] bytes = SerializeEvent(eventName, details);
                 lock (sync)
                 {
-                    if (disposed)
-                    {
-                        return;
-                    }
-
-                    WriteEventUnsafe(eventName, details);
+                    if (!disposed) EnqueueUnsafe(bytes);
                 }
             }
             catch (Exception exception) when (
-                exception is IOException or UnauthorizedAccessException or ObjectDisposedException or JsonException)
+                exception is JsonException or NotSupportedException)
             {
                 // Tester diagnostics must never interrupt emulation.
+                lock (sync) droppedEvents++;
             }
         }
 
-        private void WriteEventUnsafe(string eventName, object? details)
+        private void EnqueueUnsafe(byte[] bytes)
+        {
+            if (errorCode is not null || sizeLimitReached || queue.Count >= queueCapacity)
+            {
+                droppedEvents++;
+                return;
+            }
+            queue.Enqueue(new QueuedEvent(++acceptedSequence, bytes));
+            WakeWriterUnsafe();
+        }
+
+        private void WakeWriterUnsafe()
+        {
+            // All releasers hold sync; a worker consuming the signal cannot make Release overflow.
+            if (signal.CurrentCount == 0) signal.Release();
+        }
+
+        private async Task WriteLoop()
+        {
+            FlushRequest? activeFlush = null;
+            bool writingEvent = false;
+            try
+            {
+                while (true)
+                {
+                    await signal.WaitAsync().ConfigureAwait(false);
+                    while (true)
+                    {
+                        QueuedEvent? next;
+                        lock (sync)
+                        {
+                            // A checkpoint has its own slot, outside the lossy bounded event queue.
+                            // Snapshot before processing any event accepted after that checkpoint.
+                            if (pendingFlush is not null && completedSequence >= pendingFlush.TargetSequence)
+                            {
+                                activeFlush = pendingFlush;
+                                pendingFlush = null;
+                                next = null;
+                            }
+                            else if (queue.Count > 0) next = queue.Dequeue();
+                            else if (disposed) return;
+                            else break;
+                        }
+
+                        if (activeFlush is not null)
+                        {
+                            writer.Flush(flushToDisk: true);
+                            using var source = new FileStream(LogFilePath, FileMode.Open, FileAccess.Read,
+                                FileShare.ReadWrite, 16 * 1024, FileOptions.SequentialScan);
+                            using var buffer = new MemoryStream((int)writtenBytes);
+                            source.CopyTo(buffer);
+                            byte[] log = buffer.ToArray();
+                            long dropped; bool limited;
+                            lock (sync) { dropped = droppedEvents; limited = sizeLimitReached; }
+                            activeFlush.Completion.TrySetResult(new ReportSnapshot(log, dropped, limited));
+                            activeFlush = null;
+                            continue;
+                        }
+
+                        bool write;
+                        lock (sync)
+                        {
+                            write = !sizeLimitReached && next!.Bytes.LongLength <= maximumLogBytes - writtenBytes;
+                            if (!write) { sizeLimitReached = true; droppedEvents++; }
+                        }
+                        if (write)
+                        {
+                            writingEvent = true;
+                            beforeWrite?.Invoke();
+                            writer.Write(next!.Bytes);
+                            writer.Flush(); // Only the worker does disk I/O; preserve recent crash evidence.
+                            writtenBytes += next.Bytes.Length;
+                            writingEvent = false;
+                        }
+                        lock (sync) completedSequence = next!.Sequence;
+                    }
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ObjectDisposedException)
+            {
+                if (writingEvent) lock (sync) droppedEvents++;
+                FailWriter(exception, activeFlush);
+            }
+            finally
+            {
+                try { writer.Dispose(); }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ObjectDisposedException)
+                { FailWriter(exception, null); }
+            }
+        }
+
+        private void FailWriter(Exception exception, FlushRequest? activeFlush)
+        {
+            lock (sync)
+            {
+                errorCode = exception.GetType().Name + $":0x{exception.HResult:X8}";
+                droppedEvents += queue.Count;
+                queue.Clear();
+                var safeFailure = new IOException("The diagnostic writer failed (" + errorCode + ").");
+                activeFlush?.Completion.TrySetException(safeFailure);
+                pendingFlush?.Completion.TrySetException(safeFailure);
+                pendingFlush = null;
+            }
+        }
+
+        private static byte[] SerializeEvent(string eventName, object? details)
         {
             var entry = new Dictionary<string, object?>
             {
@@ -416,7 +545,7 @@ namespace nanoboy.Diagnostics
                 ["event"] = eventName,
                 ["details"] = details
             };
-            writer.WriteLine(JsonSerializer.Serialize(entry, JsonOptions));
+            return Encoding.UTF8.GetBytes(JsonSerializer.Serialize(entry, JsonOptions) + "\n");
         }
 
         private void ThrowIfDisposed()

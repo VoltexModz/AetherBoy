@@ -6,6 +6,7 @@ using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using AetherBoy.Runtime;
+using AetherBoy.Runtime.Video;
 using nanoboy.Platform.Video;
 
 namespace nanoboy.Controls

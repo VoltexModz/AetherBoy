@@ -1,5 +1,15 @@
 # Windows-Entwicklung: Übergabe / Developer handoff
 
+Nachtrag 12. September / September 12 addendum:
+[GBA Gen3 Online: Entwicklungsprofil, gemeinsame Sitzungssicherheit und Abnahme (DE/EN)](GBA_ONLINE_HANDOFF.md).
+[GB/GBC Online Link: Browser-WebRTC, Originalspielstandschutz und Grenzen (DE/EN)](ONLINE_LINK_HANDOFF.md).
+[Windows Firmware Station und Diagnose-Aufzeichnung / recording (DE/EN)](WINDOWS_FIRMWARE_DIAGNOSTICS.md).
+[Bidirektionaler Funktionsabgleich, Turbo-Audio, eigene Menüs und gemeinsame Tools (DE/EN)](PLATFORM_PARITY.md).
+[Local Link Lab für GB/GBC/GBA (DE/EN)](LOCAL_LINK_LAB.md),
+[GBA-SIO, CPU-Isolation und State-Migration (DE/EN)](GBA_LOCAL_LINK_HANDOFF.md) und
+[Zusammenführung mit dem neuen Linux-Commit 367674f (DE/EN)](LINUX_UPSTREAM_INTEGRATION_REVIEW.md).
+Die folgenden Abschnitte beschreiben den historischen Stand dieses Handoffs.
+
 Stand / Date: **2026-09-11** · Branch: **development** · **4.8.0-alpha.1**
 
 **Nachtrag / Follow-up:** Die nachfolgende Windows-Übergabe beschreibt den Stand

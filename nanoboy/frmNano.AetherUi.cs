@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using AetherBoy.Runtime;
 using nanoboy.Controls;
+using nanoboy.Core;
 
 namespace nanoboy
 {
@@ -47,6 +48,8 @@ namespace nanoboy
         private AetherButton aetherTurboButton = null!;
         private AetherButton aetherMaximizeButton = null!;
         private AetherButton[] aetherSlotButtons = Array.Empty<AetherButton>();
+        private AetherCommandMenu? aetherCommandMenu;
+        private AetherButton? aetherActiveNav;
 
         [DllImport("user32.dll")]
         private static extern bool ReleaseCapture();
@@ -484,7 +487,32 @@ namespace nanoboy
             AetherButton button = CreateActionButton(text, AetherButtonKind.Ghost, 72);
             button.Height = 34;
             button.Margin = new Padding(2, 0, 2, 0);
-            button.Click += (_, _) => menu.DropDown.Show(button, new Point(0, button.Height + 2));
+            button.Name = "aetherNav" + text;
+            button.Click += (_, _) =>
+            {
+                bool same = aetherActiveNav == button;
+                aetherCommandMenu?.Dismiss();
+                if (same) return;
+                input.Clear();
+                keyboardAdvanceButtons = gamepadAdvanceButtons = GameBoyAdvanceButtons.None;
+                turboPressed = false;
+                gamepadAwaitNeutral = true;
+                if (session is not null)
+                {
+                    ObserveSessionCommand(session.SetButtonsAsync(GameBoyButtons.None));
+                    ObserveSessionCommand(session.SetGameBoyAdvanceButtonsAsync(GameBoyAdvanceButtons.None));
+                    if (!IsOnlineLink) ObserveSessionCommand(session.SetTurboAsync(false));
+                }
+                aetherActiveNav = button;
+                button.Selected = true;
+                aetherCommandMenu = new AetherCommandMenu(this, aetherRoot, button, menu, text, () =>
+                {
+                    button.Selected = false;
+                    aetherCommandMenu = null;
+                    aetherActiveNav = null;
+                    gamepadAwaitNeutral = true;
+                });
+            };
             return button;
         }
 
@@ -577,7 +605,7 @@ namespace nanoboy
 
         private void aetherTurboButton_Click(object? sender, EventArgs e)
         {
-            if (stateOperationInProgress) return;
+            if (stateOperationInProgress || IsOnlineLink) return;
             EmulationSession? currentSession = session;
             if (currentSession == null)
             {
@@ -658,19 +686,19 @@ namespace nanoboy
             EmulationFeature features = snapshot?.Rom is null
                 ? EmulationFeature.GameBoyStandard
                 : snapshot.Features;
-            bool supportsSaveStates = (features & EmulationFeature.SaveStates) != 0;
-            bool supportsRewind = (features & EmulationFeature.Rewind) != 0;
+            bool supportsSaveStates = !IsOnlineLink && (features & EmulationFeature.SaveStates) != 0;
+            bool supportsRewind = !IsOnlineLink && (features & EmulationFeature.Rewind) != 0;
             aetherRewindButton.Enabled = actionsEnabled && supportsRewind && !stateOperationInProgress;
             aetherSaveButton.Enabled = actionsEnabled && supportsSaveStates && !stateOperationInProgress;
             aetherLoadButton.Enabled = actionsEnabled && supportsSaveStates && !stateOperationInProgress;
-            aetherSaveSafetyButton.Enabled = actionsEnabled &&
+            aetherSaveSafetyButton.Enabled = actionsEnabled && !IsOnlineLink &&
                 snapshot?.Rom?.BatterySave.IsEnabled == true &&
                 snapshot.Rom.BatterySave.ExpectedLength > 0 &&
                 !stateOperationInProgress;
-            aetherTurboButton.Enabled = actionsEnabled && !stateOperationInProgress;
+            aetherTurboButton.Enabled = actionsEnabled && !stateOperationInProgress && !IsOnlineLink;
             menuSaveState.Enabled = supportsSaveStates;
             menuRewind.Enabled = supportsRewind;
-            menuCheats.Enabled = (features & EmulationFeature.Cheats) != 0;
+            menuCheats.Enabled = !IsOnlineLink && (features & EmulationFeature.Cheats) != 0;
             menuPalette.Enabled = (features & EmulationFeature.MonochromePalettes) != 0;
             bool supportsAudioChannels = (features & EmulationFeature.AudioChannelControls) != 0;
             menuAudioC1.Enabled = supportsAudioChannels;
@@ -779,6 +807,9 @@ namespace nanoboy
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            if (keyData == (Keys.Control | Keys.F10)) { StartOnlineLink(true); return true; }
+            if (keyData == (Keys.Control | Keys.Shift | Keys.F10)) { StartOnlineLink(false); return true; }
+            if (aetherCommandMenu is not null) return aetherCommandMenu.HandleNavigation(keyData);
             if (keyData == Keys.F10) { _ = OpenQuickMenuAsync(); return true; }
             if (keyData == Keys.F12) { _ = CaptureScreenshotAsync(); return true; }
             if (keyData == Keys.F9) { TogglePerformanceOverlay(); return true; }

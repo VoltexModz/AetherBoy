@@ -45,15 +45,28 @@ the live Linux host.
 
 Control Center buttons are reachable through Tab/Shift+Tab with a visible focus
 outline; Enter or Space activates a focused control. Ctrl+Tab cycles sections.
+F6 switches between the selected sidebar section and its page controls.
+Stable focus identities prevent refreshed or reordered rows from activating a
+different action. Title, search and cheat fields share grapheme-aware caret/selection,
+clipboard, pointer selection, horizontal scrolling and separate IME preedit.
 Input still supports arrow-key selection and rebinding; Audio supports 1% steps.
+
+An optional native GTK3 Control Center exposes names, roles, states and editable
+text through ATK/AT-SPI, sharing the same validated host commands. Open it with
+Ctrl+F7, System → Accessible UI or `--accessible`; F7 remains rewind. This does not
+make the SDL game image screen-reader content. GTK dependencies are optional.
+ROM preparation and regular settings writes use bounded background workers;
+explicit save/scope/shutdown boundaries still wait to protect user data.
 
 ## Remaining Windows frontend gaps
 
 Linux now includes controller remapping/profiles, a searchable recent-cartridge
 library, firmware import, session cheats, WAV recording, local diagnostics and
-battery-backup recovery. Library → Patch Lab applies IPS/BPS/UPS through the shared
+battery-backup recovery. State gallery, separate resume points, undo after load,
+per-ROM settings, favorites, custom titles and active playtime are also available.
+Library → Patch Lab applies IPS/BPS/UPS through the shared
 parser, including explicit UPS undo and separate result storage. Saves and states use content-addressed XDG storage.
-See [Linux roadmap](LINUX_ROADMAP.md) and [playtest report](LINUX_PLAYTEST.md).
+See [Linux roadmap](LINUX_ROADMAP.md) and [current playtest report](LINUX_PLAYTEST_ROUND3.md).
 The full Windows Audio Inspector and its complete Cartridge Vault feature set
 remain distinct. Real-game compatibility, physical device changes, screen readers
 and multi-monitor DPI behavior require separate qualification.

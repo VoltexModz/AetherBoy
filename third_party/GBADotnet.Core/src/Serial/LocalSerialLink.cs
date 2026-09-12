@@ -1,19 +1,28 @@
 namespace GameboyAdvanced.Core.Serial;
 
 /// <summary>
-/// Deterministic, in-process cable for exactly two GBA serial controllers.
-/// It performs no networking and never owns a timing thread; both emulators
-/// remain driven by their normal schedulers.
+/// A two-port GBA cable driven exclusively by the machines' emulated schedulers.
+/// The first port is the multiplayer parent, the second is its child. Normal
+/// serial modes instead use the internal clock selected by the software.
+/// Both devices and this cable must be accessed on the same emulation thread.
 /// </summary>
-public sealed class LocalSerialLink : IDisposable
+public sealed class LocalSerialLink : IDisposable, ISerialPeer
 {
-    private sealed record Pending(int Mode, uint Data, bool InternalClock, int Cycles);
-
     private readonly SerialController _first;
     private readonly SerialController _second;
-    private Pending? _firstPending;
-    private Pending? _secondPending;
+    private bool _connected = true;
     private bool _disposed;
+    private bool _multiplayerActive;
+    private bool _multiplayerHasChild;
+    private bool _multiplayerError;
+    private ushort _parentData;
+    private ushort _childData;
+
+    public bool Connected => !_disposed && _connected;
+    public long ClockEdges { get; private set; }
+    public long CompletedTransfers { get; private set; }
+    public long AbortedTransfers { get; private set; }
+    public long ContendedClockEdges { get; private set; }
 
     public LocalSerialLink(SerialController first, SerialController second)
     {
@@ -34,61 +43,121 @@ public sealed class LocalSerialLink : IDisposable
             first.Detach(this);
             throw;
         }
+        RefreshStatus();
     }
 
-    internal void Begin(SerialController controller, int mode, uint data, bool internalClock, int cycles)
+    /// <summary>Unplugs the virtual wire without resetting either serial unit.</summary>
+    public void SetConnected(bool connected)
     {
-        ThrowIfDisposed();
-        var pending = new Pending(mode, data, internalClock, cycles);
-        if (ReferenceEquals(controller, _first))
-            _firstPending = pending;
-        else if (ReferenceEquals(controller, _second))
-            _secondPending = pending;
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_connected == connected)
+            return;
+        _connected = connected;
+        if (_multiplayerActive && !connected)
+            _multiplayerError = true;
+        RefreshStatus();
+    }
+
+    public int PlayerId(SerialController controller) => ReferenceEquals(controller, _first) ? 0 : 1;
+
+    public bool NormalInputHigh(SerialController controller)
+    {
+        SerialController peer = Peer(controller);
+        return !Connected || peer.Mode != controller.Mode || peer.NormalOutputHigh;
+    }
+
+    public void RefreshStatus()
+    {
+        bool ready = Connected && _first.Mode == 2 && _second.Mode == 2;
+        _first.UpdateLinkStatus(0, Connected, ready);
+        _second.UpdateLinkStatus(1, Connected, ready);
+    }
+
+    public void ClockNormal(SerialController source)
+    {
+        if (_disposed || !source.IsNormalClockSource)
+            return;
+
+        SerialController peer = Peer(source);
+        bool peerParticipates = Connected && peer.Mode == source.Mode && peer._transferActive;
+        // Resolve conflicting internal clocks deterministically instead of
+        // clocking both registers twice for the same emulated wire edge.
+        if (peerParticipates && peer.IsNormalClockSource && ReferenceEquals(source, _second))
+        {
+            source.ScheduleNormalClock();
+            return;
+        }
+
+        bool sourceOut = source.NormalOutputHigh;
+        bool peerOut = NormalInputHigh(source);
+        if (peerParticipates && peer.IsNormalClockSource)
+            ContendedClockEdges++;
+        ClockEdges++;
+        bool finished = source.ShiftNormalBit(peerOut);
+        if (peerParticipates)
+            _ = peer.ShiftNormalBit(sourceOut);
+        if (finished)
+            CompletedTransfers++;
         else
-            throw new InvalidOperationException("The serial controller is not attached to this link.");
-
-        TryMatch();
+            source.ScheduleNormalClock();
     }
 
-    internal void Cancel(SerialController controller)
+    public void BeginMultiplayer(SerialController controller)
     {
-        if (ReferenceEquals(controller, _first))
-            _firstPending = null;
-        else if (ReferenceEquals(controller, _second))
-            _secondPending = null;
+        if (!ReferenceEquals(controller, _first) || _multiplayerActive)
+            return;
+
+        _multiplayerActive = true;
+        _multiplayerHasChild = Connected && _second.Mode == 2;
+        _multiplayerError = !_multiplayerHasChild;
+        // Latch both send words before either receive register is reset.
+        _parentData = _first._sioData8;
+        _childData = _multiplayerHasChild ? _second._sioData8 : ushort.MaxValue;
+        _first.ArmMultiplayer();
+        if (_multiplayerHasChild)
+            _second.ArmMultiplayer();
+        _first.ScheduleMultiplayerCompletion(_multiplayerHasChild);
     }
 
-    internal void Complete(SerialController controller) => Cancel(controller);
+    public void CompleteMultiplayer(SerialController controller)
+    {
+        if (!_multiplayerActive || !ReferenceEquals(controller, _first))
+            return;
+        _multiplayerActive = false;
+        bool error = _multiplayerError || !Connected;
+        ushort childData = error ? ushort.MaxValue : _childData;
+        _first.FinishMultiplayer(_parentData, childData, error);
+        if (_multiplayerHasChild)
+            _second.FinishMultiplayer(error ? ushort.MaxValue : _parentData, childData, error);
+        // Counts data bits, excluding multiplayer UART framing/handshake bits.
+        ClockEdges += _multiplayerHasChild ? 32 : 16;
+        CompletedTransfers++;
+        RefreshStatus();
+    }
+
+    public void Cancel(SerialController controller)
+    {
+        if (_multiplayerActive && (ReferenceEquals(controller, _first) || _multiplayerHasChild))
+        {
+            _multiplayerActive = false;
+            AbortedTransfers++;
+            _first.AbortTransfer(multiplayerError: true);
+            if (_multiplayerHasChild)
+                _second.AbortTransfer(multiplayerError: true);
+        }
+        RefreshStatus();
+    }
 
     public void Dispose()
     {
         if (_disposed)
             return;
+        Cancel(_first);
         _disposed = true;
-        _firstPending = null;
-        _secondPending = null;
         _first.Detach(this);
         _second.Detach(this);
     }
 
-    private void TryMatch()
-    {
-        if (_firstPending is not { } first || _secondPending is not { } second)
-            return;
-        if (first.Mode != second.Mode || first.Mode is not (0 or 1))
-            return;
-        if (!first.InternalClock && !second.InternalClock)
-            return;
-
-        int cycles = first.InternalClock && second.InternalClock
-            ? Math.Min(first.Cycles, second.Cycles)
-            : first.InternalClock ? first.Cycles : second.Cycles;
-        _first.ArmLinkedCompletion(second.Data, cycles);
-        _second.ArmLinkedCompletion(first.Data, cycles);
-    }
-
-    private void ThrowIfDisposed()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-    }
+    private SerialController Peer(SerialController controller) =>
+        ReferenceEquals(controller, _first) ? _second : _first;
 }

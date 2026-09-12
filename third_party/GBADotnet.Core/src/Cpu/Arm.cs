@@ -951,7 +951,7 @@ internal static unsafe partial class Arm
         // modes the entire CPSR can be changed"
         // Special format of msr which only affects condition flags, can't disambiguate
         // them in lookup table as bit 16 isn't included
-        if (((instruction >> 16) & 1) == 0 || core.Cpsr.Mode == CPSRMode.User) 
+        if (((instruction >> 16) & 1) == 0 || core.Cpsr.Mode == CPSRMode.User)
         {
             val &= 0xF000_0000;
             _ = core.Cpsr.Set(val);
@@ -1040,7 +1040,7 @@ internal static unsafe partial class Arm
             }
             else
             {
-                core.CurrentSpsr().Mode = core.CurrentSpsr().Set(val); 
+                core.CurrentSpsr().Mode = core.CurrentSpsr().Set(val);
             }
         }
         core.MoveExecutePipelineToNextInstruction();
@@ -1048,18 +1048,13 @@ internal static unsafe partial class Arm
     #endregion
 
     #region SWP
-    private static uint _swpCachedVal;
-    private static uint _swpDestinationReg;
-    private static uint _swpSourceReg;
-    private static uint _dataMask;
-    private static delegate*<uint, uint, uint> _swapCastFunc;
 
     internal static void swpCycle2(Core core, uint _instruction)
     {
-        _swpCachedVal = core.D;
+        core.InstructionState.Arm._swpCachedVal = core.D;
         core.SEQ = 0;
         core.nRW = true;
-        core.D = ((_swpSourceReg == 15) ? core.R[_swpSourceReg] + 4 : core.R[_swpSourceReg]) & _dataMask;
+        core.D = ((core.InstructionState.Arm._swpSourceReg == 15) ? core.R[core.InstructionState.Arm._swpSourceReg] + 4 : core.R[core.InstructionState.Arm._swpSourceReg]) & core.InstructionState.Arm._dataMask;
         core.NextExecuteAction = &swpCycle3;
     }
 
@@ -1073,17 +1068,17 @@ internal static unsafe partial class Arm
 
     internal static void swpCycle4(Core core, uint instruction)
     {
-        core.R[_swpDestinationReg] = _swapCastFunc(core.A, _swpCachedVal);
+        core.R[core.InstructionState.Arm._swpDestinationReg] = core.InstructionState.Arm._swapCastFunc(core.A, core.InstructionState.Arm._swpCachedVal);
         Core.ResetMemoryUnitForOpcodeFetch(core, instruction);
     }
 
     internal static void swp(Core core, uint instruction)
     {
         var rn = (instruction >> 16) & 0b1111;
-        _swpDestinationReg = (instruction >> 12) & 0b1111;
-        _swpSourceReg = instruction & 0b1111;
-        _dataMask = 0xFFFF_FFFF;
-        _swapCastFunc = &LdrStrUtils.LDRW;
+        core.InstructionState.Arm._swpDestinationReg = (instruction >> 12) & 0b1111;
+        core.InstructionState.Arm._swpSourceReg = instruction & 0b1111;
+        core.InstructionState.Arm._dataMask = 0xFFFF_FFFF;
+        core.InstructionState.Arm._swapCastFunc = &LdrStrUtils.LDRW;
         core.A = core.R[rn];
         core.AIncrement = 0;
         core.MAS = BusWidth.Word;
@@ -1094,10 +1089,10 @@ internal static unsafe partial class Arm
     internal static void swpb(Core core, uint instruction)
     {
         var rn = (instruction >> 16) & 0b1111;
-        _swpDestinationReg = (instruction >> 12) & 0b1111;
-        _swpSourceReg = instruction & 0b1111;
-        _dataMask = 0xFF;
-        _swapCastFunc = &LdrStrUtils.LDRB;
+        core.InstructionState.Arm._swpDestinationReg = (instruction >> 12) & 0b1111;
+        core.InstructionState.Arm._swpSourceReg = instruction & 0b1111;
+        core.InstructionState.Arm._dataMask = 0xFF;
+        core.InstructionState.Arm._swapCastFunc = &LdrStrUtils.LDRB;
         core.A = core.R[rn];
         core.AIncrement = 0;
         core.MAS = BusWidth.Byte;
@@ -1285,17 +1280,17 @@ internal static unsafe partial class Arm
         core.MoveExecutePipelineToNextInstruction();
     }
 
-    private static uint BlReturnAddress;
+
     internal static void bl(Core core, uint instruction)
     {
-        BlReturnAddress = core.R[15] - 4;
+        core.InstructionState.Arm.BlReturnAddress = core.R[15] - 4;
         b(core, instruction);
         core.NextExecuteAction = &bl_2;
     }
 
     internal static void bl_2(Core core, uint instruction)
     {
-        core.R[14] = BlReturnAddress;
+        core.R[14] = core.InstructionState.Arm.BlReturnAddress;
         core.MoveExecutePipelineToNextInstruction();
     }
 

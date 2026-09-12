@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using nanoboy.Core;
+using AetherBoy.Runtime.Netplay;
 
 namespace AetherBoy.Runtime
 {
@@ -39,6 +40,9 @@ namespace AetherBoy.Runtime
         private int state = (int)SessionState.Starting;
         private int ownerThreadId;
         private long machineVideoFrameSequence;
+        private static long nextAudioSession;
+        private readonly long audioSession = Interlocked.Increment(ref nextAudioSession);
+        private long audioGeneration = 1;
         private bool acceptingCommands = true;
         private bool shutdownRequested;
 
@@ -73,6 +77,39 @@ namespace AetherBoy.Runtime
         }
 
         public event EventHandler<AudioSamplesAvailableEventArgs>? AudioSamplesAvailable;
+
+        /// <summary>Online sessions use one local cartridge and a private, never auto-promoted save copy.</summary>
+        public static EmulationSession CreateOnlineLink(string romPath, string originalSavePath, string sessionDirectory,
+            bool isHost, IOnlineLinkTransport transport, EmulatorConfiguration configuration, int paletteIndex = 0,
+            bool allowUnverifiedGbaProfile = false)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(romPath);
+            ArgumentException.ThrowIfNullOrWhiteSpace(originalSavePath);
+            ArgumentException.ThrowIfNullOrWhiteSpace(sessionDirectory);
+            ArgumentNullException.ThrowIfNull(transport);
+            string extension = Path.GetExtension(romPath);
+            ValidateConfiguration(configuration); ValidatePalette(paletteIndex);
+            if (extension.Equals(".gba", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!allowUnverifiedGbaProfile)
+                    throw new NotSupportedException("GBA Online requires explicit consent to the unverified Pokémon Gen3 development profile.");
+                GbaOnlineCompatibility profile = GbaOnlineProfileCatalog.InspectRom(romPath);
+                if (!profile.IsDevelopmentCandidate) throw new NotSupportedException(profile.Reason);
+                return new(new GbaOnlineLinkMachineFactory(romPath, originalSavePath, sessionDirectory, isHost,
+                    transport, configuration, profile), new RealTimeFramePacer());
+            }
+            if (!extension.Equals(".gb", StringComparison.OrdinalIgnoreCase) && !extension.Equals(".gbc", StringComparison.OrdinalIgnoreCase))
+                throw new NotSupportedException("Online Link supports GB/GBC or an explicitly accepted GBA Gen3 development profile.");
+            return new(new OnlineLinkMachineFactory(romPath, originalSavePath, sessionDirectory, isHost,
+                transport, configuration, paletteIndex), new RealTimeFramePacer());
+        }
+
+        public OnlineLinkStatus? OnlineLink => machineFactory switch
+        {
+            OnlineLinkMachineFactory gb => gb.Status.Snapshot,
+            GbaOnlineLinkMachineFactory gba => gba.Status.Snapshot,
+            _ => null
+        };
 
         public SessionState State => (SessionState)Volatile.Read(ref state);
         public EmulationSnapshot LatestSnapshot => Volatile.Read(ref latestSnapshot);
@@ -339,6 +376,7 @@ namespace AetherBoy.Runtime
             Exception? ownerFault = null;
             SessionOwnerContext? context = null;
             long emulatedFrameCount = 0;
+            bool networkWasWaiting = false;
 
             try
             {
@@ -360,11 +398,12 @@ namespace AetherBoy.Runtime
                         timelineChanged)
                     {
                         framePacer.Reset();
+                        audioGeneration++;
+                        audioDispatcher.DiscardPending();
                     }
 
                     if (timelineChanged)
                     {
-                        audioDispatcher.DiscardPending();
                         machineVideoFrameSequence = long.MinValue;
                     }
 
@@ -392,13 +431,39 @@ namespace AetherBoy.Runtime
                         break;
                     }
 
+                    var cooperative = machine as ICooperativeEmulationMachine;
+                    cooperative?.SetLocalPaused(context.IsPaused);
+                    cooperative?.PollNetwork();
+                    if (machine is IGracefulOnlineStop { StopReady: true }) break;
+                    if (cooperative is not null && cooperative.WaitingForNetwork != networkWasWaiting)
+                    {
+                        networkWasWaiting = cooperative.WaitingForNetwork;
+                        audioGeneration++;
+                        audioDispatcher.DiscardPending();
+                        framePacer.Reset();
+                    }
                     if (context.IsPaused)
                     {
-                        commandAvailable.WaitOne();
+                        if (cooperative is null) commandAvailable.WaitOne();
+                        else commandAvailable.WaitOne(5);
                         continue;
                     }
 
-                    machine.RunFrame();
+                    if (cooperative is not null)
+                    {
+                        if (!cooperative.TryRunFrame())
+                        {
+                            // Yield commands between partial chunks, without counting or pacing a false frame.
+                            if (cooperative.NeedsIdleWait)
+                            {
+                                framePacer.Reset();
+                                commandAvailable.WaitOne(2);
+                            }
+                            else Thread.Yield();
+                            continue;
+                        }
+                    }
+                    else machine.RunFrame();
                     emulatedFrameCount++;
                     PublishStateAndSnapshot(context, SessionState.Running, emulatedFrameCount);
 
@@ -415,9 +480,13 @@ namespace AetherBoy.Runtime
             catch (Exception exception)
             {
                 ownerFault = exception;
+                (machine as ICooperativeEmulationMachine)?.RecordFault(exception);
             }
             finally
             {
+                // Disposal may include durable battery/RTC writes. Keep the owner and its write
+                // leases alive, but do not advertise a runnable session while finalization blocks.
+                PublishTerminalState(SessionState.Stopping);
                 audioDispatcher.StopWithoutWaiting();
                 if (machine is not null)
                 {
@@ -545,7 +614,7 @@ namespace AetherBoy.Runtime
 
         private void ForwardAudioSamples(object? sender, AudioSamplesAvailableEventArgs eventArgs)
         {
-            audioDispatcher.TryPost(eventArgs);
+            audioDispatcher.TryPost(eventArgs.WithPlaybackGeneration(audioGeneration, audioSession));
         }
 
         private void DispatchAudioSamples(AudioSamplesAvailableEventArgs eventArgs)

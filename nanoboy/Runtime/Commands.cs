@@ -86,7 +86,12 @@ namespace AetherBoy.Runtime
     {
         private readonly bool isEnabled;
         public SetTurboCommand(bool isEnabled) => this.isEnabled = isEnabled;
-        public override void Apply(SessionOwnerContext context) => context.IsTurboEnabled = isEnabled;
+        public override void Apply(SessionOwnerContext context)
+        {
+            if (isEnabled && context.Machine is ICooperativeEmulationMachine)
+                throw new NotSupportedException("Turbo is disabled during Online Link.");
+            context.IsTurboEnabled = isEnabled;
+        }
     }
 
     internal sealed class ResetCommand : EmulationCommand
@@ -167,6 +172,10 @@ namespace AetherBoy.Runtime
 
     internal sealed class ShutdownCommand : EmulationCommand
     {
-        public override void Apply(SessionOwnerContext context) => context.StopRequested = true;
+        public override void Apply(SessionOwnerContext context)
+        {
+            if (context.Machine is IGracefulOnlineStop online) online.RequestStop();
+            else context.StopRequested = true;
+        }
     }
 }

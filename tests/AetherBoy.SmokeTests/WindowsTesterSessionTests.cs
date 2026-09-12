@@ -92,7 +92,8 @@ public sealed class WindowsTesterSessionTests
                 startupDetails.GetProperty("runtime_binary_id").GetGuid());
             StringAssert.Contains(log, "rom.load_requested");
             StringAssert.Contains(log, "rom.started");
-            StringAssert.Contains(log, "POKEMON ROCKET");
+            Assert.IsFalse(log.Contains("POKEMON ROCKET", StringComparison.Ordinal),
+                "ROM titles can be filename fallbacks and must not enter shared reports.");
             StringAssert.Contains(log, new string('A', 64));
             StringAssert.Contains(log, "Battletron Controller");
             StringAssert.Contains(log, "application.closed");
@@ -109,6 +110,8 @@ public sealed class WindowsTesterSessionTests
             CollectionAssert.AreEquivalent(
                 new[] { "README.txt", "session.jsonl" },
                 archive.Entries.Select(entry => entry.FullName).ToArray());
+            using var readme = new StreamReader(archive.GetEntry("README.txt")!.Open());
+            StringAssert.Contains(readme.ReadToEnd(), "controller device names/IDs");
         }
         finally
         {

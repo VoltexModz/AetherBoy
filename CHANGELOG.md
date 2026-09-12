@@ -2,6 +2,98 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## Unveröffentlicht – GBA Gen3 Online / development profile
+
+- Austauschbarer GBA-SIO-Gegenstellenvertrag und eigener Zweispieler-Gen3-Adapter:
+  beobachteter Spiel-Handshake, acht Datenwörter, lokale Prüfsummen, begrenzte Queues
+  und fehlersicherer Phasenwechsel. Lokaler GBA-Kabelpfad bleibt eigenständig.
+- GBA-Onlinebesitzer in derselben Runtime, getrenntes v2-Protokoll, Pause-/Abbruchsteuerung
+  und vorhandener verschlüsselter Browser-WebRTC-Transport für Windows und Linux.
+- Exakte Originalfassungen über veröffentlichte Prüfsummen identifizieren; nur nach
+  ausdrücklicher Entwicklungsbestätigung starten. Kein fertiger Kompatibilitätsnachweis,
+  keine automatische Freigabe von Hacks anhand ihrer Spielkennung.
+- Lokales Sitzungsjournal, Original-/Arbeitsdateiprüfung, konservative Behandlung
+  ungeklärter Ergebnisse, bewusste Übernahme mit vollständiger vorheriger Sicherung.
+  Beide Frontends archivieren alte Fortsetzen-Dateien; manuelle States bleiben erhalten.
+- English: original two-player Gen3 protocol endpoint, shared cross-platform GBA owner,
+  strict versioned transport, development-only profile identification and explicit,
+  journaled save-copy recovery. No retail-trade/WAN claim, automatic import or hosted relay.
+- [Anleitung, Architektur, Nachweise und offene Abnahme (DE/EN)](docs/GBA_ONLINE_HANDOFF.md).
+
+## Unveröffentlicht – GB/GBC Online Link / Online Link prototype
+
+- Eigenes GB/GBC-Netzwerkkabel mit eindeutigen Sitzungs-/Transfernummern,
+  Bereitschafts-/Abschlussbarrieren, echten seriellen Takten und erklärten Abbrüchen.
+- Gemeinsame Windows-/Linux-Runtime, Online-Link-Einstiege in beiden Frontends und
+  lokale WebRTC-Browserbrücke mit manuellem Offer/Answer. Kein ROM-/Save-Dateiaustausch,
+  kein standardmäßiger öffentlicher STUN/TURN-Kontakt, keine garantierte NAT-Durchquerung.
+- Lokale Batterie-/RTC-Sitzungskopien und gesperrte Zeitmanipulation schützen Originale;
+  auch nach Trennung keine automatische Spielstandübernahme.
+- Beim Gesamttest gefundenen Schließfehler im bisherigen lokalen Linkfenster behoben:
+  Bild-/Controller-Aktualisierung hält ihren Sitzungsbesitzer fest und erkennt
+  zwischenzeitlichen Abbau durch erneut eintretende UI-Ereignisse. Regressionstest ergänzt.
+- DoubleCherryGB als Referenz heruntergeladen und relevanten Netzwerkpfad auditiert,
+  ohne Implementierungscode zu übernehmen. Eigenes Protokoll, nicht wire-kompatibel.
+- Grenzen dieses früheren Meilensteins: paired-transfer GB/GBC-Prototyp, langsame
+  Byte-Runden über WAN möglich, kein echter Pokémon-Tausch nachgewiesen. Das inzwischen
+  ergänzte GBA-Gen3-Entwicklungsprofil ist im neueren Abschnitt oben beschrieben.
+- English: original cross-platform GB/GBC cable-data prototype with an encrypted
+  browser-assisted transport, bounded validated packets and private local save copies.
+  Actual Pokémon trading and Internet/relay qualification remain pending. The later
+  GBA Gen3 development profile is documented in the newer section above.
+- [Anleitung und Entwicklerübergabe / usage and handoff](docs/ONLINE_LINK_HANDOFF.md),
+  [Quellenprüfung / source audit](docs/DOUBLECHERRY_NETWORK_REFERENCE.md).
+
+## Unveröffentlicht – GBA Link Lab und Linux-Zusammenführung
+
+- Windows Local Link Lab unterstützt jetzt zwei GBA-Spiele mit 240×160-Puffern,
+  L/R-Eingabe, gemeinsamer Zeitsteuerung und getrennten persistenten Spielständen.
+  GB/GBC und GBA bleiben unterschiedliche, nicht mischbare Kabelprotokolle.
+- GBA-SIO ergänzt Normal-8-/32-Bit und Multiplayer-16-Bit für zwei Geräte mit
+  Baudraten, IDs, Ready/Busy/Error, Empfangsslots und Interrupts. Kein Netzwerk,
+  Wireless, Joybus oder Vier-Spieler-Modus; echte Spielabnahme steht noch aus.
+- Mehrtaktiger ARM-/Thumb-Instruktionszustand ist pro CPU statt global: zwei
+  Geräte dürfen weder geladene Werte noch laufende Befehle gegenseitig ändern.
+- GBA-Geräte-States schreiben Schema 6 und lesen weiterhin Schema 5. Batterie-
+  Saves bleiben unverändert. Einseitiges Capture/Restore am Link wird abgewiesen.
+- Linux-Commit `367674f` inhaltlich mit lokaler Windows-/Parity-/Link-Arbeit
+  vereinigt. Neue Linux-Komfort-/Accessibility-/Ladeabläufe erhalten gemeinsame
+  Audio-Generationen, Save-Locks, Screenshots und Performance-Anzeige.
+- [GBA-Entwicklung, Herkunft und Tests (DE/EN)](docs/GBA_LOCAL_LINK_HANDOFF.md),
+  [Linux-Beitrag und Integrationsprüfung (DE/EN)](docs/LINUX_UPSTREAM_INTEGRATION_REVIEW.md).
+  Kein Commit oder Push dieses vereinten Stands ohne ausdrückliche Freigabe.
+
+## Unveröffentlicht – Linux-Restkritik, Runde 3
+
+- Vollständiger gemeinsamer Texteditor mit Caret, Auswahl, Maus/Drag, Clipboard,
+  IME-Komposition, Scroll und sauberem Fokuswechsel für Titel/Suche/Cheats.
+- Optionales natives GTK3-Control-Center mit ATK-/AT-SPI-Semantik via Ctrl+F7
+  beziehungsweise `--accessible`; F7 bleibt Rewind. Reale Schnittstellen- und
+  getrennte Busprüfungen ergänzen die SDL-Tests.
+- Abbrechbare ROM-Vorbereitung im Hintergrund, sichere GBA-Fokus-/Owner-Barriere
+  und gesperrte Aktionen hinter dem Ladeoverlay.
+- Hintergrundschreiben unveränderlicher Settings-/Profilsnapshots mit Generation
+  und Retry; kritische Übergänge warten weiterhin auf erfolgreiche Speicherung.
+- [Fix-IDs, Vorher/Nachher, Tests und verbleibende Grenzen](docs/LINUX_FIX_LOG.md).
+
+## Unveröffentlicht – Linux-Komfort und Distribution
+
+- Begrenzte Hintergrundabfragen für Library, Save-Slots und Backup-Metadaten;
+  veraltete Ergebnisse dürfen keine inzwischen gewechselte ROM überschreiben.
+- Getrennte Resume-Punkte, State-Galerie mit verifizierten Vorschaubildern und
+  Undo nach Laden; Startseite und Overview bieten direktes Fortsetzen.
+  Ein nicht lesbarer Resume wird nicht automatisch durch den neuen Start ersetzt.
+- Spielbezogene Einstellungen mit globaler Vererbung, Favoriten, eigene Titel,
+  Systemfilter und aktive Spielzeit ergänzen die bisherigen Linux-Werkzeuge.
+- Drei Schriftstufen, echte Palettenmuster, kurze Aktionsnamen und F6-Navigation
+  verbessern das Control Center. Asynchrone Listenwechsel erhalten nur eindeutig
+  zugeordneten Fokus; Umordnungen dürfen keine falsche Aktion auslösen.
+- x64-/ARM64-Archive mit Runtime, Lizenzen und korrespondierenden Quellen;
+  glibc mindestens 2.38. ARM64-Ausführung bleibt praktisch zu prüfen.
+- Unabhängige, fehlerorientierte Abnahme und ehrliche Noten stehen in
+  [Kritik Runde 2](docs/LINUX_CRITIQUE_ROUND2.md) und
+  [Playtest Runde 2](docs/LINUX_PLAYTEST_ROUND2.md). Keine neuen Langläufe.
+
 ## Unveröffentlicht – Linux Patch Lab
 
 - Library → Patch Lab verwendet den gemeinsamen IPS-/BPS-/UPS-Patcher mit

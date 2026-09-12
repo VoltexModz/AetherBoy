@@ -44,6 +44,24 @@ namespace AetherBoy.Runtime
         void WaitForNextFrame(CancellationToken cancellationToken);
     }
 
+    // A network owner must keep servicing commands while emulated time is waiting.
+    // Returning false means no complete frame was emulated; it is not a fake frame.
+    internal interface ICooperativeEmulationMachine
+    {
+        bool WaitingForNetwork { get; }
+        bool NeedsIdleWait { get; }
+        void SetLocalPaused(bool paused) { }
+        void RecordFault(Exception fault) { }
+        void PollNetwork();
+        bool TryRunFrame();
+    }
+
+    internal interface IGracefulOnlineStop
+    {
+        void RequestStop();
+        bool StopReady { get; }
+    }
+
     internal sealed class RealTimeFramePacer : IFramePacer
     {
         private static readonly long FrameTicks = Math.Max(

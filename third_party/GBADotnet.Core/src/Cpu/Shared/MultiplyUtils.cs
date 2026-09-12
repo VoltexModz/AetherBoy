@@ -1,15 +1,11 @@
 ﻿namespace GameboyAdvanced.Core.Cpu.Shared;
 
 /// <summary>
-/// All the multiply operations across Arm/Thumb have aspects in common which 
+/// All the multiply operations across Arm/Thumb have aspects in common which
 /// are stored here.
 /// </summary>
 internal static unsafe class MultiplyUtils
 {
-    private static int _requiredCycles;
-    private static int _currentCycles;
-    private static int _destinationReg;
-    private static uint _multiplyResult;
 
     internal static void SetupForMultiplyAccumulateFlags(Core core, int rd, int rs, int rm, int rn)
     {
@@ -26,8 +22,8 @@ internal static unsafe class MultiplyUtils
     internal static void SetupForMultiplyAccumulate(Core core, int rd, int rs, int rm, int rn)
     {
         SetupForMultiply(core, rd, rs, rm);
-        _multiplyResult += core.R[rn];
-        _requiredCycles++; // 1 extra I cycle for MLA operation
+        core.InstructionState.Multiply._multiplyResult += core.R[rn];
+        core.InstructionState.Multiply._requiredCycles++; // 1 extra I cycle for MLA operation
     }
 
     internal static int CyclesForMultiplySigned(uint operand)
@@ -76,24 +72,24 @@ internal static unsafe class MultiplyUtils
         core.nOPC = true;
         core.nMREQ = true;
         core.AIncrement = 0;
-        _destinationReg = rd;
-        _currentCycles = 0;
-        _requiredCycles = CyclesForMultiplySigned(core.R[rs]);
-        _multiplyResult = (uint)((int)core.R[rs] * (int)core.R[rm]);
+        core.InstructionState.Multiply._destinationReg = rd;
+        core.InstructionState.Multiply._currentCycles = 0;
+        core.InstructionState.Multiply._requiredCycles = CyclesForMultiplySigned(core.R[rs]);
+        core.InstructionState.Multiply._multiplyResult = (uint)((int)core.R[rs] * (int)core.R[rm]);
         core.NextExecuteAction = &MultiplyCycle;
     }
 
     internal static void MultiplyCycle(Core core, uint instruction)
     {
-        _currentCycles++;
+        core.InstructionState.Multiply._currentCycles++;
         core.SEQ = 0;
 
-        if (_currentCycles == _requiredCycles)
+        if (core.InstructionState.Multiply._currentCycles == core.InstructionState.Multiply._requiredCycles)
         {
-            core.R[_destinationReg] = _multiplyResult;
+            core.R[core.InstructionState.Multiply._destinationReg] = core.InstructionState.Multiply._multiplyResult;
             Core.ResetMemoryUnitForOpcodeFetch(core, instruction);
 
-            if (_destinationReg == 15)
+            if (core.InstructionState.Multiply._destinationReg == 15)
             {
                 core.ClearPipeline();
             }
@@ -102,17 +98,17 @@ internal static unsafe class MultiplyUtils
 
     internal static void MultiplyCycleWFlags(Core core, uint instruction)
     {
-        _currentCycles++;
+        core.InstructionState.Multiply._currentCycles++;
         core.SEQ = 0;
 
-        if (_currentCycles == _requiredCycles)
+        if (core.InstructionState.Multiply._currentCycles == core.InstructionState.Multiply._requiredCycles)
         {
-            core.R[_destinationReg] = _multiplyResult;
-            ALU.SetZeroSignFlags(ref core.Cpsr, _multiplyResult);
+            core.R[core.InstructionState.Multiply._destinationReg] = core.InstructionState.Multiply._multiplyResult;
+            ALU.SetZeroSignFlags(ref core.Cpsr, core.InstructionState.Multiply._multiplyResult);
             // TODO - The carry flag is set to a meaningless value. Ok, but what.
             Core.ResetMemoryUnitForOpcodeFetch(core, instruction);
 
-            if (_destinationReg == 15)
+            if (core.InstructionState.Multiply._destinationReg == 15)
             {
                 core.ClearPipeline();
             }

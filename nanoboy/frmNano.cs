@@ -19,6 +19,7 @@ namespace nanoboy
     {
 
         private EmulationSession session;
+        private AetherBoy.Runtime.Storage.RomWriteLease? romWriteLease;
         private NanoboySettings settings;
         private frmAudioTool audiotoolwindow;
         private frmControlCenter controlCenter;
@@ -41,6 +42,8 @@ namespace nanoboy
         private readonly WindowsTesterSession? testerSession;
         private readonly WindowsSessionHealthMonitor? healthMonitor;
         private static readonly TimeSpan SessionShutdownTimeout = TimeSpan.FromSeconds(2);
+        // Gen3 closes through a 3-second peer handshake plus receipt drain and a final private-save flush.
+        private static readonly TimeSpan GbaOnlineShutdownTimeout = TimeSpan.FromSeconds(5);
 
         public frmNano() : this(null)
         {
@@ -75,6 +78,8 @@ namespace nanoboy
             InitializeAetherShell();
             InitializeWindowsExperience();
             InitializePlayerTools();
+            InitializeSystemTools();
+            InitializeOnlineLinkTools();
             if (testerSession != null)
             {
                 healthMonitor = new WindowsSessionHealthMonitor(testerSession);
@@ -104,6 +109,8 @@ namespace nanoboy
             EmulationSession previousSession = session;
             if (previousSession == null)
             {
+                romWriteLease?.Dispose();
+                romWriteLease = null;
                 currentRomPath = null;
                 DisposeAudioOutput(null);
                 UpdateAetherSessionUi(null);
@@ -116,14 +123,21 @@ namespace nanoboy
             }
 
             DisposeAudioOutput(previousSession);
+            bool gbaOnlineClosing = previousSession.OnlineLink?.ProfileId == AetherBoy.Runtime.Netplay.GbaOnlineProfileCatalog.PokemonGen3Profile;
+            if (gbaOnlineClosing)
+            {
+                SetSaveFeedback("GBA-Online wird sicher beendet · Gegenstelle abmelden und Sitzungskopie sichern · bis zu 5 Sekunden", false);
+                Update();
+            }
             Task shutdown = previousSession.ShutdownAsync();
             Task completed = Task.WhenAny(
                 shutdown,
-                Task.Delay(SessionShutdownTimeout)).GetAwaiter().GetResult();
+                Task.Delay(gbaOnlineClosing ? GbaOnlineShutdownTimeout : SessionShutdownTimeout)).GetAwaiter().GetResult();
 
             if (!ReferenceEquals(completed, shutdown))
             {
-                Debug.WriteLine("The emulation session did not stop within two seconds.");
+                Debug.WriteLine("The emulation session did not stop within its bounded shutdown budget.");
+                if (gbaOnlineClosing) SetSaveFeedback("GBA-Online wird noch beendet · Sitzung und Schreibschutz bleiben erhalten · bitte erneut Beenden wählen", true);
                 return false;
             }
 
@@ -139,6 +153,10 @@ namespace nanoboy
 
             if (ReferenceEquals(session, previousSession))
             {
+                onlineLinkTransport?.Dispose();
+                onlineLinkTransport = null;
+                romWriteLease?.Dispose();
+                romWriteLease = null;
                 session = null;
                 currentRomPath = null;
                 settings.UseGameProfile(null);
@@ -172,7 +190,9 @@ namespace nanoboy
 
             try
             {
-                output.Submit(eventArgs.GetInterleavedSamplesCopy(), eventArgs.SampleRate, eventArgs.Channels);
+                if (!ReferenceEquals(sender, session)) return;
+                output.Submit(eventArgs.GetInterleavedSamplesCopy(), eventArgs.SampleRate,
+                    eventArgs.Channels, eventArgs.PlaybackGeneration, eventArgs.PlaybackSession);
             }
             catch (ObjectDisposedException)
             {
@@ -186,49 +206,24 @@ namespace nanoboy
 
         private byte[] LoadBootROM(bool isColor, bool isGameBoyAdvance = false)
         {
+            firmwareLoadWarning = null;
             if (!settings.BootRomEnable)
             {
                 return null;
             }
 
-            string bootFileName = isGameBoyAdvance
-                ? "gba_bios.bin"
-                : isColor ? "gbc_boot.bin" : "dmg_boot.bin";
-            string localPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, bootFileName);
-            string managedPath = Path.Combine(WindowsDataPaths.Default.Firmware, bootFileName);
-            if (File.Exists(managedPath))
+            var kind = isGameBoyAdvance ? WindowsFirmwareKind.Gba
+                : isColor ? WindowsFirmwareKind.Cgb : WindowsFirmwareKind.Dmg;
+            try
             {
-                try { return File.ReadAllBytes(managedPath); }
-                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-                {
-                    testerSession?.RecordException("firmware.read_failed", exception);
-                    Debug.WriteLine($"Could not read local firmware: {exception}");
-                    return null;
-                }
+                return new WindowsFirmwareStore(WindowsDataPaths.Default).Load(kind);
             }
-            if (File.Exists(bootFileName))
+            catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
             {
-                try
-                {
-                    return File.ReadAllBytes(bootFileName);
-                }
-                catch (Exception exception)
-                {
-                    Debug.WriteLine($"Could not load boot ROM '{bootFileName}': {exception}");
-                }
+                testerSession?.RecordException("firmware.read_failed", exception);
+                firmwareLoadWarning = "Firmware ungültig oder nicht lesbar · integrierter Start verwendet · SYSTEM → Firmware";
+                return null;
             }
-            if (File.Exists(localPath))
-            {
-                try
-                {
-                    return File.ReadAllBytes(localPath);
-                }
-                catch (Exception exception)
-                {
-                    Debug.WriteLine($"Could not load boot ROM '{localPath}': {exception}");
-                }
-            }
-            return null;
         }
 
         #region "Menu"
@@ -324,9 +319,11 @@ namespace nanoboy
 
             try
             {
+                string savePath = WindowsRomLibrary.Default.GetSavePath(path);
+                romWriteLease = AetherBoy.Runtime.Storage.RomWriteLease.Acquire(savePath + ".lock");
                 session = new EmulationSession(
                     path,
-                    WindowsRomLibrary.Default.GetSavePath(path),
+                    savePath,
                     bootRom,
                     configuration,
                     settings.PaletteIndex);
@@ -343,6 +340,8 @@ namespace nanoboy
             catch (Exception exception)
             {
                 testerSession?.RecordException("rom.start_failed", exception);
+                romWriteLease?.Dispose();
+                romWriteLease = null;
                 preparedAudioOutput?.Dispose();
                 settings.UseGameProfile(null);
                 UpdateAetherSessionUi(null);
@@ -366,7 +365,7 @@ namespace nanoboy
             lastPadState = GamepadInput.GetState();
             UpdateAetherGamepadUi(lastPadState);
             gameView.ClearFrame();
-            SetSaveFeedback("F5 speichern · F8 laden · F6 State-Galerie · F11 Vollbild", false);
+            SetSaveFeedback(firmwareLoadWarning ?? "F5 speichern · F8 laden · F6 State-Galerie · F11 Vollbild", firmwareLoadWarning is not null);
 
             if (audiotoolwindow != null && !audiotoolwindow.IsDisposed)
             {
@@ -520,6 +519,11 @@ namespace nanoboy
                 OpenStateGallery = OpenStateGallery,
                 ToggleGameProfile = () => ChangeGameProfile(false),
                 ResetGameProfile = () => ChangeGameProfile(true),
+                OpenFirmwareManager = OpenFirmwareManager,
+                FirmwareStatusProvider = DescribeFirmware,
+                RecordNextSessionProvider = () => WindowsDiagnosticsPreferences.Default.GetStatus().RecordNextSession,
+                DiagnosticsPreferenceStatusProvider = DescribeDiagnosticsPreference,
+                SetRecordNextSession = SetRecordNextSession,
                 OpenQuickMenu = () => _ = OpenQuickMenuAsync(),
                 CaptureScreenshot = () => _ = CaptureScreenshotAsync(),
                 TogglePerformanceOverlay = TogglePerformanceOverlay,
@@ -533,7 +537,9 @@ namespace nanoboy
                 QuickSave = QuickSave,
                 QuickLoad = QuickLoad,
                 ResetSettings = ResetSettingsToDefaults,
-                TesterModeProvider = () => testerSession is not null,
+                TesterModeProvider = () => testerSession?.IsRecording == true,
+                TesterReportAvailableProvider = () => testerSession is not null && !testerExportInProgress,
+                TesterRecordingStatusProvider = DescribeActiveRecording,
                 TesterLogPathProvider = () => testerSession?.LogFilePath,
                 ExportTesterReport = ExportTesterReport,
                 OpenTesterFolder = OpenTesterFolder
@@ -544,6 +550,7 @@ namespace nanoboy
 
         private void OpenBatterySaveSafety(IWin32Window owner)
         {
+            if (IsOnlineLink) { WindowsDataPaths.OpenFolder(owner, onlineLinkDirectory!); return; }
             EmulationSession currentSession = session;
             string romPath = currentRomPath;
             RomSnapshot? rom = currentSession?.LatestSnapshot.Rom;
@@ -627,10 +634,8 @@ namespace nanoboy
                     return;
                 }
 
-                BatterySaveStore.Restore(
-                    savePath,
-                    rom.BatterySave.ExpectedLength,
-                    selectedSaveData);
+                using (AetherBoy.Runtime.Storage.RomWriteLease.Acquire(savePath + ".lock"))
+                    BatterySaveStore.Restore(savePath, rom.BatterySave.ExpectedLength, selectedSaveData);
                 stateOperationInProgress = false; // Disk restore finished; the regular ROM-start guard applies again.
                 LoadRomFile(romPath);
                 if (session != null)
@@ -693,6 +698,7 @@ namespace nanoboy
 
         private async void menuRewind_Click(object sender, EventArgs e)
         {
+            if (IsOnlineLink) { SetSaveFeedback("Rewind ist im Online-Link gesperrt", true); return; }
             EmulationSession currentSession = session;
             if (currentSession == null || stateOperationInProgress)
             {
@@ -792,6 +798,7 @@ namespace nanoboy
 
         private void menuCheats_Click(object sender, EventArgs e)
         {
+            if (IsOnlineLink) { SetSaveFeedback("Cheats sind im Online-Link gesperrt", true); return; }
             EmulationSession currentSession = session;
             if (currentSession == null)
             {
@@ -808,7 +815,8 @@ namespace nanoboy
 
         private void menuLinkCable_Click(object sender, EventArgs e)
         {
-            ShowUnavailableFeature("Link-Kabel Multiplayer");
+            using var link = new frmLocalLinkLab(settings, currentRomPath, () => StopSession());
+            link.ShowDialog(controlCenter is { IsDisposed: false } ? controlCenter : this);
         }
 
         private void ShowUnavailableFeature(string feature)
@@ -1044,11 +1052,14 @@ namespace nanoboy
             }
 
             EmulationSnapshot snapshot = currentSession.LatestSnapshot;
+            UpdateOnlineLinkUi();
             TrackGameActivity(snapshot);
             UpdatePerformanceOverlay(snapshot);
             bool running = snapshot.State == SessionState.Running;
             frameTiming.SetActive(running && WindowState != FormWindowState.Minimized && !snapshot.IsTurboEnabled);
-            Volatile.Read(ref audioOutput)?.SetSuspended(!running || snapshot.IsTurboEnabled || stateOperationInProgress);
+            bool gbaNetworkWait = snapshot.Rom?.IsGameBoyAdvance == true &&
+                currentSession.OnlineLink is { Phase: not AetherBoy.Runtime.Netplay.OnlineLinkPhase.Playing };
+            Volatile.Read(ref audioOutput)?.SetSuspended(!running || stateOperationInProgress || gbaNetworkWait);
             if (snapshot.State == SessionState.Starting)
                 return;
 
@@ -1089,7 +1100,13 @@ namespace nanoboy
             }
         }
 
-        private void PollGamepad() => ProcessGamepadState(GamepadInput.GetState(), Form.ActiveForm == this && ContainsFocus && Enabled);
+        private void PollGamepad()
+        {
+            HostGamepadState state = GamepadInput.GetState();
+            bool active = Form.ActiveForm == this && ContainsFocus && Enabled;
+            if (active) aetherCommandMenu?.ProcessGamepad(state);
+            ProcessGamepadState(state, active && aetherCommandMenu is null);
+        }
 
         private void MarkSessionProblem()
         {
@@ -1242,7 +1259,7 @@ namespace nanoboy
                 return;
             }
 
-            if (e.KeyCode == Keys.Space && !turboPressed)
+            if (e.KeyCode == Keys.Space && !turboPressed && !IsOnlineLink)
             {
                 turboPressed = true;
                 ObserveSessionCommand(currentSession.SetTurboAsync(isEnabled: true));
@@ -1345,13 +1362,16 @@ namespace nanoboy
         }
         #endregion
 
-        private void ExportTesterReport()
+        private async void ExportTesterReport()
         {
+            if (testerExportInProgress) return;
             if (testerSession is null)
             {
                 AetherSignal.Show(
                     this,
-                    "Development-Builds zeichnen die Entwicklungsdiagnose automatisch lokal auf.",
+                    "Für diesen Programmstart ist keine Sitzungsaufzeichnung verfügbar. " +
+                    "Im Control Center unter DIAGNOSTICS kannst du sie für den nächsten Start aktivieren. " +
+                    "Bereits vorhandene Berichte bleiben im Development-Ordner erhalten.",
                     "Entwicklungsdiagnose ist aus",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
@@ -1374,9 +1394,12 @@ namespace nanoboy
                 return;
             }
 
+            testerExportInProgress = true;
             try
             {
-                string reportPath = testerSession.CreateBundle(dialog.FileName);
+                string destination = dialog.FileName;
+                string reportPath = await Task.Run(() => testerSession.CreateBundle(destination));
+                if (IsDisposed) return;
                 AetherSignal.Show(
                     this,
                     $"Der lokale Testbericht wurde gespeichert.\n\n{reportPath}",
@@ -1388,6 +1411,7 @@ namespace nanoboy
                 exception is ArgumentException or IOException or InvalidOperationException or UnauthorizedAccessException)
             {
                 testerSession.RecordException("report.export_failed", exception);
+                if (IsDisposed) return;
                 AetherSignal.Show(
                     this,
                     $"Der Testbericht konnte nicht exportiert werden.\n\n{exception.Message}",
@@ -1395,12 +1419,15 @@ namespace nanoboy
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }
+            finally { testerExportInProgress = false; }
         }
 
         private void OpenTesterFolder()
         {
             if (testerSession is null)
             {
+                WindowsDataPaths.OpenFolder(controlCenter is { IsDisposed: false } ? controlCenter : this,
+                    WindowsDataPaths.Default.Development);
                 return;
             }
 

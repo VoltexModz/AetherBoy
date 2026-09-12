@@ -22,7 +22,28 @@ internal sealed partial class WaylandEmulatorHost
 
     private readonly List<(SDL.FRect Bounds, Action Action)> shellCommands = new();
     private readonly List<SDL.FRect> focusTargets = new();
+    private readonly record struct FocusIdentity(string Context, string Action, float X, float Y, float Width, float Height);
+    private readonly List<FocusIdentity> focusIdentities = new();
+    private FocusIdentity? previousFocus;
     private int focusedControl = -1;
+    private string FocusContext => !controlCenterVisible ? "main:" + storage?.Identity
+        : $"{controlCenterPage}:{showController}:{showBackups}:{showGallery}:{showPatchLab}:{editingTitleIdentity}:{storage?.Identity}";
+
+    private void BeginFocusFrame()
+    {
+        previousFocus = focusedControl >= 0 && focusedControl < focusIdentities.Count ? focusIdentities[focusedControl] : null;
+        focusedControl = -1;
+        focusTargets.Clear(); focusIdentities.Clear();
+    }
+
+    private void JumpControlCenterRegion()
+    {
+        bool inContent = focusedControl >= 0 && focusedControl < focusTargets.Count
+            && focusTargets[focusedControl].X >= 278 && focusTargets[focusedControl].Y >= 180;
+        focusedControl = inContent
+            ? focusTargets.FindIndex(target => target.X < 248 && target.Y == 224 + (int)controlCenterPage * 50)
+            : focusTargets.FindIndex(target => target.X >= 278 && target.Y >= 180);
+    }
     private IntPtr brandTexture;
     private bool mouseTurbo;
     private static readonly string[] PageNames = ["OVERVIEW", "DISPLAY", "AUDIO", "INPUT", "SAVES", "SYSTEM", "DIAGNOSTICS", "LIBRARY", "TOOLS"];
@@ -37,6 +58,7 @@ internal sealed partial class WaylandEmulatorHost
     private void Paint(float x, float y, float w, float h, SDL.Color color) => Fill(x, y, w, h, color.R, color.G, color.B);
     private void Ink(float x, float y, string text, int size = 14, SDL.Color? color = null, bool bold = false)
     {
+        DescribeAccessibleText(x, y, text);
         SDL.Color c = color ?? Colors.Text;
         textRenderer.Draw(x, y, text, c.R, c.G, c.B, size, bold);
     }
@@ -83,16 +105,25 @@ internal sealed partial class WaylandEmulatorHost
     }
 
     private void ActionButton(float x, float y, float w, float h, string label, Action action,
-        bool primary = false, bool enabled = true)
+        bool primary = false, bool enabled = true, string? focusId = null)
     {
-        DrawButton(x, y, w, h, label, primary, enabled);
+        enabled = enabled && (!IsLoading || label == "CANCEL LOAD");
+        DrawButton(x, y, w, h, label, primary, enabled, focusId);
         if (enabled) shellCommands.Add((new SDL.FRect { X = x, Y = y, W = w, H = h }, action));
     }
 
-    private void DrawButton(float x, float y, float width, float height, string label, bool selected, bool enabled = true)
+    private void DrawButton(float x, float y, float width, float height, string label, bool selected, bool enabled = true, string? focusId = null)
     {
-        bool keyboardFocused = enabled && focusedControl == focusTargets.Count;
-        if (enabled) focusTargets.Add(new SDL.FRect { X = x, Y = y, W = width, H = height });
+        enabled = enabled && (!IsLoading || label == "CANCEL LOAD");
+        AddAccessibleCommand(x, y, width, height, label, selected, enabled, focusId);
+        var identity = new FocusIdentity(FocusContext, focusId ?? label, x, y, width, height);
+        bool keyboardFocused = enabled && previousFocus == identity;
+        if (keyboardFocused) focusedControl = focusTargets.Count;
+        if (enabled)
+        {
+            focusTargets.Add(new SDL.FRect { X = x, Y = y, W = width, H = height });
+            focusIdentities.Add(identity);
+        }
         bool hovered = enabled && Hit(mouseX, mouseY, x, y, width, height);
         float cut = Math.Min(9, height / 4);
         // The same six-point chamfer and horizontal violet/cyan gradient as AetherButton.
@@ -128,9 +159,11 @@ internal sealed partial class WaylandEmulatorHost
             SDL.FRect focus = new() { X = x + 4, Y = y + 4, W = width - 8, H = height - 8 };
             SDL.RenderRect(renderer, in focus);
         }
+        drawingButtonLabel = true;
         label = textRenderer.Fit(label, width - 16, 12, true);
         Center(x + width / 2, y + (height - 17) / 2 - 1, label, 12,
             !enabled ? Colors.Muted : selected ? Colors.Void : Colors.Text, true);
+        drawingButtonLabel = false;
     }
 
     private void OpenControlPage(ControlCenterPage page)
@@ -145,7 +178,7 @@ internal sealed partial class WaylandEmulatorHost
     }
     private void HoldMouseTurbo()
     {
-        if (session is null || pendingSession is not null || controlCenterVisible) return;
+        if (session is null || IsOnlineLink || IsLoading || controlCenterVisible) return;
         mouseTurbo = true;
         session.SetTurboAsync(true).GetAwaiter().GetResult();
     }
@@ -153,10 +186,11 @@ internal sealed partial class WaylandEmulatorHost
     {
         if (!mouseTurbo) return;
         mouseTurbo = false;
-        if (session is not null)
+        if (session is not null && !IsOnlineLink)
             session.SetTurboAsync(pressedKeys.Contains(options.Keys[LinuxInputAction.Turbo])).GetAwaiter().GetResult();
     }
-    private string StateLabel => pendingSession is not null ? "LOADING" : session is null ? "IDLE"
+    private string StateLabel => IsLoading ? "LOADING" : session is null ? "IDLE"
+        : session.OnlineLink is { } link ? "LINK " + link.Phase.ToString().ToUpperInvariant()
         : session.LatestSnapshot.IsPaused ? "PAUSED" : "PLAYING";
     private string CartridgeTitle => romPath is null ? "NO CARTRIDGE" : Path.GetFileNameWithoutExtension(romPath);
     private string InputLabel => gamepad == IntPtr.Zero ? "KEYBOARD" : SDL.GetGamepadName(gamepad) ?? "GAMEPAD";
@@ -168,7 +202,7 @@ internal sealed partial class WaylandEmulatorHost
         SDL.GetWindowSize(window, out int width, out int height);
         if (width <= 0 || height <= 0) return;
         float scale = Math.Min(width / 1180f, height / 760f);
-        textRenderer.MinimumSize = Math.Max(14, (int)Math.Ceiling(12 / scale));
+        textRenderer.MinimumSize = Math.Max(14, (int)Math.Ceiling(12 / scale)) + Math.Clamp(options.TextSize - 14, 0, 4);
         int logicalWidth = (int)Math.Round(width / scale);
         int logicalHeight = (int)Math.Round(height / scale);
         if (logicalWidth == LogicalWidth && logicalHeight == LogicalHeight) return;
@@ -180,14 +214,16 @@ internal sealed partial class WaylandEmulatorHost
     private void DrawShell()
     {
         UpdateLayout();
+        PollDiskRefresh(); PollLibraryRefresh(); CompleteStateOperation();
+        accessibleCommands.Clear(); accessibleDescriptions.Clear();
         shellCommands.Clear();
-        focusTargets.Clear();
+        BeginFocusFrame();
         float dx = LogicalWidth - 1180;
         float dy = LogicalHeight - 760;
         float centerX = 442 + dx / 2;
         float centerY = dy / 2;
         Paint(0, 0, LogicalWidth, LogicalHeight, Colors.Void);
-        if (controlCenterVisible) { DrawControlCenter(); return; }
+        if (controlCenterVisible) { DrawControlCenter(); DrawLoadingOverlay(); return; }
         Paint(0, 0, LogicalWidth, 78, Colors.Chrome);
         Mark(20, 12, 52);
         Ink(86, 16, "AETHERBOY", 21, bold: true);
@@ -217,18 +253,18 @@ internal sealed partial class WaylandEmulatorHost
         else
         {
             Mark(centerX - 56, 223 + centerY, 112);
-            Center(centerX, 350 + centerY, "Ready to play", 23, bold: true);
-            Center(centerX, 391 + centerY, "Drop a .gb, .gbc or .gba file here.", 13, Colors.Muted);
-            ActionButton(centerX - 96, 452 + centerY, 192, 46, "OPEN ROM", ShowRomDialog, true, pendingSession is null && fileDialogOpen == 0);
-            Center(centerX, 516 + centerY, "O / CTRL+O  ·  OPEN A CARTRIDGE", 11, Colors.Violet, true);
-        }
-        if (pendingSession is not null)
-        {
-            Panel(centerX - 228, 308 + centerY, 456, 116);
-            Center(centerX, 330 + centerY, "LOADING CARTRIDGE", 19, bold: true);
-            Center(centerX, 368 + centerY, textRenderer.Fit(Path.GetFileName(pendingRomPath ?? ""), 410), 14, Colors.Muted);
+            Center(centerX, 350 + centerY, session is null ? "Ready to play" : "Starting cartridge…", 23, bold: true);
+            Center(centerX, 391 + centerY, session is null ? "Drop a .gb, .gbc or .gba file here." : "Waiting for the first frame.", 13, Colors.Muted);
+            if (session is null) ActionButton(centerX - 96, 452 + centerY, 192, 46, "OPEN ROM", ShowRomDialog, true, !IsLoading && fileDialogOpen == 0);
+            if (session is null && lastResumeEntry is { } recent)
+            {
+                ActionButton(centerX - 160, 514 + centerY, 320, 44, "CONTINUE LAST SESSION", ContinueLastSession, enabled: !IsLoading);
+                Center(centerX, 575 + centerY, textRenderer.Fit(recent.Title, 490, 14), 14, Colors.Muted);
+            }
+            else if (session is null) Center(centerX, 516 + centerY, "O / CTRL+O  ·  OPEN A CARTRIDGE", 11, Colors.Violet, true);
         }
 
+        DrawPerformanceOverlay();
         Panel(880 + dx, 100, 276, 548 + dy, "CURRENT SESSION");
         Ink(906 + dx, 158, textRenderer.Fit(CartridgeTitle, 224, 17, true), 17, bold: true);
         Ink(906 + dx, 201, StateLabel, 13, Colors.Muted, true);
@@ -251,19 +287,32 @@ internal sealed partial class WaylandEmulatorHost
             int slot = i + 1;
             ActionButton(904 + dx + i * 47, 548 + dy, 40, 32, slot.ToString(), () => SelectSaveSlot(slot), options.SaveSlot == slot);
         }
-        Ink(906 + dx, 601 + dy, $"{BindingLabel(LinuxInputAction.Turbo).ToUpperInvariant()} HOLD · TURBO", 10, Colors.Muted, true);
-        Ink(906 + dx, 619 + dy, textRenderer.Fit("F6 ACTIONS · F5/F8 SAVE", 228, 12, true), 12, Colors.Muted, true);
+        Ink(906 + dx, 601 + dy, IsOnlineLink ? "ONLINE SAVE COPY" : $"{BindingLabel(LinuxInputAction.Turbo).ToUpperInvariant()} HOLD · TURBO", 10, Colors.Muted, true);
+        Ink(906 + dx, 619 + dy, textRenderer.Fit(IsOnlineLink ? "F10 CONNECTION / SAVES" : "F6 ACTIONS · F5/F8 SAVE", 228, 12, true), 12, Colors.Muted, true);
         Ink(24, 659 + dy, textRenderer.Fit(loadError ?? statusMessage, LogicalWidth - 48, 12), 12, loadError is null ? Colors.Muted : Colors.Danger);
         Paint(1, 688 + dy, LogicalWidth - 2, 71, Colors.Border);
         Paint(2, 689 + dy, LogicalWidth - 4, 69, Colors.Chrome);
-        bool playable = session is not null && pendingSession is null;
-        ActionButton(24, 704 + dy, 164, 40, fileDialogOpen != 0 ? "PICKER OPEN…" : "OPEN ROM", ShowRomDialog, true, pendingSession is null && fileDialogOpen == 0);
-        ActionButton(200, 704 + dy, 142, 40, "SETTINGS", () => OpenControlPage(ControlCenterPage.Overview), enabled: pendingSession is null);
+        bool playable = session is not null && !IsLoading;
+        ActionButton(24, 704 + dy, 164, 40, fileDialogOpen != 0 ? "PICKER OPEN…" : "OPEN ROM", ShowRomDialog, true, !IsLoading && fileDialogOpen == 0);
+        ActionButton(200, 704 + dy, 142, 40, "SETTINGS", () => OpenControlPage(ControlCenterPage.Overview), enabled: !IsLoading);
         ActionButton(354, 704 + dy, 142, 40, snapshot?.IsPaused == true ? "RESUME" : "PAUSE", TogglePause, enabled: playable);
-        ActionButton(508, 704 + dy, 142, 40, "REWIND", Rewind, enabled: playable);
-        ActionButton(662, 704 + dy, 142, 40, "SAVE", QuickSave, enabled: playable);
+        ActionButton(508, 704 + dy, 142, 40, "REWIND", Rewind, enabled: playable && !IsOnlineLink);
+        ActionButton(662, 704 + dy, 142, 40, "SAVE", QuickSave, enabled: playable && !IsOnlineLink);
         ActionButton(816, 704 + dy, 142, 40, "LOAD", QuickLoad, enabled: playable && HasSelectedState);
-        ActionButton(970, 704 + dy, 164 + dx, 40, "TURBO (HOLD)", HoldMouseTurbo, mouseTurbo, playable);
+        ActionButton(970, 704 + dy, 164 + dx, 40, "TURBO (HOLD)", HoldMouseTurbo, mouseTurbo, playable && !IsOnlineLink);
+        DrawLoadingOverlay();
+    }
+
+    private void DrawLoadingOverlay()
+    {
+        if (!IsLoading) return;
+        float centerX = LogicalWidth / 2f, top = LogicalHeight / 2f - 95;
+        Panel(centerX - 228, top, 456, 190);
+        Center(centerX, top + 22, romPreparationCancellation?.IsCancellationRequested == true ? "CANCELLING…" : "LOADING CARTRIDGE", 19, bold: true);
+        Center(centerX, top + 60, textRenderer.Fit(Path.GetFileName(pendingRomPath ?? ""), 410), 14, Colors.Muted);
+        Center(centerX, top + 91, "Your current session is kept until ready.", 12, Colors.Muted);
+        ActionButton(centerX - 105, top + 128, 210, 42, "CANCEL LOAD", CancelRomLoad,
+            enabled: romPreparationCancellation?.IsCancellationRequested == false);
     }
 
     private void DrawControlCenter()
@@ -272,7 +321,7 @@ internal sealed partial class WaylandEmulatorHost
         Mark(20, 14, 54);
         Ink(92, 10, "AETHERBOY SETTINGS", 10, Colors.Cyan, true);
         Ink(92, 27, "Aether Control Center", 22);
-        Ink(92, 59, "Display, sound, controls and save data — all stored on this computer.", 12, Colors.Muted);
+        Ink(92, 51, "Display, sound, controls and save data — all stored on this computer.", 12, Colors.Muted);
         ActionButton(LogicalWidth - 66, 23, 42, 36, "×", CloseControlCenter);
         Paint(0, 82, LogicalWidth, 2, Colors.Cyan);
         Paint(0, 82, 248, 2, Colors.Violet);
@@ -294,7 +343,7 @@ internal sealed partial class WaylandEmulatorHost
         Ink(24, LogicalHeight - 87, "LOCAL CONTROL", 10, Colors.Muted, true);
         Ink(24, LogicalHeight - 66, "ON THIS COMPUTER", 10, Colors.Muted, true);
         Ink(280, 108, PageNames[(int)controlCenterPage], 26);
-        Ink(280, 150, PageDescriptions[(int)controlCenterPage], 13, Colors.Muted);
+        Ink(280, 150, textRenderer.Fit(PageDescriptions[(int)controlCenterPage] + (session is not null && controlCenterPage is ControlCenterPage.Display or ControlCenterPage.Audio or ControlCenterPage.Input ? (usingGameProfile ? " · THIS GAME" : " · GLOBAL SETTINGS") : ""), 850), 13, Colors.Muted);
         if (controlCenterPage != ControlCenterPage.Overview) Panel(278, 180, LogicalWidth - 302, 456);
         switch (controlCenterPage)
         {
@@ -309,13 +358,14 @@ internal sealed partial class WaylandEmulatorHost
             case ControlCenterPage.Tools: DrawToolsPage(); break;
         }
         Ink(280, 648, textRenderer.Fit(loadError ?? statusMessage, 852, 12), 12, loadError is null ? Colors.Muted : Colors.Danger);
-        Ink(280, LogicalHeight - 69, "Tab: focus · Ctrl+Tab: section · Enter: select · Esc: back", 12, Colors.Muted);
+        Ink(280, LogicalHeight - 69, textRenderer.Fit("F6: sidebar / page · Tab: next · Ctrl+Tab: section · Enter: select · Esc: back", LogicalWidth - 310, 12), 12, Colors.Muted);
     }
 
     private void DrawOverviewPage()
     {
         Panel(278, 184, 878, 98, "CURRENT SESSION");
-        Ink(302, 224, session is null ? "Ready to open a cartridge" : $"{StateLabel}  //  {ModelLabel}", 21);
+        Ink(302, 224, textRenderer.Fit(session is null ? "Ready to open a cartridge" : $"{StateLabel}  //  {ModelLabel}", 510, 21), 21);
+        ActionButton(842, 214, 270, 44, "CONTINUE SESSION", LoadResume, true, StateCard(0) is { Exists: true, Error: null } && stateOperation is null);
         Panel(278, 300, 282, 132, "CARTRIDGE");
         Ink(300, 351, textRenderer.Fit(CartridgeTitle, 240), 14);
         Ink(300, 379, session is null ? "DMG / CGB / GBA READY" : ModelLabel, 14);
@@ -329,7 +379,7 @@ internal sealed partial class WaylandEmulatorHost
         ActionButton(300, 497, 264, 42, "INPUT SETTINGS", () => SelectControlCenterPage(ControlCenterPage.Input));
         ActionButton(582, 497, 264, 42, "SAVE CENTER", () => SelectControlCenterPage(ControlCenterPage.Saves));
         ActionButton(864, 497, 270, 42, "AUDIO", () => SelectControlCenterPage(ControlCenterPage.Audio));
-        ActionButton(300, 558, 264, 42, "QUICK SAVE", QuickSave, true, session is not null);
+        ActionButton(300, 558, 264, 42, "QUICK SAVE", QuickSave, true, session is not null && !IsOnlineLink);
         ActionButton(582, 558, 264, 42, "QUICK LOAD", QuickLoad, enabled: HasSelectedState);
         ActionButton(864, 558, 270, 42, "FULLSCREEN", Fullscreen);
     }
@@ -338,15 +388,16 @@ internal sealed partial class WaylandEmulatorHost
     {
         Ink(300, 200, "NATIVE LINUX", 11, Colors.Cyan, true);
         Ink(300, 236, desktop.DisplayName, 20);
-        Ink(300, 284, "One emulator core for Windows and Linux.", 14, Colors.Muted);
-        Ink(300, 318, "Game Boy · Game Boy Color · Game Boy Advance", 14);
-        Ink(300, 372, "PREFERENCES FILE", 11, Colors.Cyan, true);
-        Ink(300, 404, textRenderer.Fit(settingsPath, 800), 14);
+        ActionButton(842, 198, 268, 42, $"TEXT: {TextSizeName}", CycleTextSize);
+        ActionButton(842, 440, 268, 42, "ACCESSIBLE UI", OpenAccessibleControls);
+        Ink(300, 284, "VIDEO, SOUND & KEYBOARD", 14, Colors.Cyan, true);
+        ActionButton(300, 322, 810, 44, usingGameProfile ? "THIS GAME HAS ITS OWN SETTINGS · USE GLOBAL DEFAULTS" : "USING GLOBAL SETTINGS · CREATE A PROFILE FOR THIS GAME", ToggleGameProfile, usingGameProfile, session is not null && stateOperation is null);
+        Ink(300, 380, usingGameProfile ? "Your changes apply to this game. Unchanged values inherit global defaults." : "Create a profile to keep this game's settings separate from other games.", 14, Colors.Muted);
         ActionButton(300, 440, 504, 42, options.PauseOnFocusLoss ? "AUTO-PAUSE WHEN UNFOCUSED: ON" : "AUTO-PAUSE WHEN UNFOCUSED: OFF", () =>
         { options.PauseOnFocusLoss = !options.PauseOnFocusLoss; MarkSettingsChanged(); }, options.PauseOnFocusLoss);
-        ActionButton(300, 506, 242, 44, "OPEN ROM", ShowRomDialog, true, fileDialogOpen == 0 && pendingSession is null);
+        ActionButton(300, 506, 242, 44, "OPEN ROM", ShowRomDialog, true, fileDialogOpen == 0 && !IsLoading);
         ActionButton(562, 506, 242, 44, "OPEN DATA FOLDER", () => OpenFolder(dataPaths.Data));
-        ActionButton(300, 562, 242, 42, "IMPORT BOOT ROM / BIOS", ShowFirmwareDialog);
+        ActionButton(300, 562, 242, 42, "IMPORT FIRMWARE", ShowFirmwareDialog);
         ActionButton(560, 562, 242, 42, options.UseFirmware ? "FIRMWARE ON" : "BUILT-IN BOOT", () =>
         { options.UseFirmware = !options.UseFirmware; MarkSettingsChanged(); }, options.UseFirmware);
     }

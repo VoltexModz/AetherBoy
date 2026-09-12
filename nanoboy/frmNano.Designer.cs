@@ -573,11 +573,11 @@ namespace nanoboy
             //
             // menuLinkCable
             //
-            this.menuLinkCable.Enabled = false;
+            this.menuLinkCable.Enabled = true;
             this.menuLinkCable.Name = "menuLinkCable";
             this.menuLinkCable.Size = new System.Drawing.Size(250, 22);
-            this.menuLinkCable.Text = "Link-Kabel (experimentell/deaktiviert)";
-            this.menuLinkCable.ToolTipText = "Die Netzwerkoberfläche ist noch nicht mit dem emulierten Serial-Port verdrahtet.";
+            this.menuLinkCable.Text = "Lokales Link-Kabel · GB/GBC/GBA (experimentell)";
+            this.menuLinkCable.ToolTipText = "Zwei Spielansichten auf einem PC mit getrennten Spielständen. Zwei GB/GBC oder zwei GBA; kein Netzwerk oder Wireless.";
             this.menuLinkCable.Click += new System.EventHandler(this.menuLinkCable_Click);
             //
             // menuItem4
