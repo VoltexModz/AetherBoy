@@ -31,7 +31,7 @@ internal sealed class LinuxKeyBindings
     public static bool CanBind(SDL.Scancode key) =>
         key > SDL.Scancode.Unknown && key < SDL.Scancode.Count && Enum.IsDefined(key) &&
         key is not (SDL.Scancode.Escape or SDL.Scancode.O or SDL.Scancode.C or
-            SDL.Scancode.F5 or SDL.Scancode.F6 or SDL.Scancode.F7 or SDL.Scancode.F8 or SDL.Scancode.F9 or SDL.Scancode.F11 or SDL.Scancode.F12 or
+            SDL.Scancode.F5 or SDL.Scancode.F6 or SDL.Scancode.F7 or SDL.Scancode.F8 or SDL.Scancode.F9 or SDL.Scancode.F10 or SDL.Scancode.F11 or SDL.Scancode.F12 or
             SDL.Scancode.Alpha1 or SDL.Scancode.Alpha2 or SDL.Scancode.Alpha3 or
             SDL.Scancode.Alpha4 or SDL.Scancode.Alpha5 or
             SDL.Scancode.LGUI or SDL.Scancode.RGUI or SDL.Scancode.Reserved);
@@ -59,11 +59,11 @@ internal sealed class LinuxKeyBindings
         if (saved is null) return result;
         // Validate the complete map before applying it; no partially broken controls.
         if (saved.Count != result.keys.Count || saved.Keys.Any(action => !Enum.IsDefined(action)) ||
-            saved.Values.Any(key => !CanBind(key) && key is not (SDL.Scancode.F6 or SDL.Scancode.F9 or SDL.Scancode.F12)) || saved.Values.Distinct().Count() != saved.Count)
+            saved.Values.Any(key => !CanBind(key) && key is not (SDL.Scancode.F6 or SDL.Scancode.F9 or SDL.Scancode.F10 or SDL.Scancode.F12)) || saved.Values.Distinct().Count() != saved.Count)
             throw new InvalidDataException("The saved keyboard layout is invalid.");
         foreach (var entry in saved) result.keys[entry.Key] = entry.Value;
         // Newly reserved tool keys migrate independently, preserving all other bindings.
-        foreach (var entry in saved.Where(entry => entry.Value is SDL.Scancode.F6 or SDL.Scancode.F9 or SDL.Scancode.F12))
+        foreach (var entry in saved.Where(entry => entry.Value is SDL.Scancode.F6 or SDL.Scancode.F9 or SDL.Scancode.F10 or SDL.Scancode.F12))
         {
             var defaults = new LinuxKeyBindings();
             SDL.Scancode replacement = !result.keys.Values.Contains(defaults[entry.Key]) ? defaults[entry.Key]

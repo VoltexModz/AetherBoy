@@ -13,11 +13,15 @@ public sealed class LinuxPlayerToolOptionsTests
         var saved = keys.ToDictionary();
         saved[LinuxInputAction.A] = SDL.Scancode.F9;
         saved[LinuxInputAction.B] = SDL.Scancode.F12;
+        saved[LinuxInputAction.L] = SDL.Scancode.F10;
         var migrated = LinuxKeyBindings.FromDictionary(saved);
         Assert.IsFalse(LinuxKeyBindings.CanBind(SDL.Scancode.F9));
         Assert.IsFalse(LinuxKeyBindings.CanBind(SDL.Scancode.F12));
+        Assert.IsFalse(LinuxKeyBindings.CanBind(SDL.Scancode.F10));
+        Assert.ThrowsExactly<ArgumentException>(() => keys.Bind(LinuxInputAction.A, SDL.Scancode.F10));
         Assert.AreEqual(SDL.Scancode.Z, migrated[LinuxInputAction.A]);
         Assert.AreEqual(SDL.Scancode.X, migrated[LinuxInputAction.B]);
+        Assert.AreEqual(SDL.Scancode.Q, migrated[LinuxInputAction.L]);
         Assert.AreEqual(keys[LinuxInputAction.Turbo], migrated[LinuxInputAction.Turbo]);
         Assert.AreEqual(12, migrated.ToDictionary().Values.Distinct().Count());
     }

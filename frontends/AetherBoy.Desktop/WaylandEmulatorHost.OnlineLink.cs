@@ -134,6 +134,21 @@ internal sealed partial class WaylandEmulatorHost
         statusMessage = "Online Link closed. Session saves remain in the online folder; originals were not replaced.";
     }
 
+    private void FinishStoppedOnlineLink()
+    {
+        // A GBA peer can end both owners without a local Disconnect action. Retire
+        // the completed owner before dispatching input or refreshing the frame.
+        if (!IsOnlineLink || session is not { State: SessionState.Stopped, Completion.IsCompleted: true }) return;
+        CloseSession();
+        romPath = null;
+        resumeAfterControlCenter = resumeAfterFocus = false;
+        pressedKeys.Clear();
+        postedButtons = GameBoyButtons.None;
+        postedAdvanceButtons = GameBoyAdvanceButtons.None;
+        SDL.SetWindowTitle(window, "AetherBoy · " + desktop.DisplayName);
+        statusMessage = "Online Link ended. Check the session save copies; originals were not replaced.";
+    }
+
     private void UpdateOnlineAudioWait(EmulationSession current)
     {
         if (current.LatestSnapshot.Rom?.IsGameBoyAdvance != true || current.OnlineLink is not { } link) return;

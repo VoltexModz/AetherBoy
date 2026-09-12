@@ -225,6 +225,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private unsafe void HandleEvent(in SDL.Event currentEvent)
     {
+        FinishStoppedOnlineLink();
         SDL.EventType type = (SDL.EventType)currentEvent.Type;
         switch (type)
         {
@@ -787,6 +788,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void UpdateEmulation()
     {
+        FinishStoppedOnlineLink();
         EmulationSession? currentSession = session;
         if (currentSession is null)
         {

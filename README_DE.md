@@ -25,6 +25,7 @@ Spiel je Rechner, private Sitzungsspielstände und verschlüsseltes WebRTC über
 lokalen Browserhelfer. Noch kein bestätigter Pokémon-Tausch;
 Internet-Verbindungen können STUN/TURN-Konfiguration benötigen.
 [Anleitung, Schutzmaßnahmen und Grenzen (DE/EN)](docs/ONLINE_LINK_HANDOFF.md).
+[Erster Windows↔Linux-Test über zwei Internetanschlüsse](docs/ONLINE_PLAYTEST_DE.md).
 
 Neu: **GBA-Pokémon-Gen3-Onlineprofil für Entwicklungstests** über denselben
 Windows-/Linux-Transport mit eigener Spielprotokoll-Anbindung. Nur exakt erkannte

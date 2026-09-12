@@ -58,7 +58,7 @@ jobs:
         run: dotnet build .\nanoboy.sln --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Test
-        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 885
+        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 887
 
   portable:
     name: Linux / ${{ matrix.runner }} / Core + Runtime + Wayland
@@ -134,7 +134,7 @@ jobs:
         run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 346
 
       - name: Test native Wayland frontend logic
-        run: dotnet test --project ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 119
+        run: dotnet test --project ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 121
 
       - name: Smoke-test conformance CLI
         run: dotnet run --project ./tools/AetherBoy.Conformance/AetherBoy.Conformance.csproj --configuration Release --no-build -- --help
@@ -156,7 +156,7 @@ jobs:
       - name: Test native UI and accessibility on isolated Wayland and D-Bus
         shell: bash
         # Direct MTP execution counts executed tests, excluding the three optional audio playtests.
-        run: bash scripts/test-linux-headless.sh tests/AetherBoy.DesktopTests/bin/Release/net10.0/AetherBoy.DesktopTests.dll --minimum-expected-tests 116
+        run: bash scripts/test-linux-headless.sh tests/AetherBoy.DesktopTests/bin/Release/net10.0/AetherBoy.DesktopTests.dll --minimum-expected-tests 118
 
       - name: Verify Linux package scripts and publish
         run: |

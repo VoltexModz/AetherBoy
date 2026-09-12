@@ -37,11 +37,13 @@ public sealed class LinuxOnlineLinkTests
     }
 
     [TestMethod]
-    [DataRow(true, false, false)]
-    [DataRow(false, true, false)]
-    [DataRow(true, false, true)]
-    [DataRow(false, false, true)]
-    public void NativeOnlineWaitingSessionProtectsOriginalStorageAndDisablesTimeline(bool isHost, bool color, bool advance)
+    [DataRow(true, false, false, 0)]
+    [DataRow(false, true, false, 0)]
+    [DataRow(true, false, true, 0)]
+    [DataRow(false, false, true, 0)]
+    [DataRow(true, false, true, 1)]
+    [DataRow(false, false, true, 2)]
+    public void NativeOnlineWaitingSessionProtectsOriginalStorageAndDisablesTimeline(bool isHost, bool color, bool advance, int externalStop)
     {
         if (Environment.GetEnvironmentVariable("AETHERBOY_UI_TESTS") != "1")
         { Assert.Inconclusive("Set AETHERBOY_UI_TESTS=1 in a native Wayland session."); return; }
@@ -51,6 +53,9 @@ public sealed class LinuxOnlineLinkTests
         LinuxSettingsStore.Save(settings, new LinuxFrontendOptions { AudioEnabled = false });
         string rom = Path.Combine(root, advance ? "online.gba" : color ? "online.gbc" : "online.gb");
         File.WriteAllBytes(rom, advance ? MakeAdvanceRom() : LinuxPlaytestTests.MakeBatteryRom(color));
+        // The idle ARM fixture never writes SRAM. Supply a saved game explicitly
+        // so this test exercises copying/recovery, not a nonexistent save file.
+        if (advance) File.WriteAllBytes(Path.ChangeExtension(rom, ".sav"), Enumerable.Repeat((byte)0xCC, 32 * 1024).ToArray());
         SDL.SetHint("SDL_VIDEO_DRIVER", "wayland");
         Assert.IsTrue(SDL.Init(SDL.InitFlags.Video | SDL.InitFlags.Events), SDL.GetError());
         try
@@ -86,7 +91,9 @@ public sealed class LinuxOnlineLinkTests
             Assert.IsTrue(host.StartOnlineLink(isHost, acceptGbaDevelopment: advance));
             Assert.IsTrue(original.Completion.IsCompletedSuccessfully);
             var online = Field<EmulationSession>(host, "session");
-            Wait(() => File.Exists(online.OnlineLink!.WorkingSavePath));
+            Wait(() => online.State is SessionState.Running or SessionState.Faulted);
+            Assert.AreEqual(SessionState.Running, online.State, online.Fault?.ToString());
+            Assert.IsTrue(File.Exists(online.OnlineLink!.WorkingSavePath));
             Assert.AreEqual(OnlineLinkPhase.WaitingForBrowser, online.OnlineLink!.Phase);
             Assert.AreEqual(0L, online.LatestSnapshot.EmulatedFrameCount);
             Assert.AreEqual(1, launches.Count);
@@ -111,7 +118,31 @@ public sealed class LinuxOnlineLinkTests
             Assert.IsNull(Field<Task?>(host, "stateOperation"));
             Call(host, "OpenOnlineLinkPage"); Call(host, "DrawShell");
             Assert.IsFalse(host.PromoteOnlineSaveCopy(Path.GetDirectoryName(online.OnlineLink.WorkingSavePath)!));
-            Call(host, "StopOnlineLink");
+            if (externalStop == 0) Call(host, "StopOnlineLink");
+            else
+            {
+                // Reproduce the terminal owner left by a peer's graceful close,
+                // without calling the frontend's local Disconnect action.
+                Call(host, "CloseControlCenter");
+                online.ShutdownAsync().WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+                if (externalStop == 1) Call(host, "UpdateEmulation");
+                var key = new SDL.Event
+                {
+                    Type = (uint)SDL.EventType.KeyDown,
+                    Key = new SDL.KeyboardEvent { Type = SDL.EventType.KeyDown, Scancode = SDL.Scancode.F10 }
+                };
+                // Events are dispatched before UpdateEmulation in the main loop.
+                Call(host, "HandleEvent", key);
+                Call(host, "UpdateEmulation");
+                Assert.IsNull(Field<EmulationSession?>(host, "session"));
+                Assert.IsNull(Field<LinuxRomStorage?>(host, "storage"));
+                Assert.IsNull(Field<string?>(host, "loadError"));
+                Assert.IsTrue(Field<bool>(host, "showOnlineLinkPage"));
+                Assert.IsTrue(Field<bool>(host, "controlCenterVisible"));
+                Assert.IsFalse(Field<bool>(host, "resumeAfterControlCenter"));
+                using var releasedAfterPeerClose = LinuxRomStorage.Open(paths, rom);
+                Call(host, "DrawShell");
+            }
             Assert.IsTrue(online.Completion.IsCompleted);
             CollectionAssert.AreEqual(before, File.ReadAllBytes(save));
             string directory = Path.GetDirectoryName(online.OnlineLink.WorkingSavePath)!;
