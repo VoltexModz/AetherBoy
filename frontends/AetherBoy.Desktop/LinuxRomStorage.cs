@@ -20,17 +20,22 @@ internal sealed class LinuxRomStorage : IDisposable
         StateBasePath = Path.Combine(paths.Data, "states", identity, "game.rom");
     }
 
-    public static string Identify(string romPath)
+    public static string Identify(string romPath, CancellationToken cancellationToken = default)
     {
         using var input = File.OpenRead(romPath);
         if (input.Length < 0xC0 || input.Length > 32 * 1024 * 1024)
             throw new InvalidDataException("Unsupported ROM size.");
-        return Convert.ToHexString(SHA256.HashData(input));
+        return Convert.ToHexString(Hash(input, cancellationToken));
     }
 
     public static LinuxRomStorage Open(LinuxDataPaths paths, string romPath)
     {
-        string identity = Identify(romPath);
+        return OpenIdentified(paths, romPath, Identify(romPath), default);
+    }
+
+    internal static LinuxRomStorage OpenIdentified(LinuxDataPaths paths, string romPath, string identity, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         string locks = Path.Combine(paths.Data, "locks");
         Directory.CreateDirectory(locks);
         FileStream ownership;
@@ -48,9 +53,9 @@ internal sealed class LinuxRomStorage : IDisposable
         try
         {
             string legacySave = Path.ChangeExtension(romPath, "sav");
-            storage.MigrateFamily(Path.GetDirectoryName(storage.SavePath)!, BatteryFiles(legacySave));
+            storage.MigrateFamily(Path.GetDirectoryName(storage.SavePath)!, BatteryFiles(legacySave), cancellationToken);
             storage.MigrateFamily(Path.GetDirectoryName(storage.StateBasePath)!,
-                Enumerable.Range(1, 5).Select(slot => (Path.ChangeExtension(romPath, $"ss{slot}"), $"game.ss{slot}")));
+                Enumerable.Range(1, 5).Select(slot => (Path.ChangeExtension(romPath, $"ss{slot}"), $"game.ss{slot}")), cancellationToken);
             return storage;
         }
         catch { storage.Dispose(); throw; }
@@ -67,12 +72,13 @@ internal sealed class LinuxRomStorage : IDisposable
         }
     }
 
-    private void MigrateFamily(string destination, IEnumerable<(string Source, string Name)> candidates)
+    private void MigrateFamily(string destination, IEnumerable<(string Source, string Name)> candidates, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var files = candidates.Where(file => File.Exists(file.Source)).ToArray();
         if (Directory.Exists(destination))
         {
-            if (files.Any(file => !SameContents(file.Source, Path.Combine(destination, file.Name))))
+            if (files.Any(file => !SameContents(file.Source, Path.Combine(destination, file.Name), cancellationToken)))
                 MigrationNotice = "Central saves kept. Different older files remain beside the original ROM.";
             return;
         }
@@ -91,10 +97,11 @@ internal sealed class LinuxRomStorage : IDisposable
                 if (input.Length > maximum) throw new InvalidDataException("A legacy save file is too large to migrate safely.");
                 using var output = new FileStream(Path.Combine(staging, file.Name), FileMode.CreateNew,
                     FileAccess.Write, FileShare.None);
-                input.CopyTo(output);
+                input.CopyToAsync(output, cancellationToken).GetAwaiter().GetResult();
                 output.Flush(flushToDisk: true);
             }
             // Commit the entire family. A failed copy never marks a partial migration complete.
+            cancellationToken.ThrowIfCancellationRequested();
             Directory.Move(staging, destination);
             if (files.Length > 0 && MigrationNotice is null)
                 MigrationNotice = "Existing saves copied safely. Original files have been kept.";
@@ -102,12 +109,26 @@ internal sealed class LinuxRomStorage : IDisposable
         finally { if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true); }
     }
 
-    private static bool SameContents(string left, string right)
+    private static bool SameContents(string left, string right, CancellationToken cancellationToken)
     {
         if (!File.Exists(right) || new FileInfo(left).Length != new FileInfo(right).Length) return false;
         using var a = File.OpenRead(left);
         using var b = File.OpenRead(right);
-        return SHA256.HashData(a).AsSpan().SequenceEqual(SHA256.HashData(b));
+        return Hash(a, cancellationToken).AsSpan().SequenceEqual(Hash(b, cancellationToken));
+    }
+
+    private static byte[] Hash(Stream input, CancellationToken cancellationToken)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        byte[] buffer = new byte[65536];
+        int read;
+        while ((read = input.Read(buffer)) != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            hash.AppendData(buffer, 0, read);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return hash.GetHashAndReset();
     }
 
     public void Dispose() => ownership.Dispose(); // Keep lock inode: deleting it could permit concurrent owners.

@@ -1,6 +1,6 @@
 # Linux-Entwicklung: Übergabe an Windows und den nächsten ChatGPT
 
-Stand: **11. September 2026** · Branch: **development** · Version: **4.8.0-alpha.1**
+Stand: **12. September 2026** · Branch: **development** · Version: **4.8.0-alpha.1**
 
 Diese Datei ergänzt die [Windows-Handoff](WINDOWS_DEVELOPMENT_HANDOFF.md).
 Bitte beide lesen: Die Windows-Datei beschreibt ihren damaligen Lieferstand;
@@ -15,11 +15,96 @@ per Fast-forward übernommen und mit den lokalen Linux-Änderungen zusammengefü
 Konflikte in Audioverträgen, CI, Changelog und READMEs sind aufgelöst. Die neuen
 Windows-Funktionen und die gemeinsame Stereo-Implementierung bleiben erhalten.
 
-Der bisherige Linux-Ausbau wurde inzwischen als **`c1ffe10`** committed und ist
-im lokalen Tracking-Stand von `origin/development` enthalten. Das anschließend
-angeforderte Linux Patch Lab ist beim Schreiben dieses Nachtrags noch lokal,
-uncommitted und ungepusht. Vor weiterer Arbeit den tatsächlichen Git-Stand prüfen;
-`c1ffe10` allein enthält das neue Linux Patch Lab noch nicht.
+Der erste Linux-Ausbau ist als **`c1ffe10`**, das Linux Patch Lab als
+**`22a77ef`** committed. Die zweite Komfortrunde und Runde 3 liegen beim Schreiben dieses
+Nachtrags als lokale Änderungen auf `22a77ef`; sie wurde nicht automatisch
+committed oder gepusht. Vor weiterer Arbeit den tatsächlichen Git-Stand prüfen.
+
+## Aktueller Nachtrag: Restkritik / Runde 3
+
+**Zuerst lesen:** [Fixliste mit IDs, Vorher/Nachher und Nachweisen](LINUX_FIX_LOG.md),
+[Playtest Runde 3](LINUX_PLAYTEST_ROUND3.md), [Kritik Runde 3](LINUX_CRITIQUE_ROUND3.md).
+Die anschließenden Runde-2-Noten und Testzahlen sind historische Stände.
+
+**Abgeschlossen:** 111 Desktopfälle entdeckt; Logik 78 bestanden/33 Skips,
+isoliertes Weston 108 bestanden/3 Audio-Skips, jeweils 0 Fehler. Build ohne
+Warnungen/Fehler, x64-/ARM64-Pakete und normaler Start-Build aktualisiert.
+Unabhängige Note **UI 9,1/10 / Features 8,9/10** bei unveränderter Rubrik.
+Aktuelle Logs, Paketprüfsummen und Reproduktion stehen im Runde-3-Playtest.
+
+Neu: vollständiger gemeinsamer SDL-Texteditor für Titel/Suche/Cheats, optionales
+semantisches GTK3-Control-Center, abbrechbare ROM-Vorbereitung samt GBA-Fokusbarriere
+und Hintergrundschreiben unveränderlicher Settings-/Profilsnapshots. Diese
+Funktionen nicht erneut bauen. Normale Text-/Fensterbedienung behält Entwürfe;
+Preedit und unsichtbarer Eingabefokus werden bereinigt. Native Callback- und
+Worker-Ergebnisse dürfen keine inzwischen andere Seite/ROM verändern.
+
+GTK öffnen: **Ctrl+F7** oder System → **Accessible UI**; alternativ
+`bash scripts/run-linux.sh --accessible`. **F7 allein bleibt Rewind**. GTK3/ATK
+sind optionale Systembibliotheken, nicht Bestandteil der Runtime-Archive. Der
+SDL-Pfad funktioniert weiterhin ohne sie. Kein globales Desktop-/Accessibility-
+Setting ändern, um Tests passend zu machen.
+
+Physische Controller, echte Mixed-DPI-/Orca-/IME-Bedienung, ARM64-Ausführung und
+lange Spieltests bleiben getrennte manuelle Qualifikation. Der Nutzer spielt auf
+seinem aktiven Workspace: Tests versteckt; unvermeidbare sichtbare Agentenfenster
+nur auf Workspace 5 ohne Fokuswechsel. Die AT-SPI-Busprobe mappt ausschließlich
+auf ihrem ausdrücklich isolierten Weston-Compositor.
+
+Profil-/ROM-Wechsel und Beenden warten weiterhin auf erfolgreiche Speicherung.
+Cancel kann einen laufenden Betriebssystem-I/O-Aufruf nicht hart unterbrechen;
+sein spätes Ergebnis wird verworfen und sein Lock freigegeben. Siehe Fixliste
+für die genauen Sicherungsgrenzen. Auch diese Runde ist lokal auf `22a77ef`;
+keine automatische Commit-/Push-Aktion.
+
+## Historischer Nachtrag: Komfortrunde 2
+
+Prioritäten und Lieferumfang: Hintergrund-Metadaten (10/10), Resume/Galerie/Undo
+(9/10), Spielprofile (8/10), Bibliotheksmetadaten (8/10), Text/Navigation (8/10),
+Distribution mit eingebetteter Runtime (7/10). Die Zahlen hier bewerten die
+Wichtigkeit, nicht die erreichte Qualität.
+
+- Renderpfade verwenden zwischengespeicherte Bibliotheks-, State- und Backupdaten.
+  Die Worker sind begrenzt; veraltete Ergebnisse dürfen keine andere ROM ersetzen.
+- Resume nutzt `Data/states/<hash>/game.resume`; manuelle Slots bleiben getrennt.
+  Preview-Dateien sind an den SHA-256 des State-Inhalts gebunden. Undo lebt nur
+  innerhalb der aktuellen Sitzung. Startseite und Overview bieten Fortsetzen.
+- Nullable Spielprofile liegen unter `Config/profiles/<hash>.json`; globale
+  Änderungen müssen vor einem Scopewechsel erfolgreich gespeichert sein.
+- Favoriten, eigene Titel, Systemfilter und aktive Spielzeit ergänzen die Library.
+  Spielzeit wird beim Schließen persistiert; sie ist kein dauerhafter Live-Zähler.
+- Standard/Large/Larger sind relative Schriftstufen; F6 erschließt Seiteninhalte.
+  Damals fehlte semantischer Screenreader-Zugriff; Runde 3 ergänzt den GTK-/AT-SPI-Pfad.
+- `scripts/package-linux.sh` erstellt x64-/ARM64-Archive mit Runtime und
+  korrespondierenden Quellen. Details und glibc-Untergrenze stehen in
+  [Distribution](LINUX_DISTRIBUTION.md). ARM64 wurde cross-published, nicht ausgeführt.
+
+Aktuelle unabhängige Befunde und genaue Prüfzahlen stehen in
+[Playtest Runde 2](LINUX_PLAYTEST_ROUND2.md) und
+[Kritik Runde 2](LINUX_CRITIQUE_ROUND2.md). Die weiter unten genannten älteren
+Testzahlen und Noten dokumentieren historische Stände, keine neue Abnahme.
+Die neuen Ziele sind **Features >8/10 und UI >9/10**. Unterschreitungen dürfen
+nicht durch angepasste Bewertungsgewichte oder ungeprüfte Annahmen verdeckt werden.
+Finale Integrationsprüfung vom 12. September: 84 Desktopfälle entdeckt;
+Logiklauf **67 bestanden / 17 native Skips**, isolierter Ubuntu/Weston-Lauf
+**81 bestanden / 3 Audio-Skips**, jeweils kein Fehler. CI-Mindestwerte sind auf
+67 beziehungsweise 81 angehoben. Der letzte native gezielte Lauf besteht
+**20/20** (19 Komfortfälle plus Shell-Integration); zuvor **12/12** bestehende
+Navigations-/Patch-/Kurzspiel-Fälle mit realem PipeWire. Das ist keine Behauptung,
+alle 84 Fälle zuletzt gemeinsam auf dem Nutzerdesktop ausgeführt zu haben.
+
+`bash scripts/build-linux.sh` hat den normalen Linux-x64-Build aktualisiert.
+Beide Runtime-Archive sind frisch gebaut und geprüft; x64 tatsächlich ohne
+installierte Runtime im PATH gestartet, ARM64 nur Paket/ELF geprüft. Die
+enthaltenen 158 C#-Produktionsdateien entsprechen dem finalen Produktionscode.
+Logs liegen unter `artifacts/comfort-{logic,headless,publish}-final.log` und
+`artifacts/linux-package-{x64,arm64}.log`. Kein neuer Commit oder Push erfolgte.
+
+Die aktuelle unabhängige Kritik bewertet Features mit **8,6/10**, das UI mit
+**8,9/10**: Das Featureziel ist erfüllt, das UI-Ziel bleibt offen.
+Keine neuen 30-Minuten-Läufe: Diese übernimmt der Nutzer. Während er spielt,
+Tests versteckt ausführen; notwendige sichtbare Fenster nur auf Hyprland
+Workspace 5 ohne Fokuswechsel öffnen.
 
 ## Was Linux jetzt besitzt
 
@@ -189,13 +274,14 @@ der tatsächliche kombinierte Windows-Testlauf muss dort noch erfolgen.
 2. Reale Spiele, hörbares L/R-Audio, physische Gerätewechsel, Suspend/Resume,
    gemischte DPI/Monitorraten, weitere Compositoren und ARM64 praktisch qualifizieren.
    Langtests übernimmt wie vereinbart der Nutzer.
-3. Linux-Komfortfunktionen bei Bedarf ergänzen: Galerie/Fortsetzen, Lade-Rückgängig,
-   Spielprofile, Favoriten/Spielzeit, native Screenshots und GBA-Audio-Inspector.
+3. Die Komfortrunde oben ist implementiert. Native Screenshot-Werkzeuge und
+   ein GBA-Audio-Inspector bleiben mögliche spätere Erweiterungen.
 4. Das Linux Patch Lab ist jetzt implementiert; nicht erneut bauen. Für Änderungen
    den gemeinsamen Parser beibehalten und Windows-Importdienste nicht in Linux
    einbinden. Reale Hack-Kompatibilität bleibt eine eigene Spielprüfung.
-5. Flatpak/AppImage, eingebettete Runtime, Assistenztechnik und langsame
-   Dateisysteme im UI bleiben eigene Folgearbeit.
+5. Flatpak/AppImage, Assistenztechnik und asynchrone explizite Dateiaktionen
+   bleiben eigene Folgearbeit. Eingebettete Runtime und Hintergrund-Metadaten
+   sind inzwischen implementiert.
 
 Linux besitzt bereits Save-Import/-Export; der in der Windows-Handoff offene
 Windows-Punkt 7 ist dadurch **nicht** automatisch erledigt. Ebenso bedeuten die

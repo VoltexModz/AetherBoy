@@ -60,6 +60,7 @@ internal static class Program
         using var diagnostics = new LinuxDiagnostics(LinuxDataPaths.Default,
             LinuxSettingsStore.Load(LinuxSettingsStore.DefaultPath, out _).RecordDiagnostics &&
             Environment.GetEnvironmentVariable("AETHERBOY_DIAGNOSTICS") != "0");
+        SDL.SetHint("SDL_IME_IMPLEMENTED_UI", "composition");
         SDL.SetHint("SDL_VIDEO_DRIVER", "wayland");
         SDL.SetAppMetadata("AetherBoy", LinuxBuildInfo.Version, LinuxDesktopProfile.ApplicationId);
         if (!SDL.Init(SDL.InitFlags.Video | SDL.InitFlags.Events | SDL.InitFlags.Gamepad))

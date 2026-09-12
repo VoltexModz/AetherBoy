@@ -28,6 +28,7 @@ internal sealed class LinuxFrontendOptions
     public bool RecordDiagnostics { get; set; } = LinuxBuildInfo.RecordByDefault;
     public bool UseFirmware { get; set; } = true;
     public bool PauseOnFocusLoss { get; set; } = true;
+    public int TextSize { get; set; } = 14;
     public int SaveSlot { get; set; } = 1;
 
     public void SetVolume(int percent) => AudioVolume = Math.Clamp(percent, 0, 100);

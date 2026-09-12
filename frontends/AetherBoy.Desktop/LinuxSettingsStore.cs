@@ -19,6 +19,7 @@ internal static class LinuxSettingsStore
         public bool? RecordDiagnostics { get; set; }
         public bool UseFirmware { get; set; } = true;
         public bool PauseOnFocusLoss { get; set; } = true;
+        public int TextSize { get; set; } = 14;
         public int SaveSlot { get; set; } = 1;
         public bool Channel1Enabled { get; set; } = true;
         public bool Channel2Enabled { get; set; } = true;
@@ -82,6 +83,7 @@ internal static class LinuxSettingsStore
                 UseFirmware = saved.UseFirmware,
                 PauseOnFocusLoss = saved.PauseOnFocusLoss,
                 SaveSlot = Math.Clamp(saved.SaveSlot, 1, 5),
+                TextSize = Math.Clamp(saved.TextSize, 14, 18),
                 Channel1Enabled = saved.Channel1Enabled,
                 Channel2Enabled = saved.Channel2Enabled,
                 Channel3Enabled = saved.Channel3Enabled,
@@ -98,7 +100,30 @@ internal static class LinuxSettingsStore
         }
     }
 
-    public static void Save(string path, LinuxFrontendOptions options)
+    public static byte[] SerializeSnapshotBytes(LinuxFrontendOptions options) =>
+        JsonSerializer.SerializeToUtf8Bytes(new Settings
+        {
+            AudioEnabled = options.AudioEnabled,
+            VideoFilter = options.VideoFilter,
+            Frameskip = options.Frameskip,
+            PaletteIndex = options.PaletteIndex,
+            Gamepads = options.Gamepads,
+            RecordDiagnostics = options.RecordDiagnostics,
+            UseFirmware = options.UseFirmware,
+            PauseOnFocusLoss = options.PauseOnFocusLoss,
+            SaveSlot = options.SaveSlot,
+            TextSize = options.TextSize,
+            Channel1Enabled = options.Channel1Enabled,
+            Channel2Enabled = options.Channel2Enabled,
+            Channel3Enabled = options.Channel3Enabled,
+            Channel4Enabled = options.Channel4Enabled,
+            AudioVolume = Math.Clamp(options.AudioVolume, 0, 100),
+            Keys = options.Keys.ToDictionary(),
+        }, JsonOptions);
+
+    public static void Save(string path, LinuxFrontendOptions options) => WriteSnapshot(path, SerializeSnapshotBytes(options));
+
+    public static void WriteSnapshot(string path, byte[] snapshot)
     {
         string directory = Path.GetDirectoryName(Path.GetFullPath(path))!;
         Directory.CreateDirectory(directory);
@@ -107,24 +132,7 @@ internal static class LinuxSettingsStore
         {
             using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
-                JsonSerializer.Serialize(stream, new Settings
-                {
-                    AudioEnabled = options.AudioEnabled,
-                    VideoFilter = options.VideoFilter,
-                    Frameskip = options.Frameskip,
-                    PaletteIndex = options.PaletteIndex,
-                    Gamepads = options.Gamepads,
-                    RecordDiagnostics = options.RecordDiagnostics,
-                    UseFirmware = options.UseFirmware,
-                    PauseOnFocusLoss = options.PauseOnFocusLoss,
-                    SaveSlot = options.SaveSlot,
-                    Channel1Enabled = options.Channel1Enabled,
-                    Channel2Enabled = options.Channel2Enabled,
-                    Channel3Enabled = options.Channel3Enabled,
-                    Channel4Enabled = options.Channel4Enabled,
-                    AudioVolume = Math.Clamp(options.AudioVolume, 0, 100),
-                    Keys = options.Keys.ToDictionary(),
-                }, JsonOptions);
+                stream.Write(snapshot);
                 stream.Flush(flushToDisk: true);
             }
             if (File.Exists(path))

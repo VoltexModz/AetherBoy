@@ -185,7 +185,7 @@ public sealed class LinuxPatchLabTests
     private static T Field<T>(object host, string name) => (T)host.GetType().GetField(name, Private)!.GetValue(host)!;
     private static void Call(object host, string method, params object[] args) => host.GetType().GetMethod(method, Private)!.Invoke(host, args);
     private static void WaitForSession(object host) => Assert.IsTrue(SpinWait.SpinUntil(() =>
-    { Call(host, "CompletePendingLoad"); return Field<object?>(host, "pendingSession") is null && Field<EmulationSession?>(host, "session") is not null; }, TimeSpan.FromSeconds(10)));
+    { Call(host, "CompletePendingLoad"); return Field<Task?>(host, "romPreparation") is null && Field<object?>(host, "pendingSession") is null && Field<EmulationSession?>(host, "session") is not null; }, TimeSpan.FromSeconds(10)));
     private static void Capture(object host, string name)
     {
         string? folder = Environment.GetEnvironmentVariable("AETHERBOY_PATCH_CAPTURE_DIR");

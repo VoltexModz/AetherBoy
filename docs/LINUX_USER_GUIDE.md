@@ -303,3 +303,85 @@ choose the exact base ROM required by the patch author. Files are limited to
 appear on the Patch Lab page; select corrected files and retry. Cancelling the
 file picker keeps the previous selection. This applies existing patches; it
 does not create patches or download games.
+
+## 12. Resume, state gallery and undo
+
+The start screen offers **Continue last session** when a known cartridge and its
+resume point are available. The cartridge content is checked before continuing.
+For an open game, Overview → **Continue session** restores its resume point.
+Saves → **Gallery / Resume** shows the resume point and five manual slots with
+timestamps and a verified preview. The preview shows the last completed video
+frame; it is not a cycle-exact rendering of the saved CPU state.
+
+A resume point is saved periodically during play and on a normal session close.
+It uses `Data/states/<ROM SHA-256>/game.resume`, separately from the five manual
+`.ss1`–`.ss5` slots. Loading a state keeps one **Undo last load** point in memory;
+closing or switching games clears that undo point. A failed load keeps the
+current state and any previous undo point. If a resume cannot be loaded, automatic
+resume writes are suppressed for that session: the original stays intact until
+you explicitly update it in Gallery or successfully load another state.
+Abrupt termination can lose progress
+since the most recent successfully written resume point.
+
+## 13. Profiles, library and interface text
+
+System can create a profile for the current game. Changes to picture, palette,
+sound and keyboard mapping then apply to that game; unchanged values inherit
+global defaults. Returning to global defaults removes that game's profile.
+Profiles live under `Config/profiles/<ROM SHA-256>.json`. Interface text size,
+firmware selection and controller profiles remain separate preferences.
+
+Library supports system filters, favorites and custom titles. **Clear title**
+lets you replace a long name without deleting each character. On the keyboard,
+Ctrl+A selects the title; typing replaces it. Playtime counts
+active session time, excluding pauses and the Control Center, and is persisted
+when the session closes. Renaming or relocating a cartridge preserves its
+metadata and saves when its content is unchanged.
+
+Display and System offer **Standard / Large / Larger** text. These are relative
+sizes within the scaled interface, not promises of a fixed physical pixel size.
+Use Tab to move focus and Ctrl+Tab to change sections. F6 moves between the
+sidebar and page controls. Enter selects the focused action; Escape goes back.
+The drawn SDL surface has no AT-SPI tree; the optional native controls below
+provide semantic access to Control Center actions.
+
+For archives with an embedded .NET runtime, see [Linux distribution](LINUX_DISTRIBUTION.md).
+
+
+## 14. Text editing and native accessible controls
+
+Title, library search and cheat fields support Left/Right, Home/End, Shift
+selection, Ctrl+A/C/X/V and mouse click/Shift-click/drag. Empty or failed clipboard
+reads keep the existing selection. IME preedit is shown separately until commit;
+Escape first cancels composition. Tab/F6 leave the text field without silently
+changing a title, and clicking the field resumes editing. Text scrolls to the
+caret; shortening displayed labels does not split a grapheme.
+
+Use **Ctrl+F7**, System → **Accessible UI**, or launch with:
+
+```bash
+bash scripts/run-linux.sh --accessible
+bash scripts/run-linux.sh --accessible "/path/to/game.gba"
+```
+
+F7 by itself still rewinds. The additional native GTK3 window exposes named
+buttons, selected/disabled states, status text and a native text entry to ATK /
+AT-SPI clients. It uses the same settings, library and save actions as the SDL
+window. GTK3/ATK must be available from your distribution; they are optional for
+the ordinary SDL interface and are not bundled in the runtime archive.
+
+Native GTK text uses the desktop's fonts and input methods. The bundled SDL
+Noto/atlas paths do not cover every Unicode glyph; unsupported symbols can still
+appear as missing-glyph boxes there. IME event and accessibility-bus tests do not
+replace real candidate-window, Orca listening or mixed-DPI interaction checks.
+
+## 15. Loading and preference writes
+
+Cartridge preparation runs in the background. **Cancel load** or Escape cancels
+its adoption and keeps the current session; a currently blocking filesystem call
+may finish before cleanup completes. Input actions behind the overlay cannot
+change the prepared settings. Regular preferences are written from immutable
+snapshots in the background. Errors keep changes pending for retry. A profile or
+ROM switch and shutdown still wait for required writes to complete safely.
+
+See the [fix log](LINUX_FIX_LOG.md) for tracked corrections and open manual checks.

@@ -10,7 +10,8 @@ Windows development update: stereo/WASAPI, GPU presentation, state gallery and r
 controller Quick Deck, per-game profiles and IPS/BPS/UPS Patch Lab.
 [What's changed, usage and Linux developer handoff (DE/EN)](docs/WINDOWS_DEVELOPMENT_HANDOFF.md#english).
 
-Linux follow-up: central saves, stereo, library/recovery tools, controller profiles and Patch Lab.
+Linux follow-up: central saves, stereo, state gallery/resume/undo, per-game settings,
+favorites/playtime, controller profiles and Patch Lab.
 [Linux integration handoff for the Windows developer / next ChatGPT](docs/LINUX_DEVELOPMENT_HANDOFF.md).
 
 <p align="center">
@@ -88,7 +89,8 @@ Both frontends share the same platform-neutral Core and Runtime. The available d
 | **Battery saves, five state slots, rewind** | Available | Available |
 | **Cartridge Vault, cheat management, Save Safety Center** | Available, partly experimental | Linux library, session cheats and backup recovery available |
 | **WAV recording and boot ROM selection** | Available | Available under Tools / System |
-| **Quick Deck, state gallery/resume, per-game profiles, screenshots** | Available | Separate frontend follow-up |
+| **State gallery/resume and per-game profiles** | Available | Available, including undo after state load |
+| **Quick Deck and screenshot tools** | Available | Separate frontend follow-up |
 | **IPS / BPS / UPS Patch Lab** | Integrated; UPS undo is explicit | Available under Library → Patch Lab; explicit UPS undo |
 | **Stereo playback** | GB/GBC/GBA end-to-end | GB/GBC/GBA end-to-end |
 
@@ -129,7 +131,7 @@ bash scripts/run-linux.sh "/path/to/your-game.gba"
 | x86-64 | `artifacts/AetherBoy-linux-x64/` |
 | ARM64 | `artifacts/AetherBoy-linux-arm64/` |
 
-The build requires an installed **.NET 10 runtime** to run; the runtime is not bundled into the output. The SDK already includes it. `run-linux.sh` rebuilds automatically when the build is missing or older than the source files.
+The default build requires an installed **.NET 10 runtime** to run. For archives with an embedded runtime, see [Linux distribution](docs/LINUX_DISTRIBUTION.md). The SDK already includes it. `run-linux.sh` rebuilds automatically when the build is missing or older than the source files.
 
 ### Install in the application menu
 
@@ -245,12 +247,13 @@ The main default bindings are listed below. Gameplay keys can be changed under *
 | Select save-state slot | 1–5 | — |
 | Quick save / quick load | F5 / F8 | — |
 | Rewind one step | F7 | — |
+| Native accessible Control Center | Ctrl+F7 (optional GTK3) | — |
 | Fullscreen | F11 | — |
 | Close settings / leave fullscreen | Escape | — |
 
 The default A/B bindings use physical key positions. AetherBoy displays the assigned keys for the current keyboard layout. See the [Linux User Guide](docs/LINUX_USER_GUIDE.md#5-controls) for all shortcuts and keyboard navigation.
 
-Linux implementation priorities, independent UI criticism and reproducible playtests: [Linux roadmap](docs/LINUX_ROADMAP.md), [review](docs/LINUX_CRITIQUE.md), [playtest report](docs/LINUX_PLAYTEST.md).
+Linux implementation priorities, independent UI criticism and reproducible playtests: [Linux roadmap](docs/LINUX_ROADMAP.md), [current review](docs/LINUX_CRITIQUE_ROUND3.md), [current playtest report](docs/LINUX_PLAYTEST_ROUND3.md), [tracked fixes](docs/LINUX_FIX_LOG.md).
 
 ## Saves and BIOS
 

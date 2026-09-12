@@ -46,7 +46,7 @@ public sealed class LinuxShellIntegrationTests
             Assert.AreEqual(LinuxVideoFilter.LcdGrid, options.VideoFilter);
             Click(555, 359);
             Assert.AreEqual(2, options.Frameskip);
-            Click(790, 470);
+            Click(1000, 470);
             Assert.AreEqual(4, options.PaletteIndex);
             Capture(host, "display");
             Click(120, 345);
@@ -102,6 +102,13 @@ public sealed class LinuxShellIntegrationTests
             Key(SDL.Scancode.C);
             Key(SDL.Scancode.Escape);
             Assert.IsFalse(Field<bool>(host, "controlCenterVisible"));
+            // Closing settings is intentionally nonblocking. Drive the same debounce/poll
+            // path as the native main loop until its newest generation reaches disk.
+            Assert.IsTrue(SpinWait.SpinUntil(() =>
+            {
+                Call(host, "FlushSettingsIfDue", false);
+                return !Field<bool>(host, "settingsDirty") && Field<Task?>(host, "settingsWrite") is null;
+            }, TimeSpan.FromSeconds(10)), "The latest preferences did not finish saving: " + Field<string?>(host, "loadError"));
             var loaded = LinuxSettingsStore.Load(settings, out var error);
             Assert.IsNull(error);
             Assert.AreEqual(5, loaded.SaveSlot);
@@ -160,8 +167,26 @@ public sealed class LinuxShellIntegrationTests
     }
 
     private static T Field<T>(object instance, string name) => (T)instance.GetType().GetField(name, Private)!.GetValue(instance)!;
-    private static void Call(object instance, string method, params object[] args) =>
+    private static void Call(object instance, string method, params object[] args)
+    {
         instance.GetType().GetMethod(method, Private)!.Invoke(instance, args);
+        FieldInfo? operation = instance.GetType().GetField("stateOperation", Private);
+        if (operation?.GetValue(instance) is Task)
+        {
+            Assert.IsTrue(SpinWait.SpinUntil(() =>
+            {
+                instance.GetType().GetMethod("CompleteStateOperation", Private)!.Invoke(instance, null);
+                return operation.GetValue(instance) is null;
+            }, TimeSpan.FromSeconds(10)), "The save-state action did not finish.");
+            // Save completion and the subsequent UI metadata refresh are separate asynchronous steps.
+            // The next pointer click must see the newly enabled Load action, including on slow runners.
+            Assert.IsTrue(SpinWait.SpinUntil(() =>
+            {
+                instance.GetType().GetMethod("PollDiskRefresh", Private)!.Invoke(instance, null);
+                return instance.GetType().GetField("diskRefresh", Private)!.GetValue(instance) is null;
+            }, TimeSpan.FromSeconds(10)), "Updated save information did not reach the UI.");
+        }
+    }
 
     private static void Capture(WaylandEmulatorHost host, string name)
     {

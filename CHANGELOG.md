@@ -2,6 +2,37 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## Unveröffentlicht – Linux-Restkritik, Runde 3
+
+- Vollständiger gemeinsamer Texteditor mit Caret, Auswahl, Maus/Drag, Clipboard,
+  IME-Komposition, Scroll und sauberem Fokuswechsel für Titel/Suche/Cheats.
+- Optionales natives GTK3-Control-Center mit ATK-/AT-SPI-Semantik via Ctrl+F7
+  beziehungsweise `--accessible`; F7 bleibt Rewind. Reale Schnittstellen- und
+  getrennte Busprüfungen ergänzen die SDL-Tests.
+- Abbrechbare ROM-Vorbereitung im Hintergrund, sichere GBA-Fokus-/Owner-Barriere
+  und gesperrte Aktionen hinter dem Ladeoverlay.
+- Hintergrundschreiben unveränderlicher Settings-/Profilsnapshots mit Generation
+  und Retry; kritische Übergänge warten weiterhin auf erfolgreiche Speicherung.
+- [Fix-IDs, Vorher/Nachher, Tests und verbleibende Grenzen](docs/LINUX_FIX_LOG.md).
+
+## Unveröffentlicht – Linux-Komfort und Distribution
+
+- Begrenzte Hintergrundabfragen für Library, Save-Slots und Backup-Metadaten;
+  veraltete Ergebnisse dürfen keine inzwischen gewechselte ROM überschreiben.
+- Getrennte Resume-Punkte, State-Galerie mit verifizierten Vorschaubildern und
+  Undo nach Laden; Startseite und Overview bieten direktes Fortsetzen.
+  Ein nicht lesbarer Resume wird nicht automatisch durch den neuen Start ersetzt.
+- Spielbezogene Einstellungen mit globaler Vererbung, Favoriten, eigene Titel,
+  Systemfilter und aktive Spielzeit ergänzen die bisherigen Linux-Werkzeuge.
+- Drei Schriftstufen, echte Palettenmuster, kurze Aktionsnamen und F6-Navigation
+  verbessern das Control Center. Asynchrone Listenwechsel erhalten nur eindeutig
+  zugeordneten Fokus; Umordnungen dürfen keine falsche Aktion auslösen.
+- x64-/ARM64-Archive mit Runtime, Lizenzen und korrespondierenden Quellen;
+  glibc mindestens 2.38. ARM64-Ausführung bleibt praktisch zu prüfen.
+- Unabhängige, fehlerorientierte Abnahme und ehrliche Noten stehen in
+  [Kritik Runde 2](docs/LINUX_CRITIQUE_ROUND2.md) und
+  [Playtest Runde 2](docs/LINUX_PLAYTEST_ROUND2.md). Keine neuen Langläufe.
+
 ## Unveröffentlicht – Linux Patch Lab
 
 - Library → Patch Lab verwendet den gemeinsamen IPS-/BPS-/UPS-Patcher mit

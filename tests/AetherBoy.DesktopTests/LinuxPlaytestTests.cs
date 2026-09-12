@@ -138,6 +138,7 @@ public sealed class LinuxPlaytestTests
                 string movedRom = Path.Combine(directory, color ? "relocated.gbc" : "relocated.gb");
                 File.Move(rom, movedRom);
                 Call(host, "TryLoadRom", movedRom);
+                Assert.IsTrue(SpinWait.SpinUntil(() => { Call(host, "CompletePendingLoad"); return Field<Task?>(host, "romPreparation") is null; }, TimeSpan.FromSeconds(10)));
                 Assert.AreSame(session, Field<EmulationSession>(host, "session"), "Relocating identical content must keep the running session.");
                 Assert.AreEqual(movedRom, Field<LinuxLibrary>(host, "library").Read().Single().Path,
                     "Opening relocated content must repair the cartridge library path.");
@@ -325,8 +326,26 @@ public sealed class LinuxPlaytestTests
     }
 
     private static T Field<T>(object instance, string name) => (T)instance.GetType().GetField(name, Private)!.GetValue(instance)!;
-    private static void Call(object instance, string method, params object[] args) =>
+    private static void Call(object instance, string method, params object[] args)
+    {
         instance.GetType().GetMethod(method, Private)!.Invoke(instance, args);
+        FieldInfo? operation = instance.GetType().GetField("stateOperation", Private);
+        if (operation?.GetValue(instance) is Task)
+        {
+            Assert.IsTrue(SpinWait.SpinUntil(() =>
+            {
+                instance.GetType().GetMethod("CompleteStateOperation", Private)!.Invoke(instance, null);
+                return operation.GetValue(instance) is null;
+            }, TimeSpan.FromSeconds(10)), "The save-state action did not finish.");
+            // Save completion and the subsequent UI metadata refresh are separate asynchronous steps.
+            // The next pointer click must see the newly enabled Load action, including on slow runners.
+            Assert.IsTrue(SpinWait.SpinUntil(() =>
+            {
+                instance.GetType().GetMethod("PollDiskRefresh", Private)!.Invoke(instance, null);
+                return instance.GetType().GetField("diskRefresh", Private)!.GetValue(instance) is null;
+            }, TimeSpan.FromSeconds(10)), "Updated save information did not reach the UI.");
+        }
+    }
 
     internal static byte[] MakeBatteryRom(bool color)
     {

@@ -17,7 +17,11 @@ internal static class LinuxSaveStateStore
 
     public static byte[] Read(string romPath, int slot)
     {
-        string path = GetPath(romPath, slot);
+        return ReadPath(GetPath(romPath, slot));
+    }
+
+    public static byte[] ReadPath(string path)
+    {
         using FileStream stream = new(
             path,
             FileMode.Open,
@@ -37,6 +41,9 @@ internal static class LinuxSaveStateStore
     }
 
     public static void WriteAtomic(string romPath, int slot, ReadOnlySpan<byte> state)
+        => WritePathAtomic(GetPath(romPath, slot), state);
+
+    public static void WritePathAtomic(string path, ReadOnlySpan<byte> state)
     {
         if (state.IsEmpty || state.Length > EmulatorStateCodec.MaximumDocumentLength)
         {
@@ -45,7 +52,6 @@ internal static class LinuxSaveStateStore
                 nameof(state));
         }
 
-        string path = GetPath(romPath, slot);
         string temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {

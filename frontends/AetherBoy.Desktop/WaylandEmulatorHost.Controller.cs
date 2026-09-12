@@ -55,6 +55,7 @@ internal sealed partial class WaylandEmulatorHost
     {
         if (gamepad == IntPtr.Zero || input.Which != SDL.GetGamepadID(gamepad)) return;
         var button = (SDL.GamepadButton)input.Button;
+        if (IsLoading) { if (down && button == SDL.GamepadButton.East) CancelRomLoad(); return; }
         if (rebindingGamepad is { } action)
         {
             if (down && button == SDL.GamepadButton.RightStick) { rebindingGamepad = null; statusMessage = "Controller change cancelled."; return; }
@@ -81,7 +82,7 @@ internal sealed partial class WaylandEmulatorHost
             }
             return;
         }
-        if (!windowFocused || pendingSession is not null || session is null) return;
+        if (!windowFocused || IsLoading || session is null) return;
         if (down && button == gamepadProfile.Buttons[LinuxInputAction.Pause]) TogglePause();
         if (button == gamepadProfile.Buttons[LinuxInputAction.Turbo])
             session.SetTurboAsync(down || mouseTurbo || pressedKeys.Contains(options.Keys[LinuxInputAction.Turbo])).GetAwaiter().GetResult();

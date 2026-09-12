@@ -34,8 +34,7 @@ internal sealed partial class WaylandEmulatorHost
         Ink(300, 291, recorder?.Error ?? (recorder is null ? "PCM WAV · Start recording, then close settings to resume the game." :
             $"Recording · Dropped blocks: {recorder.DroppedBlocks} · Limit: 128 MiB"), 14, Colors.Muted);
         Ink(300, 338, "CHEATS · CURRENT SESSION", 14, Colors.Cyan, true);
-        ActionButton(300, 371, 510, 42, editingCheat ? "Code: " + cheatCode : string.IsNullOrEmpty(cheatCode) ? "ENTER CHEAT CODE" : cheatCode,
-            () => { editingCheat = true; editingSearch = false; SDL.StartTextInput(window); }, editingCheat, session is not null);
+        DrawTextEntry(TextField.Cheat, 300, 371, 510, 42, "ENTER CHEAT CODE", session is not null);
         ActionButton(830, 371, 120, 42, "ADD", () => TryUiAction(() =>
         {
             if (session is null) return;
