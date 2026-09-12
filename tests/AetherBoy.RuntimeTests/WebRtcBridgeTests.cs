@@ -191,6 +191,50 @@ public sealed class WebRtcBridgeTests
     }
 
     [TestMethod]
+    [DataRow("ERROR", "browser reported a connection failure")]
+    [DataRow("ERROR:UNKNOWN", "browser reported a connection failure")]
+    [DataRow("ERROR:PEER_CONNECTION", "TURN relay may be required")]
+    [DataRow("ERROR:DATA_CHANNEL", "data channel failed")]
+    [DataRow("ERROR:CHANNEL_PROTOCOL", "incompatible WebRTC data channel")]
+    [DataRow("ERROR:LOCAL_CONNECTION", "local emulator connection")]
+    [DataRow("ERROR:SEND_FAILED", "could not forward")]
+    [DataRow("ERROR:PACKET_LIMIT", "queue was full")]
+    [DataRow("ERROR:EARLY_PACKET", "before the browser connection was ready")]
+    public async Task BrowserFailurePreservesActionableReasonBeforeAndAfterReady(string control, string expected)
+    {
+        foreach (bool ready in new[] { false, true })
+        {
+            await using var transport = new WebRtcBrowserTransport();
+            using var client = await Connect(transport);
+            if (ready)
+            {
+                await SendControl(client, "READY");
+                await transport.Ready.WaitAsync(Deadline);
+            }
+            await SendControl(client, control);
+            await transport.Completion.WaitAsync(Deadline);
+            Assert.IsFalse(transport.Connected);
+            Assert.IsNotNull(transport.Fault);
+            Exception cause = transport.Fault.GetBaseException();
+            Assert.IsInstanceOfType<IOException>(cause);
+            StringAssert.Contains(cause.Message, expected);
+            if (!ready) await Assert.ThrowsExactlyAsync<IOException>(() => transport.Ready);
+        }
+    }
+
+    [TestMethod]
+    public async Task UnknownBrowserErrorCodeIsRejectedWithoutEchoingUntrustedDetails()
+    {
+        await using var transport = new WebRtcBrowserTransport();
+        using var client = await ConnectReady(transport);
+        await SendControl(client, "ERROR:private-server-password");
+        await transport.Completion.WaitAsync(Deadline);
+        Assert.IsNotNull(transport.Fault);
+        Assert.IsInstanceOfType<InvalidDataException>(transport.Fault.GetBaseException());
+        Assert.IsFalse(transport.Fault.ToString().Contains("private-server-password", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public async Task ReceiveQueueRejectsPacket129InsteadOfGrowingOrDroppingSilently()
     {
         await using var transport = new WebRtcBrowserTransport();

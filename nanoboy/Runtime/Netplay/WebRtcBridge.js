@@ -10,6 +10,8 @@
   let bridge = null, peer = null, channel = null, ended = false, busy = false;
   let sendTimer = null;
   const toPeer = [], toNative = [];
+  // Async signaling and clipboard completions must not hide a failure or an open link.
+  const progress = message => { if (!ended && channel?.readyState !== "open") status(message); };
 
   function controls() {
     const localReady = bridge?.readyState === WebSocket.OPEN && !ended;
@@ -19,14 +21,15 @@
     byId("copy").disabled = !byId("local").value;
   }
 
-  function stop(message, failure = false) {
+  function stop(message, failure = false, reason = "UNKNOWN") {
     if (ended) return;
     ended = true;
     if (sendTimer !== null) clearInterval(sendTimer);
     sendTimer = null;
     toPeer.length = 0; toNative.length = 0;
     if (bridge?.readyState === WebSocket.OPEN) {
-      bridge.send(failure ? "ERROR" : "CLOSED");
+      // Only fixed codes cross the local bridge, never SDP, server credentials or browser errors.
+      bridge.send(failure ? "ERROR:" + reason : "CLOSED");
       bridge.close(1000, "Link closed");
     }
     channel?.close();
@@ -49,13 +52,13 @@
       while (toNative.length && bridge?.readyState === WebSocket.OPEN && bridge.bufferedAmount === 0)
         bridge.send(toNative.shift());
     } catch {
-      stop("Die Datenverbindung ist fehlgeschlagen. Neue Sitzung im Emulator öffnen.", true);
+      stop("Die Datenverbindung ist fehlgeschlagen. Neue Sitzung im Emulator öffnen.", true, "SEND_FAILED");
     }
   }
 
   function enqueue(queue, packet) {
     if (!checkPacket(packet) || queue.length >= maxPackets) {
-      stop("Ungültige oder zu viele Link-Pakete. Die Sitzung wurde sicher beendet.", true);
+      stop("Ungültige oder zu viele Link-Pakete. Die Sitzung wurde sicher beendet.", true, "PACKET_LIMIT");
       return;
     }
     queue.push(packet);
@@ -66,7 +69,7 @@
     if (channel !== null || candidate.label !== channelName || candidate.protocol !== channelName ||
         !candidate.ordered || candidate.maxRetransmits !== null || candidate.maxPacketLifeTime !== null) {
       candidate.close();
-      stop("Der Mitspieler verwendet keinen passenden zuverlässigen AetherBoy-Datenkanal.", true);
+      stop("Der Mitspieler verwendet keinen passenden zuverlässigen AetherBoy-Datenkanal.", true, "CHANNEL_PROTOCOL");
       return;
     }
     channel = candidate;
@@ -75,7 +78,7 @@
     channel.onbufferedamountlow = pump;
     channel.onopen = () => {
       if (ended || bridge?.readyState !== WebSocket.OPEN) {
-        stop("Die lokale Emulator-Verbindung ist nicht mehr verfügbar.", true);
+        stop("Die lokale Emulator-Verbindung ist nicht mehr verfügbar.", true, "LOCAL_CONNECTION");
         return;
       }
       bridge.send("READY");
@@ -84,7 +87,7 @@
       controls();
     };
     channel.onmessage = event => enqueue(toNative, event.data);
-    channel.onerror = () => stop("Der WebRTC-Datenkanal hat einen Fehler gemeldet.", true);
+    channel.onerror = () => stop("Der WebRTC-Datenkanal hat einen Fehler gemeldet.", true, "DATA_CHANNEL");
     channel.onclose = () => stop("Mitspieler getrennt. Für einen neuen Versuch eine neue Sitzung öffnen.");
   }
 
@@ -111,7 +114,7 @@
     peer.ondatachannel = event => bindChannel(event.channel);
     peer.onconnectionstatechange = () => {
       if (peer.connectionState === "failed")
-        stop("Keine Peer-Verbindung möglich. Router/Firewall prüfen; gegebenenfalls einen eigenen STUN/TURN-Server verwenden.", true);
+        stop("Keine Peer-Verbindung möglich. STUN/TURN auf beiden Seiten prüfen; bei blockierter Direktverbindung ist ein TURN-Server nötig.", true, "PEER_CONNECTION");
       else if (peer.connectionState === "disconnected" || peer.connectionState === "closed")
         stop("Die Peer-Verbindung wurde unterbrochen. Neue Sitzung im Emulator öffnen.");
     };
@@ -152,7 +155,7 @@
     if (busy || ended) return;
     busy = true; controls();
     try { await work(); }
-    catch (error) { status(error instanceof Error ? error.message : "Die Verbindung konnte nicht vorbereitet werden."); }
+    catch (error) { progress(error instanceof Error ? error.message : "Die Verbindung konnte nicht vorbereitet werden."); }
     finally { busy = false; controls(); }
   }
 
@@ -164,7 +167,7 @@
     await gatherIce(pc);
     if (ended) return;
     exportDescription(pc);
-    status("Einladung bereit · Kopieren, an den Mitspieler weitergeben und seine Antwort einfügen.");
+    progress("Einladung bereit · Kopieren, an den Mitspieler weitergeben und seine Antwort einfügen.");
   }));
 
   byId("answer").addEventListener("click", () => action(async () => {
@@ -176,22 +179,22 @@
     await gatherIce(pc);
     if (ended) return;
     exportDescription(pc);
-    status("Antwort bereit · Kopieren und an den einladenden Spieler zurückgeben.");
+    progress("Antwort bereit · Kopieren und an den einladenden Spieler zurückgeben.");
   }));
 
   byId("accept").addEventListener("click", () => action(async () => {
     const description = readDescription("answer");
     if (peer?.signalingState !== "have-local-offer") throw new Error("Bitte zuerst eine eigene Einladung erstellen.");
     await peer.setRemoteDescription(description);
-    status("Antwort übernommen · Direkte Verbindung wird aufgebaut …");
+    progress("Antwort übernommen · Direkte Verbindung wird aufgebaut …");
   }));
 
   byId("copy").addEventListener("click", async () => {
     byId("local").focus(); byId("local").select();
     try {
       await navigator.clipboard.writeText(byId("local").value);
-      status("Verbindungsdaten kopiert. Nur mit deinem Mitspieler teilen.");
-    } catch { status("Verbindungsdaten sind markiert. Bitte mit Strg+C kopieren."); }
+      progress("Verbindungsdaten kopiert. Nur mit deinem Mitspieler teilen.");
+    } catch { progress("Verbindungsdaten sind markiert. Bitte mit Strg+C kopieren."); }
   });
   byId("disconnect").addEventListener("click", () => stop("Verbindung beendet. Diese Seite kann geschlossen werden."));
   window.addEventListener("pagehide", () => stop("Seite geschlossen."));
@@ -204,10 +207,10 @@
   bridge.binaryType = "arraybuffer";
   bridge.onopen = () => { status("Lokaler Emulator verbunden · Einladung erstellen oder eine Einladung beantworten."); controls(); };
   bridge.onmessage = event => {
-    if (channel?.readyState !== "open") { stop("Emulator-Daten kamen vor einer bereiten Peer-Verbindung an.", true); return; }
+    if (channel?.readyState !== "open") { stop("Emulator-Daten kamen vor einer bereiten Peer-Verbindung an.", true, "EARLY_PACKET"); return; }
     enqueue(toPeer, event.data);
   };
-  bridge.onerror = () => stop("Die lokale Emulator-Verbindung ist nicht erreichbar. Neue Sitzung im Emulator öffnen.", true);
+  bridge.onerror = () => stop("Die lokale Emulator-Verbindung ist nicht erreichbar. Neue Sitzung im Emulator öffnen.", true, "LOCAL_CONNECTION");
   bridge.onclose = () => stop("Die Emulator-Verbindung wurde geschlossen. Neue Sitzung im Emulator öffnen.");
   controls();
 })();

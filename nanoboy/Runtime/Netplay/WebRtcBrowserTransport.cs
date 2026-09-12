@@ -314,6 +314,19 @@ public sealed class WebRtcBrowserTransport : IOnlineLinkTransport
                     ready.TrySetResult();
                 else if (control == "CLOSED")
                     return;
+                else if (control == "ERROR" || control.StartsWith("ERROR:", StringComparison.Ordinal))
+                    throw new IOException(control switch
+                    {
+                        "ERROR" or "ERROR:UNKNOWN" => "The browser reported a connection failure. Check the status on the Link Bridge page and start a new session.",
+                        "ERROR:PEER_CONNECTION" => "WebRTC could not connect to the other player. Check STUN/TURN settings on both sides; a TURN relay may be required.",
+                        "ERROR:DATA_CHANNEL" => "The WebRTC data channel failed. Check the browser connection status and start a new session.",
+                        "ERROR:CHANNEL_PROTOCOL" => "The other player uses an incompatible WebRTC data channel. Both players need compatible AetherBoy builds.",
+                        "ERROR:LOCAL_CONNECTION" => "The browser lost its local emulator connection. Start a new Online Link session in the emulator.",
+                        "ERROR:SEND_FAILED" => "The browser could not forward the link data. Start a new Online Link session.",
+                        "ERROR:PACKET_LIMIT" => "The browser stopped the connection because link packets were invalid or its queue was full.",
+                        "ERROR:EARLY_PACKET" => "The emulator sent link data before the browser connection was ready.",
+                        _ => throw new InvalidDataException("The local bridge error code is invalid."),
+                    });
                 else
                     throw new InvalidDataException("The local bridge control message is invalid.");
             }
