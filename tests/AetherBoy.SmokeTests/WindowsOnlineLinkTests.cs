@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
+using System.Net.WebSockets;
+using System.Text;
 using System.Windows.Forms;
 using AetherBoy.Runtime;
 using AetherBoy.Runtime.Netplay;
@@ -17,6 +19,133 @@ namespace AetherBoy.SmokeTests;
 public sealed class WindowsOnlineLinkTests
 {
     private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
+
+    [TestMethod]
+    public void BrowserFailureCategoriesHaveActionableWindowsDescriptions()
+    {
+        var cases = new (WebRtcBrowserFailure? Failure, string Expected)[]
+        {
+            (WebRtcBrowserFailure.Unknown, "Link-Bridge-Seite"),
+            (WebRtcBrowserFailure.PeerConnection, "kein Relay"),
+            (WebRtcBrowserFailure.DataChannel, "Datenkanal"),
+            (WebRtcBrowserFailure.ChannelProtocol, "kompatible AetherBoy-Builds"),
+            (WebRtcBrowserFailure.LocalConnection, "zwischen Browser und Emulator"),
+            (WebRtcBrowserFailure.SendFailed, "weiterleiten"),
+            (WebRtcBrowserFailure.PacketLimit, "Datenpuffer"),
+            (WebRtcBrowserFailure.EarlyPacket, "vor einem bereiten Browserkanal"),
+            (null, "Ursache ist nicht bekannt"),
+        };
+        foreach (var item in cases) StringAssert.Contains(frmNano.DescribeOnlineLinkFailure(item.Failure), item.Expected);
+        Assert.AreEqual(Enum.GetValues<WebRtcBrowserFailure>().Length + 1, cases.Length);
+    }
+
+    [STATestMethod]
+    [DataRow(0)]
+    [DataRow(1)]
+    [DataRow(2)]
+    public void BrowserFailureReachesWindowsAndRetiresCompletedGbGbcGbaOwner(int hardware)
+    {
+        using var fixture = new Fixture();
+        using var form = new frmNano();
+        form.OnlineLinkBrowserLauncher = _ => { };
+        if (hardware == 2)
+        {
+            form.OnlineGbaProfileInspector = SyntheticProfile;
+            form.OnlineLinkSessionStarter = (rom, save, directory, host, transport, configuration, palette, allowGba) =>
+                SyntheticGbaOwner(rom, save, directory, host, transport, configuration);
+        }
+        form.Show();
+        try
+        {
+            form.LoadRomFile(hardware == 2 ? fixture.AdvanceRom() : fixture.Rom(hardware == 1 ? "fault.gbc" : "fault.gb", hardware == 1));
+            PumpUntil(() => Field<EmulationSession>(form, "session").LatestSnapshot.EmulatedFrameCount > 0);
+            string originalRom = Field<string>(form, "currentRomPath");
+            string originalSave = WindowsRomLibrary.Default.GetSavePath(originalRom);
+            Assert.IsTrue(form.StartOnlineLink(true, confirm: false));
+            Field<System.Windows.Forms.Timer>(form, "updateTimer").Stop();
+            var online = Field<EmulationSession>(form, "session");
+            var transport = Field<WebRtcBrowserTransport>(form, "onlineLinkTransport");
+            byte[]? before = File.Exists(originalSave) ? File.ReadAllBytes(originalSave) : null;
+            string resume = WindowsSaveStateStore.Default.PathFor(originalRom, WindowsSaveStateStore.ResumeSlot);
+            byte[]? resumeBefore = File.Exists(resume) ? File.ReadAllBytes(resume) : null;
+            using var browser = new ClientWebSocket();
+            var page = new Uri(transport.ConnectionPageUrl);
+            browser.Options.SetRequestHeader("Origin", page.GetLeftPart(UriPartial.Authority));
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            browser.ConnectAsync(new Uri("ws://" + page.Authority + "/bridge?token=" + page.Fragment[1..]), timeout.Token).GetAwaiter().GetResult();
+            browser.SendAsync(Encoding.UTF8.GetBytes("ERROR:PEER_CONNECTION").AsMemory(), WebSocketMessageType.Text, true, timeout.Token).GetAwaiter().GetResult();
+            Assert.ThrowsExactly<IOException>(() => online.Completion.WaitAsync(timeout.Token).GetAwaiter().GetResult());
+            Assert.AreSame(online, Field<EmulationSession>(form, "session"), "Only UI retirement may release the completed owner reference.");
+            Call(form, "updateTimer_Tick", form, EventArgs.Empty);
+            Assert.IsNull(Field<EmulationSession?>(form, "session"));
+            Assert.IsNull(Field<WebRtcBrowserTransport?>(form, "onlineLinkTransport"));
+            Assert.IsNull(typeof(frmNano).GetField("audioOutput", Private)!.GetValue(form));
+            string diagnostic = Field<string>(form, "lastOnlineDiagnostic");
+            StringAssert.Contains(diagnostic, "STUN");
+            StringAssert.Contains(diagnostic, "TURN");
+            StringAssert.Contains(diagnostic, "Originalspielstände wurden nicht ersetzt");
+            Assert.IsFalse(diagnostic.Contains(page.Fragment[1..], StringComparison.Ordinal));
+            Assert.IsTrue(((ToolStripMenuItem)Field<ToolStripMenuItem>(form, "menuItem21").DropDownItems["menuOnlineLink"]!).DropDownItems.ContainsKey("menuOnlineDiagnostic"));
+            Call(form, "updateTimer_Tick", form, EventArgs.Empty);
+            Assert.AreEqual(diagnostic, Field<string>(form, "lastOnlineDiagnostic"));
+            AssertUnchanged(originalSave, before); AssertUnchanged(resume, resumeBefore);
+            Assert.IsTrue(File.Exists(Path.Combine(Path.GetDirectoryName(online.OnlineLink!.WorkingSavePath)!, "online-session.json")));
+            using (RomWriteLease.Acquire(originalSave + ".lock")) { }
+            form.LoadRomFile(originalRom);
+            PumpUntil(() => Field<EmulationSession>(form, "session").LatestSnapshot.EmulatedFrameCount > 0);
+            Assert.IsNull(Field<EmulationSession>(form, "session").OnlineLink, "A normal game can be opened again after the failure.");
+        }
+        finally { form.Close(); }
+    }
+
+    [STATestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void PeerInitiatedGen3CloseRetiresWindowsBeforeTimerOrKeyboard(bool keyboardFirst)
+    {
+        using var fixture = new Fixture();
+        string rom = fixture.AdvanceRom();
+        var (localWire, peerWire) = DelayedCloseTransport.Create(delayAcknowledgement: false);
+        using var localTransport = localWire; using var peerTransport = peerWire;
+        using var peer = SyntheticGbaOwner(rom, Path.Combine(Path.GetDirectoryName(rom)!, "peer.sav"),
+            Path.Combine(Path.GetDirectoryName(rom)!, "peer-online"), false, peerWire,
+            new EmulatorConfiguration { AudioEnabled = false });
+        using var form = new frmNano();
+        form.OnlineLinkBrowserLauncher = _ => { };
+        form.OnlineGbaProfileInspector = SyntheticProfile;
+        form.OnlineLinkSessionStarter = (path, save, directory, host, _, configuration, palette, allowGba) =>
+            SyntheticGbaOwner(path, save, directory, host, localWire, configuration);
+        form.Show();
+        try
+        {
+            form.LoadRomFile(rom);
+            PumpUntil(() => Field<EmulationSession>(form, "session").LatestSnapshot.EmulatedFrameCount > 0);
+            string originalSave = WindowsRomLibrary.Default.GetSavePath(Field<string>(form, "currentRomPath"));
+            Assert.IsTrue(form.StartOnlineLink(true, confirm: false));
+            var online = Field<EmulationSession>(form, "session");
+            PumpUntil(() => online.OnlineLink?.Phase == OnlineLinkPhase.Playing && peer.OnlineLink?.Phase == OnlineLinkPhase.Playing);
+            byte[]? before = File.Exists(originalSave) ? File.ReadAllBytes(originalSave) : null;
+            Field<System.Windows.Forms.Timer>(form, "updateTimer").Stop();
+            peer.ShutdownAsync().WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+            online.Completion.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+            Assert.AreEqual(SessionState.Stopped, online.State);
+            if (keyboardFirst) Call(form, "ProcessCmdKey", new Message(), Keys.F9);
+            else Call(form, "updateTimer_Tick", form, EventArgs.Empty);
+            Assert.IsNull(Field<EmulationSession?>(form, "session"));
+            Assert.IsNull(Field<string?>(form, "currentRomPath"));
+            StringAssert.Contains(Field<string>(form, "saveFeedback"), "Online-Link beendet");
+            Assert.IsNotNull(Field<string?>(form, "onlineRecoveryTargetSave"));
+            AssertUnchanged(originalSave, before);
+            using var lease = RomWriteLease.Acquire(originalSave + ".lock");
+        }
+        finally { form.Close(); }
+    }
+
+    private static void AssertUnchanged(string path, byte[]? before)
+    {
+        if (before is null) Assert.IsFalse(File.Exists(path), "No new original save should be published.");
+        else CollectionAssert.AreEqual(before, File.ReadAllBytes(path));
+    }
 
     [STATestMethod]
     public void DelayedGen3CloseBeyondNormalTwoSecondBudgetRetiresOwnerAndAudioCleanly()
@@ -261,9 +390,9 @@ public sealed class WindowsOnlineLinkTests
         public Task Completion => completion.Task;
         public bool Connected => Volatile.Read(ref disposed) == 0 && Volatile.Read(ref peer.disposed) == 0;
         public Exception? Fault => null;
-        internal static (DelayedCloseTransport Local, DelayedCloseTransport Peer) Create()
+        internal static (DelayedCloseTransport Local, DelayedCloseTransport Peer) Create(bool delayAcknowledgement = true)
         {
-            var first = new DelayedCloseTransport(); var second = new DelayedCloseTransport { delayAcknowledgement = true };
+            var first = new DelayedCloseTransport(); var second = new DelayedCloseTransport { delayAcknowledgement = delayAcknowledgement };
             first.peer = second; second.peer = first; return (first, second);
         }
         public void Send(ReadOnlySpan<byte> packet)

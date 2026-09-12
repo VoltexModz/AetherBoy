@@ -2,6 +2,21 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## Unveröffentlicht – WebRTC-Diagnose / Windows parity (2026-09-13)
+
+- Linux-Commits `6e69f83` und `3850464` unverändert übernommen: F10-Reservierung,
+  Bereinigung abgeschlossener Linux-Online-Sitzungen, sichere Browser-Fehlercodes
+  und Schutz vor verspätetem Überschreiben von verbundenen/beendeten Browserzuständen.
+- Windows zeigt validierte Verbindungsgründe auf Deutsch und hält sie unter
+  TOOLS → Online Link → Letzte Verbindungsdiagnose nach dem Sitzungsende abrufbar.
+  Beendete/fehlgeschlagene Online-Besitzer werden erst nach vollständiger
+  Finalisierung freigegeben; Originalspielstände und Fortsetzen-Dateien bleiben erhalten.
+- English: integrated the colleague's shared browser/native diagnostics and Linux
+  cleanup; added typed failure categories, retained Windows diagnostics and safe
+  completed-owner retirement before input/frame updates. No NAT/relay service,
+  transport-version change or successful WAN Pokémon trade is implied.
+- [Übergabe und Prüfgrenzen / handoff and verification limits (DE/EN)](docs/WEBRTC_DIAGNOSTICS_PARITY.md).
+
 ## Unveröffentlicht – GBA Gen3 Online / development profile
 
 - Austauschbarer GBA-SIO-Gegenstellenvertrag und eigener Zweispieler-Gen3-Adapter:

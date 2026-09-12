@@ -218,6 +218,9 @@ public sealed class WebRtcBridgeTests
             Exception cause = transport.Fault.GetBaseException();
             Assert.IsInstanceOfType<IOException>(cause);
             StringAssert.Contains(cause.Message, expected);
+            Assert.IsNotNull(transport.BrowserFailure);
+            string category = string.Concat(transport.BrowserFailure.Value.ToString().Where(char.IsLetter)).ToUpperInvariant();
+            Assert.AreEqual(control == "ERROR" ? "UNKNOWN" : control[6..].Replace("_", ""), category);
             if (!ready) await Assert.ThrowsExactlyAsync<IOException>(() => transport.Ready);
         }
     }
@@ -232,6 +235,7 @@ public sealed class WebRtcBridgeTests
         Assert.IsNotNull(transport.Fault);
         Assert.IsInstanceOfType<InvalidDataException>(transport.Fault.GetBaseException());
         Assert.IsFalse(transport.Fault.ToString().Contains("private-server-password", StringComparison.Ordinal));
+        Assert.IsNull(transport.BrowserFailure, "Unvalidated browser text must never become a frontend diagnostic category.");
     }
 
     [TestMethod]
@@ -268,6 +272,7 @@ public sealed class WebRtcBridgeTests
             await transport.Completion.WaitAsync(Deadline);
             Assert.IsFalse(transport.Connected);
             Assert.IsNull(transport.Fault);
+            Assert.IsNull(transport.BrowserFailure);
         }
         var pending = new WebRtcBrowserTransport();
         pending.Dispose();

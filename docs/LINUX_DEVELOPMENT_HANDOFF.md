@@ -1,5 +1,8 @@
 # Linux-Entwicklung: Übergabe an Windows und den nächsten ChatGPT
 
+Nachtrag 13. September / September 13 addendum:
+[Übernahme von 6e69f83 / 3850464, Windows-Verbindungsdiagnose und Sitzungsabschluss (DE/EN)](WEBRTC_DIAGNOSTICS_PARITY.md).
+
 Aktuellster gemeinsamer Nachtrag / latest shared addendum:
 [GBA Gen3 Online und protokollierte Sitzungsspielstände für Windows/Wayland (DE/EN)](GBA_ONLINE_HANDOFF.md).
 Identische Runtime, neuer Linux-Einstieg mit ausdrücklicher Entwicklungsbestätigung;

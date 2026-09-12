@@ -807,6 +807,7 @@ namespace nanoboy
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            FinishStoppedOnlineLink();
             if (keyData == (Keys.Control | Keys.F10)) { StartOnlineLink(true); return true; }
             if (keyData == (Keys.Control | Keys.Shift | Keys.F10)) { StartOnlineLink(false); return true; }
             if (aetherCommandMenu is not null) return aetherCommandMenu.HandleNavigation(keyData);

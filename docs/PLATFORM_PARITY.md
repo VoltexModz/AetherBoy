@@ -1,5 +1,8 @@
 # Windows ↔ Linux: Funktionsgleichheit / feature parity
 
+Aktueller Nachtrag 13. September: [Gemeinsame WebRTC-Fehlergründe und Windows-Abgleich des Sitzungsabschlusses (DE/EN)](WEBRTC_DIAGNOSTICS_PARITY.md).
+Die nachfolgenden Abschnitte behalten ihre jeweils historischen Ausgangsstände.
+
 Stand: 12. September 2026. Ausgangspunkt: `22a77ef` (Linux Patch Lab),
 inhaltlich zusammengeführt mit Linux-Commit `367674f` und lokalem GBA-Link-Ausbau.
 **Ziel ist Gleichheit in beide Richtungen. Der vollständige Abgleich ist noch nicht abgeschlossen.**

@@ -1,5 +1,8 @@
 # Windows-Entwicklung: Übergabe / Developer handoff
 
+Nachtrag 13. September / September 13 addendum:
+[Übernahme der Linux-WebRTC-Diagnose und Windows-Sitzungsabschluss (DE/EN)](WEBRTC_DIAGNOSTICS_PARITY.md).
+
 Nachtrag 12. September / September 12 addendum:
 [GBA Gen3 Online: Entwicklungsprofil, gemeinsame Sitzungssicherheit und Abnahme (DE/EN)](GBA_ONLINE_HANDOFF.md).
 [GB/GBC Online Link: Browser-WebRTC, Originalspielstandschutz und Grenzen (DE/EN)](ONLINE_LINK_HANDOFF.md).

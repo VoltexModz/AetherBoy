@@ -58,7 +58,7 @@ jobs:
         run: dotnet build .\nanoboy.sln --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Test
-        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 897
+        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 903
 
       - name: Test browser bridge callbacks
         run: node --test tests/browser/WebRtcBridge.test.cjs

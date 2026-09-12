@@ -18,6 +18,7 @@ public partial class frmNano
     private WebRtcBrowserTransport? onlineLinkTransport;
     private string? onlineLinkDirectory;
     private string? lastOnlineStatus;
+    private string? lastOnlineDiagnostic;
     private bool IsOnlineLink => session?.OnlineLink is not null;
     internal Action<string> OnlineLinkBrowserLauncher = url =>
         Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
@@ -39,6 +40,7 @@ public partial class frmNano
         Add("menuOnlineJoin", "Sitzung beitreten · Strg+Umschalt+F10", () => StartOnlineLink(false));
         Add("menuOnlineBrowser", "Verbindungsseite öffnen", OpenOnlineLinkBrowser);
         Add("menuOnlineProfile", "Aktuelles Profil und Grenzen", ShowOnlineLinkProfile);
+        Add("menuOnlineDiagnostic", "Letzte Verbindungsdiagnose", ShowOnlineLinkDiagnostic);
         Add("menuOnlineSaves", "Online-Spielstände öffnen", () => WindowsDataPaths.OpenFolder(this,
             onlineLinkDirectory ?? Path.Combine(WindowsDataPaths.Default.Development, "OnlineLink")));
         Add("menuOnlineRecovery", "Sitzungskopien prüfen / übernehmen", ShowOnlineSaveRecovery);
@@ -102,6 +104,7 @@ public partial class frmNano
                 sessionFaultReported = false; testerRomIdentityRecorded = false;
                 batteryRecoveryNoticeShown = true; currentSessionUsesExternalBootRom = false;
                 displayedFrameSequence = 0; gamepadAwaitNeutral = true; lastOnlineStatus = null;
+                lastOnlineDiagnostic = null;
                 lastPadState = GamepadInput.GetState(); gameView.ClearFrame();
                 if (configuration.AudioEnabled && TryCreateAudioOutput(out NAudioSoundOut output))
                 { Volatile.Write(ref audioOutput, output); session.AudioSamplesAvailable += Session_AudioSamplesAvailable; }
@@ -139,6 +142,55 @@ public partial class frmNano
         lastOnlineStatus = message;
         SetSaveFeedback(message, online.Failure is not null);
     }
+
+    private bool FinishStoppedOnlineLink()
+    {
+        // As on Wayland, a peer may end the owner without a local Disconnect.
+        // Never release the session while its owner still flushes/disposes.
+        if (session is not { OnlineLink: { } online } current ||
+            current.State is not (SessionState.Stopped or SessionState.Faulted)) return false;
+        frameTiming.SetActive(false);
+        DisposeAudioOutput(current);
+        if (!current.Completion.IsCompleted || stateOperationInProgress) return true;
+
+        bool failed = current.State == SessionState.Faulted || online.Phase == OnlineLinkPhase.Faulted;
+        string reason = failed ? DescribeOnlineLinkFailure(onlineLinkTransport?.BrowserFailure)
+            : "Online-Link beendet. Beide Sitzungskopien vor einer bewussten Übernahme prüfen.";
+        string diagnostic = reason + "\n\nOriginalspielstände wurden nicht ersetzt. Ein Verbindungsende bestätigt keinen erfolgreichen Tausch. " +
+            "Sitzungskopien: TOOLS → Online Link → Online-Spielstände öffnen.\n\n" +
+            "Für einen neuen Versuch das eigene Spiel öffnen, eine neue Online-Sitzung starten und neue Einladung/Antwort austauschen.";
+        if (failed && !sessionFaultReported)
+        {
+            sessionFaultReported = true;
+            testerSession?.RecordException("online_link.faulted", current.Fault);
+            Program.WriteCrashLog(current.Fault);
+        }
+        if (!StopSession()) return true;
+        pendingResume = false; activityWasRunning = false; pendingPlaySeconds = 0;
+        gamepadAwaitNeutral = true; lastOnlineStatus = null;
+        gameView.ClearFrame();
+        lastOnlineDiagnostic = diagnostic;
+        SetSaveFeedback(reason + " · TOOLS → Online Link → Letzte Verbindungsdiagnose", failed);
+        return true;
+    }
+
+    internal static string DescribeOnlineLinkFailure(WebRtcBrowserFailure? failure) => failure switch
+    {
+        WebRtcBrowserFailure.PeerConnection => "WebRTC-Verbindung zum Mitspieler fehlgeschlagen. STUN ermittelt Verbindungswege, ist aber kein Relay. " +
+            "Ein TURN-Relay kann bei blockierter Direktverbindung helfen; die Meldung allein beweist keinen Routerfehler.",
+        WebRtcBrowserFailure.DataChannel => "Der WebRTC-Datenkanal ist fehlgeschlagen. Browserstatus prüfen und eine neue Sitzung starten.",
+        WebRtcBrowserFailure.ChannelProtocol => "Unpassender Datenkanal. Beide Spieler müssen kompatible AetherBoy-Builds verwenden.",
+        WebRtcBrowserFailure.LocalConnection => "Die lokale Verbindung zwischen Browser und Emulator ist unterbrochen. Eine neue Online-Sitzung starten.",
+        WebRtcBrowserFailure.SendFailed => "Der Browser konnte die Link-Daten nicht weiterleiten. Eine neue Online-Sitzung starten.",
+        WebRtcBrowserFailure.PacketLimit => "Ungültige Link-Pakete oder voller Datenpuffer. Die Verbindung wurde sicher beendet.",
+        WebRtcBrowserFailure.EarlyPacket => "Link-Daten wurden vor einem bereiten Browserkanal gesendet. Beide Builds prüfen und neu verbinden.",
+        WebRtcBrowserFailure.Unknown => "Der Browser meldet einen Verbindungsfehler. Die Link-Bridge-Seite prüfen und eine neue Sitzung starten.",
+        _ => "Die Online-Sitzung wurde unterbrochen. Browserstatus und lokalen Diagnosebericht prüfen; die genaue Ursache ist nicht bekannt."
+    };
+
+    private void ShowOnlineLinkDiagnostic() => AetherSignal.Show(this,
+        lastOnlineDiagnostic ?? "Noch keine abgeschlossene Verbindungsdiagnose vorhanden. Den aktuellen Status auf der Link-Bridge-Seite prüfen.",
+        "Online-Link · Verbindungsdiagnose", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
     private void ShowOnlineLinkProfile()
     {

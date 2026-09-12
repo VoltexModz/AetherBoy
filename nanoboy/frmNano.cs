@@ -124,7 +124,7 @@ namespace nanoboy
 
             DisposeAudioOutput(previousSession);
             bool gbaOnlineClosing = previousSession.OnlineLink?.ProfileId == AetherBoy.Runtime.Netplay.GbaOnlineProfileCatalog.PokemonGen3Profile;
-            if (gbaOnlineClosing)
+            if (gbaOnlineClosing && !previousSession.Completion.IsCompleted)
             {
                 SetSaveFeedback("GBA-Online wird sicher beendet · Gegenstelle abmelden und Sitzungskopie sichern · bis zu 5 Sekunden", false);
                 Update();
@@ -1018,6 +1018,7 @@ namespace nanoboy
         #region "Update"
         private void updateTimer_Tick(object sender, EventArgs e)
         {
+            if (FinishStoppedOnlineLink()) return;
             healthMonitor?.Pulse(session, stateOperationInProgress || quickMenuOpen ||
                 WindowState == FormWindowState.Minimized || Form.ActiveForm != this, gameView.PresentedFrames);
             PollGamepad();
@@ -1043,6 +1044,9 @@ namespace nanoboy
                 Exception fault = currentSession.Fault;
                 testerSession?.RecordException("session.faulted", fault);
                 Program.WriteCrashLog(fault);
+                // The owner may have faulted after this tick's initial check.
+                // Online cleanup retains the actionable browser reason on the next tick.
+                if (currentSession.OnlineLink is not null) return;
                 AetherSignal.Show(this,
                     $"Die Emulation wurde wegen eines Fehlers beendet.\n\n{fault?.Message}",
                     "Emulationsfehler",
@@ -1238,6 +1242,7 @@ namespace nanoboy
         #region Joypad
         private void gameView_PreviewKeyDown(object sender, PreviewKeyDownEventArgs e)
         {
+            FinishStoppedOnlineLink();
             if (e.KeyCode == Keys.F5)
             {
                 QuickSave();
@@ -1275,6 +1280,7 @@ namespace nanoboy
 
         private void gameView_KeyUp(object sender, KeyEventArgs e)
         {
+            FinishStoppedOnlineLink();
             EmulationSession currentSession = session;
             if (currentSession == null)
             {
