@@ -46,14 +46,33 @@ public sealed class OnlineRoomTests
             root = Path.GetDirectoryName(root.TrimEnd(Path.DirectorySeparatorChar)) ?? throw new Exception("Repository root missing.");
         string? turnUrl = Environment.GetEnvironmentVariable("AETHERBOY_TEST_TURN_URL");
         string ice = turnUrl is null ? "[]" : JsonSerializer.Serialize(new[] { new { urls = turnUrl, username = "roomtest", credential = "test-password-local-only" } });
-        var start = new ProcessStartInfo("node") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-        start.ArgumentList.Add("--input-type=module"); start.ArgumentList.Add("-e");
-        start.ArgumentList.Add("import {createRoomServer} from " + JsonSerializer.Serialize(new Uri(Path.Combine(root, "services", "online-rooms", "server.mjs")).AbsoluteUri) +
-            "; const s=createRoomServer({accessKey:'" + new string('a', 32) + "',iceServers:" + ice + "}); s.listen(0,'127.0.0.1',()=>console.log(s.address().port));");
+        var start = new ProcessStartInfo("node")
+        {
+            RedirectStandardOutput = true, RedirectStandardError = true,
+            RedirectStandardInput = true, UseShellExecute = false, WorkingDirectory = root,
+        };
+        // Execute a module file instead of carrying JavaScript through Windows command-line quoting.
+        start.ArgumentList.Add(Path.Combine(root, "tests", "browser", "OnlineRoomServer.fixture.mjs"));
+        start.Environment["AETHERBOY_ROOM_TEST_ICE_SERVERS"] = ice;
         using var server = Process.Start(start)!;
+        Task<string> serverErrors = server.StandardError.ReadToEndAsync();
         try
         {
-            string? port = await server.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            string? port;
+            try
+            {
+                port = await server.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(20));
+                if (!int.TryParse(port, out int number) || number is < 1 or > 65535)
+                    throw new InvalidOperationException("Room test server did not report a listening port.");
+            }
+            catch (Exception error) when (error is TimeoutException or InvalidOperationException)
+            {
+                await StopServer(server);
+                string diagnostic = await serverErrors.WaitAsync(TimeSpan.FromSeconds(2));
+                if (diagnostic.Length > 4000) diagnostic = diagnostic[^4000..];
+                throw new InvalidOperationException("Room test server startup failed (exit " + server.ExitCode + "). " +
+                    (diagnostic.Length == 0 ? "Node produced no stderr output." : diagnostic), error);
+            }
             var settings = new OnlineRoomSettings("http://127.0.0.1:" + port, new string('a', 32));
             await using var host = new OnlineRoomTransport(settings, true, "", "gb-serial-v1", turnUrl is not null);
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -73,6 +92,13 @@ public sealed class OnlineRoomTests
             await guest.Completion.WaitAsync(deadline.Token);
             Assert.IsFalse(guest.Connected);
         }
-        finally { if (!server.HasExited) server.Kill(entireProcessTree: true); await server.WaitForExitAsync(); }
+        finally { await StopServer(server); }
+    }
+
+    private static async Task StopServer(Process server)
+    {
+        try { if (!server.HasExited) server.Kill(entireProcessTree: true); }
+        catch (InvalidOperationException) when (server.HasExited) { }
+        await server.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
     }
 }

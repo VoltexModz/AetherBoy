@@ -122,6 +122,37 @@ Bei Fehlern Buildstand, Betriebssystem, Host-/Gastrolle, Spielprofil, genaue
 Statusmeldung und letzten erfolgreichen Schritt festhalten. Zugangsschlüssel,
 TURN-Passwörter und vollständige Verbindungsdaten nicht in den Handoff kopieren.
 
+## Nachtrag: erster GitHub-Windows-Lauf von `3fb28ca`
+
+[CI-Lauf 34727729334](https://github.com/VoltexModz/AetherBoy/actions/runs/34727729334):
+Beide Linux-Jobs (x64 und ARM64) erfolgreich; Windows-Restore und -Build erfolgreich.
+Der Windows-Job wurde nach dem 15-Minuten-Limit abgebrochen. Er ist nicht grün.
+
+Die Runtime meldete vorher einen fehlgeschlagenen Test:
+`NativeRoomsExchangePacketsWithoutBrowserAndCloseTogether` wartete zehn Sekunden
+auf die Portausgabe des lokalen Node-Testservers (`OnlineRoomTests.cs:56` im Commit).
+Der Timeout trat vor dem Erstellen einer Peer-Verbindung auf. Der damalige Test
+leitete stderr zwar um, las es aber nicht; die Ursache des fehlenden Startsignals
+ist daher nicht belegt. Die Windows-Smoke-Suite blieb anschließend ohne Abschluss.
+Welcher ihrer Tests hing, ist im damaligen Log nicht erkennbar. Der ältere,
+bekannte Local-Link-Schließhänger ist nur ein möglicher Zusammenhang.
+
+Vorbereitete Änderungen für den nächsten Commit:
+
+- Node-Testserver als eigene `.mjs`-Datei statt Inline-JavaScript starten;
+  Testkonfiguration über die Prozessumgebung, stdin ausdrücklich umleiten.
+- Portmeldung prüfen, stderr lesen und bei Startfehlern mit Exitcode ausgeben;
+  Start und Prozessende zeitlich begrenzen.
+- Windows-Suiten separat und nacheinander ausführen. Jede erhält ein Testlimit von
+  zwei Minuten, ein äußeres Schrittlimit von drei Minuten, ausführliche Ausgabe
+  und Diagnose-/TRX-Dateien im Artifact `windows-test-diagnostics`.
+- Die übrigen Suiten laufen auch nach einem Testfehler, sofern der Build erfolgreich
+  war. Fehler bleiben Fehler; kein automatisches Wegfiltern oder grün gewerteter Retry.
+
+Die Änderungen sind auf Linux geprüft. Ein erfolgreicher neuer Windows-CI-Lauf
+muss nach Commit/Push noch erfolgen; weder der Serverstart-Timeout noch der
+Windows-UI-Hänger werden damit bereits als unter Windows behoben behauptet.
+
 ## Tatsächlich geprüft
 
 Nach Integration von `23c6fda` erneut geprüft: gesamter Release-Build einschließlich

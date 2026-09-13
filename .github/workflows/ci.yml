@@ -56,13 +56,40 @@ jobs:
         run: dotnet restore .\nanoboy.sln --locked-mode --configfile .\NuGet.config
 
       - name: Build
+        id: windows-build
         run: dotnet build .\nanoboy.sln --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
-      - name: Test
-        run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 903
-
-      - name: Test browser bridge callbacks
+      - name: Test browser bridge and room service
         run: node --test tests/browser/WebRtcBridge.test.cjs services/online-rooms/server.test.mjs
+
+      - name: Test Core
+        if: ${{ !cancelled() && steps.windows-build.outcome == 'success' }}
+        timeout-minutes: 3
+        run: dotnet test --project .\tests\AetherBoy.CoreTests\AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 232 --timeout 2m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Core" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Core"
+
+      - name: Test Runtime and native rooms
+        if: ${{ !cancelled() && steps.windows-build.outcome == 'success' }}
+        timeout-minutes: 3
+        run: dotnet test --project .\tests\AetherBoy.RuntimeTests\AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 364 --timeout 2m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Runtime" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Runtime"
+
+      - name: Test portable frontend logic
+        if: ${{ !cancelled() && steps.windows-build.outcome == 'success' }}
+        timeout-minutes: 3
+        run: dotnet test --project .\tests\AetherBoy.DesktopTests\AetherBoy.DesktopTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 122 --timeout 2m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Desktop" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Desktop"
+
+      - name: Test Windows UI
+        if: ${{ !cancelled() && steps.windows-build.outcome == 'success' }}
+        timeout-minutes: 3
+        run: dotnet test --project .\tests\AetherBoy.SmokeTests\AetherBoy.SmokeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 195 --timeout 2m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Smoke" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Smoke"
+
+      - name: Retain Windows test diagnostics
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-test-diagnostics
+          path: artifacts/test-results/
+          if-no-files-found: warn
+          retention-days: 7
 
   portable:
     name: Linux / ${{ matrix.runner }} / Core + Runtime + Wayland
