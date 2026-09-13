@@ -14,6 +14,8 @@ internal enum LinuxTextKey { Left, Right, Home, End, Backspace, Delete, SelectAl
 /// <summary>Single-line, UTF-16-indexed editor whose caret and selection always lie on grapheme boundaries.</summary>
 internal sealed class LinuxTextEditor(int maximumLength = 80)
 {
+    public int MaximumLength { get; set; } = maximumLength;
+
     public string Text { get; private set; } = "";
     public int Caret { get; private set; }
     public int Anchor { get; private set; }
@@ -34,7 +36,7 @@ internal sealed class LinuxTextEditor(int maximumLength = 80)
 
     public void SetText(string value)
     {
-        Text = Limit(Clean(value), maximumLength);
+        Text = Limit(Clean(value), MaximumLength);
         Caret = Anchor = Text.Length;
         ScrollOffset = 0;
         CancelComposition();
@@ -64,7 +66,7 @@ internal sealed class LinuxTextEditor(int maximumLength = 80)
 
     public void Insert(string value)
     {
-        string insertion = Limit(Clean(value), Math.Max(0, maximumLength - Text.Length + SelectionLength));
+        string insertion = Limit(Clean(value), Math.Max(0, MaximumLength - Text.Length + SelectionLength));
         int start = SelectionStart;
         Text = Text[..start] + insertion + Text[(start + SelectionLength)..];
         // Combining characters can merge with adjacent text. Snap the resulting caret forward.

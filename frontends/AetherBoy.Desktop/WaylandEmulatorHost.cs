@@ -699,6 +699,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         if (editingTitleIdentity is not null) { statusMessage = "Save or cancel the title before leaving."; return; }
         editingSearch = false;
         editingCheat = false;
+        onlineEditingField = TextField.None;
         titleEditVersion++; editingTitleIdentity = null;
         SDL.StopTextInput(window);
         focusedControl = -1;
@@ -1058,6 +1059,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         storage?.Dispose();
         storage = null;
         onlineLinkTransport?.Dispose(); onlineLinkTransport = null;
+        onlineRoomTransport?.Dispose(); onlineRoomTransport = null;
         RequestDiskRefresh();
         audioOutput?.Clear();
     }
@@ -1422,6 +1424,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         rebindingAction = null;
         editingSearch = false;
         editingCheat = false;
+        onlineEditingField = TextField.None;
         titleEditVersion++; editingTitleIdentity = null;
         SDL.StopTextInput(window);
         rebindingGamepad = null;

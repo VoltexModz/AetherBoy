@@ -1,5 +1,8 @@
 # Linux-Entwicklung: Übergabe an Windows und den nächsten ChatGPT
 
+Nachtrag 13. September: [Native Raumcodes – Windows-Integration, Build und Abnahme](ONLINE_ROOMS_WINDOWS_HANDOFF.md).
+Enthält auch die Zusammenführung mit Voltex' Diagnose-/Session-Fix `23c6fda`.
+
 Nachtrag 13. September / September 13 addendum:
 [Übernahme von 6e69f83 / 3850464, Windows-Verbindungsdiagnose und Sitzungsabschluss (DE/EN)](WEBRTC_DIAGNOSTICS_PARITY.md).
 

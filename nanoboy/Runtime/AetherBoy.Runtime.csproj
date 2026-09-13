@@ -11,6 +11,20 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MediaToolkit.WebRtc.Native.win-x64" Version="0.24.5.1" GeneratePathProperty="true" ExcludeAssets="build" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OnlineNativeRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</OnlineNativeRid>
+    <OnlineNativeRid Condition="'$(OnlineNativeRid)' == ''">$(NETCoreSdkRuntimeIdentifier)</OnlineNativeRid>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="../../third_party/online-native-licenses/*" Link="licenses/online-native/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(PkgMediaToolkit_WebRtc_Native_win-x64)/native/win-x64/datachannel.dll" Link="datachannel.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../artifacts/native/$(OnlineNativeRid)/libdatachannel.so" Link="libdatachannel.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('../../artifacts/native/$(OnlineNativeRid)/libdatachannel.so')" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Core\AetherBoy.Core.csproj" />
     <ProjectReference Include="..\..\third_party\GBADotnet.Core\AetherBoy.Vendored.GBADotnet.Core.csproj" />
   </ItemGroup>

@@ -378,3 +378,11 @@ AetherBoy began in 2014 as **nanoboy** by **Frédéric Meyer**, continued as **C
 The emulator code is licensed under **GPL-3.0-only**; see [LICENSE](LICENSE). Third-party components, particularly the MIT-licensed GBADotnet core and bundled fonts, have their own licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Use only ROMs and firmware you are authorized to use. The code license grants no rights to games or Nintendo firmware. AetherBoy is not affiliated with or endorsed by Nintendo; Game Boy, Game Boy Color and Game Boy Advance are trademarks of their respective owners.
+
+### Online room codes
+
+The native Windows and Linux online UI supports short room codes through a private
+CapRover room service, with TURN settings supplied by the service. See the
+[setup guide](docs/ONLINE_ROOMS_DE.md) and the
+[Windows developer handoff](docs/ONLINE_ROOMS_WINDOWS_HANDOFF.md). Existing experimental cable-profile and
+protected-save limitations still apply. The manual browser connection remains available.

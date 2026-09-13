@@ -19,6 +19,7 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
   DOTNET_NOLOGO: "1"
   NUGET_XMLDOC_MODE: skip
+  AETHERBOY_TEST_NATIVE_ONLINE: "1"
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
 jobs:
@@ -61,7 +62,7 @@ jobs:
         run: dotnet test --solution .\nanoboy.sln --configuration Release --no-build --no-restore --minimum-expected-tests 903
 
       - name: Test browser bridge callbacks
-        run: node --test tests/browser/WebRtcBridge.test.cjs
+        run: node --test tests/browser/WebRtcBridge.test.cjs services/online-rooms/server.test.mjs
 
   portable:
     name: Linux / ${{ matrix.runner }} / Core + Runtime + Wayland
@@ -70,7 +71,7 @@ jobs:
       matrix:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -93,6 +94,12 @@ jobs:
             tests/AetherBoy.DesktopTests/packages.lock.json
             tools/AetherBoy.Conformance/packages.lock.json
             tools/AetherBoy.GbaProbe/packages.lock.json
+
+      - name: Build native online transport
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential libssl-dev
+          bash scripts/build-online-native.sh
 
       - name: Restore Core tests
         run: dotnet restore ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --locked-mode --configfile ./NuGet.config
@@ -137,7 +144,7 @@ jobs:
         run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 356
 
       - name: Test browser bridge callbacks
-        run: node --test tests/browser/WebRtcBridge.test.cjs
+        run: node --test tests/browser/WebRtcBridge.test.cjs services/online-rooms/server.test.mjs
 
       - name: Test native Wayland frontend logic
         run: dotnet test --project ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 121

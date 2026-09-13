@@ -808,8 +808,8 @@ namespace nanoboy
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             FinishStoppedOnlineLink();
-            if (keyData == (Keys.Control | Keys.F10)) { StartOnlineLink(true); return true; }
-            if (keyData == (Keys.Control | Keys.Shift | Keys.F10)) { StartOnlineLink(false); return true; }
+            if (keyData == (Keys.Control | Keys.F10)) { ShowOnlineRoomDialog(true); return true; }
+            if (keyData == (Keys.Control | Keys.Shift | Keys.F10)) { ShowOnlineRoomDialog(false); return true; }
             if (aetherCommandMenu is not null) return aetherCommandMenu.HandleNavigation(keyData);
             if (keyData == Keys.F10) { _ = OpenQuickMenuAsync(); return true; }
             if (keyData == Keys.F12) { _ = CaptureScreenshotAsync(); return true; }

@@ -30,6 +30,7 @@ internal sealed partial class WaylandEmulatorHost
         showOnlineLinkPage = true; focusedControl = -1;
         pendingOnlineRole = null;
         showOnlineSaveRecovery = false;
+        LoadRoomSettings();
         InspectOnlineProfile();
     }
 
@@ -83,13 +84,16 @@ internal sealed partial class WaylandEmulatorHost
             // Linux normal sessions use the central cartridge lock, in addition to
             // the Runtime's save-path lock. Keep it while the online copy is active.
             storage = LinuxRomStorage.Open(dataPaths, path);
-            var transport = new WebRtcBrowserTransport();
+            IOnlineLinkTransport transport = startNativeRoom
+                ? new OnlineRoomTransport(roomSettings, isHost, roomCodeInput, gba is null ? "gb-serial-v1" : GbaOnlineProfileCatalog.PokemonGen3Profile)
+                : new WebRtcBrowserTransport();
             try
             {
                 string directory = Path.Combine(dataPaths.State, "online-link",
                     $"{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}");
                 session = OnlineLinkSessionStarter(path, save, directory, isHost, transport, configuration, palette, gba is not null);
-                onlineLinkTransport = transport; onlineLinkDirectory = directory;
+                onlineLinkTransport = transport as WebRtcBrowserTransport;
+                onlineRoomTransport = transport as OnlineRoomTransport; onlineLinkDirectory = directory;
                 onlineRecoveryTargetSave = save; onlineRecoveryRomPath = path;
                 romPath = path; loadError = null;
                 undoState = null; undoIdentity = null; pendingResumeIdentity = null;
@@ -103,7 +107,7 @@ internal sealed partial class WaylandEmulatorHost
                 RequestDiskRefresh();
                 statusMessage = "DEVELOPMENT online copy prepared. Browser handshake next; a connection does not confirm a trade.";
                 SDL.SetWindowTitle(window, "AetherBoy · ONLINE LINK" + (gba is null ? "" : " · GEN3 DEV") + " · " + Path.GetFileNameWithoutExtension(path));
-                OpenOnlineLinkBrowser();
+                if (!startNativeRoom) OpenOnlineLinkBrowser();
                 return true;
             }
             catch { transport.Dispose(); throw; }
@@ -160,6 +164,7 @@ internal sealed partial class WaylandEmulatorHost
     private void DrawOnlineLinkPage()
     {
         if (showOnlineSaveRecovery) { DrawOnlineSaveRecoveryPage(); return; }
+        if (!showLegacyOnlineLink && (onlineLinkTransport is null)) { DrawOnlineRoomPage(); return; }
         ActionButton(300, 198, 200, 40, "BACK TO TOOLS", () => { showOnlineLinkPage = false; pendingOnlineRole = null; OpenControlPage(ControlCenterPage.Tools); focusedControl = -1; });
         Ink(300, 258, "ONLINE LINK · GB/GBC + GBA GEN3 DEV", 20, Colors.Cyan, true);
         Ink(300, 292, textRenderer.Fit(session?.OnlineLink?.DisplayName ?? onlineProfileMessage, 825, 14), 14, Colors.Cyan);

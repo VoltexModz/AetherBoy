@@ -32,8 +32,9 @@ internal sealed class LinuxSdlTextClipboard : ILinuxTextClipboard
 
 internal sealed partial class WaylandEmulatorHost
 {
-    private enum TextField { None, Title, Search, Cheat }
+    private enum TextField { None, Title, Search, Cheat, RoomCode, RoomServer, RoomAccessKey }
 
+    private TextField onlineEditingField;
     private readonly LinuxTextEditor textEditor = new(80);
     private ILinuxTextClipboard textClipboard = new LinuxSdlTextClipboard();
     private TextField editorField;
@@ -41,14 +42,14 @@ internal sealed partial class WaylandEmulatorHost
     private bool draggingTextSelection;
     private readonly Dictionary<TextField, SDL.FRect> textEntryBounds = new();
     private TextField ActiveTextField => editingTitleIdentity is not null ? TextField.Title
-        : editingSearch ? TextField.Search : editingCheat ? TextField.Cheat : TextField.None;
+        : editingSearch ? TextField.Search : editingCheat ? TextField.Cheat : controlCenterVisible && showOnlineLinkPage && !showLegacyOnlineLink ? onlineEditingField : TextField.None;
     private string? ActiveTextEntryName => ActiveTextField switch
-    { TextField.Title => "Cartridge title", TextField.Search => "Search cartridges", TextField.Cheat => "Cheat code", _ => null };
+    { TextField.Title => "Cartridge title", TextField.Search => "Search cartridges", TextField.Cheat => "Cheat code", TextField.RoomCode => "Room code", TextField.RoomServer => "Room server address", TextField.RoomAccessKey => "Server access key", _ => null };
     private string? ActiveTextName => ActiveTextEntryName;
     private bool ActiveTextReadOnly => ActiveTextField == TextField.Title && libraryMutation is not null;
     private string ActiveTextValue
     {
-        get { EnsureTextEditor(); return ActiveTextField == TextField.None ? "" : textEditor.Text; }
+        get { EnsureTextEditor(); return ActiveTextField == TextField.None ? "" : ActiveTextField == TextField.RoomAccessKey ? new string('*', textEditor.Text.Length) : textEditor.Text; }
         set
         {
             if (ActiveTextField == TextField.None || ActiveTextReadOnly) return;
@@ -56,10 +57,15 @@ internal sealed partial class WaylandEmulatorHost
         }
     }
 
+    private string TextFieldValue(TextField field) => field switch
+    { TextField.Title => titleInput, TextField.Search => librarySearch, TextField.Cheat => cheatCode,
+      TextField.RoomCode => roomCodeInput, TextField.RoomServer => roomServerInput, TextField.RoomAccessKey => roomAccessKeyInput, _ => "" };
+
     private void EnsureTextEditor()
     {
         var field = ActiveTextField;
-        string value = field switch { TextField.Title => titleInput, TextField.Search => librarySearch, TextField.Cheat => cheatCode, _ => "" };
+        textEditor.MaximumLength = field is TextField.RoomServer or TextField.RoomAccessKey ? 256 : field == TextField.RoomCode ? 14 : 80;
+        string value = TextFieldValue(field);
         if (editorField != field || textEditor.Text != value)
         { textEditor.SetText(value); editorField = field; editorHasFocus = true; }
         if (field == TextField.Title && titleSelectedAll && !textEditor.AllSelected) textEditor.SelectAll();
@@ -72,6 +78,9 @@ internal sealed partial class WaylandEmulatorHost
             case TextField.Title: titleInput = textEditor.Text; titleSelectedAll = textEditor.AllSelected; break;
             case TextField.Search: librarySearch = textEditor.Text; libraryPage = 0; break;
             case TextField.Cheat: cheatCode = textEditor.Text; break;
+            case TextField.RoomCode: roomCodeInput = textEditor.Text; break;
+            case TextField.RoomServer: roomServerInput = textEditor.Text; break;
+            case TextField.RoomAccessKey: roomAccessKeyInput = textEditor.Text; break;
         }
     }
 
@@ -79,6 +88,7 @@ internal sealed partial class WaylandEmulatorHost
     {
         if (ActiveTextReadOnly) return;
         if (textEditor.IsComposing) SDL.ClearComposition(window);
+        onlineEditingField = field is TextField.RoomCode or TextField.RoomServer or TextField.RoomAccessKey ? field : TextField.None;
         editingSearch = field == TextField.Search;
         editingCheat = field == TextField.Cheat;
         editorField = TextField.None;
@@ -118,6 +128,7 @@ internal sealed partial class WaylandEmulatorHost
         SyncTextEditor();
         if (ActiveTextField == TextField.Title) { EndTitleEdit(true); return; }
         editingSearch = editingCheat = false;
+        onlineEditingField = TextField.None;
         editorField = TextField.None; SDL.StopTextInput(window);
     }
 
@@ -169,17 +180,18 @@ internal sealed partial class WaylandEmulatorHost
     {
         textEntryBounds[field] = new SDL.FRect { X = x, Y = y, W = width, H = height };
         bool active = ActiveTextField == field;
-        string value = field switch { TextField.Title => titleInput, TextField.Search => librarySearch, _ => cheatCode };
+        string value = TextFieldValue(field);
+        if (field == TextField.RoomAccessKey) value = new string('*', value.Length);
         ActionButton(x, y, width, height, "", () => BeginTextEditing(field), false, enabled, focusId: "text:" + field);
         if (!active)
         { Ink(x + 12, y + (height - 22) / 2, textRenderer.Fit(string.IsNullOrEmpty(value) ? placeholder : value, width - 24, 16), 16, string.IsNullOrEmpty(value) ? Colors.Muted : Colors.Text); return; }
         EnsureTextEditor();
         float lineHeight = Math.Max(16, textRenderer.MinimumSize) + 8;
         float contentWidth = width - 24, top = y + (height - lineHeight) / 2;
-        float Measure(string text) => textRenderer.Measure(text, 16);
+        float Measure(string text) => textRenderer.Measure(field == TextField.RoomAccessKey ? new string('*', text.Length) : text, 16);
         textEditor.EnsureCaretVisible(contentWidth, Measure);
         float origin = x + 12 - textEditor.ScrollOffset;
-        string display = textEditor.DisplayText;
+        string display = field == TextField.RoomAccessKey ? new string('*', textEditor.DisplayText.Length) : textEditor.DisplayText;
         bool clipped = SDL.RenderClipEnabled(renderer);
         SDL.GetRenderClipRect(renderer, out SDL.Rect previous);
         var clip = new SDL.Rect { X = (int)(x + 10), Y = (int)y, W = (int)(width - 20), H = (int)height };
@@ -216,6 +228,12 @@ internal sealed partial class WaylandEmulatorHost
             ControlCenterPage.Tools when session is not null => TextField.Cheat,
             _ => TextField.None
         };
+        if (controlCenterVisible && showOnlineLinkPage && !showLegacyOnlineLink && onlineLinkTransport is null)
+        {
+            field = TextField.None;
+            foreach (var candidate in showRoomSetup ? new[] { TextField.RoomServer, TextField.RoomAccessKey } : onlineRoomTransport is null ? new[] { TextField.RoomCode } : Array.Empty<TextField>())
+                if (textEntryBounds.TryGetValue(candidate, out var rectangle) && Hit(x, y, rectangle.X, rectangle.Y, rectangle.W, rectangle.H)) field = candidate;
+        }
         if (field == TextField.None || !textEntryBounds.TryGetValue(field, out var bounds) || !Hit(x, y, bounds.X, bounds.Y, bounds.W, bounds.H))
         {
             if (ActiveTextField != TextField.None && !textEditor.IsComposing)
@@ -226,7 +244,7 @@ internal sealed partial class WaylandEmulatorHost
         if (ActiveTextField != field) BeginTextEditing(field);
         else { EnsureTextEditor(); editorHasFocus = true; focusedControl = -1; SDL.StartTextInput(window); }
         if (textEditor.IsComposing) return true;
-        textEditor.PlaceCaret(x - bounds.X - 12 + textEditor.ScrollOffset, value => textRenderer.Measure(value, 16), shift);
+        textEditor.PlaceCaret(x - bounds.X - 12 + textEditor.ScrollOffset, value => textRenderer.Measure(ActiveTextField == TextField.RoomAccessKey ? new string('*', value.Length) : value, 16), shift);
         SyncTextEditor(); draggingTextSelection = true;
         return true;
     }
@@ -235,8 +253,8 @@ internal sealed partial class WaylandEmulatorHost
     {
         if (!draggingTextSelection || ActiveTextReadOnly || !editorHasFocus ||
             !textEntryBounds.TryGetValue(ActiveTextField, out var bounds)) return;
-        textEditor.PlaceCaret(x - bounds.X - 12 + textEditor.ScrollOffset, value => textRenderer.Measure(value, 16), extend: true);
-        textEditor.EnsureCaretVisible(bounds.W - 24, value => textRenderer.Measure(value, 16));
+        textEditor.PlaceCaret(x - bounds.X - 12 + textEditor.ScrollOffset, value => textRenderer.Measure(ActiveTextField == TextField.RoomAccessKey ? new string('*', value.Length) : value, 16), extend: true);
+        textEditor.EnsureCaretVisible(bounds.W - 24, value => textRenderer.Measure(ActiveTextField == TextField.RoomAccessKey ? new string('*', value.Length) : value, 16));
         SyncTextEditor();
     }
 }

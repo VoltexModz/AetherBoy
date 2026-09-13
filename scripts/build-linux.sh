@@ -21,6 +21,8 @@ fi
 project="$repository_root/frontends/AetherBoy.Desktop/AetherBoy.Desktop.csproj"
 output="$repository_root/artifacts/AetherBoy-$runtime_id"
 
+bash "$repository_root/scripts/build-online-native.sh"
+
 dotnet restore "$project" \
     --locked-mode \
     --configfile "$repository_root/NuGet.config"

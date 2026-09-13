@@ -43,6 +43,11 @@
           "MSTest.Analyzers": "4.3.2"
         }
       },
+      "MediaToolkit.WebRtc.Native.win-x64": {
+        "type": "Transitive",
+        "resolved": "0.24.5.1",
+        "contentHash": "H46CLQXAhdYXy6uZnzYpkUqDPDjdzDP5OjdfiFxWZxtPk6b5XERIRTcztHRm92TZKGl2BlNXSw1804+ARrkPtA=="
+      },
       "Microsoft.ApplicationInsights": {
         "type": "Transitive",
         "resolved": "2.23.0",
@@ -116,7 +121,8 @@
         "type": "Project",
         "dependencies": {
           "AetherBoy.Core": "[4.8.0-alpha.1, )",
-          "AetherBoy.Vendored.GBADotnet.Core": "[4.8.0-alpha.1, )"
+          "AetherBoy.Vendored.GBADotnet.Core": "[4.8.0-alpha.1, )",
+          "MediaToolkit.WebRtc.Native.win-x64": "[0.24.5.1, )"
         }
       },
       "aetherboy.vendored.gbadotnet.core": {

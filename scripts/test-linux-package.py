@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='aetherboy package $ check ') as directo
                      'licenses/SDL3-CS-LICENSE.txt', 'licenses/SDL3-CS.Linux-LICENSE.txt',
                      'licenses/GBADotnet-LICENSE.md', 'Assets/Fonts/OFL.txt'):
         assert (app / required).is_file(), required
-    for executable in ('AetherBoy.Desktop', 'libhostfxr.so', 'libcoreclr.so', 'libSDL3.so'):
+    for executable in ('AetherBoy.Desktop', 'libhostfxr.so', 'libcoreclr.so', 'libSDL3.so', 'libdatachannel.so'):
         with (app / executable).open('rb') as stream:
             header = stream.read(20)
         assert header[:6] == b'\x7fELF\x02\x01', f'Expected 64-bit little-endian ELF: {executable}'

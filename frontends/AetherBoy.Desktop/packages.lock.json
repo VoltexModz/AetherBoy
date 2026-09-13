@@ -14,6 +14,11 @@
         "resolved": "3.4.16",
         "contentHash": "jC1+e5CVbeNCsF7mdZaCqgD2rPY8RCsGdMxzokxjj+ZNNu3Nzc9esl+z6tFCGuHd2kg2565t8zIVI5Up0GoQmg=="
       },
+      "MediaToolkit.WebRtc.Native.win-x64": {
+        "type": "Transitive",
+        "resolved": "0.24.5.1",
+        "contentHash": "H46CLQXAhdYXy6uZnzYpkUqDPDjdzDP5OjdfiFxWZxtPk6b5XERIRTcztHRm92TZKGl2BlNXSw1804+ARrkPtA=="
+      },
       "aetherboy.core": {
         "type": "Project"
       },
@@ -21,7 +26,8 @@
         "type": "Project",
         "dependencies": {
           "AetherBoy.Core": "[4.8.0-alpha.1, )",
-          "AetherBoy.Vendored.GBADotnet.Core": "[4.8.0-alpha.1, )"
+          "AetherBoy.Vendored.GBADotnet.Core": "[4.8.0-alpha.1, )",
+          "MediaToolkit.WebRtc.Native.win-x64": "[0.24.5.1, )"
         }
       },
       "aetherboy.vendored.gbadotnet.core": {

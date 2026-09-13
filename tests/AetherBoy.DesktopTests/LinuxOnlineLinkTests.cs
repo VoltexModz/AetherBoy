@@ -158,6 +158,54 @@ public sealed class LinuxOnlineLinkTests
         finally { SDL.Quit(); Directory.Delete(root, recursive: true); }
     }
 
+    [TestMethod]
+    public void RoomSetupKeepsAccessKeyMaskedAndPersistsSettingsWithoutStartingGame()
+    {
+        if (Environment.GetEnvironmentVariable("AETHERBOY_UI_TESTS") != "1") Assert.Inconclusive("Requires isolated Wayland.");
+        string root = Path.Combine(Path.GetTempPath(), "aetherboy-room-ui-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        SDL.SetHint("SDL_VIDEO_DRIVER", "wayland");
+        Assert.IsTrue(SDL.Init(SDL.InitFlags.Video | SDL.InitFlags.Events), SDL.GetError());
+        try
+        {
+            using var host = new WaylandEmulatorHost(LinuxDesktopProfile.Detect(), Path.Combine(root, "settings.json"), hidden: true);
+            Call(host, "OpenOnlineLinkPage"); Call(host, "DrawShell");
+            Assert.IsTrue(Field<bool>(host, "showRoomSetup"));
+            var fieldType = typeof(WaylandEmulatorHost).GetNestedType("TextField", BindingFlags.NonPublic)!;
+            Call(host, "BeginTextEditing", Enum.Parse(fieldType, "RoomServer"));
+            Call(host, "ReceiveTextInput", "https://rooms.example.com");
+            Call(host, "BeginTextEditing", Enum.Parse(fieldType, "RoomAccessKey"));
+            string secret = new string('a', 128);
+            Call(host, "ReceiveTextInput", secret);
+            Assert.AreEqual(secret, Field<string>(host, "roomAccessKeyInput"));
+            Assert.AreEqual(new string('*', 128), typeof(WaylandEmulatorHost).GetProperty("ActiveTextValue", Private)!.GetValue(host));
+            CaptureRoom(host, "online-server-setup");
+            Call(host, "SaveRoomSettings");
+            Assert.IsFalse(Field<bool>(host, "showRoomSetup"));
+            var settings = OnlineRoomSettings.Load(Path.Combine(Field<LinuxDataPaths>(host, "dataPaths").Config, "online-room.json"));
+            Assert.AreEqual(secret, settings.AccessKey);
+            Assert.IsFalse(Field<bool>(host, "acceptRoomSaveCopy"));
+            Call(host, "StartOnlineRoom", true);
+            Assert.IsNull(Field<OnlineRoomTransport?>(host, "onlineRoomTransport"));
+            CaptureRoom(host, "online-rooms");
+            Call(host, "BeginTextEditing", Enum.Parse(fieldType, "RoomCode"));
+            Call(host, "ReceiveTextInput", "ABCDE-FGHJK"); Call(host, "CommitActiveText");
+            Assert.AreEqual("ABCDE-FGHJK", Field<string>(host, "roomCodeInput"));
+        }
+        finally { SDL.Quit(); Directory.Delete(root, true); }
+    }
+
+    private static void CaptureRoom(WaylandEmulatorHost host, string name)
+    {
+        string? output = Environment.GetEnvironmentVariable("AETHERBOY_UI_CAPTURE_DIR");
+        if (string.IsNullOrEmpty(output)) return;
+        Directory.CreateDirectory(output); Call(host, "DrawShell");
+        IntPtr surface = SDL.RenderReadPixels(Field<IntPtr>(host, "renderer"), null);
+        Assert.AreNotEqual(IntPtr.Zero, surface);
+        try { Assert.IsTrue(SDL.SavePNG(surface, Path.Combine(output, name + ".png"))); }
+        finally { SDL.DestroySurface(surface); }
+    }
+
     private static byte[] MakeAdvanceRom()
     {
         byte[] bytes = new byte[0x200];

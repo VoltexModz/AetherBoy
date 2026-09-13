@@ -31,11 +31,11 @@ python3 - "$repository_root" "$staging/source" <<'PY'
 import pathlib, shutil, subprocess, sys
 root, destination = map(pathlib.Path, sys.argv[1:])
 prefixes = ('frontends/AetherBoy.Desktop/', 'nanoboy/Core/', 'nanoboy/Runtime/',
-            'third_party/GBADotnet.Core/', 'branding/', 'scripts/')
+            'third_party/GBADotnet.Core/', 'third_party/online-native-licenses/', 'branding/', 'scripts/')
 root_files = {'Directory.Build.props', 'Directory.Build.targets', 'NuGet.config', 'global.json',
               'LICENSE', 'THIRD_PARTY_NOTICES.md', 'CHANGELOG.md',
               'docs/GBADOTNET_REVIEW.md', 'docs/MGBA_REVIEW.md', 'docs/LINUX_DISTRIBUTION.md'}
-source_extensions = {'.cs', '.csproj', '.props', '.targets', '.json', '.config', '.md', '.txt', '.sh', '.py'}
+source_extensions = {'.cs', '.csproj', '.props', '.targets', '.json', '.config', '.md', '.txt', '.sh', '.py', '.html', '.js'}
 for raw in subprocess.check_output(['git', '-C', str(root), 'ls-files', '-cz', '--others', '--exclude-standard']).split(b'\0'):
     if not raw: continue
     relative = pathlib.Path(raw.decode())
@@ -51,6 +51,16 @@ for raw in subprocess.check_output(['git', '-C', str(root), 'ls-files', '-cz', '
     target.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, target)
 PY
+# Build the native dependency for this host; cross-packaging needs a native build
+# from the target architecture in artifacts/native/<rid>.
+if [[ ! -f "$repository_root/artifacts/native/$runtime_id/libdatachannel.so" ]]; then
+    bash "$repository_root/scripts/build-online-native.sh"
+fi
+[[ -f "$repository_root/artifacts/native/$runtime_id/libdatachannel.so" ]] || {
+    printf 'Build the online native library on the target architecture first: %s\n' "$runtime_id" >&2; exit 2;
+}
+mkdir -p "$staging/source/artifacts/native/$runtime_id"
+cp "$repository_root/artifacts/native/$runtime_id/libdatachannel.so" "$staging/source/artifacts/native/$runtime_id/"
 project="$staging/source/frontends/AetherBoy.Desktop/AetherBoy.Desktop.csproj"
 dotnet restore "$project" --locked-mode --artifacts-path "$staging/build" --configfile "$staging/source/NuGet.config"
 dotnet publish "$project" --no-restore --configuration Release --runtime "$runtime_id" --self-contained true \
@@ -66,7 +76,7 @@ app = stage / 'application'
 assets = json.loads((stage / 'build/obj/AetherBoy.Desktop/project.assets.json').read_text())
 package_root = pathlib.Path(next(iter(assets['packageFolders'])))
 notices = app / 'licenses'
-notices.mkdir()
+notices.mkdir(exist_ok=True)
 for package in ('SDL3-CS', 'SDL3-CS.Linux'):
     key = next(key for key in assets['libraries'] if key.lower().startswith(package.lower() + '/'))
     shutil.copyfile(package_root / key.lower() / 'LICENSE', notices / f'{package}-LICENSE.txt')
@@ -79,7 +89,7 @@ runtime_version = next(f['version'] for f in frameworks if f['name'] == 'Microso
 runtime_package = package_root / f'microsoft.netcore.app.runtime.{rid}' / runtime_version
 for filename in ('LICENSE.TXT', 'THIRD-PARTY-NOTICES.TXT'):
     shutil.copyfile(runtime_package / filename, notices / f'DOTNET-{filename}')
-for required in ('libhostfxr.so', 'libcoreclr.so', 'Assets/Fonts/OFL.txt',
+for required in ('libdatachannel.so', 'libhostfxr.so', 'libcoreclr.so', 'Assets/Fonts/OFL.txt',
                  'Assets/aetherboy-mark.png', 'LICENSE', 'THIRD_PARTY_NOTICES.md'):
     if not (app / required).is_file(): raise SystemExit(f'Publish is missing required file: {required}')
 version = next(key.rsplit('/', 1)[1] for key in json.loads((app / 'AetherBoy.Desktop.deps.json').read_text())['libraries']
@@ -93,10 +103,11 @@ metadata = {'applicationVersion': version, 'runtimeIdentifier': rid, 'sourceComm
     'graphics driver and system audio/runtime libraries are still required.\n'
     'Settings and saves use normal XDG user folders, not this extracted directory.\n'
     'No ROMs or BIOS images are included. Corresponding Linux source is in source.tar.gz.\n'
-    'Build extracted source with dotnet publish frontends/AetherBoy.Desktop/AetherBoy.Desktop.csproj\n'
+    'Build the native library with bash scripts/build-online-native.sh, then dotnet publish frontends/AetherBoy.Desktop/AetherBoy.Desktop.csproj\n'
     '  -c Release --self-contained true -r linux-x64 (or linux-arm64). SDK: global.json.\n')
 (stage / 'package-name').write_text(f'AetherBoy-{version}-{rid}-self-contained')
 PY
+rm -rf -- "$staging/source/artifacts"
 # Sorted entries, normalized ownership/time and gzip without timestamps make
 # archive creation repeatable for identical published files and source inputs.
 tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner \

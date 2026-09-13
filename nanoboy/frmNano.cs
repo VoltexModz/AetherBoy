@@ -155,6 +155,7 @@ namespace nanoboy
             {
                 onlineLinkTransport?.Dispose();
                 onlineLinkTransport = null;
+                onlineRoomTransport?.Dispose(); onlineRoomTransport = null;
                 romWriteLease?.Dispose();
                 romWriteLease = null;
                 session = null;

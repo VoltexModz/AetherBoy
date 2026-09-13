@@ -36,8 +36,10 @@ public partial class frmNano
             var item = new ToolStripMenuItem(text) { Name = name };
             item.Click += (_, _) => action(); online.DropDownItems.Add(item);
         }
-        Add("menuOnlineHost", "Sitzung erstellen · Strg+F10", () => StartOnlineLink(true));
-        Add("menuOnlineJoin", "Sitzung beitreten · Strg+Umschalt+F10", () => StartOnlineLink(false));
+        Add("menuOnlineHost", "Sitzung erstellen · Strg+F10", () => ShowOnlineRoomDialog(true));
+        Add("menuOnlineJoin", "Sitzung beitreten · Strg+Umschalt+F10", () => ShowOnlineRoomDialog(false));
+        Add("menuOnlineManualHost", "Manuell im Browser · Host", () => StartOnlineLink(true));
+        Add("menuOnlineManualGuest", "Manuell im Browser · Gast", () => StartOnlineLink(false));
         Add("menuOnlineBrowser", "Verbindungsseite öffnen", OpenOnlineLinkBrowser);
         Add("menuOnlineProfile", "Aktuelles Profil und Grenzen", ShowOnlineLinkProfile);
         Add("menuOnlineDiagnostic", "Letzte Verbindungsdiagnose", ShowOnlineLinkDiagnostic);
@@ -91,13 +93,16 @@ public partial class frmNano
         {
             if (!StopSession()) throw new InvalidOperationException("Das aktuelle Spiel konnte nicht sicher beendet werden.");
             settings.UseGameProfile(path);
-            var transport = new WebRtcBrowserTransport();
+            IOnlineLinkTransport transport = startNativeRoom
+                ? new OnlineRoomTransport(roomSettings, isHost, roomCodeInput, gba is null ? "gb-serial-v1" : GbaOnlineProfileCatalog.PokemonGen3Profile)
+                : new WebRtcBrowserTransport();
             try
             {
                 string directory = Path.Combine(WindowsDataPaths.Default.Development, "OnlineLink",
                     $"{DateTime.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}");
                 session = OnlineLinkSessionStarter(path, save, directory, isHost, transport, configuration, palette, gba is not null);
-                onlineLinkTransport = transport; onlineLinkDirectory = directory;
+                onlineLinkTransport = transport as WebRtcBrowserTransport;
+                onlineRoomTransport = transport as OnlineRoomTransport; onlineLinkDirectory = directory;
                 onlineRecoveryTargetSave = save; onlineRecoveryRomPath = path;
                 currentRomPath = path;
                 pendingResume = false; pendingPlaySeconds = 0; activityWasRunning = false;
@@ -110,7 +115,7 @@ public partial class frmNano
                 { Volatile.Write(ref audioOutput, output); session.AudioSamplesAvailable += Session_AudioSamplesAvailable; }
                 if (audiotoolwindow is { IsDisposed: false }) audiotoolwindow.Session = session;
                 UpdateAetherSessionUi(session.LatestSnapshot);
-                OpenOnlineLinkBrowser();
+                if (!startNativeRoom) OpenOnlineLinkBrowser();
                 return true;
             }
             catch { transport.Dispose(); throw; }
@@ -136,7 +141,7 @@ public partial class frmNano
     private void UpdateOnlineLinkUi()
     {
         if (session?.OnlineLink is not { } online) return;
-        string message = $"ONLINE · {online.DisplayName} · {OnlinePhaseLabel(online.Phase)} · {online.TransfersCompleted} Transfers · " +
+        string message = $"ONLINE · {online.DisplayName} · {(online.Phase == OnlineLinkPhase.WaitingForBrowser && onlineRoomTransport is not null ? onlineRoomTransport.Status : OnlinePhaseLabel(online.Phase))} · {online.TransfersCompleted} Transfers · " +
             (online.Failure ?? "Sitzungskopie · Tausch/Speichererfolg nicht bestätigt");
         if (message == lastOnlineStatus) return;
         lastOnlineStatus = message;
@@ -154,11 +159,15 @@ public partial class frmNano
         if (!current.Completion.IsCompleted || stateOperationInProgress) return true;
 
         bool failed = current.State == SessionState.Faulted || online.Phase == OnlineLinkPhase.Faulted;
-        string reason = failed ? DescribeOnlineLinkFailure(onlineLinkTransport?.BrowserFailure)
+        bool nativeRoom = onlineRoomTransport is not null;
+        string reason = failed ? (nativeRoom ? DescribeOnlineRoomFailure(onlineRoomTransport?.Fault)
+            : DescribeOnlineLinkFailure(onlineLinkTransport?.BrowserFailure))
             : "Online-Link beendet. Beide Sitzungskopien vor einer bewussten Übernahme prüfen.";
         string diagnostic = reason + "\n\nOriginalspielstände wurden nicht ersetzt. Ein Verbindungsende bestätigt keinen erfolgreichen Tausch. " +
             "Sitzungskopien: TOOLS → Online Link → Online-Spielstände öffnen.\n\n" +
-            "Für einen neuen Versuch das eigene Spiel öffnen, eine neue Online-Sitzung starten und neue Einladung/Antwort austauschen.";
+            (nativeRoom
+                ? "Für einen neuen Versuch das eigene Spiel öffnen und einen neuen Raum erstellen oder per Raumcode beitreten. Servereinstellungen im Raumdialog prüfen."
+                : "Für einen neuen Versuch das eigene Spiel öffnen, eine neue Online-Sitzung starten und neue Einladung/Antwort austauschen.");
         if (failed && !sessionFaultReported)
         {
             sessionFaultReported = true;
@@ -173,6 +182,9 @@ public partial class frmNano
         SetSaveFeedback(reason + " · TOOLS → Online Link → Letzte Verbindungsdiagnose", failed);
         return true;
     }
+
+    internal static string DescribeOnlineRoomFailure(Exception? failure) => failure?.Message
+        ?? "Die Online-Raumsitzung wurde unterbrochen. Raumstatus und lokalen Diagnosebericht prüfen; die genaue Ursache ist nicht bekannt.";
 
     internal static string DescribeOnlineLinkFailure(WebRtcBrowserFailure? failure) => failure switch
     {
@@ -189,7 +201,7 @@ public partial class frmNano
     };
 
     private void ShowOnlineLinkDiagnostic() => AetherSignal.Show(this,
-        lastOnlineDiagnostic ?? "Noch keine abgeschlossene Verbindungsdiagnose vorhanden. Den aktuellen Status auf der Link-Bridge-Seite prüfen.",
+        lastOnlineDiagnostic ?? onlineRoomTransport?.Status ?? "Noch keine abgeschlossene Verbindungsdiagnose vorhanden. Den aktuellen Status auf der Link-Bridge-Seite prüfen.",
         "Online-Link · Verbindungsdiagnose", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
     private void ShowOnlineLinkProfile()

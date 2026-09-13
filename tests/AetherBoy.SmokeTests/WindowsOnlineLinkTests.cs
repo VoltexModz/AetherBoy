@@ -39,6 +39,15 @@ public sealed class WindowsOnlineLinkTests
         Assert.AreEqual(Enum.GetValues<WebRtcBrowserFailure>().Length + 1, cases.Length);
     }
 
+    [TestMethod]
+    public void NativeRoomFailureRetainsActionableReasonWithoutBrowserFallback()
+    {
+        const string reason = "The server access key is incorrect. Open Server settings.";
+        Assert.AreEqual(reason, frmNano.DescribeOnlineRoomFailure(new IOException(reason)));
+        StringAssert.Contains(frmNano.DescribeOnlineRoomFailure(null), "Raumstatus");
+        Assert.IsFalse(frmNano.DescribeOnlineRoomFailure(null).Contains("Browser", StringComparison.Ordinal));
+    }
+
     [STATestMethod]
     [DataRow(0)]
     [DataRow(1)]

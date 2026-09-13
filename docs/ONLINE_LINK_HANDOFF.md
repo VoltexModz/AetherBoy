@@ -1,5 +1,10 @@
 # Online Link: GB/GBC development prototype / Entwicklungsprototyp
 
+> Update 2026-09-13: The primary UI now uses native room-code connections.
+> Windows developer handoff: [native room integration](ONLINE_ROOMS_WINDOWS_HANDOFF.md).
+> See [room service setup](ONLINE_ROOMS_DE.md). Browser-only statements below
+> describe the retained manual transport and its earlier test history.
+
 Status: 2026-09-12. **Not a verified Pokémon trading release.**
 
 Neuer Folgestand / newer follow-up: [GBA Gen3 online development profile and shared save recovery (DE/EN)](GBA_ONLINE_HANDOFF.md).

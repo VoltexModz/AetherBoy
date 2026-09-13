@@ -112,3 +112,28 @@ Noto Sans fonts. Copyright 2022 The Noto Project Authors
 Font License 1.1; see `branding/fonts/OFL.txt` (published as `Assets/Fonts/OFL.txt`).
 The generated UI glyph atlases and metrics accompany the fonts under that license.
 Regenerate them with `python3 scripts/build-font-atlas.py` using Pillow.
+
+## Native online room connections (2026-09-13)
+
+AetherBoy's room transport uses **libdatachannel 0.24.5** (MPL-2.0),
+Copyright Paul-Louis Ageneau and contributors. Corresponding source, including
+submodule revisions, is available at
+https://github.com/paullouisageneau/libdatachannel/tree/443f6934d9007eb7076ab7825ba330f355fcbead.
+The library is unmodified. `scripts/build-online-native.sh` reproduces the Linux
+build with media and WebSocket support disabled. The C# adapter and private room
+service are AetherBoy code. The shared library may be replaced by a compatible
+build of the same C ABI.
+
+Windows x64 binaries come from `MediaToolkit.WebRtc.Native.win-x64` **0.24.5.1**
+(MPL-2.0 package), maintained at https://github.com/Rukhlov/MediaToolkit.NetCore
+(package source revision `c8d6edec0032cd99b46193abaee8a2a62b3a9f8b`).
+Its `datachannel.dll` includes libjuice (MPL-2.0), usrsctp (BSD), plog (MIT),
+libsrtp (BSD), and OpenSSL (Apache-2.0). Linux builds include libjuice, usrsctp and
+plog and dynamically link the operating system's OpenSSL 3 libraries.
+License texts are distributed in `licenses/online-native/`, sourced from
+`third_party/online-native-licenses/`. Upstream source notices remain applicable.
+
+The optional room service image uses Node.js 24's official Alpine image.
+Its runtime and operating system retain the notices shipped in that image.
+Coturn is independently deployed by the server administrator, not bundled into
+the emulator.
