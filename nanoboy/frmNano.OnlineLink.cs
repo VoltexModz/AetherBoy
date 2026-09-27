@@ -43,6 +43,8 @@ public partial class frmNano
         Add("menuOnlineBrowser", "Verbindungsseite öffnen", OpenOnlineLinkBrowser);
         Add("menuOnlineProfile", "Aktuelles Profil und Grenzen", ShowOnlineLinkProfile);
         Add("menuOnlineDiagnostic", "Letzte Verbindungsdiagnose", ShowOnlineLinkDiagnostic);
+        Add("menuOnlineNativeReports", "Native Verbindungsberichte öffnen", () => WindowsDataPaths.OpenFolder(this,
+            Path.Combine(WindowsDataPaths.Default.Development, "OnlineDiagnostics")));
         Add("menuOnlineSaves", "Online-Spielstände öffnen", () => WindowsDataPaths.OpenFolder(this,
             onlineLinkDirectory ?? Path.Combine(WindowsDataPaths.Default.Development, "OnlineLink")));
         Add("menuOnlineRecovery", "Sitzungskopien prüfen / übernehmen", ShowOnlineSaveRecovery);
@@ -94,7 +96,9 @@ public partial class frmNano
             if (!StopSession()) throw new InvalidOperationException("Das aktuelle Spiel konnte nicht sicher beendet werden.");
             settings.UseGameProfile(path);
             IOnlineLinkTransport transport = startNativeRoom
-                ? new OnlineRoomTransport(roomSettings, isHost, roomCodeInput, gba is null ? "gb-serial-v1" : GbaOnlineProfileCatalog.PokemonGen3Profile)
+                ? new OnlineRoomTransport(roomSettings, isHost, roomCodeInput, gba is null ? "gb-serial-v1" : GbaOnlineProfileCatalog.PokemonGen3Profile,
+                    (Program.StartupDiagnosticsDecision ?? Diagnostics.WindowsDiagnosticsPreferences.Default.GetStatus()).RecordingRequested
+                        ? Path.Combine(WindowsDataPaths.Default.Development, "OnlineDiagnostics") : null)
                 : new WebRtcBrowserTransport();
             try
             {

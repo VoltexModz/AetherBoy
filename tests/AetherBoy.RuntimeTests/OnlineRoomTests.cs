@@ -37,7 +37,10 @@ public sealed class OnlineRoomTests
     }
 
     [TestMethod]
-    public async Task NativeRoomsExchangePacketsWithoutBrowserAndCloseTogether()
+    [DataRow("gb-serial-v1")]
+    [DataRow("gba-pokemon-gen3-v1")]
+    [DataRow(OnlineTransportProbe.Profile)]
+    public async Task NativeRoomsExchangePacketsWithoutBrowserAndCloseTogether(string profile)
     {
         if (Environment.GetEnvironmentVariable("AETHERBOY_TEST_NATIVE_ONLINE") != "1")
             Assert.Inconclusive("Run with AETHERBOY_TEST_NATIVE_ONLINE=1 after building the native online library.");
@@ -45,6 +48,7 @@ public sealed class OnlineRoomTests
         while (!File.Exists(Path.Combine(root, "services", "online-rooms", "server.mjs")))
             root = Path.GetDirectoryName(root.TrimEnd(Path.DirectorySeparatorChar)) ?? throw new Exception("Repository root missing.");
         string? turnUrl = Environment.GetEnvironmentVariable("AETHERBOY_TEST_TURN_URL");
+        if (string.IsNullOrWhiteSpace(turnUrl)) turnUrl = null;
         string ice = turnUrl is null ? "[]" : JsonSerializer.Serialize(new[] { new { urls = turnUrl, username = "roomtest", credential = "test-password-local-only" } });
         var start = new ProcessStartInfo("node")
         {
@@ -56,6 +60,7 @@ public sealed class OnlineRoomTests
         start.Environment["AETHERBOY_ROOM_TEST_ICE_SERVERS"] = ice;
         using var server = Process.Start(start)!;
         Task<string> serverErrors = server.StandardError.ReadToEndAsync();
+        string reports = Path.Combine(Path.GetTempPath(), "aetherboy-native-reports-" + Guid.NewGuid().ToString("N"));
         try
         {
             string? port;
@@ -74,10 +79,10 @@ public sealed class OnlineRoomTests
                     (diagnostic.Length == 0 ? "Node produced no stderr output." : diagnostic), error);
             }
             var settings = new OnlineRoomSettings("http://127.0.0.1:" + port, new string('a', 32));
-            await using var host = new OnlineRoomTransport(settings, true, "", "gb-serial-v1", turnUrl is not null);
+            await using var host = new OnlineRoomTransport(settings, true, "", profile, turnUrl is not null, reports);
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             while (host.RoomCode.Length == 0) { if (host.Fault is { } e) throw e; await Task.Delay(20, deadline.Token); }
-            await using var guest = new OnlineRoomTransport(settings, false, host.DisplayCode, "gb-serial-v1", turnUrl is not null);
+            await using var guest = new OnlineRoomTransport(settings, false, host.DisplayCode, profile, turnUrl is not null);
             await Task.WhenAll(host.Ready, guest.Ready).WaitAsync(deadline.Token);
             byte[] outgoing = Enumerable.Range(0, 4096).Select(i => (byte)i).ToArray();
             host.Send(outgoing);
@@ -88,11 +93,31 @@ public sealed class OnlineRoomTests
             while (!host.TryReceive(out packet)) await Task.Delay(10, deadline.Token);
             CollectionAssert.AreEqual(new byte[] { 7, 8, 9 }, packet);
             Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => host.Send(new byte[4097]));
+            if (profile == OnlineTransportProbe.Profile)
+            {
+                var results = await Task.WhenAll(OnlineTransportProbe.RunAsync(host, 2, deadline.Token),
+                    OnlineTransportProbe.RunAsync(guest, 2, deadline.Token));
+                Assert.IsTrue(results.All(r => r.VerifiedEchoes == 8));
+            }
+            else Assert.ThrowsExactly<ArgumentException>(() => OnlineTransportProbe.RunAsync(host));
+            Assert.IsTrue(host.Diagnostics.Snapshot().Any(e => e.Kind == "ice-state" && e.Detail is "connected" or "completed"));
+            Assert.IsTrue(host.Diagnostics.Snapshot().Any(e => e.Kind == "candidate-pair" && e.Detail.StartsWith("local=", StringComparison.Ordinal)));
+            Assert.IsFalse(host.Diagnostics.Snapshot().Any(e => e.Kind == "candidate-pair" && e.Detail.Contains("=unknown", StringComparison.Ordinal)));
+            Assert.IsTrue(host.Diagnostics.Snapshot().Any(e => e.Kind == "native-process"));
             await host.DisposeAsync();
             await guest.Completion.WaitAsync(deadline.Token);
             Assert.IsFalse(guest.Connected);
+            Assert.IsTrue(File.Exists(host.DiagnosticPath));
+            string report = File.ReadAllText(host.DiagnosticPath!);
+            Assert.IsFalse(report.Contains(host.RoomCode, StringComparison.Ordinal));
+            Assert.IsFalse(report.Contains(new string('a', 32), StringComparison.Ordinal));
+            Assert.IsNull(host.DiagnosticWriteError);
         }
-        finally { await StopServer(server); }
+        finally
+        {
+            try { await StopServer(server); }
+            finally { if (Directory.Exists(reports)) Directory.Delete(reports, true); }
+        }
     }
 
     private static async Task StopServer(Process server)

@@ -36,6 +36,10 @@ public partial class frmNano
         Label("Ein Raum. Zwei Spieler. Direkt im Emulator spielen.", 24, 18, 650);
         var setup = new Panel { Bounds = new Rectangle(24, 65, 650, 220), Visible = false };
         dialog.Controls.Add(setup);
+        // Control.Visible is false while the parent form is hidden, even for a requested
+        // visible panel. Keep the page selection independent of the form's lifetime.
+        bool showingSetup = false;
+        void ShowSetup(bool value) { showingSetup = value; setup.Visible = value; }
         var url = new TextBox { Text = roomSettings.ServerUrl, Bounds = new Rectangle(0, 30, 645, 30), MaxLength = 256, AccessibleName = "Raumserver HTTPS-Adresse" };
         var key = new TextBox { Text = roomSettings.AccessKey, Bounds = new Rectangle(0, 104, 645, 30), MaxLength = 256, UseSystemPasswordChar = true, AccessibleName = "Server-Zugangsschlüssel" };
         setup.Controls.Add(new Label { Text = "Raumserver · HTTPS-Adresse", Bounds = new Rectangle(0, 4, 640, 24) });
@@ -69,7 +73,7 @@ public partial class frmNano
             try { if (observed?.RoomCode.Length == 10) Clipboard.SetText(observed.DisplayCode); }
             catch (System.Runtime.InteropServices.ExternalException) { message.Text = "Zwischenablage ist gerade nicht verfügbar."; }
         });
-        var server = Button("Server einstellen", 24, 393, 200, () => { if (!IsOnlineLink) setup.Visible = !setup.Visible; });
+        var server = Button("Server einstellen", 24, 393, 200, () => { if (!IsOnlineLink) ShowSetup(!showingSetup); });
         var stop = Button("Verbindung beenden", 244, 393, 210, () => { if (IsOnlineLink) StopSession(); });
         var back = Button("Zum Spiel", 474, 393, 200, () => dialog.Close());
         Label("Originalspielstände bleiben erhalten. Sitzungskopien danach unter\nTools → Online Link → Sitzungskopien prüfen / übernehmen kontrollieren.", 24, 458, 650, 54);
@@ -78,18 +82,18 @@ public partial class frmNano
             try
             {
                 var candidate = new OnlineRoomSettings(url.Text.Trim(), key.Text.Trim());
-                candidate.Save(RoomSettingsPath); roomSettings = candidate; setup.Visible = false;
+                candidate.Save(RoomSettingsPath); roomSettings = candidate; ShowSetup(false);
                 message.Text = "Server gespeichert. TURN-Einstellungen kommen automatisch vom Server.";
             }
             catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException) { message.Text = ex.Message; }
         };
         bool Configured() { try { roomSettings.Validate(); return true; } catch (ArgumentException) { return false; } }
-        setup.Visible = !Configured() && !IsOnlineLink;
+        ShowSetup(!Configured() && !IsOnlineLink);
         var timer = new System.Windows.Forms.Timer { Interval = 200 };
         void Refresh()
         {
             bool active = onlineRoomTransport is not null;
-            foreach (Control control in new Control[] { codeCaption, code, consent, create, join, copy }) control.Visible = !setup.Visible;
+            foreach (Control control in new Control[] { codeCaption, code, consent, create, join, copy }) control.Visible = !showingSetup;
             code.ReadOnly = active; consent.Enabled = !active;
             create.Enabled = join.Enabled = !active && !IsOnlineLink && consent.Checked && Configured() && currentRomPath is not null;
             copy.Enabled = active && observed?.RoomCode.Length == 10;
@@ -97,10 +101,11 @@ public partial class frmNano
             if (active && observed is not null) { code.Text = observed.DisplayCode; message.Text = observed.Status; }
             else if (observed is not null) message.Text = observed.Fault?.Message ?? "Online-Sitzung beendet. Deine Spielstandkopie bleibt erhalten.";
         }
+        setup.VisibleChanged += (_, _) => Refresh();
         timer.Tick += (_, _) => Refresh();
         dialog.FormClosed += (_, _) => { timer.Dispose(); onlineRoomDialog = null; };
         AetherDialog.Apply(dialog, "ONLINE LINK // ROOMS", "Kurzen Code teilen · Browserfrei verbinden · Geschützte Spielstandkopie");
         Refresh(); timer.Start(); dialog.Show(this);
-        if (!host && !setup.Visible) code.Focus();
+        if (!host && !showingSetup) code.Focus();
     }
 }

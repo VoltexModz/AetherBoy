@@ -18,21 +18,46 @@ internal sealed class NativeRtcPeer : IDisposable
     private readonly TaskCompletionSource opened = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Action<Exception?> stopped;
     private readonly ChannelWriter<byte[]> received;
-    private readonly Rtc.StateCallback stateCallback, gatheringCallback, channelCallback;
+    private readonly OnlineRoomDiagnostics diagnostics;
+    private readonly Rtc.StateCallback stateCallback, iceCallback, gatheringCallback, channelCallback;
     private readonly Rtc.SimpleCallback openCallback, closeCallback;
     private readonly Rtc.ErrorCallback errorCallback;
     private readonly Rtc.MessageCallback messageCallback;
     private int peer = -1, channel = -1;
+    private int inspectPair;
+    private long nextPairCheck;
+    private string lastPair = "";
+    private bool loggerRegistered;
 
-    internal NativeRtcPeer(IceServer[] servers, bool relayOnly, ChannelWriter<byte[]> received, Action<Exception?> stopped)
+    internal NativeRtcPeer(IceServer[] servers, bool relayOnly, ChannelWriter<byte[]> received, Action<Exception?> stopped, OnlineRoomDiagnostics diagnostics)
     {
-        this.received = received; this.stopped = stopped;
-        stateCallback = (_, state, _) => { if (state == 4) Fail("Could not connect through the relay. Check the server's relay ports."); else if (state == 5) stopped(null); };
-        gatheringCallback = (_, state, _) => { if (state == 2) gathered.TrySetResult(); };
-        channelCallback = (_, id, _) => { if (!incomingChannel.TrySetResult(id)) Fail("The peer opened more than one data channel."); };
-        openCallback = (_, _) => opened.TrySetResult();
-        closeCallback = (_, _) => stopped(null);
-        errorCallback = (_, _, _) => Fail("The online data channel failed.");
+        this.received = received; this.stopped = stopped; this.diagnostics = diagnostics;
+        stateCallback = (_, state, _) => Callback(() =>
+        {
+            diagnostics.Record("peer-state", StateName(state, false));
+            Interlocked.Exchange(ref inspectPair, 1);
+            if (state == 4) Fail("Native connection failed. Check the connection report; the cause is not yet determined.");
+            else if (state == 5) stopped(null);
+        });
+        iceCallback = (_, state, _) => Callback(() =>
+        {
+            diagnostics.Record("ice-state", StateName(state, true));
+            Interlocked.Exchange(ref inspectPair, 1);
+        });
+        gatheringCallback = (_, state, _) => Callback(() =>
+        {
+            diagnostics.Record("gathering", state switch { 0 => "new", 1 => "in-progress", 2 => "complete", _ => "unknown" });
+            if (state == 2) gathered.TrySetResult();
+        });
+        channelCallback = (_, id, _) => Callback(() => { if (!incomingChannel.TrySetResult(id)) Fail("The peer opened more than one data channel."); });
+        openCallback = (_, _) => Callback(() => { diagnostics.Record("data-channel", "open"); opened.TrySetResult(); });
+        closeCallback = (_, _) => Callback(() => { diagnostics.Record("data-channel", "closed"); stopped(null); });
+        errorCallback = (_, error, _) => Callback(() =>
+        {
+            string detail = NativeRtcLogger.Sanitize(NativeRtcLogger.CopyMessage(error));
+            diagnostics.Record("data-channel-error", detail);
+            Fail("The online data channel failed: " + detail);
+        });
         messageCallback = (_, data, size, _) =>
         {
             try
@@ -46,6 +71,8 @@ internal sealed class NativeRtcPeer : IDisposable
         var allocations = new List<IntPtr>();
         try
         {
+            NativeRtcLogger.Register(diagnostics, servers); loggerRegistered = true;
+            diagnostics.Record("native-config", "libdatachannel=0.24.5 relay-only=" + relayOnly.ToString().ToLowerInvariant());
             IntPtr array = Marshal.AllocHGlobal(IntPtr.Size * servers.Length); allocations.Add(array);
             for (int i = 0; i < servers.Length; i++)
             {
@@ -57,6 +84,7 @@ internal sealed class NativeRtcPeer : IDisposable
                 DisableAutoNegotiation = 1, TransportPolicy = relayOnly ? 1 : 0, MaxMessageSize = 4096 };
             peer = Check(Rtc.rtcCreatePeerConnection(ref config));
             Check(Rtc.rtcSetStateChangeCallback(peer, stateCallback));
+            Check(Rtc.rtcSetIceStateChangeCallback(peer, iceCallback));
             Check(Rtc.rtcSetGatheringStateChangeCallback(peer, gatheringCallback));
             Check(Rtc.rtcSetDataChannelCallback(peer, channelCallback));
         }
@@ -67,6 +95,15 @@ internal sealed class NativeRtcPeer : IDisposable
             if (allocations.Count > 0) Marshal.FreeHGlobal(allocations[0]);
         }
     }
+
+    private void Callback(Action action)
+    {
+        try { action(); }
+        catch (Exception) { diagnostics.Record("callback-error", "Managed callback failed; see surrounding state events."); }
+    }
+    private static string StateName(int state, bool ice) => ice
+        ? state switch { 0 => "new", 1 => "checking", 2 => "connected", 3 => "completed", 4 => "failed", 5 => "disconnected", 6 => "closed", _ => "unknown" }
+        : state switch { 0 => "new", 1 => "connecting", 2 => "connected", 3 => "disconnected", 4 => "failed", 5 => "closed", _ => "unknown" };
 
     private void Fail(string message) => stopped(new IOException(message));
     internal async Task<string> DescriptionAsync(bool host, string? remote, CancellationToken cancellation)
@@ -79,18 +116,68 @@ internal sealed class NativeRtcPeer : IDisposable
         }
         else Check(Rtc.rtcSetRemoteDescription(peer, remote!, "offer"));
         Check(Rtc.rtcSetLocalDescription(peer, host ? "offer" : "answer"));
-        await gathered.Task.WaitAsync(TimeSpan.FromSeconds(45), cancellation).ConfigureAwait(false);
+        diagnostics.Record("sdp-local", "gathering-started");
+        await WaitWithDiagnostics(gathered.Task.WaitAsync(TimeSpan.FromSeconds(45), cancellation), cancellation).ConfigureAwait(false);
         byte[] buffer = new byte[100_001];
         int length = Check(Rtc.rtcGetLocalDescription(peer, buffer, buffer.Length));
         if (length > buffer.Length) throw new IOException("Online description exceeds its limit.");
+        diagnostics.Record("sdp-local", "complete bytes=" + length);
         return Encoding.UTF8.GetString(buffer, 0, Math.Max(0, length - 1));
     }
     internal void AcceptAnswer(string sdp) => Check(Rtc.rtcSetRemoteDescription(peer, sdp, "answer"));
     internal async Task WaitForOpenAsync(bool host, CancellationToken cancellation)
     {
-        if (!host) Bind(await incomingChannel.Task.WaitAsync(TimeSpan.FromSeconds(45), cancellation).ConfigureAwait(false));
-        await opened.Task.WaitAsync(TimeSpan.FromSeconds(45), cancellation).ConfigureAwait(false);
+        if (!host)
+        {
+            Task<int> waitingChannel = incomingChannel.Task.WaitAsync(TimeSpan.FromSeconds(45), cancellation);
+            await WaitWithDiagnostics(waitingChannel, cancellation).ConfigureAwait(false);
+            Bind(await waitingChannel.ConfigureAwait(false));
+        }
+        await WaitWithDiagnostics(opened.Task.WaitAsync(TimeSpan.FromSeconds(45), cancellation), cancellation).ConfigureAwait(false);
+        PollDiagnostics(force: true);
     }
+    private async Task WaitWithDiagnostics(Task waiting, CancellationToken cancellation)
+    {
+        while (!waiting.IsCompleted)
+        {
+            PollDiagnostics();
+            await Task.WhenAny(waiting, Task.Delay(100, cancellation)).ConfigureAwait(false);
+        }
+        PollDiagnostics(force: true);
+        await waiting.ConfigureAwait(false);
+    }
+
+    // Called on the transport worker, never within native callbacks. A pair can be unavailable
+    // during ICE transitions and may change later. The native API supplies full candidate strings.
+    internal void PollDiagnostics(bool force = false)
+    {
+        if (peer < 0) return;
+        bool changed = Interlocked.Exchange(ref inspectPair, 0) != 0;
+        long now = Environment.TickCount64;
+        if (!force && !changed && now < nextPairCheck) return;
+        nextPairCheck = now + 2000;
+        int required = Rtc.rtcGetSelectedCandidatePair(peer, null, 0, null, 0);
+        if (required < 0) { PairResult("unavailable code=" + required); return; }
+        for (int attempt = 0; attempt < 3 && required is > 0 and <= 16384; attempt++)
+        {
+            byte[] local = new byte[required], remote = new byte[required];
+            int result = Rtc.rtcGetSelectedCandidatePair(peer, local, local.Length, remote, remote.Length);
+            if (result == -4 || result > required)
+            { required = Rtc.rtcGetSelectedCandidatePair(peer, null, 0, null, 0); continue; }
+            if (result < 0) { PairResult("unavailable code=" + result); return; }
+            string Decode(byte[] value)
+            {
+                int end = Array.IndexOf(value, (byte)0);
+                return Encoding.UTF8.GetString(value, 0, end < 0 ? value.Length : end);
+            }
+            PairResult("local=" + OnlineRoomDiagnostics.CandidateType(Decode(local)) +
+                " remote=" + OnlineRoomDiagnostics.CandidateType(Decode(remote)) + " endpoints=redacted");
+            return;
+        }
+        PairResult("read-failed-or-size-limit");
+    }
+    private void PairResult(string value)
+    { if (value != lastPair) { lastPair = value; diagnostics.Record("candidate-pair", value); } }
     private void Bind(int id)
     {
         channel = id;
@@ -112,10 +199,16 @@ internal sealed class NativeRtcPeer : IDisposable
     private static int Check(int result) => result >= 0 ? result : throw new IOException("Native WebRTC operation failed (" + result + ").");
     public void Dispose()
     {
-        if (peer < 0) return;
-        if (channel >= 0) { Rtc.rtcDeleteDataChannel(channel); channel = -1; }
-        Rtc.rtcDeletePeerConnection(peer); peer = -1;
-        GC.KeepAlive(this); // Keep every delegate rooted until native deletion has finished waiting for callbacks.
+        try
+        {
+            if (channel >= 0) { Rtc.rtcDeleteDataChannel(channel); channel = -1; }
+            if (peer >= 0) { Rtc.rtcDeletePeerConnection(peer); peer = -1; }
+            GC.KeepAlive(this);
+        }
+        finally
+        {
+            if (loggerRegistered) { NativeRtcLogger.Unregister(diagnostics); loggerRegistered = false; }
+        }
     }
 
     private static class Rtc
@@ -139,6 +232,8 @@ internal sealed class NativeRtcPeer : IDisposable
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int rtcCreatePeerConnection(ref Configuration config);
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int rtcDeletePeerConnection(int pc);
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int rtcSetStateChangeCallback(int pc, StateCallback cb);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int rtcSetIceStateChangeCallback(int pc, StateCallback cb);
+        [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int rtcGetSelectedCandidatePair(int pc, [Out] byte[]? local, int localSize, [Out] byte[]? remote, int remoteSize);
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int rtcSetGatheringStateChangeCallback(int pc, StateCallback cb);
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int rtcSetDataChannelCallback(int pc, StateCallback cb);
         [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int rtcSetLocalDescription(int pc, [MarshalAs(UnmanagedType.LPUTF8Str)] string type);

@@ -57,3 +57,14 @@ test('media descriptions and excess rooms are rejected', async () => {
     }, host.participantToken)).status, 400);
   } finally { await f.close(); }
 });
+test('ROM-free probe rooms cannot be joined by either game profile', async () => {
+  const f = await fixture();
+  try {
+    const host = await f.request('/v1/rooms', 'POST', { profile: 'transport-probe-v1' });
+    assert.equal(host.status, 201);
+    const room = '/v1/rooms/' + host.data.code + '/join';
+    for (const profile of ['gb-serial-v1', 'gba-pokemon-gen3-v1'])
+      assert.equal((await f.request(room, 'POST', { profile })).status, 409);
+    assert.equal((await f.request(room, 'POST', { profile: 'transport-probe-v1' })).status, 200);
+  } finally { await f.close(); }
+});

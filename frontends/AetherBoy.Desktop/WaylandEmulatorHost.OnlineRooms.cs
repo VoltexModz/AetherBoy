@@ -60,6 +60,7 @@ internal sealed partial class WaylandEmulatorHost
         ActionButton(900, 198, 220, 40, showRoomSetup ? "BACK TO ROOMS" : "SERVER SETTINGS", () => { CommitActiveText(); showRoomSetup = !showRoomSetup; }, enabled: !IsOnlineLink);
         Ink(300, 262, "ONLINE LINK", 28, Colors.Cyan, true);
         Ink(300, 305, "One room. Two players. Play here in the emulator.", 16, Colors.Text);
+        ActionButton(820, 260, 300, 36, "CONNECTION REPORTS", () => OpenFolder(Path.Combine(dataPaths.State, "online-diagnostics")));
         if (showRoomSetup)
         {
             Ink(300, 355, "Set up once on each computer", 18, Colors.Text, true);

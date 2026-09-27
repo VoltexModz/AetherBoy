@@ -85,7 +85,8 @@ internal sealed partial class WaylandEmulatorHost
             // the Runtime's save-path lock. Keep it while the online copy is active.
             storage = LinuxRomStorage.Open(dataPaths, path);
             IOnlineLinkTransport transport = startNativeRoom
-                ? new OnlineRoomTransport(roomSettings, isHost, roomCodeInput, gba is null ? "gb-serial-v1" : GbaOnlineProfileCatalog.PokemonGen3Profile)
+                ? new OnlineRoomTransport(roomSettings, isHost, roomCodeInput, gba is null ? "gb-serial-v1" : GbaOnlineProfileCatalog.PokemonGen3Profile,
+                    diagnostics.Enabled ? Path.Combine(dataPaths.State, "online-diagnostics") : null)
                 : new WebRtcBrowserTransport();
             try
             {
@@ -105,7 +106,8 @@ internal sealed partial class WaylandEmulatorHost
                 lastGbaOnlineAudioPhase = null;
                 if (audioOutput is not null) session.AudioSamplesAvailable += OnAudioSamplesAvailable;
                 RequestDiskRefresh();
-                statusMessage = "DEVELOPMENT online copy prepared. Browser handshake next; a connection does not confirm a trade.";
+                statusMessage = startNativeRoom ? "Protected online copy prepared. Connecting through the room server…"
+                    : "DEVELOPMENT online copy prepared. Browser handshake next; a connection does not confirm a trade.";
                 SDL.SetWindowTitle(window, "AetherBoy · ONLINE LINK" + (gba is null ? "" : " · GEN3 DEV") + " · " + Path.GetFileNameWithoutExtension(path));
                 if (!startNativeRoom) OpenOnlineLinkBrowser();
                 return true;

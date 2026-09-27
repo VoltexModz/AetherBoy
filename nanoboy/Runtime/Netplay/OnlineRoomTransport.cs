@@ -23,7 +23,12 @@ public sealed class OnlineRoomTransport : IOnlineLinkTransport
     private readonly string profile;
     private string roomCode, participant = "", status = "Connecting to room server…";
     private int connected;
+    private long sentPackets, receivedPackets;
     private Exception? fault;
+    private string stage = "room-admission";
+    public OnlineRoomDiagnostics Diagnostics { get; } = new();
+    public string? DiagnosticPath { get; }
+    public string? DiagnosticWriteError { get; private set; }
     public Task Ready => ready.Task;
     public Task Completion { get; }
     public bool Connected => Volatile.Read(ref connected) != 0 && !lifetime.IsCancellationRequested;
@@ -31,14 +36,19 @@ public sealed class OnlineRoomTransport : IOnlineLinkTransport
     public string RoomCode => Volatile.Read(ref roomCode);
     public string DisplayCode => RoomCode.Length == 10 ? RoomCode[..5] + "-" + RoomCode[5..] : RoomCode;
     public string Status => Volatile.Read(ref status);
+    public string WireProfile => profile;
 
-    public OnlineRoomTransport(OnlineRoomSettings settings, bool host, string code, string profile)
-        : this(settings, host, code, profile, true) { }
-    internal OnlineRoomTransport(OnlineRoomSettings settings, bool host, string code, string profile, bool relayOnly)
+    public OnlineRoomTransport(OnlineRoomSettings settings, bool host, string code, string profile, string? diagnosticDirectory = null)
+        : this(settings, host, code, profile, true, diagnosticDirectory) { }
+    internal OnlineRoomTransport(OnlineRoomSettings settings, bool host, string code, string profile, bool relayOnly, string? diagnosticDirectory = null)
     {
         Uri address = settings.Validate();
         this.host = host; this.profile = profile; this.relayOnly = relayOnly;
         roomCode = host ? "" : OnlineRoomSettings.NormalizeCode(code);
+        if (diagnosticDirectory is not null)
+            DiagnosticPath = Path.Combine(Path.GetFullPath(diagnosticDirectory), "online-" + Diagnostics.SessionId + ".json");
+        Diagnostics.Record("session", "role=" + (host ? "host" : "guest") + " profile=" +
+            (profile is "gb-serial-v1" or "gba-pokemon-gen3-v1" or OnlineTransportProbe.Profile ? profile : "unknown"));
         http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = address, Timeout = TimeSpan.FromSeconds(15) };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", settings.AccessKey);
         Completion = Task.Run(RunAsync);
@@ -46,6 +56,7 @@ public sealed class OnlineRoomTransport : IOnlineLinkTransport
 
     private async Task RunAsync()
     {
+        Task reports = WriteReportsAsync();
         try
         {
             CancellationToken cancel = lifetime.Token;
@@ -59,28 +70,36 @@ public sealed class OnlineRoomTransport : IOnlineLinkTransport
             deadline.CancelAfter(TimeSpan.FromMinutes(10));
             CancellationToken setup = deadline.Token;
             status = "Preparing the relay connection…";
-            using var peer = new NativeRtcPeer(admission.IceServers, relayOnly, incoming.Writer, Stop);
+            using var peer = new NativeRtcPeer(admission.IceServers, relayOnly, incoming.Writer, Stop, Diagnostics);
             string? remote = null;
-            if (!host) { status = "Waiting for the host…"; remote = await WaitForDescription(setup).ConfigureAwait(false); }
+            if (!host) { Stage("remote-offer"); status = "Waiting for the host…"; remote = await WaitForDescription(setup).ConfigureAwait(false); }
+            Stage("ice-gathering");
             string local = await peer.DescriptionAsync(host, remote, setup).ConfigureAwait(false);
+            Stage("publish-description");
             await Request<JsonElement>(HttpMethod.Put, "v1/rooms/" + roomCode + "/description", new { type = host ? "offer" : "answer", sdp = local }, setup).ConfigureAwait(false);
             if (host)
             {
                 status = "Room ready · Share the code with your friend.";
+                Stage("remote-answer");
                 peer.AcceptAnswer(await WaitForDescription(setup).ConfigureAwait(false));
             }
             status = "Connecting to your friend…";
+            Stage("data-channel-open");
             await peer.WaitForOpenAsync(host, setup).ConfigureAwait(false);
+            Stage("connected");
             Volatile.Write(ref connected, 1); status = "Connected · Return to the game."; ready.TrySetResult();
             while (!cancel.IsCancellationRequested)
             {
-                if (peer.CanSend && outgoing.Reader.TryRead(out var packet)) peer.Send(packet);
+                peer.PollDiagnostics();
+                if (peer.CanSend && outgoing.Reader.TryRead(out var packet)) { peer.Send(packet); Interlocked.Increment(ref sentPackets); }
                 else await Task.Delay(4, cancel).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (OperationCanceledException) { Stop(new TimeoutException("The room expired or the connection took too long. Create a new room.")); }
         catch (DllNotFoundException) { Stop(new IOException("Native online support is missing from this build. Install a complete AetherBoy build.")); }
+        catch (EntryPointNotFoundException) { Stop(new IOException("The native online library is incompatible. Install the complete libdatachannel 0.24.5 build.")); }
+        catch (TimeoutException) { Stop(new TimeoutException("Connection timeout during " + stage + ". Check the connection report and try a new room.")); }
         catch (Exception error) { Stop(error is HttpRequestException ? new IOException("Cannot reach the room server. Check its address and HTTPS certificate.") : error); }
         finally
         {
@@ -91,6 +110,33 @@ public sealed class OnlineRoomTransport : IOnlineLinkTransport
                 catch (Exception) { /* Room expires automatically if cleanup cannot reach the server. */ }
             }
             http.Dispose();
+            await reports.ConfigureAwait(false);
+            Diagnostics.Record("finished", Fault is null ? "closed" : "failed at=" + stage);
+            SaveReport();
+        }
+    }
+
+    private void Stage(string value) { stage = value; Diagnostics.Record("stage", value); }
+    private async Task WriteReportsAsync()
+    {
+        try
+        {
+            while (!lifetime.IsCancellationRequested)
+            {
+                SaveReport();
+                await Task.Delay(2000, lifetime.Token).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+    private void SaveReport()
+    {
+        if (DiagnosticPath is null || DiagnosticWriteError is not null) return;
+        try { Diagnostics.Save(DiagnosticPath); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            DiagnosticWriteError = "Could not save the local connection report.";
+            Diagnostics.Record("report-write-failed", "Local report storage unavailable.");
         }
     }
 
@@ -104,6 +150,7 @@ public sealed class OnlineRoomTransport : IOnlineLinkTransport
                 if (description.Type != (host ? "answer" : "offer") || description.Sdp is null || description.Sdp.Length > 100_000 ||
                     !description.Sdp.Contains("m=application ", StringComparison.Ordinal) || description.Sdp.Contains("m=audio ", StringComparison.Ordinal) || description.Sdp.Contains("m=video ", StringComparison.Ordinal))
                     throw new IOException("The room contains incompatible connection data.");
+                Diagnostics.Record("sdp-remote", "received type=" + description.Type + " characters=" + description.Sdp.Length);
                 return description.Sdp;
             }
             if (host && room.PeerPresent) status = "Your friend joined · Preparing connection…";
@@ -116,12 +163,17 @@ public sealed class OnlineRoomTransport : IOnlineLinkTransport
         using var request = new HttpRequestMessage(method, path);
         if (body is not null) request.Content = new StringContent(JsonSerializer.Serialize(body, Json), Encoding.UTF8, "application/json");
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellation).ConfigureAwait(false);
+        // Never record the URL (contains room code), headers, response body or SDP.
+        string operation = path.EndsWith("/join", StringComparison.Ordinal) ? "join" : path.EndsWith("/description", StringComparison.Ordinal)
+            ? "description" : method == HttpMethod.Post ? "create" : method == HttpMethod.Delete ? "close" : "poll";
+        Diagnostics.Record("room-http", "operation=" + operation + " status=" + (int)response.StatusCode);
         if (!response.IsSuccessStatusCode)
             throw new IOException(response.StatusCode switch
             {
                 HttpStatusCode.Unauthorized => "The server access key is incorrect. Open Server settings.",
                 HttpStatusCode.NotFound => "Room not found or expired. Check the code or create a new room.",
                 HttpStatusCode.Conflict => "The room is full or uses a different game system.",
+                HttpStatusCode.BadRequest => "The room server rejected the request. For a connection test, update the server to support transport-probe-v1.",
                 HttpStatusCode.TooManyRequests => "Too many connection attempts. Wait a minute and try again.",
                 _ => "The room server could not complete the request (" + (int)response.StatusCode + ").",
             });
@@ -136,17 +188,20 @@ public sealed class OnlineRoomTransport : IOnlineLinkTransport
     }
     private void Stop(Exception? error = null)
     {
-        if (error is not null) Interlocked.CompareExchange(ref fault, error, null);
+        if (error is not null && Interlocked.CompareExchange(ref fault, error, null) is null)
+            Diagnostics.Record("transport-fault", "stage=" + stage + " type=" + error.GetType().Name);
         Volatile.Write(ref connected, 0);
         if (Fault is { } failure) { status = failure.Message; ready.TrySetException(failure); }
         else { status = "Room closed."; ready.TrySetCanceled(); }
+        if (!lifetime.IsCancellationRequested)
+            Diagnostics.Record("packet-counts", "sent=" + Interlocked.Read(ref sentPackets) + " delivered=" + Interlocked.Read(ref receivedPackets));
         lifetime.Cancel(); incoming.Writer.TryComplete(); outgoing.Writer.TryComplete();
     }
     public void Dispose() => Stop();
     public async ValueTask DisposeAsync() { Stop(); await Completion.ConfigureAwait(false); }
     public bool TryReceive(out byte[] packet)
     {
-        if (!lifetime.IsCancellationRequested && incoming.Reader.TryRead(out var next)) { packet = next; return true; }
+        if (!lifetime.IsCancellationRequested && incoming.Reader.TryRead(out var next)) { packet = next; Interlocked.Increment(ref receivedPackets); return true; }
         packet = Array.Empty<byte>(); return false;
     }
     public void Send(ReadOnlySpan<byte> packet)

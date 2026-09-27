@@ -7,7 +7,7 @@ const digest = value => createHash('sha256').update(value).digest();
 const same = (a, b) => typeof a === 'string' && timingSafeEqual(digest(a), digest(b));
 const token = () => randomBytes(32).toString('base64url');
 const code = () => [...randomBytes(10)].map(b => alphabet[b & 31]).join('');
-const profiles = new Set(['gb-serial-v1', 'gba-pokemon-gen3-v1']);
+const profiles = new Set(['gb-serial-v1', 'gba-pokemon-gen3-v1', 'transport-probe-v1']);
 
 export function createRoomServer({ accessKey, iceServers = [], ttlMs = 600_000, maxRooms = 100, now = Date.now }) {
   if (typeof accessKey !== 'string' || accessKey.length < 32 || accessKey.length > 256 || !/^[\x21-\x7e]+$/.test(accessKey)) throw new Error('ROOM_ACCESS_KEY needs at least 32 random characters.');

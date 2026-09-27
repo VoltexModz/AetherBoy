@@ -25,12 +25,18 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AetherBoy.Desktop", "fronte
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AetherBoy.DesktopTests", "tests\AetherBoy.DesktopTests\AetherBoy.DesktopTests.csproj", "{E1F77470-7C06-4E40-B086-05ED049785CF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AetherBoy.OnlineProbe", "tools\AetherBoy.OnlineProbe\AetherBoy.OnlineProbe.csproj", "{249A57EE-57CD-4F9F-9F4C-85C2E91F0134}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{249A57EE-57CD-4F9F-9F4C-85C2E91F0134}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{249A57EE-57CD-4F9F-9F4C-85C2E91F0134}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{249A57EE-57CD-4F9F-9F4C-85C2E91F0134}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{249A57EE-57CD-4F9F-9F4C-85C2E91F0134}.Release|Any CPU.Build.0 = Release|Any CPU
 		{606FFA4F-891C-49A0-A100-D9B7D2852538}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{606FFA4F-891C-49A0-A100-D9B7D2852538}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{606FFA4F-891C-49A0-A100-D9B7D2852538}.Release|Any CPU.ActiveCfg = Release|Any CPU

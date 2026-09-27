@@ -1,9 +1,15 @@
 # Übergabe an Voltex: Native Online-Räume unter Windows
 
+Aktueller Abgleich 27. September: [Kollegen-Commit, erhaltene lokale Änderungen,
+frische Windows-Prüfung und offene WAN-Abnahme (DE/EN)](UPSTREAM_SYNC_2026-09-27.md).
+
 Stand: 2026-09-13. **Die Windows-Implementierung ist bereits enthalten.** Den
 vollständigen Featurecommit übernehmen, bauen und unter Windows prüfen. Eine
 separate Portierung der Raumverbindung ist nicht nötig. Dieser Stand ersetzt
 den Browser als primären Verbindungsweg, nicht die vorhandenen Kabelprofile.
+
+Nachfolgende native Windows-Prüfung: [Ergebnisse, kleine Dialogkorrektur und
+noch offene Serverabnahme](ONLINE_ROOMS_WINDOWS_VALIDATION.md).
 
 ## Zusammenführung mit dem neuen Windows-Commit
 
@@ -183,3 +189,31 @@ Windows-UI-Abnahme und ein nachweislich erfolgreicher Pokémon-Tausch. Die früh
 Browser-/WSL-Tests belegen diesen neuen nativen Windows-Weg nicht. Rocket Edition
 ist durch diese Änderung nicht allgemein freigegeben; bestehende experimentelle
 GB/GBC- und Pokémon-Gen3-GBA-Profile sowie Spielstandschutz gelten weiter.
+
+## Ergänzung 15. September 2026 / September 15 update
+
+Gemeinsame native Diagnose und ROM-freier Verbindungstest:
+[ONLINE_CONNECTION_DIAGNOSTICS.md](ONLINE_CONNECTION_DIAGNOSTICS.md).
+Das neue Testprofil `transport-probe-v1` erfordert einen aktualisierten Raumdienst.
+Kein Server-Deployment und kein WAN-/Pokémon-Tauschnachweis durch diese Änderung.
+
+Windows-Abnahme: frischer kompletter Release-Build 0 Warnungen/0 Fehler;
+Core 232/232, Runtime 379 bestanden/1 POSIX-Skip, Windows Smoke 194 bestanden/4
+Hardware-/Vordergrund-Skips, Desktop 80 bestanden/42 Linux-/Hardware-Skips.
+Gesamt 885 bestanden, 47 übersprungen, 0 Testfehler. Node 8/8 bestanden.
+Die 24 gezielten Online-/Diagnosetests wurden nach der letzten Runtime-Änderung
+erneut ausgeführt, einschließlich drei echter lokaler nativer Profilverbindungen,
+Kandidaten-Typerkennung und bidirektionalem Probe-Lauf. Der erste vollständige
+Windows-Testlauf erreichte das zu kurze 60-Sekunden-Limit; der Wiederholungslauf
+mit 180-Sekunden-Limit war nach rund 68 Sekunden vollständig erfolgreich.
+
+Frischer Build und TRX-Berichte: `artifacts/online-diagnostics-20260915/`.
+Windows-Start: `bin/nanoboy/release/AetherBoy.exe`; ROM-freies Werkzeug:
+`bin/AetherBoy.OnlineProbe/release/AetherBoy.OnlineProbe.exe` mit `host`/`join`.
+Keine echte ROM, kein Originalspielstand und kein Server wurde verändert.
+
+English: the shared diagnostics and isolated probe are implemented and tested
+locally on native Windows. Linux frontend compilation passed, but native Linux
+UI execution, the production TURN path and Windows-to-Linux WAN remain unverified.
+Existing recording opt-outs are respected. The probe needs the updated room
+service; game profiles and saved-game protection were not changed.

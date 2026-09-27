@@ -1,5 +1,10 @@
 # Linux-Entwicklung: Übergabe an Windows und den nächsten ChatGPT
 
+Nachtrag 27. September / September 27 addendum:
+[Gemeinsamer Upstream-Abgleich, native Diagnose und aktuelle Windows-Prüfung (DE/EN)](UPSTREAM_SYNC_2026-09-27.md).
+Übernimmt `0e8cdb2` und erhält unsere Ergänzungen; Veröffentlichung auf
+`development` am 27. September freigegeben. Native Linux-/WAN-Abnahme bleibt offen.
+
 Nachtrag 13. September: [Native Raumcodes – Windows-Integration, Build und Abnahme](ONLINE_ROOMS_WINDOWS_HANDOFF.md).
 Enthält auch die Zusammenführung mit Voltex' Diagnose-/Session-Fix `23c6fda`.
 
