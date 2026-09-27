@@ -1,5 +1,10 @@
 # Linux-Entwicklung: Übergabe an Windows und den nächsten ChatGPT
 
+Neuer Windows-Dialog / shared Runtime handoff (27. September):
+[ROM-freier Verbindungstest im Emulator und konkrete Linux-Anbindung (DE/EN)](CONNECTION_TEST_UI_HANDOFF.md).
+`OnlineProbeSession` ist gemeinsam nutzbar; eine Linux-Testoberfläche bleibt noch
+anzubinden. Keine Änderung am Drahtprotokoll oder Raumserver erforderlich.
+
 Nachtrag 27. September / September 27 addendum:
 [Gemeinsamer Upstream-Abgleich, native Diagnose und aktuelle Windows-Prüfung (DE/EN)](UPSTREAM_SYNC_2026-09-27.md).
 Übernimmt `0e8cdb2` und erhält unsere Ergänzungen; Veröffentlichung auf

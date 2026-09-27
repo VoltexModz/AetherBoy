@@ -25,7 +25,8 @@ public static class OnlineTransportProbe
     }
 
     internal static async Task<OnlineTransportProbeResult> RunCoreAsync(IOnlineLinkTransport transport, int samplesPerSize,
-        OnlineRoomDiagnostics diagnostics, TimeSpan responseTimeout, CancellationToken cancellation)
+        OnlineRoomDiagnostics diagnostics, TimeSpan responseTimeout, CancellationToken cancellation,
+        Action<OnlineTransportProbeProgress>? progress = null)
     {
         if (samplesPerSize is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(samplesPerSize));
         if (responseTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(responseTimeout));
@@ -73,6 +74,7 @@ public static class OnlineTransportProbe
                         diagnostics.Record("probe-sample", FormattableString.Invariant($"bytes={packet.Length} rtt-ms={rtt:F3}"));
                     }
                     lastProgress = Stopwatch.GetTimestamp();
+                    progress?.Invoke(new(samples.Count, remoteSequence, total));
                 }
                 if ((expected is not null && Stopwatch.GetElapsedTime(sentAt) > responseTimeout) ||
                     Stopwatch.GetElapsedTime(lastProgress) > responseTimeout)
@@ -121,3 +123,4 @@ public static class OnlineTransportProbe
 public sealed record OnlineTransportProbeSample(int Bytes, double RoundTripMs);
 public sealed record OnlineTransportProbeSize(int Bytes, int Verified, double MinMs, double MedianMs, double P95Ms, double MaxMs);
 public sealed record OnlineTransportProbeResult(int VerifiedEchoes, int PeerRequestsEchoed, OnlineTransportProbeSize[] Sizes);
+public sealed record OnlineTransportProbeProgress(int VerifiedEchoes, int PeerRequestsEchoed, int ExpectedEchoes);

@@ -95,9 +95,18 @@ public sealed class OnlineRoomTests
             Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => host.Send(new byte[4097]));
             if (profile == OnlineTransportProbe.Profile)
             {
-                var results = await Task.WhenAll(OnlineTransportProbe.RunAsync(host, 2, deadline.Token),
-                    OnlineTransportProbe.RunAsync(guest, 2, deadline.Token));
-                Assert.IsTrue(results.All(r => r.VerifiedEchoes == 8));
+                await using var hostProbe = new OnlineProbeSession(host, 2);
+                await using var guestProbe = new OnlineProbeSession(guest, 2);
+                while (hostProbe.Snapshot.Phase != OnlineProbePhase.Passed || guestProbe.Snapshot.Phase != OnlineProbePhase.Passed)
+                {
+                    Assert.AreNotEqual(OnlineProbePhase.Failed, hostProbe.Snapshot.Phase);
+                    Assert.AreNotEqual(OnlineProbePhase.Failed, guestProbe.Snapshot.Phase);
+                    await Task.Delay(10, deadline.Token);
+                }
+                Assert.AreEqual(8, hostProbe.Snapshot.Result!.VerifiedEchoes);
+                Assert.AreEqual(8, guestProbe.Snapshot.Result!.VerifiedEchoes);
+                Assert.IsTrue(hostProbe.Snapshot.Active);
+                Assert.IsTrue(hostProbe.Snapshot.Connection.RoomAdmitted && hostProbe.Snapshot.Connection.PeerPresent);
             }
             else Assert.ThrowsExactly<ArgumentException>(() => OnlineTransportProbe.RunAsync(host));
             Assert.IsTrue(host.Diagnostics.Snapshot().Any(e => e.Kind == "ice-state" && e.Detail is "connected" or "completed"));

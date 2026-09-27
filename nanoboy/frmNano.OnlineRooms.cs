@@ -19,6 +19,11 @@ public partial class frmNano
 
     private void ShowOnlineRoomDialog(bool host)
     {
+        if (onlineProbeDialog is { IsDisposed: false })
+        {
+            if (IsConnectionTestActive) { onlineProbeDialog.BringToFront(); return; }
+            onlineProbeDialog.Close();
+        }
         if (onlineRoomDialog is { IsDisposed: false }) { onlineRoomDialog.BringToFront(); return; }
         roomSettings = OnlineRoomSettings.Load(RoomSettingsPath);
         var dialog = new Form { Text = "Online Link · Räume", ClientSize = new Size(700, 530), StartPosition = FormStartPosition.CenterParent };
@@ -95,7 +100,7 @@ public partial class frmNano
             bool active = onlineRoomTransport is not null;
             foreach (Control control in new Control[] { codeCaption, code, consent, create, join, copy }) control.Visible = !showingSetup;
             code.ReadOnly = active; consent.Enabled = !active;
-            create.Enabled = join.Enabled = !active && !IsOnlineLink && consent.Checked && Configured() && currentRomPath is not null;
+            create.Enabled = join.Enabled = !active && !IsOnlineLink && !IsConnectionTestActive && consent.Checked && Configured() && currentRomPath is not null;
             copy.Enabled = active && observed?.RoomCode.Length == 10;
             stop.Enabled = IsOnlineLink; server.Enabled = !IsOnlineLink;
             if (active && observed is not null) { code.Text = observed.DisplayCode; message.Text = observed.Status; }

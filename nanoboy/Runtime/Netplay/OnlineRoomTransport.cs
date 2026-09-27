@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 namespace AetherBoy.Runtime.Netplay;
 
 /// <summary>Native reliable WebRTC with private room-code signaling. No browser or ROM/save upload.</summary>
-public sealed class OnlineRoomTransport : IOnlineLinkTransport
+public sealed class OnlineRoomTransport : IOnlineProbeConnection
 {
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private readonly CancellationTokenSource lifetime = new();
@@ -23,6 +23,7 @@ public sealed class OnlineRoomTransport : IOnlineLinkTransport
     private readonly string profile;
     private string roomCode, participant = "", status = "Connecting to room server…";
     private int connected;
+    private int admitted, peerPresent;
     private long sentPackets, receivedPackets;
     private Exception? fault;
     private string stage = "room-admission";
@@ -37,6 +38,8 @@ public sealed class OnlineRoomTransport : IOnlineLinkTransport
     public string DisplayCode => RoomCode.Length == 10 ? RoomCode[..5] + "-" + RoomCode[5..] : RoomCode;
     public string Status => Volatile.Read(ref status);
     public string WireProfile => profile;
+    public OnlineProbeConnectionState ConnectionState => new(DisplayCode,
+        Volatile.Read(ref admitted) != 0, Volatile.Read(ref peerPresent) != 0, Connected, Volatile.Read(ref stage));
 
     public OnlineRoomTransport(OnlineRoomSettings settings, bool host, string code, string profile, string? diagnosticDirectory = null)
         : this(settings, host, code, profile, true, diagnosticDirectory) { }
@@ -65,11 +68,13 @@ public sealed class OnlineRoomTransport : IOnlineLinkTransport
             if (admission.ParticipantToken is null || admission.IceServers is null || admission.ParticipantToken.Length is < 32 or > 256 || admission.IceServers.Length > 4 || (relayOnly && admission.IceServers.Length == 0))
                 throw new IOException("The room server returned an invalid relay configuration.");
             participant = admission.ParticipantToken;
+            Volatile.Write(ref admitted, 1);
             http.DefaultRequestHeaders.Add("X-Room-Token", participant);
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancel);
             deadline.CancelAfter(TimeSpan.FromMinutes(10));
             CancellationToken setup = deadline.Token;
             status = "Preparing the relay connection…";
+            Stage("relay-preparation");
             using var peer = new NativeRtcPeer(admission.IceServers, relayOnly, incoming.Writer, Stop, Diagnostics);
             string? remote = null;
             if (!host) { Stage("remote-offer"); status = "Waiting for the host…"; remote = await WaitForDescription(setup).ConfigureAwait(false); }
@@ -145,8 +150,10 @@ public sealed class OnlineRoomTransport : IOnlineLinkTransport
         while (true)
         {
             var room = await Request<Room>(HttpMethod.Get, "v1/rooms/" + roomCode, null, cancellation).ConfigureAwait(false);
+            if (room.PeerPresent) Volatile.Write(ref peerPresent, 1);
             if (room.RemoteDescription is { } description)
             {
+                Volatile.Write(ref peerPresent, 1);
                 if (description.Type != (host ? "answer" : "offer") || description.Sdp is null || description.Sdp.Length > 100_000 ||
                     !description.Sdp.Contains("m=application ", StringComparison.Ordinal) || description.Sdp.Contains("m=audio ", StringComparison.Ordinal) || description.Sdp.Contains("m=video ", StringComparison.Ordinal))
                     throw new IOException("The room contains incompatible connection data.");
@@ -168,7 +175,7 @@ public sealed class OnlineRoomTransport : IOnlineLinkTransport
             ? "description" : method == HttpMethod.Post ? "create" : method == HttpMethod.Delete ? "close" : "poll";
         Diagnostics.Record("room-http", "operation=" + operation + " status=" + (int)response.StatusCode);
         if (!response.IsSuccessStatusCode)
-            throw new IOException(response.StatusCode switch
+            throw new OnlineRoomRequestException(response.StatusCode, response.StatusCode switch
             {
                 HttpStatusCode.Unauthorized => "The server access key is incorrect. Open Server settings.",
                 HttpStatusCode.NotFound => "Room not found or expired. Check the code or create a new room.",

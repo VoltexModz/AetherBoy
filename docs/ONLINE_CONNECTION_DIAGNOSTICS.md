@@ -2,6 +2,10 @@
 
 ## Deutsch
 
+Windows-Einstieg direkt im Emulator: **Tools → Online Link → Verbindung testen ·
+ohne ROM**. [Bedienung, Datenschutz und Linux-UI-Übergabe](CONNECTION_TEST_UI_HANDOFF.md).
+Die unten beschriebene CLI bleibt für Linux und gezielte Konsolentests verfügbar.
+
 Der normale native Verbindungsweg benutzt einen **10-stelligen Raumcode** wie
 `ABCDE-FGHJK`. Keine SDP-Texte kopieren: Offer und Answer werden automatisch über
 den privaten HTTPS-Raumdienst ausgetauscht. Der alte Browser-/SDP-Weg bleibt eine
@@ -95,6 +99,10 @@ Abschaltungen oder Loopback-Freigaben. Erst nach erfolgreichem Transporttest
 GB/GBC und GBA-Gen3 separat mit geschützten Spielstandkopien testen.
 
 ## English
+
+Windows also offers an in-app **Verbindung testen · ohne ROM** entry under
+Tools → Online Link. See the [UI and shared session handoff](CONNECTION_TEST_UI_HANDOFF.md).
+The CLI remains available; the Linux GUI binding is separate follow-up work.
 
 Native rooms use a short **10-character room code**, not manual SDP copying.
 The HTTPS room service exchanges descriptions automatically. A deployed,

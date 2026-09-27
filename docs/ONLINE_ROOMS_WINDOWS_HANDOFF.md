@@ -1,5 +1,8 @@
 # Übergabe an Voltex: Native Online-Räume unter Windows
 
+Neuer Windows-Einstieg: [Verbindung testen direkt im Emulator, Runtime-API und
+Linux-UI-Übergabe (DE/EN)](CONNECTION_TEST_UI_HANDOFF.md).
+
 Aktueller Abgleich 27. September: [Kollegen-Commit, erhaltene lokale Änderungen,
 frische Windows-Prüfung und offene WAN-Abnahme (DE/EN)](UPSTREAM_SYNC_2026-09-27.md).
 

@@ -19,6 +19,10 @@ public partial class frmNano
     private string? onlineLinkDirectory;
     private string? lastOnlineStatus;
     private string? lastOnlineDiagnostic;
+    private frmOnlineConnectionTest? onlineProbeDialog;
+    internal Func<OnlineRoomSettings, bool, string, string?, IOnlineProbeSession> OnlineProbeSessionFactory =
+        (configuration, host, code, reports) => new OnlineProbeSession(configuration, host, code, reports);
+    private bool IsConnectionTestActive => onlineProbeDialog?.IsTestActive == true;
     private bool IsOnlineLink => session?.OnlineLink is not null;
     internal Action<string> OnlineLinkBrowserLauncher = url =>
         Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
@@ -38,6 +42,7 @@ public partial class frmNano
         }
         Add("menuOnlineHost", "Sitzung erstellen · Strg+F10", () => ShowOnlineRoomDialog(true));
         Add("menuOnlineJoin", "Sitzung beitreten · Strg+Umschalt+F10", () => ShowOnlineRoomDialog(false));
+        Add("menuOnlineProbe", "Verbindung testen · ohne ROM", ShowOnlineConnectionTest);
         Add("menuOnlineManualHost", "Manuell im Browser · Host", () => StartOnlineLink(true));
         Add("menuOnlineManualGuest", "Manuell im Browser · Gast", () => StartOnlineLink(false));
         Add("menuOnlineBrowser", "Verbindungsseite öffnen", OpenOnlineLinkBrowser);
@@ -57,6 +62,8 @@ public partial class frmNano
 
     internal bool StartOnlineLink(bool isHost, bool confirm = true)
     {
+        if (IsConnectionTestActive)
+        { SetSaveFeedback("Zuerst den laufenden Verbindungstest beenden", true); return false; }
         if (IsOnlineLink || stateOperationInProgress || currentRomPath is null || session?.LatestSnapshot.Rom is not { } rom)
         { SetSaveFeedback("Zuerst ein eigenes GB/GBC- oder unterstütztes GBA-Spiel öffnen; laufende Aktion abwarten", true); return false; }
         string path = currentRomPath;
@@ -140,6 +147,20 @@ public partial class frmNano
         try { OnlineLinkBrowserLauncher(onlineLinkTransport.ConnectionPageUrl); }
         catch (Exception ex)
         { SetSaveFeedback("Browser konnte nicht geöffnet werden: " + ex.Message, true); }
+    }
+
+    private void ShowOnlineConnectionTest()
+    {
+        if (onlineProbeDialog is { IsDisposed: false }) { onlineProbeDialog.BringToFront(); return; }
+        // A single settings editor prevents the game-room window from retaining stale credentials.
+        onlineRoomDialog?.Close();
+        var dialog = new frmOnlineConnectionTest(RoomSettingsPath,
+            Path.Combine(WindowsDataPaths.Default.Development, "OnlineDiagnostics"),
+            (Program.StartupDiagnosticsDecision ?? Diagnostics.WindowsDiagnosticsPreferences.Default.GetStatus()).RecordingRequested,
+            () => !IsOnlineLink && !stateOperationInProgress, OnlineProbeSessionFactory);
+        onlineProbeDialog = dialog;
+        dialog.Disposed += (_, _) => { if (ReferenceEquals(onlineProbeDialog, dialog)) onlineProbeDialog = null; };
+        dialog.Show(this);
     }
 
     private void UpdateOnlineLinkUi()

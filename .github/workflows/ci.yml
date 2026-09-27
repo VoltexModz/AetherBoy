@@ -74,7 +74,7 @@ jobs:
       - name: Test Runtime and native rooms
         if: ${{ !cancelled() && steps.windows-build.outcome == 'success' }}
         timeout-minutes: 3
-        run: dotnet test --project .\tests\AetherBoy.RuntimeTests\AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 380 --timeout 2m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Runtime" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Runtime"
+        run: dotnet test --project .\tests\AetherBoy.RuntimeTests\AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 392 --timeout 2m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Runtime" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Runtime"
 
       - name: Test portable frontend logic
         if: ${{ !cancelled() && steps.windows-build.outcome == 'success' }}
@@ -86,7 +86,7 @@ jobs:
         # Run 34755810398 was still completing UI tests when the old 2m suite limit expired.
         # Keep both deadlines and the full test-count gate; do not skip or retry failures.
         timeout-minutes: 5
-        run: dotnet test --project .\tests\AetherBoy.SmokeTests\AetherBoy.SmokeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 198 --timeout 4m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Smoke" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Smoke"
+        run: dotnet test --project .\tests\AetherBoy.SmokeTests\AetherBoy.SmokeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 210 --timeout 4m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Smoke" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Smoke"
 
       - name: Retain Windows test diagnostics
         if: ${{ !cancelled() }}
@@ -181,7 +181,7 @@ jobs:
         run: dotnet test --project ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 232
 
       - name: Test Runtime
-        run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 380
+        run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 392
 
       - name: Test browser bridge callbacks
         run: node --test tests/browser/WebRtcBridge.test.cjs services/online-rooms/server.test.mjs
