@@ -1,5 +1,11 @@
 # Linux-Entwicklung: Übergabe an Windows und den nächsten ChatGPT
 
+**Aktueller Arbeitsauftrag an den Linux-ChatGPT (27. September):**
+[Vollständige nächste Schritte: Server, WAN-Test, Linux-Testdialog und Pokémon-Abnahme](LINUX_ONLINE_NEXT_STEPS_2026-09-27.md).
+Enthält ausführbare Build-/Testbefehle, Erfolgskriterien und die verlangte Rückgabe
+an Windows. CI für `f94bdef` ist auf Windows und Linux x64/ARM64 grün; der echte
+Produktions-WAN-/Tauschnachweis bleibt offen.
+
 Neuer Windows-Dialog / shared Runtime handoff (27. September):
 [ROM-freier Verbindungstest im Emulator und konkrete Linux-Anbindung (DE/EN)](CONNECTION_TEST_UI_HANDOFF.md).
 `OnlineProbeSession` ist gemeinsam nutzbar; eine Linux-Testoberfläche bleibt noch
