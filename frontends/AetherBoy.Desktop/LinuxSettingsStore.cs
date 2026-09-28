@@ -14,6 +14,7 @@ internal static class LinuxSettingsStore
         public bool AudioEnabled { get; set; } = true;
         public Dictionary<LinuxInputAction, SDL.Scancode>? Keys { get; set; }
         public LinuxVideoFilter VideoFilter { get; set; }
+        public LinuxVideoScaling VideoScaling { get; set; }
         public int Frameskip { get; set; }
         public int PaletteIndex { get; set; }
         public Dictionary<string, LinuxGamepadProfile>? Gamepads { get; set; }
@@ -81,6 +82,7 @@ internal static class LinuxSettingsStore
             {
                 AudioEnabled = saved.AudioEnabled,
                 VideoFilter = Enum.IsDefined(saved.VideoFilter) ? saved.VideoFilter : LinuxVideoFilter.Sharp,
+                VideoScaling = Enum.IsDefined(saved.VideoScaling) ? saved.VideoScaling : LinuxVideoScaling.Automatic,
                 Frameskip = Math.Clamp(saved.Frameskip, 0, 2),
                 PaletteIndex = Math.Clamp(saved.PaletteIndex, 0, 4),
                 Gamepads = saved.Gamepads?.Where(pair => pair.Key.Length == 32 && pair.Key.All(Uri.IsHexDigit)).Take(32)
@@ -120,6 +122,7 @@ internal static class LinuxSettingsStore
             UiBackgroundColor = theme.Background.Hex,
             AudioEnabled = options.AudioEnabled,
             VideoFilter = options.VideoFilter,
+            VideoScaling = options.VideoScaling,
             Frameskip = options.Frameskip,
             PaletteIndex = options.PaletteIndex,
             Gamepads = options.Gamepads,

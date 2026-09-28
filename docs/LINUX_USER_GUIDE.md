@@ -71,7 +71,8 @@ filenames with spaces are supported; extract archives before opening them.
 
 The Linux shell now follows the Windows Aether layout: title navigation, game
 stage, right session rail, bottom command deck, and the nine-section Control
-Center (Overview, Display, Audio, Input, Saves, System, Diagnostics). It adapts
+Center (Overview, Graphics, Audio, Controls, Save states, App & files,
+Diagnostics, Library and Tools). It adapts
 to tall tiling windows and wide windows, preserving the game's aspect ratio.
 At 1180×760 the stage fits GBA at 3× with Sharp filtering.
 
@@ -148,7 +149,8 @@ Screenshots contain only the native game picture (160×144 or 240×160), not the
 window or display filter. Find them using **Tools → Open screenshots**. The F9
 overlay reports newly presented frames, average/P95 frame intervals and the audio
 queue; it does not measure input-to-display latency. Its enabled state is saved.
-The reset button restores keyboard defaults; gamepads retain the standard layout.
+The Keyboard tab has its own reset button. The Controller tab can reset the
+selected controller’s buttons without changing its stick deadzone.
 
 The sidebar displays the assigned key labels for your current keyboard layout.
 Losing window focus releases held controls and turbo. Escape during ordinary
@@ -157,7 +159,7 @@ play no longer closes the application.
 **Settings (C) → Audio** provides a draggable 0–100% volume slider and **−1% / +1%**
 buttons. Left/Right also change the volume in 1% steps; Home selects 0% (silence)
 and End selects 100%. Low settings such as 1% or 5% are supported.
-Keyboard bindings, volume, mute, display filter, frameskip, DMG palette, audio
+Keyboard bindings, volume, mute, display filter, picture size, frameskip, DMG palette, audio
 channel switches and save slot save automatically to
 `$XDG_CONFIG_HOME/aetherboy/settings.json`, normally
 `~/.config/aetherboy/settings.json`, and load at the next start.
@@ -168,6 +170,41 @@ Only the central data directory needs write access. Legacy files are copied once
 and never replace an existing central save family. The Control
 Center exposes Sharp, Smooth and LCD Grid video, frameskip, five DMG palettes,
 master audio, all four hardware channels, keyboard bindings and timeline controls.
+
+### Finding graphics and controller settings
+
+Open **Settings** or press **C**. The overview links directly to Graphics,
+Controller, Keyboard, Appearance and Save states. The sidebar search is available
+on every settings page; **Ctrl+K** focuses it. Search for a purpose such as
+`controller`, `volume`, `palette` or `BIOS`. Common German terms such as `Grafik`,
+`Tastenbelegung` and `Totzone` work too. Enter opens the first result on the current
+result page. Escape clears the search and returns to the previous settings page.
+
+**Graphics** has three tabs:
+
+- **Picture:** Sharp, Smooth or LCD grid; picture size; and fullscreen (F11).
+  **Whole pixels** uses an integer scale. **Fit** uses the available game area
+  while preserving proportions. **Auto** preserves the earlier behavior: Fit
+  with Smooth, whole pixels with the other filters. Picture size is saved and
+  can be overridden in a game profile.
+- **Game Boy colors:** five palettes for original Game Boy games. GBC and GBA
+  games keep their own colors. App colors have a separate Appearance page.
+- **Performance:** frame skipping and the FPS overlay. Start with All frames;
+  frame skipping reduces display work without changing emulated game speed.
+
+**Controls → Controller** shows the selected device and its assigned buttons.
+Select an assignment, then press the desired controller button. Occupied buttons
+swap; Escape cancels. Recognized face buttons use the device’s label and position.
+**Next controller** cycles connected devices. **Reset buttons** restores this
+device’s mappings. **Stick settings** explains the deadzone and shows live left
+stick movement against its threshold. Mappings and deadzone are saved per device;
+keyboard mappings remain separate. Without a controller, the page tells you to
+connect one and disables device changes.
+
+**Controls → App shortcuts** lists fixed application keys. **App & files** separates
+Appearance, Desktop & accessibility, Game profiles, Firmware and Files into their
+own pages. Escape goes back within these new subpages; the close button returns
+to the game. Most preferences save automatically. Color drafts use **Apply colors**.
 
 ## 6. Hyprland setup
 

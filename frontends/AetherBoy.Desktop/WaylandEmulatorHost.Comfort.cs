@@ -158,7 +158,7 @@ internal sealed partial class WaylandEmulatorHost
         catch (Exception ex) { diagnostics.Failure("resume_on_close", ex); statusMessage = "Could not save resume point: " + ex.Message; }
     }
 
-    private string TextSizeName => options.TextSize >= 18 ? "LARGER" : options.TextSize >= 16 ? "LARGE" : "STANDARD";
+    private string TextSizeName => options.TextSize >= 18 ? "Larger" : options.TextSize >= 16 ? "Large" : "Standard";
 
     private void CycleTextSize()
     { options.TextSize = options.TextSize >= 18 ? 14 : options.TextSize + 2; MarkSettingsChanged(); focusedControl = -1; }

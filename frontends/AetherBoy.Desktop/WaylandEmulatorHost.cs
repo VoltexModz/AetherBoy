@@ -375,7 +375,12 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
         if (rebindingGamepad is not null && isPressed && keyEvent.Scancode == SDL.Scancode.Escape)
         { rebindingGamepad = null; statusMessage = "Controller change cancelled."; return; }
+        if (controlCenterVisible && isPressed && !keyEvent.Repeat && keyEvent.Scancode == SDL.Scancode.K &&
+            (keyEvent.Mod & SDL.Keymod.Ctrl) != 0)
+        { FocusSettingsSearch(); return; }
         if (HandleTextEditorKey(keyEvent, isPressed)) return;
+        if (controlCenterVisible && isPressed && keyEvent.Scancode == SDL.Scancode.Escape && ShowingSettingsSearch)
+        { ClearSettingsSearch(); return; }
         if (!controlCenterVisible && isPressed && !keyEvent.Repeat)
         {
             if (keyEvent.Scancode == SDL.Scancode.F6 || (focusedControl >= 0 && keyEvent.Scancode == SDL.Scancode.Return))
@@ -421,7 +426,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                         : (focusedControl + direction + focusTargets.Count) % focusTargets.Count;
                 return;
             }
-            if (controlCenterPage == ControlCenterPage.Input && !showController &&
+            if (!ShowingSettingsSearch && controlCenterPage == ControlCenterPage.Input && !showController && !showInputShortcuts &&
                 keyEvent.Scancode is SDL.Scancode.Up or SDL.Scancode.Down or SDL.Scancode.Left or SDL.Scancode.Right)
                 focusedControl = -1;
             if (focusedControl >= 0 && focusedControl < focusTargets.Count &&
@@ -431,7 +436,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 HandleMouseClick(target.X + target.W / 2, target.Y + target.H / 2);
                 return;
             }
-            if (controlCenterPage == ControlCenterPage.Audio)
+            if (!ShowingSettingsSearch && controlCenterPage == ControlCenterPage.Audio)
             {
                 switch (keyEvent.Scancode)
                 {
@@ -441,7 +446,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                     case SDL.Scancode.End: SetVolume(100); return;
                 }
             }
-            if (controlCenterPage == ControlCenterPage.Input && !showController)
+            if (!ShowingSettingsSearch && controlCenterPage == ControlCenterPage.Input && !showController && !showInputShortcuts)
             {
                 switch (keyEvent.Scancode)
                 {
@@ -485,7 +490,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             case SDL.Scancode.Escape:
                 if (controlCenterVisible)
                 {
-                    CloseControlCenter();
+                    BackFromSettings();
                 }
                 else if (loadError is not null)
                 {
@@ -567,34 +572,15 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     {
         if ((controlCenterPage == ControlCenterPage.Saves && (showBackups || showGallery)) ||
             (controlCenterPage == ControlCenterPage.Input && showController)) return;
+        if (ShowingSettingsSearch || showInputShortcuts) return;
         switch (controlCenterPage)
         {
-            case ControlCenterPage.Display:
-                if (Hit(x, y, 300, 230, 180, 42)) SetVideoFilter(LinuxVideoFilter.Sharp);
-                else if (Hit(x, y, 494, 230, 180, 42)) SetVideoFilter(LinuxVideoFilter.Smooth);
-                else if (Hit(x, y, 688, 230, 180, 42)) SetVideoFilter(LinuxVideoFilter.LcdGrid);
-                else if (Hit(x, y, 300, 340, 100, 40)) SetFrameskip(0);
-                else if (Hit(x, y, 414, 340, 100, 40)) SetFrameskip(1);
-                else if (Hit(x, y, 528, 340, 100, 40)) SetFrameskip(2);
-                else
-                {
-                    for (int index = 0; index < 5; index++)
-                    {
-                        if (Hit(x, y, 300 + (index * 164), 450, 152, 40))
-                        {
-                            SetPalette(index);
-                            break;
-                        }
-                    }
-                }
-                break;
-
             case ControlCenterPage.Audio:
                 if (Hit(x, y, 300, 224, 220, 44))
                 {
                     options.AudioEnabled = !options.AudioEnabled;
                     MarkSettingsChanged();
-                    TryUiAction(ApplyEmulatorConfiguration, options.AudioEnabled ? "AUDIO ENABLED" : "AUDIO MUTED");
+                    TryUiAction(ApplyEmulatorConfiguration, options.AudioEnabled ? "AUDIO ENABLED" : "Sound muted");
                 }
                 else if (Hit(x, y, 300, 326, 72, 40))
                 {
@@ -626,7 +612,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 for (int index = 0; index < BindingActions.Length; index++)
                 {
                     float buttonX = 424 + (index / 6) * 330;
-                    float buttonY = 246 + (index % 6) * 46;
+                    float buttonY = 276 + (index % 6) * 44;
                     if (Hit(x, y, buttonX, buttonY, 156, 36))
                     {
                         BeginRebinding(index);
@@ -681,6 +667,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         focusedControl = -1;
         controlCenterVisible = true;
         controlCenterPage = ControlCenterPage.Overview;
+        ResetSettingsNavigation();
         mouseTurbo = false;
         pressedKeys.Clear();
         EmulationSession? currentSession = session;
@@ -698,6 +685,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     private void CloseControlCenter()
     {
         if (editingTitleIdentity is not null) { statusMessage = "Save or cancel the title before leaving."; return; }
+        editingSettingsSearch = false;
         editingSearch = false;
         editingCheat = false;
         onlineEditingField = TextField.None;
@@ -728,14 +716,14 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             SDL.SetTextureScaleMode(frameTexture, options.TextureScaleMode);
         }
 
-        statusMessage = $"VIDEO FILTER · {filter.ToString().ToUpperInvariant()}";
+        statusMessage = filter switch { LinuxVideoFilter.Sharp => "Sharp pixel edges selected.", LinuxVideoFilter.Smooth => "Smooth picture selected.", _ => "LCD grid selected." };
     }
 
     private void SetFrameskip(int frameskip)
     {
         options.Frameskip = Math.Clamp(frameskip, 0, 2);
         MarkSettingsChanged();
-        TryUiAction(ApplyEmulatorConfiguration, $"FRAMESKIP {options.Frameskip}");
+        TryUiAction(ApplyEmulatorConfiguration, options.Frameskip == 0 ? "Displaying every frame." : $"Skipping {options.Frameskip} display frames between updates.");
     }
 
     private void SetPalette(int paletteIndex)
@@ -1261,13 +1249,13 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private SDL.FRect GetGameDestination(VideoGeometry geometry)
     {
-        float scale = options.VideoFilter == LinuxVideoFilter.Smooth
-            ? Math.Min(
-                GameAreaWidth / (float)geometry.Width,
-                GameAreaHeight / (float)geometry.Height)
-            : Math.Max(
-                1,
-                Math.Min(GameAreaWidth / geometry.Width, GameAreaHeight / geometry.Height));
+        // The UI uses logical coordinates, but whole-pixel scaling must use output pixels,
+        // including compositor/HiDPI scaling and the logical letterbox transform.
+        float presentationScale = SDL.GetRenderOutputSize(renderer, out int outputWidth, out int outputHeight)
+            ? Math.Min(outputWidth / (float)LogicalWidth, outputHeight / (float)LogicalHeight) : 1;
+        if (presentationScale <= 0) presentationScale = 1;
+        float scale = options.GameScale((int)MathF.Floor(GameAreaWidth * presentationScale),
+            (int)MathF.Floor(GameAreaHeight * presentationScale), geometry.Width, geometry.Height) / presentationScale;
         float width = geometry.Width * scale;
         float height = geometry.Height * scale;
         return new SDL.FRect
@@ -1305,62 +1293,29 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         SDL.SetRenderDrawBlendMode(renderer, SDL.BlendMode.None);
     }
 
-    private void DrawDisplayPage()
-    {
-        Text(300, 198, "VIDEO FILTER", 161, 173, 192);
-        DrawButton(300, 230, 180, 42, "SHARP", options.VideoFilter == LinuxVideoFilter.Sharp);
-        DrawButton(494, 230, 180, 42, "SMOOTH", options.VideoFilter == LinuxVideoFilter.Smooth);
-        DrawButton(688, 230, 180, 42, "LCD GRID", options.VideoFilter == LinuxVideoFilter.LcdGrid);
-
-        Text(300, 310, "FRAMESKIP", 161, 173, 192);
-        for (int value = 0; value <= 2; value++)
-        {
-            DrawButton(300 + (value * 114), 340, 100, 40, (value == 0 ? "ALL" : $"SKIP {value}"), options.Frameskip == value);
-        }
-
-        Text(300, 392, "Skip display frames to reduce load; game speed stays the same.", 161, 173, 192);
-        Text(300, 420, "DMG PALETTE", 161, 173, 192);
-        uint[][] swatches = [
-            [0xFFF5F5F5, 0xFFA0A0A0, 0xFF505050, 0xFF000000],
-            [0xFF9BBC0F, 0xFF8BAC0F, 0xFF306230, 0xFF0F380F],
-            [0xFF00FFCD, 0xFF00A597, 0xFF00665E, 0xFF00332F],
-            [0xFFF5EA8C, 0xFFD4B055, 0xFF8C5620, 0xFF381900],
-            [0xFF00FFFF, 0xFFFF00FF, 0xFF800080, 0xFF000040]
-        ];
-        for (int index = 0; index < 5; index++)
-        {
-            DrawButton(300 + index * 164, 450, 152, 40, new[] { "POCKET", "ORIGINAL", "LIGHT", "SEPIA", "CYBER" }[index], options.PaletteIndex == index);
-            for (int color = 0; color < 4; color++)
-            { uint rgba = swatches[index][color]; Fill(300 + index * 164 + color * 38, 500, 38, 20, (byte)(rgba >> 16), (byte)(rgba >> 8), (byte)rgba); }
-        }
-        ActionButton(300, 565, 360, 44, $"TEXT: {TextSizeName}", CycleTextSize);
-        Ink(685, 578, "Text size applies to every game.", 14, Colors.Muted);
-
-    }
-
     private void DrawAudioPage()
     {
-        Text(300, 194, "NATIVE SDL3 AUDIO", 161, 173, 192);
+        Ink(300, 194, "Sound output", 14, Colors.Muted);
         DrawButton(
             300,
             224,
             220,
             44,
-            options.AudioEnabled ? "AUDIO ON" : "AUDIO MUTED",
+            options.AudioEnabled ? "Sound on" : "Sound muted",
             options.AudioEnabled && audioOutput is not null);
 
-        Text(300, 302, "MASTER VOLUME", 161, 173, 192);
+        Ink(300, 302, "Volume", 14, Colors.Muted);
         DrawButton(300, 326, 72, 40, "-1%", false, options.AudioVolume > 0);
-        Text(426, 340, $"{options.AudioVolume}%", 240, 242, 255);
+        Ink(426, 340, $"{options.AudioVolume}%", 14, Colors.Text);
         DrawButton(560, 326, 72, 40, "+1%", false, options.AudioVolume < 100);
-        Fill(300, 389, 570, 6, 52, 61, 80);
-        Fill(300, 389, options.AudioVolume * 5.7f, 6, 176, 158, 245);
-        Fill(300 + options.AudioVolume * 5.7f - 7, 381, 14, 22, 216, 204, 255);
-        Text(300, 410, "0%", 161, 173, 192);
-        Text(360, 410, "Drag, or use Left / Right for 1% steps.", 161, 173, 192);
-        Text(838, 410, "100%", 161, 173, 192);
+        Paint(300, 389, 570, 6, Colors.Border);
+        Paint(300, 389, options.AudioVolume * 5.7f, 6, Colors.Primary);
+        Paint(300 + options.AudioVolume * 5.7f - 7, 381, 14, 22, Colors.Cyan);
+        Ink(300, 410, "0%", 14, Colors.Muted);
+        Ink(360, 410, "Drag, or use Left / Right for 1% steps.", 14, Colors.Muted);
+        Ink(838, 410, "100%", 14, Colors.Muted);
 
-        Text(300, 452, "HARDWARE CHANNELS", 161, 173, 192);
+        Ink(300, 452, "Game Boy sound channels", 14, Colors.Muted);
         bool[] channels =
         {
             options.Channel1Enabled,
@@ -1370,37 +1325,37 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         };
         for (int index = 0; index < channels.Length; index++)
         {
-            DrawButton(300 + (index * 146), 480, 132, 40, $"CH {index + 1}", channels[index]);
+            DrawButton(300 + (index * 146), 480, 132, 40, $"Channel {index + 1}", channels[index]);
         }
 
         string backend = audioOutput is null ? "NOT OPEN" : audioOutput.DriverName;
-        Text(300, 536, $"BACKEND  {Truncate(backend, 56)}", 218, 222, 242);
+        Ink(300, 536, $"Audio driver: {Truncate(backend, 56)}", 14, Colors.Text);
         if (!string.IsNullOrWhiteSpace(audioError))
         {
-            Text(300, 558, Truncate($"LAST ERROR  {audioError}", 80), 255, 132, 156);
+            Ink(300, 558, Truncate($"LAST ERROR  {audioError}", 80), 14, Colors.Danger);
         }
     }
 
     private void DrawInputPage()
     {
         if (showController) { DrawControllerPage(); return; }
-        ActionButton(910, 188, 190, 40, "CONTROLLERS", () => showController = true);
-        Text(300, 188, "KEYBOARD CONTROLS", 176, 158, 245);
-        Text(300, 216, "Click a key, or use arrows + Enter. Esc cancels a change.", 161, 173, 192);
+        DrawInputTabs();
+        if (showInputShortcuts) { DrawInputShortcuts(); return; }
+        Ink(300, 238, "Choose a key to change it. Escape cancels; occupied keys swap.", 14, Colors.Muted);
         for (int index = 0; index < BindingActions.Length; index++)
         {
             LinuxInputAction action = BindingActions[index];
             float x = 300 + (index / 6) * 330;
-            float y = 246 + (index % 6) * 46;
-            Text(x, y + 8, action is LinuxInputAction.L or LinuxInputAction.R ? $"{action} (GBA)" : action.ToString(), 218, 222, 242);
+            float y = 276 + (index % 6) * 44;
+            Ink(x, y + 8, action is LinuxInputAction.L or LinuxInputAction.R ? $"{action} (GBA)" : action.ToString(), 14, Colors.Text);
             DrawButton(x + 124, y, 156, 36,
                 rebindingAction == action ? "Press a key..." : BindingLabel(action),
                 rebindingAction == action || (rebindingAction is null && focusedControl < 0 && focusedBinding == index));
         }
-        DrawButton(300, 548, 210, 40, "RESET KEYS", false);
+        DrawButton(300, 548, 210, 40, "Reset keys", false);
         string controller = gamepad == IntPtr.Zero ? "No controller connected" : SDL.GetGamepadName(gamepad) ?? "Controller connected";
-        Text(536, 548, textRenderer.Fit(controller, 380), 161, 173, 192);
-        Text(536, 570, "Use Controller setup to change mapping.", 161, 173, 192);
+        Ink(536, 548, textRenderer.Fit(controller, 380), 14, Colors.Muted);
+        Ink(536, 570, "Use the Controller tab to change its buttons.", 14, Colors.Muted);
     }
 
     private string BindingLabel(LinuxInputAction action) => KeyLabel(options.Keys[action]);
@@ -1418,6 +1373,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     private void SelectControlCenterPage(ControlCenterPage page)
     {
         if (editingTitleIdentity is not null) { statusMessage = "Save or cancel the title before changing sections."; return; }
+        ResetSettingsNavigation();
         showController = false;
         showBackups = false;
         showGallery = false;

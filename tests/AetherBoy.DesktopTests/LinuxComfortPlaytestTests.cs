@@ -169,15 +169,17 @@ public sealed class LinuxComfortPlaytestTests
             Load(host, a);
             Call(host, "ToggleGameProfile");
             var options = Field<LinuxFrontendOptions>(host, "options");
-            options.AudioVolume = 17; options.VideoFilter = LinuxVideoFilter.Smooth;
+            options.AudioVolume = 17; options.VideoFilter = LinuxVideoFilter.Smooth; options.VideoScaling = LinuxVideoScaling.Fit;
             options.Keys.Bind(LinuxInputAction.A, SDL.Scancode.V);
             Call(host, "MarkSettingsChanged"); Call(host, "FlushSettingsIfDue", true);
             Assert.AreEqual(75, LinuxSettingsStore.Load(settings, out _).AudioVolume);
             Load(host, b);
             Assert.AreEqual(75, options.AudioVolume); Assert.AreEqual(LinuxVideoFilter.Sharp, options.VideoFilter);
+            Assert.AreEqual(LinuxVideoScaling.Automatic, options.VideoScaling);
             Assert.AreEqual(SDL.Scancode.Z, options.Keys[LinuxInputAction.A]);
             Load(host, a);
             Assert.AreEqual(17, options.AudioVolume); Assert.AreEqual(LinuxVideoFilter.Smooth, options.VideoFilter);
+            Assert.AreEqual(LinuxVideoScaling.Fit, options.VideoScaling);
             Assert.AreEqual(SDL.Scancode.V, options.Keys[LinuxInputAction.A]);
             if (Environment.GetEnvironmentVariable("AETHERBOY_COMFORT_CAPTURE_DIR") is not null)
             {
@@ -297,10 +299,10 @@ public sealed class LinuxComfortPlaytestTests
         {
             Call(host, "ToggleControlCenter"); SelectPage(host, "Input");
             Key(host, SDL.Scancode.F6);
-            Assert.AreEqual(910f, Focus(host).X);
+            Assert.AreEqual(300f, Focus(host).X);
             Key(host, SDL.Scancode.F6);
             Assert.AreEqual(22f, Focus(host).X); Assert.AreEqual(374f, Focus(host).Y);
-            Key(host, SDL.Scancode.F6); Key(host, SDL.Scancode.Return);
+            Key(host, SDL.Scancode.F6); Key(host, SDL.Scancode.Tab); Key(host, SDL.Scancode.Return);
             Assert.IsTrue(Field<bool>(host, "showController"));
             Key(host, SDL.Scancode.F6);
             Assert.IsTrue(Focus(host).X >= 278 && Focus(host).Y >= 180);
@@ -308,7 +310,7 @@ public sealed class LinuxComfortPlaytestTests
             Assert.AreEqual(22f, Focus(host).X);
             Key(host, SDL.Scancode.Return);
             Assert.IsFalse(Field<bool>(host, "showController"), "Sidebar selection must leave the controller subview.");
-            Key(host, SDL.Scancode.F6); Assert.AreEqual(910f, Focus(host).X);
+            Key(host, SDL.Scancode.F6); Assert.AreEqual(300f, Focus(host).X);
         });
     }
 

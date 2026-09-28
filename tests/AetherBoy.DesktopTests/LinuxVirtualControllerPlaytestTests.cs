@@ -155,6 +155,32 @@ public sealed class LinuxVirtualControllerPlaytestTests
             var options = LinuxSettingsStore.Load(settings, out var error);
             Assert.IsNull(error);
             Assert.IsTrue(options.Gamepads.Values.Any(profile => profile.Buttons[LinuxInputAction.A] == SDL.GamepadButton.East && profile.Deadzone == 8000));
+            // Use the same visible controls as a player, including the real SDL button event.
+            Call(host, "ToggleControlCenter");
+            Call(host, "OpenSettingsDestination", LinuxSettingsDestination.Controller);
+            void Click(float x, float y) { Call(host, "DrawShell"); Call(host, "HandleMouseClick", x, y); Call(host, "DrawShell"); }
+            Click(550, 315);
+            Assert.AreEqual(LinuxInputAction.A, Field<LinuxInputAction?>(host, "rebindingGamepad"));
+            Button(SDL.GamepadButton.West, true); Button(SDL.GamepadButton.West, false);
+            Assert.AreEqual(SDL.GamepadButton.West, Field<LinuxGamepadProfile>(host, "gamepadProfile").Buttons[LinuxInputAction.A]);
+            Click(970, 592); // Stick settings
+            Assert.IsTrue(Field<bool>(host, "showControllerStick"));
+            Click(370, 468); // Decrease deadzone
+            Assert.AreEqual(6000, Field<LinuxGamepadProfile>(host, "gamepadProfile").Deadzone);
+            Axis(5000); Call(host, "DrawShell");
+            Assert.IsTrue(Field<List<string>>(host, "accessibleDescriptions").Contains("Stick input is inside the deadzone"));
+            Axis(14000); Call(host, "DrawShell");
+            Assert.IsTrue(Field<List<string>>(host, "accessibleDescriptions").Contains("Stick input is active"));
+            Axis(0);
+            Click(400, 275); // Back to buttons
+            Click(400, 592); // Reset buttons
+            Assert.AreEqual(SDL.GamepadButton.South, Field<LinuxGamepadProfile>(host, "gamepadProfile").Buttons[LinuxInputAction.A]);
+            Assert.AreEqual(6000, Field<LinuxGamepadProfile>(host, "gamepadProfile").Deadzone);
+            Call(host, "FlushSettingsIfDue", true);
+            options = LinuxSettingsStore.Load(settings, out error);
+            Assert.IsNull(error);
+            Assert.IsTrue(options.Gamepads.Values.Any(profile => profile.Buttons[LinuxInputAction.A] == SDL.GamepadButton.South && profile.Deadzone == 6000));
+
         }
         finally
         {

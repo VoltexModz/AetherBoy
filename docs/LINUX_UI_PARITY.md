@@ -39,8 +39,11 @@ The shell connects ROM opening/drag-and-drop, keyboard/gamepad input, pause,
 held turbo, rewind, quick save/load, five slots, fullscreen, display filtering,
 frameskip, DMG palettes, volume/mute and four hardware audio channels.
 Preferences persist in the existing version-1 settings format, with defaults for
-fields absent from older files. The nine Control Center sections are Overview, Display, Audio, Input, Saves,
-System, Diagnostics, Library and Tools. Diagnostic values come from
+fields absent from older files. The nine Control Center sections are Overview, Graphics, Audio, Controls, Save states,
+App & files, Diagnostics, Library and Tools. Settings search and the new Graphics,
+Controller and App & files subpages live in `WaylandEmulatorHost.SettingsNavigation.cs`.
+The search catalog lives in `LinuxSettingsCatalog.cs`. See the
+[settings design notes](LINUX_SETTINGS_DESIGN.md) for rationale and validation. Diagnostic values come from
 the live Linux host.
 
 Control Center buttons are reachable through Tab/Shift+Tab with a visible focus

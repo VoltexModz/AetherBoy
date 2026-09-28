@@ -9,7 +9,7 @@ internal sealed partial class WaylandEmulatorHost
     private readonly List<(LinuxAccessibleControls.Command Command, SDL.FRect Bounds)> accessibleCommands = new();
     private readonly List<string> accessibleDescriptions = new();
     private bool drawingButtonLabel;
-    private string AccessibleTextKey => FocusContext + ":" + ActiveTextEntryName;
+    private string AccessibleTextKey => ActiveTextField == TextField.SettingsSearch ? "settings-search" : FocusContext + ":" + ActiveTextEntryName;
 
     private void OpenAccessibleControls() => ShowAccessibleControls(hidden: hiddenWindow);
     private void ShowAccessibleControls(bool hidden)
@@ -28,26 +28,27 @@ internal sealed partial class WaylandEmulatorHost
         string key = navigation ? "navigation:" + y : FocusContext + ":" + (focusId ?? "button") + $":{x}:{y}";
         string name = label == "×" ? "Return to game" : label;
         if (focusId?.StartsWith("text:", StringComparison.Ordinal) == true) name = focusId switch
-        { "text:Title" => "Edit cartridge title", "text:Search" => "Search cartridges", "text:Cheat" => "Edit cheat code", _ => "Edit text" };
-        bool? option = navigation ? (int)((y - 224) / 50) == (int)controlCenterPage : null;
-        if (!navigation && controlCenterPage == ControlCenterPage.Display && y is 230 or 340 or 450) option = selected;
+        { "text:Title" => "Edit cartridge title", "text:Search" => "Search cartridges", "text:SettingsSearch" => "Search settings", "text:Cheat" => "Edit cheat code", _ => "Edit text" };
+        bool? option = navigation ? selected : null;
         if (!navigation && controlCenterPage == ControlCenterPage.Audio && y is 224 or 480) option = selected;
         if (!navigation && controlCenterPage == ControlCenterPage.Saves && ((showGallery && y == 260) || (!showGallery && !showBackups && y == 232 && x >= 300 && x <= 756))) option = selected;
-        if (controlCenterPage == ControlCenterPage.Input && !showController && y >= 246 && y <= 476 && (x == 424 || x == 754))
+        if (controlCenterPage == ControlCenterPage.Input && !showController && !showInputShortcuts && y >= 276 && y <= 496 && (x == 424 || x == 754))
         {
-            int index = (x == 754 ? 6 : 0) + (int)((y - 246) / 46);
+            int index = (x == 754 ? 6 : 0) + (int)((y - 276) / 44);
             if (index < BindingActions.Length) name = $"Map {BindingActions[index]}: {label}";
         }
-        if (controlCenterPage == ControlCenterPage.Input && showController && y >= 290 && y <= 500 && (x == 400 || x == 790))
+        if (controlCenterPage == ControlCenterPage.Input && showController && !showControllerStick && y >= 297 && y <= 512 && (x == 400 || x == 814))
         {
-            int index = (x == 790 ? 6 : 0) + (int)((y - 290) / 42);
+            int index = (x == 814 ? 6 : 0) + (int)((y - 297) / 43);
             if (index < BindingActions.Length) name = $"Map controller {BindingActions[index]}: {label}";
         }
+        if (focusId?.StartsWith("option:") == true) option = selected;
+        if (focusId == "setting:auto-pause") { option = options.PauseOnFocusLoss; name = "Pause when unfocused: " + label; }
+        if (focusId == "setting:text-size") name = "Text size: " + label;
+        if (focusId?.StartsWith("result:") == true && Enum.TryParse<LinuxSettingsDestination>(focusId[7..], out var destination))
+            name = "Open " + LinuxSettingsCatalog.Entries.First(entry => entry.Destination == destination).Title;
         if (focusId?.StartsWith("favorite:") == true) option = selected;
         if (controlCenterPage == ControlCenterPage.Library && x == 570 && y == 254) option = favoritesOnly;
-        if (controlCenterPage == ControlCenterPage.System && x == 300 && y == 322) option = usingGameProfile;
-        if (controlCenterPage == ControlCenterPage.System && x == 300 && y == 440) option = options.PauseOnFocusLoss;
-        if (controlCenterPage == ControlCenterPage.System && x == 560 && y == 562) option = options.UseFirmware;
         if (controlCenterPage == ControlCenterPage.Diagnostics && x == 300 && y == 535) option = options.RecordDiagnostics;
         if (controlCenterPage == ControlCenterPage.Audio && label is "-1%" or "+1%") name = label == "-1%" ? "Decrease volume by 1 percent" : "Increase volume by 1 percent";
         if (focusId?.StartsWith("rename:") == true || focusId?.StartsWith("favorite:") == true)

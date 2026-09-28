@@ -32,7 +32,7 @@ internal sealed class LinuxSdlTextClipboard : ILinuxTextClipboard
 
 internal sealed partial class WaylandEmulatorHost
 {
-    private enum TextField { None, Title, Search, Cheat, RoomCode, RoomServer, RoomAccessKey, ThemePrimary, ThemeSecondary, ThemeBackground }
+    private enum TextField { None, Title, Search, SettingsSearch, Cheat, RoomCode, RoomServer, RoomAccessKey, ThemePrimary, ThemeSecondary, ThemeBackground }
 
     private TextField onlineEditingField;
     private TextField appearanceEditingField;
@@ -43,11 +43,11 @@ internal sealed partial class WaylandEmulatorHost
     private bool draggingTextSelection;
     private readonly Dictionary<TextField, SDL.FRect> textEntryBounds = new();
     private TextField ActiveTextField => editingTitleIdentity is not null ? TextField.Title
-        : editingSearch ? TextField.Search : editingCheat ? TextField.Cheat
+        : editingSettingsSearch ? TextField.SettingsSearch : editingSearch ? TextField.Search : editingCheat ? TextField.Cheat
         : controlCenterVisible && controlCenterPage == ControlCenterPage.System && showAppearance ? appearanceEditingField
         : controlCenterVisible && showOnlineLinkPage && !showLegacyOnlineLink ? onlineEditingField : TextField.None;
     private string? ActiveTextEntryName => ActiveTextField switch
-    { TextField.Title => "Cartridge title", TextField.Search => "Search cartridges", TextField.Cheat => "Cheat code", TextField.RoomCode => "Room code", TextField.RoomServer => "Room server address", TextField.RoomAccessKey => "Server access key",
+    { TextField.Title => "Cartridge title", TextField.Search => "Search cartridges", TextField.SettingsSearch => "Search settings", TextField.Cheat => "Cheat code", TextField.RoomCode => "Room code", TextField.RoomServer => "Room server address", TextField.RoomAccessKey => "Server access key",
       TextField.ThemePrimary => "Primary UI color", TextField.ThemeSecondary => "Secondary UI color", TextField.ThemeBackground => "UI background color", _ => null };
     private string? ActiveTextName => ActiveTextEntryName;
     private bool ActiveTextReadOnly => ActiveTextField == TextField.Title && libraryMutation is not null;
@@ -62,7 +62,7 @@ internal sealed partial class WaylandEmulatorHost
     }
 
     private string TextFieldValue(TextField field) => field switch
-    { TextField.Title => titleInput, TextField.Search => librarySearch, TextField.Cheat => cheatCode,
+    { TextField.Title => titleInput, TextField.Search => librarySearch, TextField.SettingsSearch => settingsSearch, TextField.Cheat => cheatCode,
       TextField.RoomCode => roomCodeInput, TextField.RoomServer => roomServerInput, TextField.RoomAccessKey => roomAccessKeyInput,
       TextField.ThemePrimary => primaryColorInput, TextField.ThemeSecondary => secondaryColorInput, TextField.ThemeBackground => backgroundColorInput, _ => "" };
 
@@ -83,6 +83,7 @@ internal sealed partial class WaylandEmulatorHost
         switch (ActiveTextField)
         {
             case TextField.Title: titleInput = textEditor.Text; titleSelectedAll = textEditor.AllSelected; break;
+            case TextField.SettingsSearch: settingsSearch = textEditor.Text; settingsSearchPage = 0; focusedControl = -1; break;
             case TextField.Search: librarySearch = textEditor.Text; libraryPage = 0; break;
             case TextField.Cheat: cheatCode = textEditor.Text; break;
             case TextField.RoomCode: roomCodeInput = textEditor.Text; break;
@@ -100,6 +101,7 @@ internal sealed partial class WaylandEmulatorHost
         if (textEditor.IsComposing) SDL.ClearComposition(window);
         onlineEditingField = field is TextField.RoomCode or TextField.RoomServer or TextField.RoomAccessKey ? field : TextField.None;
         appearanceEditingField = field is TextField.ThemePrimary or TextField.ThemeSecondary or TextField.ThemeBackground ? field : TextField.None;
+        editingSettingsSearch = field == TextField.SettingsSearch;
         editingSearch = field == TextField.Search;
         editingCheat = field == TextField.Cheat;
         editorField = TextField.None;
@@ -138,6 +140,7 @@ internal sealed partial class WaylandEmulatorHost
         if (textEditor.IsComposing) return;
         SyncTextEditor();
         if (ActiveTextField == TextField.Title) { EndTitleEdit(true); return; }
+        editingSettingsSearch = false;
         editingSearch = editingCheat = false;
         onlineEditingField = TextField.None;
         appearanceEditingField = TextField.None;
@@ -149,6 +152,7 @@ internal sealed partial class WaylandEmulatorHost
         if (ActiveTextReadOnly) return;
         EnsureTextEditor();
         if (textEditor.IsComposing) { CancelTextComposition(); return; }
+        if (ActiveTextField == TextField.SettingsSearch) { ClearSettingsSearch(); return; }
         if (ActiveTextField == TextField.Title) { EndTitleEdit(false); return; }
         CommitActiveText(); // Search/cheat drafts survive leaving the field.
     }
@@ -168,7 +172,17 @@ internal sealed partial class WaylandEmulatorHost
             return false;
         }
         if (!editorHasFocus) return false;
-        if (key.Scancode == SDL.Scancode.Return) { CommitActiveText(); return true; }
+        if (key.Scancode == SDL.Scancode.Return)
+        {
+            if (ActiveTextField == TextField.SettingsSearch && !textEditor.IsComposing)
+            {
+                var first = LinuxSettingsCatalog.Search(settingsSearch).Skip(settingsSearchPage * SettingsResultsPerPage).FirstOrDefault();
+                if (first is not null) OpenSettingsDestination(first.Destination);
+                else CommitActiveText();
+            }
+            else CommitActiveText();
+            return true;
+        }
         bool ctrl = (key.Mod & SDL.Keymod.Ctrl) != 0 && (key.Mod & SDL.Keymod.Alt) == 0;
         LinuxTextKey? command = ctrl ? key.Scancode switch
         {
@@ -190,11 +204,16 @@ internal sealed partial class WaylandEmulatorHost
 
     private void DrawTextEntry(TextField field, float x, float y, float width, float height, string placeholder, bool enabled = true)
     {
-        textEntryBounds[field] = new SDL.FRect { X = x, Y = y, W = width, H = height };
+        if (field == TextField.SettingsSearch)
+        {
+            // Search is available while a page is open, but never steals an unfinished title edit.
+            enabled = enabled && editingTitleIdentity is null;
+        }
+        if (enabled && !IsLoading) textEntryBounds[field] = new SDL.FRect { X = x, Y = y, W = width, H = height };
         bool active = ActiveTextField == field;
         string value = TextFieldValue(field);
         if (field == TextField.RoomAccessKey) value = new string('*', value.Length);
-        ActionButton(x, y, width, height, "", () => BeginTextEditing(field), false, enabled, focusId: "text:" + field);
+        ActionButton(x, y, width, height, "", () => { if (field == TextField.SettingsSearch) FocusSettingsSearch(); else BeginTextEditing(field); }, false, enabled, focusId: "text:" + field);
         if (!active)
         { Ink(x + 12, y + (height - 22) / 2, textRenderer.Fit(string.IsNullOrEmpty(value) ? placeholder : value, width - 24, 16), 16, string.IsNullOrEmpty(value) ? Colors.Muted : Colors.Text); return; }
         EnsureTextEditor();
@@ -234,25 +253,12 @@ internal sealed partial class WaylandEmulatorHost
     private bool HandleTextPointerDown(float x, float y, bool shift)
     {
         draggingTextSelection = false;
-        TextField field = !controlCenterVisible ? TextField.None : controlCenterPage switch
-        {
-            ControlCenterPage.Library when !showPatchLab => editingTitleIdentity is not null ? TextField.Title : TextField.Search,
-            ControlCenterPage.Tools when session is not null => TextField.Cheat,
-            ControlCenterPage.System when showAppearance => appearanceEditingField,
-            _ => TextField.None
-        };
-        if (controlCenterVisible && showOnlineLinkPage && !showLegacyOnlineLink && onlineLinkTransport is null)
-        {
-            field = TextField.None;
-            foreach (var candidate in showRoomSetup ? new[] { TextField.RoomServer, TextField.RoomAccessKey } : onlineRoomTransport is null ? new[] { TextField.RoomCode } : Array.Empty<TextField>())
-                if (textEntryBounds.TryGetValue(candidate, out var rectangle) && Hit(x, y, rectangle.X, rectangle.Y, rectangle.W, rectangle.H)) field = candidate;
-        }
-        if (controlCenterVisible && controlCenterPage == ControlCenterPage.System && showAppearance)
-        {
-            field = TextField.None;
-            foreach (var candidate in new[] { TextField.ThemePrimary, TextField.ThemeSecondary, TextField.ThemeBackground })
-                if (textEntryBounds.TryGetValue(candidate, out var rectangle) && Hit(x, y, rectangle.X, rectangle.Y, rectangle.W, rectangle.H)) field = candidate;
-        }
+        TextField field = TextField.None;
+        if (controlCenterVisible)
+            foreach (var candidate in textEntryBounds)
+                if (Hit(x, y, candidate.Value.X, candidate.Value.Y, candidate.Value.W, candidate.Value.H))
+                    field = candidate.Key;
+        if (field == TextField.SettingsSearch && editingTitleIdentity is not null) return true;
         if (field == TextField.None || !textEntryBounds.TryGetValue(field, out var bounds) || !Hit(x, y, bounds.X, bounds.Y, bounds.W, bounds.H))
         {
             if (ActiveTextField != TextField.None && !textEditor.IsComposing)
@@ -260,7 +266,8 @@ internal sealed partial class WaylandEmulatorHost
             return false;
         }
         if (ActiveTextReadOnly) return true;
-        if (ActiveTextField != field) BeginTextEditing(field);
+        if (ActiveTextField != field)
+        { if (field == TextField.SettingsSearch) FocusSettingsSearch(); else BeginTextEditing(field); }
         else { EnsureTextEditor(); editorHasFocus = true; focusedControl = -1; SDL.StartTextInput(window); }
         if (textEditor.IsComposing) return true;
         textEditor.PlaceCaret(x - bounds.X - 12 + textEditor.ScrollOffset, value => textRenderer.Measure(ActiveTextField == TextField.RoomAccessKey ? new string('*', value.Length) : value, 16), shift);

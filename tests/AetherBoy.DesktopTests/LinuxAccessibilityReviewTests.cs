@@ -19,7 +19,7 @@ public sealed class LinuxAccessibilityReviewTests
             Assert.AreEqual(0, gtk_widget_get_mapped(controls.Window), "This test must never map a user-visible window.");
             VisitNamed(controls, "Save slot one", accessible =>
             {
-                Assert.AreEqual("push button", Role(accessible));
+                Assert.IsTrue(Role(accessible) is "push button" or "button", "ATK_ROLE_BUTTON is the renamed ATK_ROLE_PUSH_BUTTON alias.");
                 Assert.IsTrue(State(accessible, 7)); // ATK_STATE_ENABLED
                 Assert.IsTrue(State(accessible, 10)); // ATK_STATE_FOCUSABLE
                 Assert.AreNotEqual(0, atk_action_do_action(accessible, 0));
@@ -129,7 +129,7 @@ public sealed class LinuxAccessibilityReviewTests
             var panel = Field<LinuxAccessibleControls>("accessibleControls");
             Assert.IsTrue(panel.IsOpen, "Ctrl+F7 must open the accessible surface without a pointer.");
             Page("Display");
-            VisitNamed(panel, "SHARP", accessible => { Assert.AreEqual("toggle button", Role(accessible)); Assert.IsTrue(State(accessible, 4)); });
+            VisitNamed(panel, "Sharp", accessible => { Assert.AreEqual("toggle button", Role(accessible)); Assert.IsTrue(State(accessible, 4)); });
             string KeyFor(string label)
             {
                 foreach (object item in Field<System.Collections.IEnumerable>("accessibleCommands"))
@@ -139,14 +139,14 @@ public sealed class LinuxAccessibilityReviewTests
                 }
                 throw new InvalidOperationException("Missing mirrored action " + label);
             }
-            panel.ActivateForTest(KeyFor("SMOOTH")); Call("UpdateAccessibleControls"); Call("DrawShell"); Call("UpdateAccessibleControls");
+            panel.ActivateForTest(KeyFor("Smooth")); Call("UpdateAccessibleControls"); Call("DrawShell"); Call("UpdateAccessibleControls");
             Assert.AreEqual(LinuxVideoFilter.Smooth, Field<LinuxFrontendOptions>("options").VideoFilter);
-            VisitNamed(panel, "SMOOTH", accessible => Assert.IsTrue(State(accessible, 4)));
-            panel.ActivateForTest(KeyFor("SHARP"));
+            VisitNamed(panel, "Smooth", accessible => Assert.IsTrue(State(accessible, 4)));
+            panel.ActivateForTest(KeyFor("Sharp"));
             Page("Saves"); // Pending old-page callback must not alter the replacement page/session.
             Assert.AreEqual(LinuxVideoFilter.Smooth, Field<LinuxFrontendOptions>("options").VideoFilter);
             Assert.IsTrue(panel.InspectActions().Any(item => item.Name.StartsWith("1 ", StringComparison.Ordinal) && item.Role == "toggle button" && item.Checked), "Active manual slot must have checked semantics.");
-            VisitNamed(panel, "BACKUPS / EXPORT", accessible => Assert.AreEqual("push button", Role(accessible)));
+            VisitNamed(panel, "BACKUPS / EXPORT", accessible => Assert.IsTrue(Role(accessible) is "push button" or "button", "ATK_ROLE_BUTTON is the renamed ATK_ROLE_PUSH_BUTTON alias."));
             Assert.AreEqual(0, gtk_widget_get_mapped(panel.Window));
         }
         finally { SDL.Quit(); Directory.Delete(directory, true); }

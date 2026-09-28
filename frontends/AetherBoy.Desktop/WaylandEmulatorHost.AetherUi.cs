@@ -32,7 +32,7 @@ internal sealed partial class WaylandEmulatorHost
     private FocusIdentity? previousFocus;
     private int focusedControl = -1;
     private string FocusContext => !controlCenterVisible ? "main:" + storage?.Identity
-        : $"{controlCenterPage}:{showAppearance}:{showController}:{showBackups}:{showGallery}:{showPatchLab}:{editingTitleIdentity}:{storage?.Identity}";
+        : $"{controlCenterPage}:{graphicsSection}:{systemSection}:{showInputShortcuts}:{showControllerStick}:{settingsSearch}:{settingsSearchPage}:{showAppearance}:{showController}:{showBackups}:{showGallery}:{showPatchLab}:{editingTitleIdentity}:{storage?.Identity}";
 
     private void BeginFocusFrame()
     {
@@ -53,17 +53,17 @@ internal sealed partial class WaylandEmulatorHost
     private bool mouseTurbo;
     private bool showAppearance;
     private string primaryColorInput = "", secondaryColorInput = "", backgroundColorInput = "";
-    private static readonly string[] PageNames = ["Overview", "Video", "Audio", "Controls", "Save states", "System", "Diagnostics", "Library", "Tools"];
+    private static readonly string[] PageNames = ["Overview", "Graphics", "Audio", "Controls", "Save states", "App & files", "Diagnostics", "Library", "Tools"];
     private static readonly string[] PageDescriptions =
     [
-        "Your current game and useful shortcuts", "Picture style, palettes and display options",
+        "Choose a topic below, or search for a specific setting", "Choose how your games look on screen",
         "Volume, channels and audio output", "Keyboard mapping and controller setup",
-        "Save, load and manage your game data", "Desktop, storage and firmware", "Session health and local reports", "Your games, most recently played first", "Audio recording and game tools"
+        "Save, load and manage your game data", "Appearance, desktop behavior, game profiles and files", "Session health and local reports", "Your games, most recently played first", "Audio recording and game tools"
     ];
-    private string CurrentPageName => showAppearance && controlCenterPage == ControlCenterPage.System
+    private string CurrentPageName => ShowingSettingsSearch ? "Search settings" : showAppearance && controlCenterPage == ControlCenterPage.System
         ? "Appearance" : PageNames[(int)controlCenterPage];
-    private string CurrentPageDescription => showAppearance && controlCenterPage == ControlCenterPage.System
-        ? "Choose logo accents and a background for the whole app" : PageDescriptions[(int)controlCenterPage];
+    private string CurrentPageDescription => ShowingSettingsSearch ? "Search by name or purpose, then open the matching section" : showAppearance && controlCenterPage == ControlCenterPage.System
+        ? "Choose colors for the whole app, then select Apply colors" : PageDescriptions[(int)controlCenterPage];
 
     private static SDL.Color Rgb(byte r, byte g, byte b) => new() { R = r, G = g, B = b, A = 255 };
     private void Paint(float x, float y, float w, float h, SDL.Color color) => Fill(x, y, w, h, color.R, color.G, color.B);
@@ -136,9 +136,10 @@ internal sealed partial class WaylandEmulatorHost
             focusTargets.Add(new SDL.FRect { X = x, Y = y, W = width, H = height });
             focusIdentities.Add(identity);
         }
+        bool navigation = focusId?.StartsWith("nav:") == true;
         bool hovered = enabled && Hit(mouseX, mouseY, x, y, width, height);
-        SDL.Color fill = selected && enabled ? Colors.Primary : hovered ? Colors.Raised : Colors.Surface;
-        SDL.Color border = keyboardFocused ? Colors.Cyan : selected && enabled ? Colors.Primary : Colors.Border;
+        SDL.Color fill = selected && enabled ? Colors.Primary : hovered ? Colors.Raised : navigation ? Colors.Chrome : Colors.Surface;
+        SDL.Color border = keyboardFocused ? Colors.Cyan : selected && enabled ? Colors.Primary : navigation ? Colors.Chrome : Colors.Border;
         RoundedFill(x, y, width, height, 8, border);
         RoundedFill(x + 1, y + 1, width - 2, height - 2, 7, fill);
         if (keyboardFocused)
@@ -148,7 +149,8 @@ internal sealed partial class WaylandEmulatorHost
         }
         drawingButtonLabel = true;
         label = textRenderer.Fit(label, width - 16, 13, true);
-        Center(x + width / 2, y + (height - 17) / 2 - 1, label, 12,
+        if (navigation) Ink(x + 16, y + (height - 20) / 2, label, 15, selected ? Colors.OnPrimary : Colors.Text, selected);
+        else Center(x + width / 2, y + (height - 17) / 2 - 1, label, 12,
             !enabled ? Colors.Muted : selected ? Colors.OnPrimary : Colors.Text, true);
         drawingButtonLabel = false;
     }
@@ -204,6 +206,7 @@ internal sealed partial class WaylandEmulatorHost
         PollDiskRefresh(); PollLibraryRefresh(); CompleteStateOperation();
         accessibleCommands.Clear(); accessibleDescriptions.Clear();
         shellCommands.Clear();
+        textEntryBounds.Clear();
         BeginFocusFrame();
         float dx = LogicalWidth - 1180;
         float dy = LogicalHeight - 760;
@@ -217,7 +220,7 @@ internal sealed partial class WaylandEmulatorHost
         Ink(84, 15, "AetherBoy", 21, bold: true);
         Ink(84, 46, "GAME BOY · COLOR · ADVANCE", 11, Colors.Muted);
         ActionButton(568 + dx, 18, 132, 42, "Library", () => OpenControlPage(ControlCenterPage.Library));
-        ActionButton(708 + dx, 18, 132, 42, "Video", () => OpenControlPage(ControlCenterPage.Display));
+        ActionButton(708 + dx, 18, 132, 42, "Graphics", () => OpenControlPage(ControlCenterPage.Display));
         ActionButton(848 + dx, 18, 132, 42, "Save states", () => OpenControlPage(ControlCenterPage.Saves));
         ActionButton(988 + dx, 18, 168, 42, "Settings", () => OpenControlPage(ControlCenterPage.Overview));
 
@@ -307,79 +310,43 @@ internal sealed partial class WaylandEmulatorHost
         Mark(20, 14, 52);
         Ink(92, 12, "AetherBoy", 12, Colors.Muted, true);
         Ink(92, 29, "Settings", 22, bold: true);
-        Ink(206, 37, "Make the game feel right for you.", 12, Colors.Muted);
+        Ink(242, 37, "Find settings with Ctrl+K", 14, Colors.Muted);
         ActionButton(LogicalWidth - 66, 23, 42, 36, "×", CloseControlCenter);
         Paint(0, 83, LogicalWidth, 1, Colors.Border);
         Paint(0, 84, 248, LogicalHeight - 84, Colors.Chrome);
         Paint(247, 84, 1, LogicalHeight - 84, Colors.Border);
-        Ink(22, 117, "PREFERENCES", 11, Colors.Muted, true);
-        Ink(22, 154, "Browse settings", 16, bold: true);
+        Ink(22, 117, "Find a setting", 16, bold: true);
+        DrawTextEntry(TextField.SettingsSearch, 22, 164, 204, 42, "Search settings");
         for (int i = 0; i < PageNames.Length; i++)
         {
             ControlCenterPage page = (ControlCenterPage)i;
-            ActionButton(22, 224 + i * 50, 204, 42, PageNames[i], () => SelectControlCenterPage(page), page == controlCenterPage);
+            ActionButton(22, 224 + i * 50, 204, 42, PageNames[i], () => SelectControlCenterPage(page), !ShowingSettingsSearch && page == controlCenterPage, focusId: "nav:" + page);
         }
-        Ink(24, LogicalHeight - 71, "Saved on this computer", 11, Colors.Muted);
+        DrawSettingsParagraph(24, LogicalHeight - 78, settingsDirty || settingsWrite is not null ? "Saving changes…" : "Changes save automatically", 200, 12);
         Ink(280, 108, CurrentPageName, 26);
-        Ink(280, 150, textRenderer.Fit(CurrentPageDescription + (session is not null && controlCenterPage is ControlCenterPage.Display or ControlCenterPage.Audio or ControlCenterPage.Input ? (usingGameProfile ? " · THIS GAME" : " · GLOBAL SETTINGS") : ""), 850), 13, Colors.Muted);
-        if (controlCenterPage != ControlCenterPage.Overview) Panel(278, 180, LogicalWidth - 302, 456);
+        Ink(280, 150, textRenderer.Fit(CurrentPageDescription, LogicalWidth - 310), 14, Colors.Muted);
+        Panel(278, 180, LogicalWidth - 302, 456);
+        if (ShowingSettingsSearch) DrawSettingsResults();
+        else
         switch (controlCenterPage)
         {
-            case ControlCenterPage.Overview: DrawOverviewPage(); break;
+            case ControlCenterPage.Overview: DrawSettingsOverview(); break;
             case ControlCenterPage.Display: DrawDisplayPage(); break;
             case ControlCenterPage.Audio: DrawAudioPage(); break;
             case ControlCenterPage.Input: DrawInputPage(); break;
             case ControlCenterPage.Saves: DrawSavesPage(); break;
-            case ControlCenterPage.System: DrawSystemPage(); break;
+            case ControlCenterPage.System: DrawSystemSettings(); break;
             case ControlCenterPage.Diagnostics: DrawDiagnosticsPage(); break;
             case ControlCenterPage.Library: DrawLibraryPage(); break;
             case ControlCenterPage.Tools: DrawToolsPage(); break;
         }
-        Ink(280, 648, textRenderer.Fit(loadError ?? statusMessage, 852, 12), 12, loadError is null ? Colors.Muted : Colors.Danger);
+        string scope = controlCenterPage is ControlCenterPage.Display or ControlCenterPage.Audio or ControlCenterPage.Input
+            ? ShowingSettingsSearch || showInputShortcuts ? "" : showController ? "Controller mappings are saved for this device."
+            : usingGameProfile ? "Changes apply to this game’s profile." : "Changes apply to global defaults."
+            : "";
+        DrawSettingsParagraph(280, 648, loadError ?? (string.IsNullOrEmpty(statusMessage) ? scope : statusMessage), LogicalWidth - 310, 12,
+            loadError is null ? Colors.Muted : Colors.Danger);
         Ink(280, LogicalHeight - 69, textRenderer.Fit("F6: sidebar / page · Tab: next · Ctrl+Tab: section · Enter: select · Esc: back", LogicalWidth - 310, 12), 12, Colors.Muted);
-    }
-
-    private void DrawOverviewPage()
-    {
-        Panel(278, 184, 878, 98, "CURRENT SESSION");
-        Ink(302, 224, textRenderer.Fit(session is null ? "Ready to open a cartridge" : $"{StateLabel}  //  {ModelLabel}", 510, 21), 21);
-        ActionButton(842, 214, 270, 44, "CONTINUE SESSION", LoadResume, true, StateCard(0) is { Exists: true, Error: null } && stateOperation is null);
-        Panel(278, 300, 282, 132, "CARTRIDGE");
-        Ink(300, 351, textRenderer.Fit(CartridgeTitle, 240), 14);
-        Ink(300, 379, session is null ? "DMG / CGB / GBA READY" : ModelLabel, 14);
-        Panel(576, 300, 282, 132, "CONTROLS");
-        Ink(598, 351, gamepad == IntPtr.Zero ? "KEYBOARD READY" : "GAMEPAD LIVE", 14);
-        Ink(598, 379, textRenderer.Fit(InputLabel.ToUpperInvariant(), 238), 14);
-        Panel(874, 300, 282, 132, "SAVE STATUS");
-        Ink(896, 351, session is null ? "NO CARTRIDGE" : $"STATE SLOT {options.SaveSlot} / 5", 14);
-        Ink(896, 379, session is null ? "NO SAVE ROUTE" : "LOCAL SAVE FILES", 14);
-        Panel(278, 450, 878, 168, "QUICK ACCESS");
-        ActionButton(300, 497, 264, 42, "INPUT SETTINGS", () => SelectControlCenterPage(ControlCenterPage.Input));
-        ActionButton(582, 497, 264, 42, "SAVE CENTER", () => SelectControlCenterPage(ControlCenterPage.Saves));
-        ActionButton(864, 497, 270, 42, "AUDIO", () => SelectControlCenterPage(ControlCenterPage.Audio));
-        ActionButton(300, 558, 264, 42, "QUICK SAVE", QuickSave, true, session is not null && !IsOnlineLink);
-        ActionButton(582, 558, 264, 42, "QUICK LOAD", QuickLoad, enabled: HasSelectedState);
-        ActionButton(864, 558, 270, 42, "FULLSCREEN", Fullscreen);
-    }
-
-    private void DrawSystemPage()
-    {
-        if (showAppearance) { DrawAppearancePage(); return; }
-        Ink(300, 200, "NATIVE LINUX", 11, Colors.Cyan, true);
-        Ink(300, 236, desktop.DisplayName, 20);
-        ActionButton(842, 198, 268, 42, $"TEXT: {TextSizeName}", CycleTextSize);
-        ActionButton(842, 440, 268, 42, "ACCESSIBLE UI", OpenAccessibleControls);
-        ActionButton(842, 506, 268, 44, "APPEARANCE COLORS", OpenAppearancePage);
-        Ink(300, 284, "VIDEO, SOUND & KEYBOARD", 14, Colors.Cyan, true);
-        ActionButton(300, 322, 810, 44, usingGameProfile ? "THIS GAME HAS ITS OWN SETTINGS · USE GLOBAL DEFAULTS" : "USING GLOBAL SETTINGS · CREATE A PROFILE FOR THIS GAME", ToggleGameProfile, usingGameProfile, session is not null && stateOperation is null);
-        Ink(300, 380, usingGameProfile ? "Your changes apply to this game. Unchanged values inherit global defaults." : "Create a profile to keep this game's settings separate from other games.", 14, Colors.Muted);
-        ActionButton(300, 440, 504, 42, options.PauseOnFocusLoss ? "AUTO-PAUSE WHEN UNFOCUSED: ON" : "AUTO-PAUSE WHEN UNFOCUSED: OFF", () =>
-        { options.PauseOnFocusLoss = !options.PauseOnFocusLoss; MarkSettingsChanged(); }, options.PauseOnFocusLoss);
-        ActionButton(300, 506, 242, 44, "OPEN ROM", ShowRomDialog, true, fileDialogOpen == 0 && !IsLoading);
-        ActionButton(562, 506, 242, 44, "OPEN DATA FOLDER", () => OpenFolder(dataPaths.Data));
-        ActionButton(300, 562, 242, 42, "IMPORT FIRMWARE", ShowFirmwareDialog);
-        ActionButton(560, 562, 242, 42, options.UseFirmware ? "FIRMWARE ON" : "BUILT-IN BOOT", () =>
-        { options.UseFirmware = !options.UseFirmware; MarkSettingsChanged(); }, options.UseFirmware);
     }
 
     private void OpenAppearancePage()
@@ -393,16 +360,17 @@ internal sealed partial class WaylandEmulatorHost
 
     private void DrawAppearancePage()
     {
-        ActionButton(300, 198, 158, 42, "BACK", () => { CommitActiveText(); showAppearance = false; });
-        Ink(482, 206, "Appearance colors", 20);
-        Ink(300, 254, "PRIMARY ACCENT · actions and selection", 13, Colors.Muted);
+        ActionButton(300, 198, 158, 42, "Back", () => { CommitActiveText(); showAppearance = false; });
+        Ink(482, 206, "App colors", 20);
+        ActionButton(906, 198, 204, 42, $"Text: {TextSizeName}", CycleTextSize);
+        Ink(300, 254, "Primary accent for actions and selection", 13, Colors.Muted);
         DrawColorEntry(TextField.ThemePrimary, primaryColorInput, 282);
-        Ink(300, 348, "SECONDARY ACCENT · focus and details", 13, Colors.Muted);
+        Ink(300, 348, "Secondary accent for keyboard focus", 13, Colors.Muted);
         DrawColorEntry(TextField.ThemeSecondary, secondaryColorInput, 376);
-        Ink(300, 442, "BACKGROUND · panels follow this color", 13, Colors.Muted);
+        Ink(300, 442, "Background color", 13, Colors.Muted);
         DrawColorEntry(TextField.ThemeBackground, backgroundColorInput, 470);
-        ActionButton(300, 548, 278, 44, "APPLY COLORS", ApplyAppearanceColors, true);
-        ActionButton(598, 548, 278, 44, "RESTORE LOGO COLORS", ResetAppearanceColors);
+        ActionButton(300, 548, 278, 44, "Apply colors", ApplyAppearanceColors, true);
+        ActionButton(598, 548, 278, 44, "Restore logo colors", ResetAppearanceColors);
         Ink(300, 604, "Enter #RRGGBB. Text and button contrast adjust automatically.", 13, Colors.Muted);
     }
 

@@ -6,6 +6,7 @@ namespace AetherBoy.Desktop;
 internal sealed record LinuxGameProfile
 {
     public LinuxVideoFilter? VideoFilter { get; init; }
+    public LinuxVideoScaling? VideoScaling { get; init; }
     public int? Frameskip { get; init; }
     public int? PaletteIndex { get; init; }
     public int? AudioVolume { get; init; }
@@ -19,6 +20,7 @@ internal sealed record LinuxGameProfile
     public void ApplyTo(LinuxFrontendOptions target)
     {
         if (VideoFilter.HasValue) target.VideoFilter = VideoFilter.Value;
+        if (VideoScaling.HasValue) target.VideoScaling = VideoScaling.Value;
         if (Frameskip.HasValue) target.Frameskip = Frameskip.Value;
         if (PaletteIndex.HasValue) target.PaletteIndex = PaletteIndex.Value;
         if (AudioVolume.HasValue) target.AudioVolume = AudioVolume.Value;
@@ -33,6 +35,7 @@ internal sealed record LinuxGameProfile
     public static LinuxGameProfile FromDifference(LinuxFrontendOptions current, LinuxFrontendOptions global) => new()
     {
         VideoFilter = current.VideoFilter != global.VideoFilter ? current.VideoFilter : null,
+        VideoScaling = current.VideoScaling != global.VideoScaling ? current.VideoScaling : null,
         Frameskip = current.Frameskip != global.Frameskip ? current.Frameskip : null,
         PaletteIndex = current.PaletteIndex != global.PaletteIndex ? current.PaletteIndex : null,
         AudioVolume = current.AudioVolume != global.AudioVolume ? current.AudioVolume : null,
@@ -45,7 +48,7 @@ internal sealed record LinuxGameProfile
     };
     public static LinuxGameProfile Capture(LinuxFrontendOptions value) => new()
     {
-        VideoFilter = value.VideoFilter, Frameskip = value.Frameskip, PaletteIndex = value.PaletteIndex,
+        VideoScaling = value.VideoScaling, VideoFilter = value.VideoFilter, Frameskip = value.Frameskip, PaletteIndex = value.PaletteIndex,
         AudioVolume = value.AudioVolume, AudioEnabled = value.AudioEnabled, Keys = value.Keys.ToDictionary(),
         Channel1Enabled = value.Channel1Enabled, Channel2Enabled = value.Channel2Enabled,
         Channel3Enabled = value.Channel3Enabled, Channel4Enabled = value.Channel4Enabled
@@ -90,6 +93,7 @@ internal sealed class LinuxProfileStore(LinuxDataPaths paths)
     private static void Validate(LinuxGameProfile profile)
     {
         if (profile.VideoFilter.HasValue && !Enum.IsDefined(profile.VideoFilter.Value)
+            || profile.VideoScaling.HasValue && !Enum.IsDefined(profile.VideoScaling.Value)
             || profile.Frameskip is < 0 or > 2 || profile.PaletteIndex is < 0 or > 4 || profile.AudioVolume is < 0 or > 100)
             throw new InvalidDataException("Invalid game profile.");
         if (profile.Keys is not null) _ = LinuxKeyBindings.FromDictionary(profile.Keys);

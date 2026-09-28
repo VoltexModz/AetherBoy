@@ -40,13 +40,54 @@ public sealed class LinuxShellIntegrationTests
             Assert.AreEqual("Overview", Page());
             Assert.IsTrue(Field<bool>(host, "controlCenterVisible"));
             Capture(host, "overview");
+            void Search(string query)
+            {
+                Call(host, "HandleKeyboard", new SDL.KeyboardEvent { Scancode = SDL.Scancode.K, Mod = SDL.Keymod.Ctrl }, true);
+                Call(host, "HandleKeyboard", new SDL.KeyboardEvent { Scancode = SDL.Scancode.A, Mod = SDL.Keymod.Ctrl }, true);
+                Call(host, "ReceiveTextInput", query);
+                Draw();
+            }
+            Search("Totzone");
+            Capture(host, "search-controller");
+            Key(SDL.Scancode.Return);
+            Assert.AreEqual("Input", Page());
+            Assert.IsTrue(Field<bool>(host, "showController"));
+            Assert.IsTrue(Field<bool>(host, "showControllerStick"));
+            Key(SDL.Scancode.Escape);
+            Capture(host, "controller-dark");
+            Search("there-is-no-such-setting");
+            Capture(host, "search-empty");
+            Key(SDL.Scancode.Escape);
+            Assert.AreEqual("", Field<string>(host, "settingsSearch"));
+            Assert.IsTrue(Field<bool>(host, "controlCenterVisible"));
+            Search(" ");
+            Click(1040, 606); // Next page of unfiltered results
+            Assert.AreEqual(1, Field<int>(host, "settingsSearchPage"));
+            Search("palette");
+            Assert.AreEqual(0, Field<int>(host, "settingsSearchPage"));
+            Key(SDL.Scancode.Return);
+            Assert.AreEqual("Palette", Field<object>(host, "graphicsSection").ToString());
+            // A search result must not leak pointer clicks into the page it covers.
+            Click(120, 345);
+            int previousVolume = options.AudioVolume;
+            Search("nonesuch");
+            Click(580, 350);
+            Assert.AreEqual(previousVolume, options.AudioVolume);
+            Key(SDL.Scancode.Escape);
+
             Click(120, 295);
             Assert.AreEqual("Display", Page());
-            Click(770, 248);
+            Click(1040, 300);
             Assert.AreEqual(LinuxVideoFilter.LcdGrid, options.VideoFilter);
-            Click(555, 359);
+            Click(1040, 428); // Fit scaling
+            Assert.AreEqual(LinuxVideoScaling.Fit, options.VideoScaling);
+            Capture(host, "graphics-picture");
+            Click(980, 213); // Performance tab
+            Click(840, 415);
             Assert.AreEqual(2, options.Frameskip);
-            Click(1000, 470);
+            Capture(host, "graphics-performance");
+            Click(700, 213); // Game Boy colors tab
+            Click(1000, 424);
             Assert.AreEqual(4, options.PaletteIndex);
             Capture(host, "display");
             Click(120, 345);
@@ -59,7 +100,7 @@ public sealed class LinuxShellIntegrationTests
             Assert.AreEqual(100, options.AudioVolume);
             Capture(host, "audio");
             Click(120, 395);
-            Click(480, 263);
+            Click(480, 293);
             Key(SDL.Scancode.V);
             Assert.AreEqual(SDL.Scancode.V, options.Keys[LinuxInputAction.A]);
             Capture(host, "input");
@@ -68,7 +109,7 @@ public sealed class LinuxShellIntegrationTests
             Click(120, 495);
             Assert.AreEqual("System", Page());
             Capture(host, "system");
-            Click(970, 528);
+            Click(1000, 222);
             Assert.IsTrue(Field<bool>(host, "showAppearance"));
             Capture(host, "appearance");
             void EnterColor(float y, string value)
@@ -92,7 +133,7 @@ public sealed class LinuxShellIntegrationTests
             Click(120, 645);
             Capture(host, "tools");
             Click(120, 395);
-            Click(985, 208);
+            Click(700, 214);
             Assert.IsTrue(Field<bool>(host, "showController"));
             Capture(host, "controller");
             Click(410, 220);
@@ -133,6 +174,7 @@ public sealed class LinuxShellIntegrationTests
             Assert.AreEqual("#0066CC", loaded.UiSecondaryColor);
             Assert.AreEqual("#EFEFEF", loaded.UiBackgroundColor);
             Assert.AreEqual(LinuxVideoFilter.LcdGrid, loaded.VideoFilter);
+            Assert.AreEqual(LinuxVideoScaling.Fit, loaded.VideoScaling);
             Assert.IsFalse(loaded.Channel1Enabled);
 
             // Check native text without the optional SDL_ttf library.
@@ -192,6 +234,32 @@ public sealed class LinuxShellIntegrationTests
             Draw();
             Assert.IsGreaterThan(760, Field<int>(host, "LogicalHeight"));
             Capture(host, "tall-window");
+            SDL.SetWindowSize(window, 860, 554);
+            SDL.PumpEvents();
+            options.TextSize = 18;
+            Draw();
+            options.VideoScaling = LinuxVideoScaling.Integer;
+            var geometry = session.LatestSnapshot.VideoGeometry;
+            var gameDestination = (SDL.FRect)typeof(WaylandEmulatorHost).GetMethod("GetGameDestination", Private)!.Invoke(host, [geometry])!;
+            Assert.IsTrue(SDL.GetRenderOutputSize(renderer, out int outputWidth, out int outputHeight));
+            float physicalScale = Math.Min(outputWidth / (float)Field<int>(host, "LogicalWidth"), outputHeight / (float)Field<int>(host, "LogicalHeight"));
+            float gameScale = gameDestination.W * physicalScale / geometry.Width;
+            Assert.AreEqual(MathF.Round(gameScale), gameScale, .001f, "Whole pixels must remain integral after the SDL presentation transform.");
+            Call(host, "ToggleControlCenter");
+            foreach (var destination in new[] { LinuxSettingsDestination.Picture, LinuxSettingsDestination.Palette,
+                LinuxSettingsDestination.Performance, LinuxSettingsDestination.Keyboard, LinuxSettingsDestination.Volume, LinuxSettingsDestination.Controller, LinuxSettingsDestination.Shortcuts,
+                LinuxSettingsDestination.Appearance, LinuxSettingsDestination.Desktop, LinuxSettingsDestination.Firmware })
+            {
+                Call(host, "OpenSettingsDestination", destination);
+                Draw(); Capture(host, "small-" + destination);
+            }
+            Call(host, "OpenSettingsDestination", LinuxSettingsDestination.Controller);
+            if (Field<IntPtr>(host, "gamepad") != IntPtr.Zero)
+            {
+                Click(970, 590);
+                Capture(host, "small-controller-stick");
+            }
+
         }
         finally
         {

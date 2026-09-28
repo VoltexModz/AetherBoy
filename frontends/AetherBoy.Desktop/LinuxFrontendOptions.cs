@@ -10,11 +10,14 @@ internal enum LinuxVideoFilter
     LcdGrid
 }
 
+internal enum LinuxVideoScaling { Automatic, Integer, Fit }
+
 internal sealed class LinuxFrontendOptions
 {
     public const int SampleRate = 44_100;
 
     public LinuxVideoFilter VideoFilter { get; set; } = LinuxVideoFilter.Sharp;
+    public LinuxVideoScaling VideoScaling { get; set; }
     public bool AudioEnabled { get; set; } = true;
     public int AudioVolume { get; set; } = 75;
     public LinuxKeyBindings Keys { get; set; } = new();
@@ -36,6 +39,14 @@ internal sealed class LinuxFrontendOptions
     public string UiBackgroundColor { get; set; } = UiThemePalette.DefaultBackground;
 
     public void SetVolume(int percent) => AudioVolume = Math.Clamp(percent, 0, 100);
+
+    public float GameScale(int availableWidth, int availableHeight, int width, int height)
+    {
+        float fit = Math.Min(availableWidth / (float)width, availableHeight / (float)height);
+        bool integer = VideoScaling == LinuxVideoScaling.Integer ||
+            (VideoScaling == LinuxVideoScaling.Automatic && VideoFilter != LinuxVideoFilter.Smooth);
+        return integer && fit >= 1 ? MathF.Floor(fit) : fit;
+    }
 
     public SDL.ScaleMode TextureScaleMode => VideoFilter == LinuxVideoFilter.Smooth
         ? SDL.ScaleMode.Linear
