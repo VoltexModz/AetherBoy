@@ -75,7 +75,9 @@ GTK-Zugänglichkeit und abbrechbares Laden ergänzen den nativen Client.
 
 ## Ein Blick auf AetherBoy
 
-Die **Aether-Wave-Oberfläche** verbindet das Spielbild mit einer Live-Sessionleiste, direkten Aktionen und einem zentralen Control Center. Violett, Cyan und dunkle Flächen prägen das gemeinsame Design unter Windows und Linux.
+Die Desktop-Oberfläche stellt das Spiel in den Mittelpunkt: **Open game** startet direkt, daneben stehen Pause, Speichern, Laden und Zurückspulen als vertraute Aktionen bereit. Die Seitenleiste zeigt nur das aktuelle Spiel und wichtige Angaben; weitere Optionen liegen unter Settings. Windows und Linux nutzen ruhige dunkle Flächen und eine klare Akzentfarbe für die nächste Aktion.
+
+Die Violett- und Cyan-Töne des Logos sind die Standard-Akzente. Unter Windows lassen sich in **Settings → Appearance**, unter Linux in **Settings → System → Appearance colors** beide Akzente und der Hintergrund frei wählen. Diese globalen UI-Farben bleiben von den Farbpaletten der Spiele getrennt.
 
 <p align="center">
   <img src="docs/images/aetherboy-linux.png" alt="AetherBoy unter Linux: Hauptfenster mit ROM-Auswahl, Sessionleiste, fünf Save-Slots und direkten Spielaktionen" width="1000">
@@ -84,13 +86,22 @@ Die **Aether-Wave-Oberfläche** verbindet das Spielbild mit einer Live-Sessionle
 </p>
 
 <details>
-<summary><strong>Control Center ansehen</strong></summary>
+<summary><strong>Einstellungen ansehen</strong></summary>
 
 <p align="center">
-  <img src="docs/images/aetherboy-control-center.png" alt="Aether Control Center unter Linux: Display-Einstellungen mit Sharp, Smooth, LCD Grid, Frameskip und DMG-Paletten" width="1000">
+  <img src="docs/images/aetherboy-control-center.png" alt="AetherBoy-Einstellungen unter Linux: Videoseite mit Filtern, Frameskip und DMG-Paletten" width="1000">
 </p>
 
-Neun Bereiche bündeln Übersicht, Display, Audio, Eingabe, Spielstände, System und Diagnose. Die Aufnahme zeigt die Display-Einstellungen des Linux-Clients.
+Neun Bereiche bündeln Übersicht, Video, Audio, Steuerung, Spielstände, System, Diagnose, Bibliothek und Werkzeuge. Die Aufnahme zeigt die Video-Einstellungen des Linux-Clients.
+
+</details>
+
+<details>
+<summary><strong>Oberflächenfarben anpassen</strong></summary>
+
+<p align="center">
+  <img src="docs/images/aetherboy-appearance.png" alt="AetherBoy-Einstellungen unter Linux mit anpassbarem violettem und cyanfarbenem Akzent sowie dunklem Hintergrund" width="1000">
+</p>
 
 </details>
 

@@ -31,6 +31,9 @@ internal sealed class LinuxFrontendOptions
     public int TextSize { get; set; } = 14;
     public int SaveSlot { get; set; } = 1;
     public bool PerformanceOverlay { get; set; }
+    public string UiPrimaryColor { get; set; } = UiThemePalette.DefaultPrimary;
+    public string UiSecondaryColor { get; set; } = UiThemePalette.DefaultSecondary;
+    public string UiBackgroundColor { get; set; } = UiThemePalette.DefaultBackground;
 
     public void SetVolume(int percent) => AudioVolume = Math.Clamp(percent, 0, 100);
 

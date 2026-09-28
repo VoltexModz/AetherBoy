@@ -74,6 +74,7 @@ namespace nanoboy
             SelectSaveSlot(settings.SaveSlot);
             SetPalette(settings.PaletteIndex);
             SetDisplayFilter(settings.DisplayFilterIndex);
+            AetherColors.Apply(new UiThemePalette(settings.UiPrimaryColor, settings.UiSecondaryColor, settings.UiBackgroundColor));
             DarkTheme.Apply(this);
             InitializeAetherShell();
             InitializeWindowsExperience();
@@ -514,6 +515,7 @@ namespace nanoboy
                 ToggleFullscreen = ToggleAetherFullscreen,
                 ApplyAudioSettings = ApplyAudioSettingsFromControlCenter,
                 ApplyVideoSettings = ApplyWindowsVideoSettings,
+                ApplyUiTheme = () => AetherColors.Apply(new UiThemePalette(settings.UiPrimaryColor, settings.UiSecondaryColor, settings.UiBackgroundColor)),
                 AudioOutputProvider = DescribeWindowsAudio,
                 VideoOutputProvider = DescribeWindowsVideo,
                 SaveFeedbackProvider = () => saveFeedback,
@@ -953,6 +955,7 @@ namespace nanoboy
         {
             if (settings.HasGameProfile) settings.ResetGameProfile();
             nanoboy.Properties.Settings.Default.Reset();
+            AetherColors.Apply(new UiThemePalette(settings.UiPrimaryColor, settings.UiSecondaryColor, settings.UiBackgroundColor));
             SetPalette(settings.PaletteIndex);
             SetDisplayFilter(settings.DisplayFilterIndex);
             SelectSaveSlot(settings.SaveSlot);

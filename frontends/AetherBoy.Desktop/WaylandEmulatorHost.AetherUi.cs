@@ -1,4 +1,5 @@
 using AetherBoy.Runtime;
+using nanoboy.Core;
 using SDL3;
 
 namespace AetherBoy.Desktop;
@@ -6,19 +7,23 @@ namespace AetherBoy.Desktop;
 // Linux rendering of frmNano.AetherUi / frmControlCenter. The runtime stays shared.
 internal sealed partial class WaylandEmulatorHost
 {
-    private static class Colors
+    private sealed class UiColors(UiThemePalette theme)
     {
-        public static readonly SDL.Color Void = Rgb(5, 7, 18);
-        public static readonly SDL.Color Chrome = Rgb(8, 11, 24);
-        public static readonly SDL.Color Surface = Rgb(12, 16, 31);
-        public static readonly SDL.Color Raised = Rgb(17, 22, 41);
-        public static readonly SDL.Color Border = Rgb(47, 55, 83);
-        public static readonly SDL.Color Text = Rgb(241, 244, 255);
-        public static readonly SDL.Color Muted = Rgb(139, 148, 177);
-        public static readonly SDL.Color Violet = Rgb(164, 92, 255);
-        public static readonly SDL.Color Cyan = Rgb(41, 226, 237);
-        public static readonly SDL.Color Danger = Rgb(255, 92, 132);
+        private static SDL.Color From(UiRgb value) => Rgb(value.R, value.G, value.B);
+        public readonly SDL.Color Void = From(theme.Background);
+        public readonly SDL.Color Chrome = From(theme.Chrome);
+        public readonly SDL.Color Surface = From(theme.Surface);
+        public readonly SDL.Color Raised = From(theme.Raised);
+        public readonly SDL.Color Border = From(theme.Border);
+        public readonly SDL.Color Text = From(theme.Text);
+        public readonly SDL.Color Muted = From(theme.Muted);
+        public readonly SDL.Color Violet = From(theme.PrimaryText);
+        public readonly SDL.Color Cyan = From(theme.SecondaryText);
+        public readonly SDL.Color Primary = From(theme.Primary);
+        public readonly SDL.Color OnPrimary = From(theme.OnPrimary);
+        public readonly SDL.Color Danger = From(theme.DangerText);
     }
+    private UiColors Colors = new(new UiThemePalette(null, null, null));
 
     private readonly List<(SDL.FRect Bounds, Action Action)> shellCommands = new();
     private readonly List<SDL.FRect> focusTargets = new();
@@ -27,7 +32,7 @@ internal sealed partial class WaylandEmulatorHost
     private FocusIdentity? previousFocus;
     private int focusedControl = -1;
     private string FocusContext => !controlCenterVisible ? "main:" + storage?.Identity
-        : $"{controlCenterPage}:{showController}:{showBackups}:{showGallery}:{showPatchLab}:{editingTitleIdentity}:{storage?.Identity}";
+        : $"{controlCenterPage}:{showAppearance}:{showController}:{showBackups}:{showGallery}:{showPatchLab}:{editingTitleIdentity}:{storage?.Identity}";
 
     private void BeginFocusFrame()
     {
@@ -46,13 +51,19 @@ internal sealed partial class WaylandEmulatorHost
     }
     private IntPtr brandTexture;
     private bool mouseTurbo;
-    private static readonly string[] PageNames = ["OVERVIEW", "DISPLAY", "AUDIO", "INPUT", "SAVES", "SYSTEM", "DIAGNOSTICS", "LIBRARY", "TOOLS"];
+    private bool showAppearance;
+    private string primaryColorInput = "", secondaryColorInput = "", backgroundColorInput = "";
+    private static readonly string[] PageNames = ["Overview", "Video", "Audio", "Controls", "Save states", "System", "Diagnostics", "Library", "Tools"];
     private static readonly string[] PageDescriptions =
     [
-        "Your session and frequently used actions", "Picture style, palettes and display options",
+        "Your current game and useful shortcuts", "Picture style, palettes and display options",
         "Volume, channels and audio output", "Keyboard mapping and controller setup",
-        "Save slots, battery data and recovery", "Desktop, storage and firmware", "Session health and local reports", "Your cartridges, most recently played first", "Audio recording and session cheats"
+        "Save, load and manage your game data", "Desktop, storage and firmware", "Session health and local reports", "Your games, most recently played first", "Audio recording and game tools"
     ];
+    private string CurrentPageName => showAppearance && controlCenterPage == ControlCenterPage.System
+        ? "Appearance" : PageNames[(int)controlCenterPage];
+    private string CurrentPageDescription => showAppearance && controlCenterPage == ControlCenterPage.System
+        ? "Choose logo accents and a background for the whole app" : PageDescriptions[(int)controlCenterPage];
 
     private static SDL.Color Rgb(byte r, byte g, byte b) => new() { R = r, G = g, B = b, A = 255 };
     private void Paint(float x, float y, float w, float h, SDL.Color color) => Fill(x, y, w, h, color.R, color.G, color.B);
@@ -86,22 +97,23 @@ internal sealed partial class WaylandEmulatorHost
         SDL.RenderTexture(renderer, brandTexture, IntPtr.Zero, in destination);
     }
 
+    private void RoundedFill(float x, float y, float w, float h, float radius, SDL.Color color)
+    {
+        Paint(x + radius, y, w - radius * 2, h, color);
+        Paint(x, y + radius, w, h - radius * 2, color);
+        for (int row = 0; row < radius; row++)
+        {
+            float inset = radius - MathF.Sqrt(radius * radius - MathF.Pow(radius - row - .5f, 2));
+            Paint(x + inset, y + row, w - inset * 2, 1, color);
+            Paint(x + inset, y + h - row - 1, w - inset * 2, 1, color);
+        }
+    }
+
     private void Panel(float x, float y, float w, float h, string? caption = null, bool stage = false)
     {
-        Paint(x, y, w, h, Colors.Border);
-        Paint(x + 1, y + 1, w - 2, h - 2, stage ? Colors.Void : Colors.Surface);
-        SDL.FColor violet = new() { R = 164 / 255f, G = 92 / 255f, B = 1, A = 1 };
-        SDL.FColor cyan = new() { R = 41 / 255f, G = 226 / 255f, B = 237 / 255f, A = 1 };
-        ReadOnlySpan<SDL.Vertex> edge =
-        [
-            new() { Position = new() { X = x, Y = y + 1 }, Color = violet },
-            new() { Position = new() { X = x + 2, Y = y + 1 }, Color = violet },
-            new() { Position = new() { X = x + 2, Y = y + h - 1 }, Color = cyan },
-            new() { Position = new() { X = x, Y = y + h - 1 }, Color = cyan },
-        ];
-        ReadOnlySpan<int> indices = [0, 1, 2, 0, 2, 3];
-        SDL.RenderGeometry(renderer, IntPtr.Zero, edge, edge.Length, indices, indices.Length);
-        if (caption is not null) Ink(x + 22, y + 18, caption, 11, Colors.Cyan, true);
+        RoundedFill(x, y, w, h, 12, Colors.Border);
+        RoundedFill(x + 1, y + 1, w - 2, h - 2, 11, stage ? Colors.Chrome : Colors.Surface);
+        if (caption is not null) Ink(x + 22, y + 18, caption, 12, Colors.Muted, true);
     }
 
     private void ActionButton(float x, float y, float w, float h, string label, Action action,
@@ -125,44 +137,19 @@ internal sealed partial class WaylandEmulatorHost
             focusIdentities.Add(identity);
         }
         bool hovered = enabled && Hit(mouseX, mouseY, x, y, width, height);
-        float cut = Math.Min(9, height / 4);
-        // The same six-point chamfer and horizontal violet/cyan gradient as AetherButton.
-        SDL.Color flat = hovered ? Rgb(27, 34, 57) : Colors.Raised;
-        SDL.FColor ColorAt(float t)
-        {
-            SDL.Color c = selected && enabled
-                ? Rgb((byte)(164 - 123 * t), (byte)(92 + 134 * t), (byte)(255 - 18 * t)) : flat;
-            return new SDL.FColor { R = c.R / 255f, G = c.G / 255f, B = c.B / 255f, A = 1 };
-        }
-        Span<SDL.Vertex> vertices = stackalloc SDL.Vertex[6];
-        vertices[0] = new() { Position = new() { X = x, Y = y }, Color = ColorAt(0) };
-        vertices[1] = new() { Position = new() { X = x + width - cut, Y = y }, Color = ColorAt((width - cut) / width) };
-        vertices[2] = new() { Position = new() { X = x + width, Y = y + cut }, Color = ColorAt(1) };
-        vertices[3] = new() { Position = new() { X = x + width, Y = y + height }, Color = ColorAt(1) };
-        vertices[4] = new() { Position = new() { X = x + cut, Y = y + height }, Color = ColorAt(cut / width) };
-        vertices[5] = new() { Position = new() { X = x, Y = y + height - cut }, Color = ColorAt(0) };
-        ReadOnlySpan<int> indices = [0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 5];
-        SDL.RenderGeometry(renderer, IntPtr.Zero, vertices, vertices.Length, indices, indices.Length);
-        SDL.Color edge = hovered ? Colors.Cyan : Colors.Border;
-        SDL.SetRenderDrawColor(renderer, edge.R, edge.G, edge.B, 255);
-        ReadOnlySpan<SDL.FPoint> points =
-        [
-            new() { X = x, Y = y }, new() { X = x + width - cut, Y = y },
-            new() { X = x + width, Y = y + cut }, new() { X = x + width, Y = y + height },
-            new() { X = x + cut, Y = y + height }, new() { X = x, Y = y + height - cut }, new() { X = x, Y = y }
-        ];
-        for (int i = 0; i < points.Length - 1; i++)
-            SDL.RenderLine(renderer, points[i].X, points[i].Y, points[i + 1].X, points[i + 1].Y);
+        SDL.Color fill = selected && enabled ? Colors.Primary : hovered ? Colors.Raised : Colors.Surface;
+        SDL.Color border = keyboardFocused ? Colors.Cyan : selected && enabled ? Colors.Primary : Colors.Border;
+        RoundedFill(x, y, width, height, 8, border);
+        RoundedFill(x + 1, y + 1, width - 2, height - 2, 7, fill);
         if (keyboardFocused)
         {
-            SDL.SetRenderDrawColor(renderer, Colors.Cyan.R, Colors.Cyan.G, Colors.Cyan.B, 255);
-            SDL.FRect focus = new() { X = x + 4, Y = y + 4, W = width - 8, H = height - 8 };
-            SDL.RenderRect(renderer, in focus);
+            RoundedFill(x + 3, y + 3, width - 6, height - 6, 5, Colors.Cyan);
+            RoundedFill(x + 5, y + 5, width - 10, height - 10, 4, fill);
         }
         drawingButtonLabel = true;
-        label = textRenderer.Fit(label, width - 16, 12, true);
+        label = textRenderer.Fit(label, width - 16, 13, true);
         Center(x + width / 2, y + (height - 17) / 2 - 1, label, 12,
-            !enabled ? Colors.Muted : selected ? Colors.Void : Colors.Text, true);
+            !enabled ? Colors.Muted : selected ? Colors.OnPrimary : Colors.Text, true);
         drawingButtonLabel = false;
     }
 
@@ -189,10 +176,10 @@ internal sealed partial class WaylandEmulatorHost
         if (session is not null && !IsOnlineLink)
             session.SetTurboAsync(pressedKeys.Contains(options.Keys[LinuxInputAction.Turbo])).GetAwaiter().GetResult();
     }
-    private string StateLabel => IsLoading ? "LOADING" : session is null ? "IDLE"
+    private string StateLabel => IsLoading ? "Loading" : session is null ? "Ready"
         : session.OnlineLink is { } link ? "LINK " + link.Phase.ToString().ToUpperInvariant()
-        : session.LatestSnapshot.IsPaused ? "PAUSED" : "PLAYING";
-    private string CartridgeTitle => romPath is null ? "NO CARTRIDGE" : Path.GetFileNameWithoutExtension(romPath);
+        : session.LatestSnapshot.IsPaused ? "Paused" : "Playing";
+    private string CartridgeTitle => romPath is null ? "No game open" : Path.GetFileNameWithoutExtension(romPath);
     private string InputLabel => gamepad == IntPtr.Zero ? "KEYBOARD" : SDL.GetGamepadName(gamepad) ?? "GAMEPAD";
     private string ModelLabel => session?.LatestSnapshot.Rom is not { } rom ? "—"
         : rom.IsGameBoyAdvance ? "GBA" : rom.HasColorFeatures ? "CGB" : "DMG";
@@ -225,19 +212,17 @@ internal sealed partial class WaylandEmulatorHost
         Paint(0, 0, LogicalWidth, LogicalHeight, Colors.Void);
         if (controlCenterVisible) { DrawControlCenter(); DrawLoadingOverlay(); return; }
         Paint(0, 0, LogicalWidth, 78, Colors.Chrome);
-        Mark(20, 12, 52);
-        Ink(86, 16, "AETHERBOY", 21, bold: true);
-        Ink(86, 47, "GB · GBC · GBA", 10, Colors.Muted, true);
-        for (int i = 0; i < 3; i++) Paint(330 + i * 5, 22 + i * 8, 25, 3, Colors.Violet);
-        Paint(330, 76, 110, 2, Colors.Violet);
-        ActionButton(568 + dx, 18, 132, 42, "LIBRARY", () => OpenControlPage(ControlCenterPage.Library));
-        ActionButton(708 + dx, 18, 132, 42, "DISPLAY", () => OpenControlPage(ControlCenterPage.Display));
-        ActionButton(848 + dx, 18, 132, 42, "SAVES", () => OpenControlPage(ControlCenterPage.Saves));
-        ActionButton(988 + dx, 18, 168, 42, "REPORTS", () => OpenControlPage(ControlCenterPage.Diagnostics));
+        Paint(0, 77, LogicalWidth, 1, Colors.Border);
+        Mark(20, 12, 50);
+        Ink(84, 15, "AetherBoy", 21, bold: true);
+        Ink(84, 46, "GAME BOY · COLOR · ADVANCE", 11, Colors.Muted);
+        ActionButton(568 + dx, 18, 132, 42, "Library", () => OpenControlPage(ControlCenterPage.Library));
+        ActionButton(708 + dx, 18, 132, 42, "Video", () => OpenControlPage(ControlCenterPage.Display));
+        ActionButton(848 + dx, 18, 132, 42, "Save states", () => OpenControlPage(ControlCenterPage.Saves));
+        ActionButton(988 + dx, 18, 168, 42, "Settings", () => OpenControlPage(ControlCenterPage.Overview));
 
         Panel(24, 100, 836 + dx, 548 + dy, stage: true);
-        Ink(44, 113, $"DISPLAY // {frameGeometry.Width} × {frameGeometry.Height}", 10, Colors.Muted, true);
-        Paint(798 + dx, 121, 40, 2, Colors.Cyan);
+        Ink(44, 115, "GAME SCREEN", 11, Colors.Muted, true);
         EmulationSnapshot? snapshot = session?.LatestSnapshot;
         if (frameTexture != IntPtr.Zero && snapshot?.HasVideoFrame == true)
         {
@@ -246,60 +231,61 @@ internal sealed partial class WaylandEmulatorHost
             if (options.VideoFilter == LinuxVideoFilter.LcdGrid) DrawLcdGrid(in destination, frameGeometry);
             if (snapshot.IsPaused)
             {
-                Paint(centerX - 64, 345 + centerY, 128, 46, Colors.Surface);
-                Center(centerX, 356 + centerY, "PAUSED", 17, bold: true);
+                RoundedFill(centerX - 64, 345 + centerY, 128, 46, 8, Colors.Surface);
+                Center(centerX, 356 + centerY, "Paused", 17, bold: true);
             }
         }
         else
         {
-            Mark(centerX - 56, 223 + centerY, 112);
-            Center(centerX, 350 + centerY, session is null ? "Ready to play" : "Starting cartridge…", 23, bold: true);
-            Center(centerX, 391 + centerY, session is null ? "Drop a .gb, .gbc or .gba file here." : "Waiting for the first frame.", 13, Colors.Muted);
-            if (session is null) ActionButton(centerX - 96, 452 + centerY, 192, 46, "OPEN ROM", ShowRomDialog, true, !IsLoading && fileDialogOpen == 0);
+            Mark(centerX - 42, 225 + centerY, 84);
+            Center(centerX, 344 + centerY, session is null ? "Ready for your next game?" : "Starting your game…", 23, bold: true);
+            Center(centerX, 386 + centerY, session is null ? "Open a game or drop a .gb, .gbc or .gba file here." : "Waiting for the first frame.", 13, Colors.Muted);
+            if (session is null) ActionButton(centerX - 96, 452 + centerY, 192, 46, "Open game", ShowRomDialog, true, !IsLoading && fileDialogOpen == 0);
             if (session is null && lastResumeEntry is { } recent)
             {
-                ActionButton(centerX - 160, 514 + centerY, 320, 44, "CONTINUE LAST SESSION", ContinueLastSession, enabled: !IsLoading);
+                ActionButton(centerX - 160, 514 + centerY, 320, 44, "Continue last game", ContinueLastSession, enabled: !IsLoading);
                 Center(centerX, 575 + centerY, textRenderer.Fit(recent.Title, 490, 14), 14, Colors.Muted);
             }
-            else if (session is null) Center(centerX, 516 + centerY, "O / CTRL+O  ·  OPEN A CARTRIDGE", 11, Colors.Violet, true);
+            else if (session is null) Center(centerX, 517 + centerY, "Shortcut: O or Ctrl+O", 11, Colors.Muted);
         }
 
         DrawPerformanceOverlay();
-        Panel(880 + dx, 100, 276, 548 + dy, "CURRENT SESSION");
+        Panel(880 + dx, 100, 276, 548 + dy, "NOW PLAYING");
         Ink(906 + dx, 158, textRenderer.Fit(CartridgeTitle, 224, 17, true), 17, bold: true);
         Ink(906 + dx, 201, StateLabel, 13, Colors.Muted, true);
         Paint(902 + dx, 240, 232, 1, Colors.Border);
         string audio = !options.AudioEnabled ? "MUTED" : audioError is not null ? "UNAVAILABLE"
             : audioOutput is null ? "READY" : $"{audioOutput.SourceRate / 1000.0:0.0}K · {(audioOutput.Channels == 2 ? "STEREO" : "MONO")}";
-        string[] keys = ["MODEL", "STATE", "FRAME", "AUDIO", "FILTER", "INPUT", "SLOT"];
-        string[] values = [ModelLabel, StateLabel, session is null ? "—" : displayedFrameSequence.ToString(), audio,
-            options.VideoFilter == LinuxVideoFilter.LcdGrid ? "LCD GRID" : options.VideoFilter.ToString().ToUpperInvariant(), InputLabel.ToUpperInvariant(), options.SaveSlot.ToString()];
+        string[] keys = ["System", "Audio", "Video", "Controls"];
+        string[] values = [ModelLabel, audio,
+            options.VideoFilter == LinuxVideoFilter.LcdGrid ? "LCD GRID" : options.VideoFilter.ToString().ToUpperInvariant(),
+            gamepad == IntPtr.Zero ? "KEYBOARD" : "GAMEPAD"];
         for (int i = 0; i < keys.Length; i++)
         {
-            Ink(906 + dx, 253 + i * 31, keys[i], 10, Colors.Muted, true);
+            Ink(906 + dx, 263 + i * 40, keys[i], 12, Colors.Muted);
             string value = textRenderer.Fit(values[i], 152, 12, true);
-            Ink(1134 + dx - textRenderer.Measure(value, 12, true), 250 + i * 31, value, 12, bold: true);
+            Ink(1134 + dx - textRenderer.Measure(value, 12, true), 263 + i * 40, value, 12, bold: true);
         }
-        Ink(906 + dx, 485 + dy, "STATE BANK", 10, Colors.Muted, true);
-        ActionButton(902 + dx, 509 + dy, 232, 28, "SAVE CENTER", () => OpenControlPage(ControlCenterPage.Saves));
+        Ink(906 + dx, 485, "SAVE SLOT", 12, Colors.Muted, true);
+        ActionButton(902 + dx, 509, 232, 28, "Manage saves", () => OpenControlPage(ControlCenterPage.Saves));
         for (int i = 0; i < 5; i++)
         {
             int slot = i + 1;
-            ActionButton(904 + dx + i * 47, 548 + dy, 40, 32, slot.ToString(), () => SelectSaveSlot(slot), options.SaveSlot == slot);
+            ActionButton(904 + dx + i * 47, 548, 40, 32, slot.ToString(), () => SelectSaveSlot(slot), options.SaveSlot == slot);
         }
-        Ink(906 + dx, 601 + dy, IsOnlineLink ? "ONLINE SAVE COPY" : $"{BindingLabel(LinuxInputAction.Turbo).ToUpperInvariant()} HOLD · TURBO", 10, Colors.Muted, true);
-        Ink(906 + dx, 619 + dy, textRenderer.Fit(IsOnlineLink ? "F10 CONNECTION / SAVES" : "F6 ACTIONS · F5/F8 SAVE", 228, 12, true), 12, Colors.Muted, true);
+        Ink(906 + dx, 601, IsOnlineLink ? "Private online save" : "F5 save · F8 load", 11, Colors.Muted);
+        Ink(906 + dx, 619, textRenderer.Fit(IsOnlineLink ? "F10 connection and saves" : "Hold Tab for turbo", 228, 12), 12, Colors.Muted);
         Ink(24, 659 + dy, textRenderer.Fit(loadError ?? statusMessage, LogicalWidth - 48, 12), 12, loadError is null ? Colors.Muted : Colors.Danger);
-        Paint(1, 688 + dy, LogicalWidth - 2, 71, Colors.Border);
-        Paint(2, 689 + dy, LogicalWidth - 4, 69, Colors.Chrome);
+        Paint(0, 688 + dy, LogicalWidth, 72, Colors.Chrome);
+        Paint(0, 688 + dy, LogicalWidth, 1, Colors.Border);
         bool playable = session is not null && !IsLoading;
-        ActionButton(24, 704 + dy, 164, 40, fileDialogOpen != 0 ? "PICKER OPEN…" : "OPEN ROM", ShowRomDialog, true, !IsLoading && fileDialogOpen == 0);
-        ActionButton(200, 704 + dy, 142, 40, "SETTINGS", () => OpenControlPage(ControlCenterPage.Overview), enabled: !IsLoading);
-        ActionButton(354, 704 + dy, 142, 40, snapshot?.IsPaused == true ? "RESUME" : "PAUSE", TogglePause, enabled: playable);
-        ActionButton(508, 704 + dy, 142, 40, "REWIND", Rewind, enabled: playable && !IsOnlineLink);
-        ActionButton(662, 704 + dy, 142, 40, "SAVE", QuickSave, enabled: playable && !IsOnlineLink);
-        ActionButton(816, 704 + dy, 142, 40, "LOAD", QuickLoad, enabled: playable && HasSelectedState);
-        ActionButton(970, 704 + dy, 164 + dx, 40, "TURBO (HOLD)", HoldMouseTurbo, mouseTurbo, playable && !IsOnlineLink);
+        ActionButton(24, 704 + dy, 164, 40, fileDialogOpen != 0 ? "File picker…" : "Open game", ShowRomDialog, enabled: !IsLoading && fileDialogOpen == 0);
+        ActionButton(200, 704 + dy, 142, 40, "Settings", () => OpenControlPage(ControlCenterPage.Overview), enabled: !IsLoading);
+        ActionButton(354, 704 + dy, 142, 40, snapshot?.IsPaused == true ? "Resume" : "Pause", TogglePause, playable, playable);
+        ActionButton(508, 704 + dy, 142, 40, "Rewind", Rewind, enabled: playable && !IsOnlineLink);
+        ActionButton(662, 704 + dy, 142, 40, "Save", QuickSave, enabled: playable && !IsOnlineLink);
+        ActionButton(816, 704 + dy, 142, 40, "Load", QuickLoad, enabled: playable && HasSelectedState);
+        ActionButton(970, 704 + dy, 164 + dx, 40, "Turbo (hold)", HoldMouseTurbo, mouseTurbo, playable && !IsOnlineLink);
         DrawLoadingOverlay();
     }
 
@@ -318,32 +304,24 @@ internal sealed partial class WaylandEmulatorHost
     private void DrawControlCenter()
     {
         Paint(0, 0, LogicalWidth, 84, Colors.Chrome);
-        Mark(20, 14, 54);
-        Ink(92, 10, "AETHERBOY SETTINGS", 10, Colors.Cyan, true);
-        Ink(92, 27, "Aether Control Center", 22);
-        Ink(92, 51, "Display, sound, controls and save data — all stored on this computer.", 12, Colors.Muted);
+        Mark(20, 14, 52);
+        Ink(92, 12, "AetherBoy", 12, Colors.Muted, true);
+        Ink(92, 29, "Settings", 22, bold: true);
+        Ink(206, 37, "Make the game feel right for you.", 12, Colors.Muted);
         ActionButton(LogicalWidth - 66, 23, 42, 36, "×", CloseControlCenter);
-        Paint(0, 82, LogicalWidth, 2, Colors.Cyan);
-        Paint(0, 82, 248, 2, Colors.Violet);
+        Paint(0, 83, LogicalWidth, 1, Colors.Border);
         Paint(0, 84, 248, LogicalHeight - 84, Colors.Chrome);
         Paint(247, 84, 1, LogicalHeight - 84, Colors.Border);
-        Ink(22, 109, "PREFERENCES", 11, Colors.Cyan, true);
-        Ink(26, 143, "SETTINGS", 22);
-        Ink(26, 176, "CENTER", 22);
+        Ink(22, 117, "PREFERENCES", 11, Colors.Muted, true);
+        Ink(22, 154, "Browse settings", 16, bold: true);
         for (int i = 0; i < PageNames.Length; i++)
         {
             ControlCenterPage page = (ControlCenterPage)i;
-            ActionButton(22, 224 + i * 50, 204, 42, $"{i + 1:00}  {PageNames[i]}", () => SelectControlCenterPage(page));
-            if (page == controlCenterPage)
-            {
-                Paint(25, 230 + i * 50, 2, 30, Colors.Cyan);
-                Paint(30, 265 + i * 50, 178, 1, Colors.Violet);
-            }
+            ActionButton(22, 224 + i * 50, 204, 42, PageNames[i], () => SelectControlCenterPage(page), page == controlCenterPage);
         }
-        Ink(24, LogicalHeight - 87, "LOCAL CONTROL", 10, Colors.Muted, true);
-        Ink(24, LogicalHeight - 66, "ON THIS COMPUTER", 10, Colors.Muted, true);
-        Ink(280, 108, PageNames[(int)controlCenterPage], 26);
-        Ink(280, 150, textRenderer.Fit(PageDescriptions[(int)controlCenterPage] + (session is not null && controlCenterPage is ControlCenterPage.Display or ControlCenterPage.Audio or ControlCenterPage.Input ? (usingGameProfile ? " · THIS GAME" : " · GLOBAL SETTINGS") : ""), 850), 13, Colors.Muted);
+        Ink(24, LogicalHeight - 71, "Saved on this computer", 11, Colors.Muted);
+        Ink(280, 108, CurrentPageName, 26);
+        Ink(280, 150, textRenderer.Fit(CurrentPageDescription + (session is not null && controlCenterPage is ControlCenterPage.Display or ControlCenterPage.Audio or ControlCenterPage.Input ? (usingGameProfile ? " · THIS GAME" : " · GLOBAL SETTINGS") : ""), 850), 13, Colors.Muted);
         if (controlCenterPage != ControlCenterPage.Overview) Panel(278, 180, LogicalWidth - 302, 456);
         switch (controlCenterPage)
         {
@@ -386,10 +364,12 @@ internal sealed partial class WaylandEmulatorHost
 
     private void DrawSystemPage()
     {
+        if (showAppearance) { DrawAppearancePage(); return; }
         Ink(300, 200, "NATIVE LINUX", 11, Colors.Cyan, true);
         Ink(300, 236, desktop.DisplayName, 20);
         ActionButton(842, 198, 268, 42, $"TEXT: {TextSizeName}", CycleTextSize);
         ActionButton(842, 440, 268, 42, "ACCESSIBLE UI", OpenAccessibleControls);
+        ActionButton(842, 506, 268, 44, "APPEARANCE COLORS", OpenAppearancePage);
         Ink(300, 284, "VIDEO, SOUND & KEYBOARD", 14, Colors.Cyan, true);
         ActionButton(300, 322, 810, 44, usingGameProfile ? "THIS GAME HAS ITS OWN SETTINGS · USE GLOBAL DEFAULTS" : "USING GLOBAL SETTINGS · CREATE A PROFILE FOR THIS GAME", ToggleGameProfile, usingGameProfile, session is not null && stateOperation is null);
         Ink(300, 380, usingGameProfile ? "Your changes apply to this game. Unchanged values inherit global defaults." : "Create a profile to keep this game's settings separate from other games.", 14, Colors.Muted);
@@ -400,6 +380,62 @@ internal sealed partial class WaylandEmulatorHost
         ActionButton(300, 562, 242, 42, "IMPORT FIRMWARE", ShowFirmwareDialog);
         ActionButton(560, 562, 242, 42, options.UseFirmware ? "FIRMWARE ON" : "BUILT-IN BOOT", () =>
         { options.UseFirmware = !options.UseFirmware; MarkSettingsChanged(); }, options.UseFirmware);
+    }
+
+    private void OpenAppearancePage()
+    {
+        primaryColorInput = options.UiPrimaryColor;
+        secondaryColorInput = options.UiSecondaryColor;
+        backgroundColorInput = options.UiBackgroundColor;
+        showAppearance = true;
+        focusedControl = -1;
+    }
+
+    private void DrawAppearancePage()
+    {
+        ActionButton(300, 198, 158, 42, "BACK", () => { CommitActiveText(); showAppearance = false; });
+        Ink(482, 206, "Appearance colors", 20);
+        Ink(300, 254, "PRIMARY ACCENT · actions and selection", 13, Colors.Muted);
+        DrawColorEntry(TextField.ThemePrimary, primaryColorInput, 282);
+        Ink(300, 348, "SECONDARY ACCENT · focus and details", 13, Colors.Muted);
+        DrawColorEntry(TextField.ThemeSecondary, secondaryColorInput, 376);
+        Ink(300, 442, "BACKGROUND · panels follow this color", 13, Colors.Muted);
+        DrawColorEntry(TextField.ThemeBackground, backgroundColorInput, 470);
+        ActionButton(300, 548, 278, 44, "APPLY COLORS", ApplyAppearanceColors, true);
+        ActionButton(598, 548, 278, 44, "RESTORE LOGO COLORS", ResetAppearanceColors);
+        Ink(300, 604, "Enter #RRGGBB. Text and button contrast adjust automatically.", 13, Colors.Muted);
+    }
+
+    private void DrawColorEntry(TextField field, string input, float y)
+    {
+        SDL.Color swatch = UiRgb.TryParse(input, out UiRgb color) ? Rgb(color.R, color.G, color.B) : Colors.Border;
+        RoundedFill(300, y, 58, 44, 8, Colors.Border);
+        RoundedFill(302, y + 2, 54, 40, 6, swatch);
+        DrawTextEntry(field, 374, y, 502, 44, "#RRGGBB");
+    }
+
+    private void ApplyAppearanceColors()
+    {
+        CommitActiveText();
+        if (!UiRgb.TryParse(primaryColorInput, out UiRgb primary) ||
+            !UiRgb.TryParse(secondaryColorInput, out UiRgb secondary) ||
+            !UiRgb.TryParse(backgroundColorInput, out UiRgb background))
+        { statusMessage = "Use six hexadecimal digits for each color, for example #8B38FF."; return; }
+        options.UiPrimaryColor = primaryColorInput = primary.Hex;
+        options.UiSecondaryColor = secondaryColorInput = secondary.Hex;
+        options.UiBackgroundColor = backgroundColorInput = background.Hex;
+        Colors = new UiColors(new UiThemePalette(primary.Hex, secondary.Hex, background.Hex));
+        MarkSettingsChanged();
+        statusMessage = "Appearance colors saved for the whole app.";
+    }
+
+    private void ResetAppearanceColors()
+    {
+        CommitActiveText();
+        primaryColorInput = UiThemePalette.DefaultPrimary;
+        secondaryColorInput = UiThemePalette.DefaultSecondary;
+        backgroundColorInput = UiThemePalette.DefaultBackground;
+        ApplyAppearanceColors();
     }
 
     private void DrawDiagnosticsPage()

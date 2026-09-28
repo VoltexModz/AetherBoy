@@ -34,7 +34,7 @@ public partial class frmNano
 
     private void InitializeOnlineLinkTools()
     {
-        var online = new ToolStripMenuItem("Online Link · GB/GBC + GBA Gen3 DEV") { Name = "menuOnlineLink" };
+        var online = new ToolStripMenuItem("Online Link · GB/GBC + GBA Gen3 (Test)") { Name = "menuOnlineLink" };
         void Add(string name, string text, Action action)
         {
             var item = new ToolStripMenuItem(text) { Name = name };
@@ -55,7 +55,7 @@ public partial class frmNano
         Add("menuOnlineRecovery", "Sitzungskopien prüfen / übernehmen", ShowOnlineSaveRecovery);
         Add("menuOnlineStop", "Online-Verbindung beenden", () =>
         {
-            if (IsOnlineLink && StopSession()) SetSaveFeedback("Online-Link beendet · Sitzungskopie bleibt im Online-Ordner", false);
+            if (IsOnlineLink && StopSession()) SetSaveFeedback("Online Link beendet. Deine Spielstandkopie bleibt erhalten.", false);
         });
         menuItem21.DropDownItems.Add(online);
     }
@@ -82,16 +82,17 @@ public partial class frmNano
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
         { SetSaveFeedback("Online-Profil konnte nicht geprüft werden: " + ex.Message, true); return false; }
-        string profile = gba is null ? "GB/GBC · KABEL-PROTOTYP" : "GBA · POKÉMON GEN3 · DEVELOPMENT\n" + gba.DisplayName;
+        string profile = gba is null ? "GB/GBC: Online Link im Test" : "GBA: Pokémon Gen3 (Test)\n" + gba.DisplayName;
         if (confirm && AetherSignal.Show(this,
             profile + "\n\n" +
-            "Nicht als erfolgreicher Pokémon-Tausch geprüft. " +
-            (gba is null ? "" : "Nur dieses Gen3-Profil, keine Hack-Freigabe. GBA-Online nutzt HLE-BIOS; deine Voll-BIOS-Auswahl wird hier noch nicht übernommen. ") +
-            "Dein Spiel startet mit einer lokalen Kopie. Originalspielstände werden nicht automatisch ersetzt.\n\n" +
-            "Im Browser " + (isHost ? "eine Einladung erstellen" : "aus der Einladung eine Antwort erstellen") +
-            "; beide Codes per Chat austauschen. Browser offen lassen, hier spielen. STUN/TURN kann nötig sein.\n\n" +
-            "Keine ROM- oder vollständige Spielstanddatei wird verschickt. Turbo, Rewind, States, Reset und Cheats sind gesperrt. " +
-            "Ergebnis nach Abbruch: ungeklärt. Entwicklungssitzung starten?",
+            "Online Link ist noch in Entwicklung. Ein erfolgreicher Pokémon-Tausch ist nicht bestätigt. " +
+            (gba is null ? "" : "GBA lässt sich nur mit diesem Gen3-Profil testen, nicht mit ROM-Hacks. Dabei wird das HLE-BIOS verwendet. ") +
+            "Das Spiel startet mit einer Kopie deines Spielstands. Dein Original wird nicht ersetzt.\n\n" +
+            "Im Browser " + (isHost ? "eine Einladung erstellen" : "die Einladung deines Mitspielers beantworten") +
+            ". Schickt euch Einladung und Antwort per Chat. Lasst die Browserseiten offen und spielt im Emulator. " +
+            "Je nach Netzwerk kann ein STUN- oder TURN-Server nötig sein.\n\n" +
+            "ROMs und vollständige Spielstände werden nicht übertragen. Turbo, Zurückspulen, Schnellspeicherstände, Neustart und Cheats sind gesperrt. " +
+            "Nach der Sitzung beide Spielstandkopien prüfen. Online Link jetzt starten?",
             "Online-Link starten", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return false;
 
         EmulatorConfiguration configuration = CreateEmulatorConfiguration();
@@ -166,8 +167,12 @@ public partial class frmNano
     private void UpdateOnlineLinkUi()
     {
         if (session?.OnlineLink is not { } online) return;
-        string message = $"ONLINE · {online.DisplayName} · {(online.Phase == OnlineLinkPhase.WaitingForBrowser && onlineRoomTransport is not null ? onlineRoomTransport.Status : OnlinePhaseLabel(online.Phase))} · {online.TransfersCompleted} Transfers · " +
-            (online.Failure ?? "Sitzungskopie · Tausch/Speichererfolg nicht bestätigt");
+        string connection = online.Phase == OnlineLinkPhase.WaitingForBrowser && onlineRoomTransport is { } room
+            ? RoomStatus(room) : OnlinePhaseLabel(online.Phase);
+        connection = connection.TrimEnd(' ', '.', '…');
+        string message = online.Failure is null
+            ? $"Online Link: {connection}. Kabelübertragungen: {online.TransfersCompleted}. Tausch noch nicht bestätigt."
+            : "Online Link unterbrochen. Prüfe den Verbindungsbericht und beide Spielstandkopien.";
         if (message == lastOnlineStatus) return;
         lastOnlineStatus = message;
         SetSaveFeedback(message, online.Failure is not null);
@@ -245,17 +250,17 @@ public partial class frmNano
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
         { text = "Profil konnte nicht gelesen werden: " + ex.Message; }
-        AetherSignal.Show(this, text, "Online-Profil · DEVELOPMENT", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        AetherSignal.Show(this, text, "Online-Profil · Testversion", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private static string OnlinePhaseLabel(OnlineLinkPhase phase) => phase switch
     {
-        OnlineLinkPhase.WaitingForBrowser => "Browser verbinden",
-        OnlineLinkPhase.WaitingForPeer => "Gegenstelle wird geprüft",
+        OnlineLinkPhase.WaitingForBrowser => "Browser wird verbunden",
+        OnlineLinkPhase.WaitingForPeer => "Warte auf den Mitspieler",
         OnlineLinkPhase.Playing => "Verbunden",
-        OnlineLinkPhase.WaitingForTransfer => "Warte auf Kabeldaten",
-        OnlineLinkPhase.Closed => "Beendet · Ergebnis prüfen",
-        OnlineLinkPhase.Faulted => "Abbruch · Ergebnis ungeklärt",
-        _ => phase.ToString()
+        OnlineLinkPhase.WaitingForTransfer => "Warte auf Daten aus dem Spiel",
+        OnlineLinkPhase.Closed => "Sitzung beendet",
+        OnlineLinkPhase.Faulted => "Verbindung abgebrochen",
+        _ => "Online Link wird gestartet"
     };
 }

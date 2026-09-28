@@ -100,6 +100,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         library = new LinuxLibrary(dataPaths);
         this.diagnostics = diagnostics ?? new LinuxDiagnostics(dataPaths, false);
         options = LinuxSettingsStore.Load(this.settingsPath, out string? settingsError);
+        Colors = new UiColors(new UiThemePalette(options.UiPrimaryColor, options.UiSecondaryColor, options.UiBackgroundColor));
         globalProfile = LinuxGameProfile.Capture(options);
         loadError = settingsError;
         fileDialogCallback = OnFileDialogCompleted;
@@ -1420,11 +1421,13 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         showController = false;
         showBackups = false;
         showGallery = false;
+        showAppearance = false;
         showPatchLab = false;
         rebindingAction = null;
         editingSearch = false;
         editingCheat = false;
         onlineEditingField = TextField.None;
+        appearanceEditingField = TextField.None;
         titleEditVersion++; editingTitleIdentity = null;
         SDL.StopTextInput(window);
         rebindingGamepad = null;

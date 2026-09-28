@@ -68,6 +68,22 @@ public sealed class LinuxShellIntegrationTests
             Click(120, 495);
             Assert.AreEqual("System", Page());
             Capture(host, "system");
+            Click(970, 528);
+            Assert.IsTrue(Field<bool>(host, "showAppearance"));
+            Capture(host, "appearance");
+            void EnterColor(float y, string value)
+            {
+                Click(500, y);
+                Call(host, "HandleKeyboard", new SDL.KeyboardEvent { Scancode = SDL.Scancode.A, Mod = SDL.Keymod.Ctrl }, true);
+                Call(host, "ReceiveTextInput", value);
+            }
+            EnterColor(304, "#FF8800");
+            EnterColor(398, "#0066CC");
+            EnterColor(492, "#EFEFEF");
+            Click(430, 570);
+            Assert.AreEqual("#FF8800", options.UiPrimaryColor);
+            Capture(host, "appearance-custom");
+            Click(360, 218);
             Click(120, 545);
             Assert.AreEqual("Diagnostics", Page());
             Capture(host, "diagnostics");
@@ -113,6 +129,9 @@ public sealed class LinuxShellIntegrationTests
             Assert.IsNull(error);
             Assert.AreEqual(5, loaded.SaveSlot);
             Assert.AreEqual(4, loaded.PaletteIndex);
+            Assert.AreEqual("#FF8800", loaded.UiPrimaryColor);
+            Assert.AreEqual("#0066CC", loaded.UiSecondaryColor);
+            Assert.AreEqual("#EFEFEF", loaded.UiBackgroundColor);
             Assert.AreEqual(LinuxVideoFilter.LcdGrid, loaded.VideoFilter);
             Assert.IsFalse(loaded.Channel1Enabled);
 

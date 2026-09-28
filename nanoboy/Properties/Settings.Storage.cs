@@ -6,6 +6,13 @@ namespace nanoboy.Properties;
 [SettingsProvider(typeof(WindowsSettingsProvider))]
 internal sealed partial class Settings
 {
+    [UserScopedSetting, DefaultSettingValue("#8B38FF")]
+    public string UiPrimaryColor { get => (string)this[nameof(UiPrimaryColor)]; set => this[nameof(UiPrimaryColor)] = value; }
+    [UserScopedSetting, DefaultSettingValue("#29E2ED")]
+    public string UiSecondaryColor { get => (string)this[nameof(UiSecondaryColor)]; set => this[nameof(UiSecondaryColor)] = value; }
+    [UserScopedSetting, DefaultSettingValue("#050712")]
+    public string UiBackgroundColor { get => (string)this[nameof(UiBackgroundColor)]; set => this[nameof(UiBackgroundColor)] = value; }
+
     // Empty means the build default: development records locally, stable does not.
     // Kept outside NanoboySettings' per-ROM overrides because privacy is application-wide.
     [UserScopedSetting, DefaultSettingValue("")]

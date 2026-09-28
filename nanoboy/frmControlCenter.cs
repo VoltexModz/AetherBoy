@@ -24,6 +24,7 @@ namespace nanoboy
         private readonly List<AetherButton> scaleButtons = new();
         private readonly List<AetherButton> volumeButtons = new();
         private readonly List<AetherButton> latencyButtons = new();
+        private readonly List<(Panel Swatch, AetherButton Picker, Func<string> Read)> themeControls = new();
         private AetherButton gpuButton = null!, vsyncButton = null!, integerButton = null!;
         private Label videoDetails = null!, stateFeedback = null!;
         private Label profileDetails = null!;
@@ -58,7 +59,7 @@ namespace nanoboy
         {
             this.bridge = bridge ?? throw new ArgumentNullException(nameof(bridge));
 
-            Text = "Aether Control Center";
+            Text = "Settings";
             StartPosition = FormStartPosition.CenterParent;
             ShowInTaskbar = false;
             ClientSize = new Size(1_080, 780);
@@ -78,6 +79,7 @@ namespace nanoboy
             Controls.Add(nav);
 
             AddPage("overview", BuildOverviewPage());
+            AddPage("appearance", BuildAppearancePage());
             AddPage("display", BuildDisplayPage());
             AddPage("audio", BuildAudioPage());
             AddPage("input", BuildInputPage());
@@ -88,8 +90,8 @@ namespace nanoboy
 
             AetherDialog.Apply(
                 this,
-                "CONTROL CENTER // 09.2",
-                "Alle lokalen Emulator-, Eingabe- und Sicherheitsfunktionen an einem Ort");
+                "AetherBoy",
+                "Make the game feel right for you.");
             // This pane has its own Aether card and scroll actions, not native white chrome.
             diagnostics.BorderStyle = BorderStyle.None;
             diagnostics.ScrollBars = RichTextBoxScrollBars.None;
@@ -121,11 +123,11 @@ namespace nanoboy
             {
                 AutoSize = false,
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Bold, GraphicsUnit.Point),
-                ForeColor = AetherColors.Cyan,
+                ForeColor = AetherColors.Muted,
                 Location = new Point(18, 20),
                 Size = new Size(180, 20),
                 Tag = "accent",
-                Text = "AETHER SYSTEM MATRIX"
+                Text = "PREFERENCES"
             });
             nav.Controls.Add(new Label
             {
@@ -135,17 +137,18 @@ namespace nanoboy
                 Location = new Point(18, 42),
                 Size = new Size(182, 54),
                 Tag = "value",
-                Text = "CONTROL\r\nCENTER"
+                Text = "Settings"
             });
 
-            AddNavigationButton(nav, "overview", "01  OVERVIEW", 114);
-            AddNavigationButton(nav, "display", "02  DISPLAY", 158);
-            AddNavigationButton(nav, "audio", "03  AUDIO", 202);
-            AddNavigationButton(nav, "input", "04  INPUT", 246);
-            AddNavigationButton(nav, "saves", "05  SAVES", 290);
-            AddNavigationButton(nav, "system", "06  SYSTEM", 334);
-            AddNavigationButton(nav, "diagnostics", "07  DIAGNOSTICS", 378);
-            AddNavigationButton(nav, "storage", "08  ORDNER", 422);
+            AddNavigationButton(nav, "overview", "Overview", 114);
+            AddNavigationButton(nav, "appearance", "Appearance", 158);
+            AddNavigationButton(nav, "display", "Video", 202);
+            AddNavigationButton(nav, "audio", "Audio", 246);
+            AddNavigationButton(nav, "input", "Controls", 290);
+            AddNavigationButton(nav, "saves", "Save states", 334);
+            AddNavigationButton(nav, "system", "System", 378);
+            AddNavigationButton(nav, "diagnostics", "Diagnostics", 422);
+            AddNavigationButton(nav, "storage", "Folders", 466);
 
             var privacy = new Label
             {
@@ -155,7 +158,7 @@ namespace nanoboy
                 ForeColor = AetherColors.Muted,
                 Location = new Point(18, 575),
                 Size = new Size(180, 66),
-                Text = "LOCAL CONTROL PLANE\r\nNO CLOUD SYNC\r\nNO TELEMETRY"
+                Text = "Saved on this computer"
             };
             nav.Controls.Add(privacy);
             return nav;
@@ -204,29 +207,80 @@ namespace nanoboy
 
         private Panel BuildOverviewPage()
         {
-            Panel page = CreatePage("controlCenterPageOverview", "OVERVIEW", "Live-Zustand und direkte Werkzeuge");
-            AetherSurfacePanel signal = CreateCard(page, 0, 72, 788, 92, "SESSION SIGNAL");
+            Panel page = CreatePage("controlCenterPageOverview", "Overview", "Your current game and useful shortcuts");
+            AetherSurfacePanel signal = CreateCard(page, 0, 72, 788, 92, "CURRENT GAME");
             overviewState = CreateValueLabel(signal, 20, 36, 748, 38, 15f);
 
-            AetherSurfacePanel game = CreateCard(page, 0, 180, 252, 126, "CARTRIDGE");
+            AetherSurfacePanel game = CreateCard(page, 0, 180, 252, 126, "GAME");
             overviewGame = CreateValueLabel(game, 18, 38, 216, 70, 10f);
-            AetherSurfacePanel input = CreateCard(page, 268, 180, 252, 126, "INPUT ROUTE");
+            AetherSurfacePanel input = CreateCard(page, 268, 180, 252, 126, "CONTROLS");
             overviewInput = CreateValueLabel(input, 18, 38, 216, 70, 10f);
-            AetherSurfacePanel save = CreateCard(page, 536, 180, 252, 126, "SAVE SAFETY");
+            AetherSurfacePanel save = CreateCard(page, 536, 180, 252, 126, "SAVE DATA");
             overviewSave = CreateValueLabel(save, 18, 38, 216, 70, 10f);
 
-            AetherSurfacePanel actions = CreateCard(page, 0, 322, 788, 180, "QUICK ACCESS // OPERATOR DECK");
-            AddActionButton(actions, "CONTROL MAPPING", 18, 46, 230, bridge.OpenControls);
-            AddActionButton(actions, "SAVE SAFETY", 264, 46, 230, bridge.OpenSaveSafety);
-            AddActionButton(actions, "AUDIO INSPECTOR", 510, 46, 230, bridge.OpenAudioInspector);
-            AddActionButton(actions, "QUICK SAVE", 18, 104, 230, bridge.QuickSave, AetherButtonKind.Primary);
-            AddActionButton(actions, "QUICK LOAD", 264, 104, 230, bridge.QuickLoad);
-            AddActionButton(actions, "FULLSCREEN", 510, 104, 230, bridge.ToggleFullscreen);
+            AetherSurfacePanel actions = CreateCard(page, 0, 322, 788, 180, "QUICK ACTIONS");
+            AddActionButton(actions, "Change controls", 18, 46, 230, bridge.OpenControls);
+            AddActionButton(actions, "Manage saves", 264, 46, 230, bridge.OpenSaveSafety);
+            AddActionButton(actions, "Audio inspector", 510, 46, 230, bridge.OpenAudioInspector);
+            AddActionButton(actions, "Save game", 18, 104, 230, bridge.QuickSave, AetherButtonKind.Primary);
+            AddActionButton(actions, "Load game", 264, 104, 230, bridge.QuickLoad);
+            AddActionButton(actions, "Fullscreen", 510, 104, 230, bridge.ToggleFullscreen);
 
             page.Controls.Add(CreateFootnote(
                 "Alle Einstellungen bleiben lokal. Firmware gilt beim erneuten ROM-Öffnen, die Diagnose-Aufzeichnung ab dem nächsten Programmstart.",
                 522));
             return page;
+        }
+
+        private Panel BuildAppearancePage()
+        {
+            Panel page = CreatePage("controlCenterPageAppearance", "Appearance", "Choose the colors of the interface. Game palettes stay separate.");
+            AddThemeColorCard(page, 72, "PRIMARY ACCENT", "Main actions and active selection",
+                () => bridge.Settings.UiPrimaryColor, value => bridge.Settings.UiPrimaryColor = value);
+            AddThemeColorCard(page, 204, "SECONDARY ACCENT", "Links, focus and connection details",
+                () => bridge.Settings.UiSecondaryColor, value => bridge.Settings.UiSecondaryColor = value);
+            AddThemeColorCard(page, 336, "BACKGROUND", "The base color behind all panels",
+                () => bridge.Settings.UiBackgroundColor, value => bridge.Settings.UiBackgroundColor = value);
+
+            AetherSurfacePanel brand = CreateCard(page, 0, 474, 788, 132, "AETHERBOY LOGO PALETTE");
+            brand.Controls.Add(new PictureBox
+            {
+                Image = Branding.AppBrand.CreateMarkBitmap(), SizeMode = PictureBoxSizeMode.Zoom,
+                Location = new Point(18, 36), Size = new Size(82, 82),
+            });
+            brand.Controls.Add(CreateSmallLabel("Default: #8B38FF violet · #29E2ED cyan · #050712 background. Your choices are saved globally.",
+                118, 39, 630, 35));
+            AddActionButton(brand, "RESTORE LOGO COLORS", 118, 79, 256, () =>
+            {
+                bridge.Settings.UiPrimaryColor = UiThemePalette.DefaultPrimary;
+                bridge.Settings.UiSecondaryColor = UiThemePalette.DefaultSecondary;
+                bridge.Settings.UiBackgroundColor = UiThemePalette.DefaultBackground;
+                bridge.ApplyUiTheme(); RefreshAll();
+            });
+            page.Controls.Add(CreateFootnote("Text, focus and warning colors adjust automatically to keep the interface readable.", 620));
+            return page;
+        }
+
+        private void AddThemeColorCard(Control page, int y, string heading, string description,
+            Func<string> read, Action<string> write)
+        {
+            AetherSurfacePanel card = CreateCard(page, 0, y, 788, 116, heading);
+            card.Controls.Add(CreateSmallLabel(description, 110, 42, 410, 30));
+            var swatch = new Panel { Location = new Point(18, 43), Size = new Size(72, 52), BorderStyle = BorderStyle.FixedSingle };
+            card.Controls.Add(swatch);
+            AetherButton picker = AddActionButton(card, "CHOOSE COLOR", 546, 45, 222, () =>
+            {
+                UiRgb.TryParse(read(), out UiRgb current);
+                using var dialog = new ColorDialog
+                {
+                    Color = Color.FromArgb(current.R, current.G, current.B),
+                    AllowFullOpen = true, FullOpen = true, AnyColor = true,
+                };
+                if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                write($"#{dialog.Color.R:X2}{dialog.Color.G:X2}{dialog.Color.B:X2}");
+                bridge.ApplyUiTheme(); RefreshAll();
+            });
+            themeControls.Add((swatch, picker, read));
         }
 
         private Panel BuildDisplayPage()
@@ -644,6 +698,14 @@ namespace nanoboy
 
         private void RefreshAll()
         {
+            UiThemePalette theme = new(bridge.Settings.UiPrimaryColor, bridge.Settings.UiSecondaryColor, bridge.Settings.UiBackgroundColor);
+            UiRgb[] colors = [theme.Primary, theme.Secondary, theme.Background];
+            for (int i = 0; i < themeControls.Count; i++)
+            {
+                UiRgb color = colors[i];
+                themeControls[i].Swatch.BackColor = Color.FromArgb(color.R, color.G, color.B);
+                themeControls[i].Picker.Text = "CHOOSE · " + color.Hex;
+            }
             RefreshSelectors();
             RefreshOverview();
             RefreshInput();

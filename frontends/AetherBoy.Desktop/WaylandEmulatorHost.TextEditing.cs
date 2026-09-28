@@ -32,9 +32,10 @@ internal sealed class LinuxSdlTextClipboard : ILinuxTextClipboard
 
 internal sealed partial class WaylandEmulatorHost
 {
-    private enum TextField { None, Title, Search, Cheat, RoomCode, RoomServer, RoomAccessKey }
+    private enum TextField { None, Title, Search, Cheat, RoomCode, RoomServer, RoomAccessKey, ThemePrimary, ThemeSecondary, ThemeBackground }
 
     private TextField onlineEditingField;
+    private TextField appearanceEditingField;
     private readonly LinuxTextEditor textEditor = new(80);
     private ILinuxTextClipboard textClipboard = new LinuxSdlTextClipboard();
     private TextField editorField;
@@ -42,9 +43,12 @@ internal sealed partial class WaylandEmulatorHost
     private bool draggingTextSelection;
     private readonly Dictionary<TextField, SDL.FRect> textEntryBounds = new();
     private TextField ActiveTextField => editingTitleIdentity is not null ? TextField.Title
-        : editingSearch ? TextField.Search : editingCheat ? TextField.Cheat : controlCenterVisible && showOnlineLinkPage && !showLegacyOnlineLink ? onlineEditingField : TextField.None;
+        : editingSearch ? TextField.Search : editingCheat ? TextField.Cheat
+        : controlCenterVisible && controlCenterPage == ControlCenterPage.System && showAppearance ? appearanceEditingField
+        : controlCenterVisible && showOnlineLinkPage && !showLegacyOnlineLink ? onlineEditingField : TextField.None;
     private string? ActiveTextEntryName => ActiveTextField switch
-    { TextField.Title => "Cartridge title", TextField.Search => "Search cartridges", TextField.Cheat => "Cheat code", TextField.RoomCode => "Room code", TextField.RoomServer => "Room server address", TextField.RoomAccessKey => "Server access key", _ => null };
+    { TextField.Title => "Cartridge title", TextField.Search => "Search cartridges", TextField.Cheat => "Cheat code", TextField.RoomCode => "Room code", TextField.RoomServer => "Room server address", TextField.RoomAccessKey => "Server access key",
+      TextField.ThemePrimary => "Primary UI color", TextField.ThemeSecondary => "Secondary UI color", TextField.ThemeBackground => "UI background color", _ => null };
     private string? ActiveTextName => ActiveTextEntryName;
     private bool ActiveTextReadOnly => ActiveTextField == TextField.Title && libraryMutation is not null;
     private string ActiveTextValue
@@ -59,12 +63,15 @@ internal sealed partial class WaylandEmulatorHost
 
     private string TextFieldValue(TextField field) => field switch
     { TextField.Title => titleInput, TextField.Search => librarySearch, TextField.Cheat => cheatCode,
-      TextField.RoomCode => roomCodeInput, TextField.RoomServer => roomServerInput, TextField.RoomAccessKey => roomAccessKeyInput, _ => "" };
+      TextField.RoomCode => roomCodeInput, TextField.RoomServer => roomServerInput, TextField.RoomAccessKey => roomAccessKeyInput,
+      TextField.ThemePrimary => primaryColorInput, TextField.ThemeSecondary => secondaryColorInput, TextField.ThemeBackground => backgroundColorInput, _ => "" };
 
     private void EnsureTextEditor()
     {
         var field = ActiveTextField;
-        textEditor.MaximumLength = field is TextField.RoomServer or TextField.RoomAccessKey ? 256 : field == TextField.RoomCode ? 14 : 80;
+        textEditor.MaximumLength = field is TextField.RoomServer or TextField.RoomAccessKey ? 256
+            : field is TextField.ThemePrimary or TextField.ThemeSecondary or TextField.ThemeBackground ? 7
+            : field == TextField.RoomCode ? 14 : 80;
         string value = TextFieldValue(field);
         if (editorField != field || textEditor.Text != value)
         { textEditor.SetText(value); editorField = field; editorHasFocus = true; }
@@ -81,6 +88,9 @@ internal sealed partial class WaylandEmulatorHost
             case TextField.RoomCode: roomCodeInput = textEditor.Text; break;
             case TextField.RoomServer: roomServerInput = textEditor.Text; break;
             case TextField.RoomAccessKey: roomAccessKeyInput = textEditor.Text; break;
+            case TextField.ThemePrimary: primaryColorInput = textEditor.Text; break;
+            case TextField.ThemeSecondary: secondaryColorInput = textEditor.Text; break;
+            case TextField.ThemeBackground: backgroundColorInput = textEditor.Text; break;
         }
     }
 
@@ -89,6 +99,7 @@ internal sealed partial class WaylandEmulatorHost
         if (ActiveTextReadOnly) return;
         if (textEditor.IsComposing) SDL.ClearComposition(window);
         onlineEditingField = field is TextField.RoomCode or TextField.RoomServer or TextField.RoomAccessKey ? field : TextField.None;
+        appearanceEditingField = field is TextField.ThemePrimary or TextField.ThemeSecondary or TextField.ThemeBackground ? field : TextField.None;
         editingSearch = field == TextField.Search;
         editingCheat = field == TextField.Cheat;
         editorField = TextField.None;
@@ -129,6 +140,7 @@ internal sealed partial class WaylandEmulatorHost
         if (ActiveTextField == TextField.Title) { EndTitleEdit(true); return; }
         editingSearch = editingCheat = false;
         onlineEditingField = TextField.None;
+        appearanceEditingField = TextField.None;
         editorField = TextField.None; SDL.StopTextInput(window);
     }
 
@@ -226,12 +238,19 @@ internal sealed partial class WaylandEmulatorHost
         {
             ControlCenterPage.Library when !showPatchLab => editingTitleIdentity is not null ? TextField.Title : TextField.Search,
             ControlCenterPage.Tools when session is not null => TextField.Cheat,
+            ControlCenterPage.System when showAppearance => appearanceEditingField,
             _ => TextField.None
         };
         if (controlCenterVisible && showOnlineLinkPage && !showLegacyOnlineLink && onlineLinkTransport is null)
         {
             field = TextField.None;
             foreach (var candidate in showRoomSetup ? new[] { TextField.RoomServer, TextField.RoomAccessKey } : onlineRoomTransport is null ? new[] { TextField.RoomCode } : Array.Empty<TextField>())
+                if (textEntryBounds.TryGetValue(candidate, out var rectangle) && Hit(x, y, rectangle.X, rectangle.Y, rectangle.W, rectangle.H)) field = candidate;
+        }
+        if (controlCenterVisible && controlCenterPage == ControlCenterPage.System && showAppearance)
+        {
+            field = TextField.None;
+            foreach (var candidate in new[] { TextField.ThemePrimary, TextField.ThemeSecondary, TextField.ThemeBackground })
                 if (textEntryBounds.TryGetValue(candidate, out var rectangle) && Hit(x, y, rectangle.X, rectangle.Y, rectangle.W, rectangle.H)) field = candidate;
         }
         if (field == TextField.None || !textEntryBounds.TryGetValue(field, out var bounds) || !Hit(x, y, bounds.X, bounds.Y, bounds.W, bounds.H))

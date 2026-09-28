@@ -52,13 +52,13 @@
       while (toNative.length && bridge?.readyState === WebSocket.OPEN && bridge.bufferedAmount === 0)
         bridge.send(toNative.shift());
     } catch {
-      stop("Die Datenverbindung ist fehlgeschlagen. Neue Sitzung im Emulator öffnen.", true, "SEND_FAILED");
+      stop("Die Verbindung ist abgebrochen. Starte im Emulator eine neue Sitzung.", true, "SEND_FAILED");
     }
   }
 
   function enqueue(queue, packet) {
     if (!checkPacket(packet) || queue.length >= maxPackets) {
-      stop("Ungültige oder zu viele Link-Pakete. Die Sitzung wurde sicher beendet.", true, "PACKET_LIMIT");
+      stop("Die Verbindung wurde wegen ungültiger Daten beendet. Starte eine neue Sitzung.", true, "PACKET_LIMIT");
       return;
     }
     queue.push(packet);
@@ -69,7 +69,7 @@
     if (channel !== null || candidate.label !== channelName || candidate.protocol !== channelName ||
         !candidate.ordered || candidate.maxRetransmits !== null || candidate.maxPacketLifeTime !== null) {
       candidate.close();
-      stop("Der Mitspieler verwendet keinen passenden zuverlässigen AetherBoy-Datenkanal.", true, "CHANNEL_PROTOCOL");
+      stop("Der Mitspieler hat einen unpassenden Datenkanal geöffnet. Prüft eure AetherBoy-Versionen.", true, "CHANNEL_PROTOCOL");
       return;
     }
     channel = candidate;
@@ -82,19 +82,19 @@
         return;
       }
       bridge.send("READY");
-      status("Verbunden · Zum Emulator zurückkehren und dort weiterspielen.");
+      status("Verbunden. Du kannst jetzt im Emulator weiterspielen.");
       sendTimer = setInterval(pump, 8);
       controls();
     };
     channel.onmessage = event => enqueue(toNative, event.data);
-    channel.onerror = () => stop("Der WebRTC-Datenkanal hat einen Fehler gemeldet.", true, "DATA_CHANNEL");
+    channel.onerror = () => stop("Der Datenkanal hat einen Fehler gemeldet. Starte im Emulator eine neue Sitzung.", true, "DATA_CHANNEL");
     channel.onclose = () => stop("Mitspieler getrennt. Für einen neuen Versuch eine neue Sitzung öffnen.");
   }
 
   function configuration() {
     const stun = byId("stun").value.trim(), turn = byId("turn").value.trim();
     if ((stun || turn) && !byId("serverConsent").checked)
-      throw new Error("Bitte den optionalen Serverkontakt ausdrücklich bestätigen oder die Serverfelder leeren.");
+      throw new Error("Bestätige den Serverkontakt oder entferne die Serveradressen.");
     if (stun && !/^stuns?:[a-z0-9.\-:\[\]]{1,255}$/i.test(stun))
       throw new Error("Die STUN-Adresse ist ungültig. Erwartet wird stun:server:port.");
     if (turn && !/^turns?:[a-z0-9.\-:\[\]]{1,255}(?:\?transport=(?:udp|tcp))?$/i.test(turn))
@@ -129,7 +129,7 @@
         if (error) reject(error); else resolve();
       };
       const changed = () => { if (pc.iceGatheringState === "complete") finish(); };
-      const timeout = setTimeout(() => finish(new Error("Die Suche nach Verbindungswegen dauerte zu lange. Server/Netzwerk prüfen und eine neue Sitzung öffnen.")), 45000);
+      const timeout = setTimeout(() => finish(new Error("Die Verbindung dauert zu lange. Prüfe deine Servereinstellungen und starte eine neue Sitzung.")), 45000);
       pc.addEventListener("icegatheringstatechange", changed);
       changed();
     });
@@ -137,12 +137,12 @@
 
   function readDescription(expected) {
     const text = byId("remote").value.trim();
-    if (!text || text.length > 131072) throw new Error("Bitte passende Verbindungsdaten einfügen (maximal 128 KiB).");
+    if (!text || text.length > 131072) throw new Error("Füge die Einladung oder Antwort deines Mitspielers ein (maximal 128 KiB).");
     let data;
-    try { data = JSON.parse(text); } catch { throw new Error("Die eingefügten Daten sind kein gültiges JSON."); }
+    try { data = JSON.parse(text); } catch { throw new Error("Der eingefügte Text ist keine gültige Einladung oder Antwort."); }
     if (!data || data.format !== "aetherboy-webrtc" || data.version !== 1 || data.type !== expected ||
         typeof data.sdp !== "string" || data.sdp.length > 100000 || !/^m=application /m.test(data.sdp) || /^m=(audio|video) /m.test(data.sdp))
-      throw new Error("Erwartet wird eine AetherBoy-" + (expected === "offer" ? "Einladung" : "Antwort") + " für einen reinen Datenkanal.");
+      throw new Error("Der eingefügte Text ist keine AetherBoy-" + (expected === "offer" ? "Einladung" : "Antwort") + ". Bitte kopiere den vollständigen Text von deinem Mitspieler.");
     return { type: data.type, sdp: data.sdp };
   }
 
@@ -162,31 +162,31 @@
   byId("offer").addEventListener("click", () => action(async () => {
     const pc = newPeer();
     bindChannel(pc.createDataChannel(channelName, { ordered: true, protocol: channelName }));
-    status("Einladung wird vorbereitet · Verbindungswege werden gesammelt …");
+    status("Einladung wird erstellt. Das kann einen Moment dauern …");
     await pc.setLocalDescription(await pc.createOffer());
     await gatherIce(pc);
     if (ended) return;
     exportDescription(pc);
-    progress("Einladung bereit · Kopieren, an den Mitspieler weitergeben und seine Antwort einfügen.");
+    progress("Einladung ist fertig. Kopiere sie und füge danach die Antwort deines Mitspielers ein.");
   }));
 
   byId("answer").addEventListener("click", () => action(async () => {
     const description = readDescription("offer");
     const pc = newPeer();
-    status("Antwort wird vorbereitet · Verbindungswege werden gesammelt …");
+    status("Antwort wird erstellt. Das kann einen Moment dauern …");
     await pc.setRemoteDescription(description);
     await pc.setLocalDescription(await pc.createAnswer());
     await gatherIce(pc);
     if (ended) return;
     exportDescription(pc);
-    progress("Antwort bereit · Kopieren und an den einladenden Spieler zurückgeben.");
+    progress("Antwort ist fertig. Kopiere sie und schick sie an den einladenden Spieler.");
   }));
 
   byId("accept").addEventListener("click", () => action(async () => {
     const description = readDescription("answer");
     if (peer?.signalingState !== "have-local-offer") throw new Error("Bitte zuerst eine eigene Einladung erstellen.");
     await peer.setRemoteDescription(description);
-    progress("Antwort übernommen · Direkte Verbindung wird aufgebaut …");
+    progress("Antwort übernommen. Verbindung wird aufgebaut …");
   }));
 
   byId("copy").addEventListener("click", async () => {
@@ -205,9 +205,9 @@
   }
   bridge = new WebSocket("ws://" + location.host + "/bridge?token=" + token);
   bridge.binaryType = "arraybuffer";
-  bridge.onopen = () => { status("Lokaler Emulator verbunden · Einladung erstellen oder eine Einladung beantworten."); controls(); };
+  bridge.onopen = () => { status("Emulator verbunden. Erstelle eine Einladung oder füge die Einladung deines Mitspielers ein."); controls(); };
   bridge.onmessage = event => {
-    if (channel?.readyState !== "open") { stop("Emulator-Daten kamen vor einer bereiten Peer-Verbindung an.", true, "EARLY_PACKET"); return; }
+    if (channel?.readyState !== "open") { stop("Die Verbindung zum Mitspieler war noch nicht bereit. Starte im Emulator eine neue Sitzung.", true, "EARLY_PACKET"); return; }
     enqueue(toPeer, event.data);
   };
   bridge.onerror = () => stop("Die lokale Emulator-Verbindung ist nicht erreichbar. Neue Sitzung im Emulator öffnen.", true, "LOCAL_CONNECTION");

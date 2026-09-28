@@ -67,8 +67,8 @@ internal sealed partial class WaylandEmulatorHost
         if (accessibleControls is not { IsOpen: true } panel) return;
         if (!controlCenterVisible) { panel.Hide(); return; }
         panel.CaptureKeys = rebindingAction is not null;
-        panel.Update("AetherBoy — " + PageNames[(int)controlCenterPage],
-            PageDescriptions[(int)controlCenterPage] + "\n" + string.Join("\n", accessibleDescriptions.Distinct()),
+        panel.Update("AetherBoy — " + CurrentPageName,
+            CurrentPageDescription + "\n" + string.Join("\n", accessibleDescriptions.Distinct()),
             loadError ?? statusMessage,
             accessibleCommands.Select(item => item.Command).ToArray(),
             ActiveTextEntryName is { } name ? new(AccessibleTextKey, name, ActiveTextValue, ActiveTextReadOnly) : null);

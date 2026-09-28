@@ -1,16 +1,17 @@
 using System.Drawing;
 using System.Windows.Forms;
+using nanoboy.Controls;
 
 namespace nanoboy
 {
     public static class DarkTheme
     {
-        public static readonly Color BackColor = Color.FromArgb(30, 30, 46);
-        public static readonly Color PanelColor = Color.FromArgb(37, 37, 56);
-        public static readonly Color TextColor = Color.FromArgb(205, 214, 244);
-        public static readonly Color SubTextColor = Color.FromArgb(166, 173, 200);
-        public static readonly Color AccentColor = Color.FromArgb(137, 180, 250);
-        public static readonly Color ButtonColor = Color.FromArgb(49, 50, 68);
+        public static Color BackColor => AetherColors.Void;
+        public static Color PanelColor => AetherColors.Surface;
+        public static Color TextColor => AetherColors.Text;
+        public static Color SubTextColor => AetherColors.Muted;
+        public static Color AccentColor => AetherColors.Violet;
+        public static Color ButtonColor => AetherColors.SurfaceRaised;
 
         public static void Apply(Form form)
         {
@@ -74,17 +75,17 @@ namespace nanoboy
 
         private class DarkColorTable : ProfessionalColorTable
         {
-            public override Color MenuItemSelected => Color.FromArgb(49, 50, 68);
-            public override Color MenuItemSelectedGradientBegin => Color.FromArgb(49, 50, 68);
-            public override Color MenuItemSelectedGradientEnd => Color.FromArgb(49, 50, 68);
-            public override Color MenuItemBorder => Color.FromArgb(137, 180, 250);
-            public override Color MenuBorder => Color.FromArgb(49, 50, 68);
-            public override Color MenuItemPressedGradientBegin => Color.FromArgb(37, 37, 56);
-            public override Color MenuItemPressedGradientEnd => Color.FromArgb(37, 37, 56);
-            public override Color ToolStripDropDownBackground => Color.FromArgb(30, 30, 46);
-            public override Color ImageMarginGradientBegin => Color.FromArgb(30, 30, 46);
-            public override Color ImageMarginGradientMiddle => Color.FromArgb(30, 30, 46);
-            public override Color ImageMarginGradientEnd => Color.FromArgb(30, 30, 46);
+            public override Color MenuItemSelected => ButtonColor;
+            public override Color MenuItemSelectedGradientBegin => ButtonColor;
+            public override Color MenuItemSelectedGradientEnd => ButtonColor;
+            public override Color MenuItemBorder => AccentColor;
+            public override Color MenuBorder => ButtonColor;
+            public override Color MenuItemPressedGradientBegin => PanelColor;
+            public override Color MenuItemPressedGradientEnd => PanelColor;
+            public override Color ToolStripDropDownBackground => BackColor;
+            public override Color ImageMarginGradientBegin => BackColor;
+            public override Color ImageMarginGradientMiddle => BackColor;
+            public override Color ImageMarginGradientEnd => BackColor;
         }
     }
 }

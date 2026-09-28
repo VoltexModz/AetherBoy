@@ -71,22 +71,33 @@ favorites/playtime, controller profiles and Patch Lab.
 
 ## A look at AetherBoy
 
-The **Aether Wave interface** brings together the game display, a live session sidebar, quick actions and a central Control Center. Violet, cyan and dark surfaces define the shared design on Windows and Linux.
+The desktop interface puts the game first: a clear **Open game** action, a readable play area, and familiar pause, save, load and rewind controls. The sidebar keeps only the current game and essential settings in view; the remaining options live in Settings. The shared Windows and Linux design uses calm dark surfaces and one accent for the next action.
+
+The logo's violet and cyan are the default UI accents. In **Settings → Appearance** on Windows, or **Settings → System → Appearance colors** on Linux, you can choose both accent colors and the background. These global UI colors are saved separately from game video palettes.
 
 <p align="center">
   <img src="docs/images/aetherboy-linux.png" alt="AetherBoy on Linux: main window with ROM selection, session sidebar, five save slots and quick gameplay actions" width="1000">
   <br>
-  <sub>Actual screenshot of the native Linux frontend, with no ROM loaded. The captured interface includes German text.</sub>
+  <sub>Actual screenshot of the native Linux frontend, with no game loaded.</sub>
 </p>
 
 <details>
-<summary><strong>View the Control Center</strong></summary>
+<summary><strong>View Settings</strong></summary>
 
 <p align="center">
-  <img src="docs/images/aetherboy-control-center.png" alt="Aether Control Center on Linux: display settings with Sharp, Smooth, LCD Grid, frameskip and DMG palettes; some interface text is in German" width="1000">
+  <img src="docs/images/aetherboy-control-center.png" alt="AetherBoy Settings on Linux: Video page with filters, frameskip and DMG palettes" width="1000">
 </p>
 
-Nine sections cover overview, display, audio, input, saves, system and diagnostics. This screenshot shows the Linux client's display settings.
+Nine sections cover overview, video, audio, controls, saves, system, diagnostics, library and tools. This screenshot shows the Linux client's video settings.
+
+</details>
+
+<details>
+<summary><strong>Customize interface colors</strong></summary>
+
+<p align="center">
+  <img src="docs/images/aetherboy-appearance.png" alt="AetherBoy Appearance settings on Linux with editable violet and cyan accents and a dark background" width="1000">
+</p>
 
 </details>
 

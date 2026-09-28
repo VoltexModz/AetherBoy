@@ -233,6 +233,11 @@ namespace nanoboy
             set => WriteSetting("AudioVolume", Math.Clamp(value, 0, 100), next => Properties.Settings.Default.AudioVolume = next);
         }
 
+        // Application-wide appearance is independent of per-game video palettes.
+        public string UiPrimaryColor { get => Properties.Settings.Default.UiPrimaryColor; set => Properties.Settings.Default.UiPrimaryColor = value; }
+        public string UiSecondaryColor { get => Properties.Settings.Default.UiSecondaryColor; set => Properties.Settings.Default.UiSecondaryColor = value; }
+        public string UiBackgroundColor { get => Properties.Settings.Default.UiBackgroundColor; set => Properties.Settings.Default.UiBackgroundColor = value; }
+
         public System.Collections.Generic.List<string> RecentFiles { get; } = new System.Collections.Generic.List<string>();
 
         private void PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)

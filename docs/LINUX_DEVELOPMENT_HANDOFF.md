@@ -1,5 +1,7 @@
 # Linux-Entwicklung: Übergabe an Windows und den nächsten ChatGPT
 
+**Lokaler UI-Nachtrag vom 28. September (noch uncommittet):** [Logo-Farben, frei wählbare Akzente und Hintergrund auf Windows/Wayland](UI_THEME_HANDOFF_2026-09-28.md).
+
 **Aktueller Arbeitsauftrag an den Linux-ChatGPT (27. September):**
 [Vollständige nächste Schritte: Server, WAN-Test, Linux-Testdialog und Pokémon-Abnahme](LINUX_ONLINE_NEXT_STEPS_2026-09-27.md).
 Enthält ausführbare Build-/Testbefehle, Erfolgskriterien und die verlangte Rückgabe

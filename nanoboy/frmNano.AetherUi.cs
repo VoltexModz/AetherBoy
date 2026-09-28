@@ -33,12 +33,12 @@ namespace nanoboy
         private Label aetherRomTitle = null!;
         private Label aetherStateValue = null!;
         private Label aetherModelValue = null!;
-        private Label aetherFrameValue = null!;
         private Label aetherAudioValue = null!;
         private Label aetherFilterValue = null!;
         private Label aetherInputValue = null!;
         private Label aetherSlotValue = null!;
         private AetherButton aetherOpenButton = null!;
+        private AetherButton aetherDeckOpenButton = null!;
         private AetherButton aetherControlCenterButton = null!;
         private AetherButton aetherPauseButton = null!;
         private AetherButton aetherRewindButton = null!;
@@ -131,15 +131,15 @@ namespace nanoboy
                 Padding = new Padding(12, 3, 0, 0)
             };
             var productName = CreateUiLabel(
-                "AETHERBOY",
+                "AetherBoy",
                 13f,
                 FontStyle.Bold,
                 AetherColors.Text,
                 DockStyle.Top,
                 24);
             var productSignal = CreateUiLabel(
-                $"by {ProductInfo.TeamName}",
-                7.5f,
+                "GAME BOY · COLOR · ADVANCE",
+                8.5f,
                 FontStyle.Bold,
                 AetherColors.Muted,
                 DockStyle.Top,
@@ -175,10 +175,10 @@ namespace nanoboy
                 WrapContents = false,
                 Width = 330
             };
-            navigation.Controls.Add(CreateNavButton("SYSTEM", menuFile));
-            navigation.Controls.Add(CreateNavButton("TUNE", menuItem1));
-            navigation.Controls.Add(CreateNavButton("TOOLS", menuItem21));
-            navigation.Controls.Add(CreateNavButton("INFO", menuItem4));
+            navigation.Controls.Add(CreateNavButton("GAME", menuFile, "SYSTEM"));
+            navigation.Controls.Add(CreateNavButton("VIDEO", menuItem1, "TUNE"));
+            navigation.Controls.Add(CreateNavButton("TOOLS", menuItem21, "TOOLS"));
+            navigation.Controls.Add(CreateNavButton("HELP", menuItem4, "INFO"));
 
             titleBar.Controls.Add(navigation);
             titleBar.Controls.Add(windowControls);
@@ -265,7 +265,7 @@ namespace nanoboy
             };
             mark.Disposed += (_, _) => mark.Image?.Dispose();
             var headline = CreateUiLabel(
-                "NO SIGNAL",
+                "Ready for your next game?",
                 15f,
                 FontStyle.Bold,
                 AetherColors.Text,
@@ -273,21 +273,21 @@ namespace nanoboy
                 34,
                 ContentAlignment.MiddleCenter);
             var copy = CreateUiLabel(
-                "Zieh eine .GB-, .GBC- oder .GBA-Datei hierher.",
+                "Open a game or drop a .gb, .gbc or .gba file here.",
                 9f,
                 FontStyle.Regular,
                 AetherColors.Muted,
                 DockStyle.Fill,
                 48,
                 ContentAlignment.TopCenter);
-            aetherOpenButton = CreateActionButton("OPEN ROM", AetherButtonKind.Primary, 158);
+            aetherOpenButton = CreateActionButton("Open game", AetherButtonKind.Primary, 158);
             aetherOpenButton.Anchor = AnchorStyles.None;
             aetherOpenButton.Click += (_, _) => OpenRomFromAetherUi();
             var hint = CreateUiLabel(
-                "STRG+O  //  DATEI ABLEGEN",
-                7.5f,
+                "SHORTCUT: CTRL+O",
+                8.5f,
                 FontStyle.Bold,
-                AetherColors.Violet,
+                AetherColors.Muted,
                 DockStyle.Fill,
                 30,
                 ContentAlignment.MiddleCenter);
@@ -319,48 +319,43 @@ namespace nanoboy
                 BackColor = AetherColors.Surface,
                 ColumnCount = 1,
                 Dock = DockStyle.Fill,
-                RowCount = 15
+                RowCount = 13
             };
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 12f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24f));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36f));
 
-            layout.Controls.Add(CreateUiLabel("SESSION // SIGNAL", 7.5f, FontStyle.Bold, AetherColors.Violet, DockStyle.Fill, 24), 0, 0);
-            aetherRomTitle = CreateUiLabel("NO CARTRIDGE", 12f, FontStyle.Bold, AetherColors.Text, DockStyle.Fill, 58);
+            layout.Controls.Add(CreateUiLabel("NOW PLAYING", 8.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 24), 0, 0);
+            aetherRomTitle = CreateUiLabel("No game open", 12f, FontStyle.Bold, AetherColors.Text, DockStyle.Fill, 58);
             aetherRomTitle.AutoEllipsis = true;
             layout.Controls.Add(aetherRomTitle, 0, 1);
 
             var stateRow = new Panel { BackColor = AetherColors.Surface, Dock = DockStyle.Fill };
             aetherStatusDot = new AetherStatusDot { Location = new Point(0, 8) };
-            aetherStateValue = CreateUiLabel("IDLE", 8.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 30);
+            aetherStateValue = CreateUiLabel("Ready", 8.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 30);
             aetherStateValue.Padding = new Padding(22, 0, 0, 0);
             stateRow.Controls.Add(aetherStateValue);
             stateRow.Controls.Add(aetherStatusDot);
             layout.Controls.Add(stateRow, 0, 2);
 
             layout.Controls.Add(CreateDivider(), 0, 3);
-            layout.Controls.Add(CreateMetricRow("MODEL", out aetherModelValue), 0, 4);
-            layout.Controls.Add(CreateMetricRow("STATE", out Label stateMetric), 0, 5);
-            aetherStateValue.Tag = stateMetric;
-            layout.Controls.Add(CreateMetricRow("FRAME", out aetherFrameValue), 0, 6);
-            layout.Controls.Add(CreateMetricRow("AUDIO", out aetherAudioValue), 0, 7);
-            layout.Controls.Add(CreateMetricRow("FILTER", out aetherFilterValue), 0, 8);
-            layout.Controls.Add(CreateMetricRow("INPUT", out aetherInputValue), 0, 9);
+            layout.Controls.Add(CreateMetricRow("System", out aetherModelValue), 0, 4);
+            layout.Controls.Add(CreateMetricRow("Audio", out aetherAudioValue), 0, 5);
+            layout.Controls.Add(CreateMetricRow("Video", out aetherFilterValue), 0, 6);
+            layout.Controls.Add(CreateMetricRow("Controls", out aetherInputValue), 0, 7);
             aetherInputValue.AutoEllipsis = true;
-            layout.Controls.Add(CreateMetricRow("SLOT", out aetherSlotValue), 0, 10);
-            layout.Controls.Add(CreateUiLabel("STATE BANK", 7.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 30), 0, 11);
+            layout.Controls.Add(CreateMetricRow("Slot", out aetherSlotValue), 0, 8);
+            layout.Controls.Add(CreateUiLabel("SAVE SLOT", 8.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 30), 0, 9);
 
             var slots = new FlowLayoutPanel
             {
@@ -386,26 +381,26 @@ namespace nanoboy
                 aetherSlotButtons[slot - 1] = button;
                 slots.Controls.Add(button);
             }
-            layout.Controls.Add(slots, 0, 13);
+            layout.Controls.Add(slots, 0, 11);
 
             aetherSaveSafetyButton = CreateActionButton(
-                "SAVE SAFETY CENTER",
+                "Manage saves",
                 AetherButtonKind.Ghost,
                 190);
             aetherSaveSafetyButton.Dock = DockStyle.Bottom;
             aetherSaveSafetyButton.Margin = Padding.Empty;
             aetherSaveSafetyButton.Click += (_, args) => menuBatterySaveSafety_Click(aetherSaveSafetyButton, args);
-            layout.Controls.Add(aetherSaveSafetyButton, 0, 12);
+            layout.Controls.Add(aetherSaveSafetyButton, 0, 10);
 
             var hint = CreateUiLabel(
-                "F10 QUICK · F12 PNG\r\nF9 LIVE · F5/F8 STATE",
-                7.5f,
+                "F5 save · F8 load\r\nF10 quick menu",
+                8.5f,
                 FontStyle.Bold,
                 AetherColors.Muted,
                 DockStyle.Fill,
                 40,
                 ContentAlignment.BottomLeft);
-            layout.Controls.Add(hint, 0, 14);
+            layout.Controls.Add(hint, 0, 12);
             rail.Controls.Add(layout);
             return rail;
         }
@@ -419,52 +414,57 @@ namespace nanoboy
                 Height = 78,
                 Padding = new Padding(22, 17, 22, 16)
             };
-            var commands = new FlowLayoutPanel
+            var commands = new TableLayoutPanel
             {
                 BackColor = AetherColors.Chrome,
                 Dock = DockStyle.Fill,
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false
+                ColumnCount = 8,
+                RowCount = 1,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty
             };
+            foreach (float width in new[] { 17f, 14f, 10f, 12f, 12f, 10f, 10f, 15f })
+                commands.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, width));
+            commands.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
-            AetherButton open = CreateActionButton("OPEN ROM", AetherButtonKind.Primary, 126);
-            open.Click += (_, _) => OpenRomFromAetherUi();
-            aetherControlCenterButton = CreateActionButton("CONTROL", AetherButtonKind.Secondary, 94);
+            aetherDeckOpenButton = CreateActionButton("Open game", AetherButtonKind.Primary, 126);
+            aetherDeckOpenButton.Click += (_, _) => OpenRomFromAetherUi();
+            aetherControlCenterButton = CreateActionButton("Settings", AetherButtonKind.Secondary, 94);
             aetherControlCenterButton.Click += (_, _) => OpenControlCenter();
-            AetherButton quick = CreateActionButton("QUICK", AetherButtonKind.Secondary, 82);
+            AetherButton quick = CreateActionButton("Quick", AetherButtonKind.Secondary, 82);
             quick.Name = "aetherQuickMenuButton";
             quick.Click += (_, _) => _ = OpenQuickMenuAsync();
-            aetherPauseButton = CreateActionButton("PAUSE", AetherButtonKind.Secondary, 92);
+            aetherPauseButton = CreateActionButton("Pause", AetherButtonKind.Secondary, 92);
             aetherPauseButton.Click += aetherPauseButton_Click;
-            aetherRewindButton = CreateActionButton("REWIND", AetherButtonKind.Secondary, 94);
+            aetherRewindButton = CreateActionButton("Rewind", AetherButtonKind.Secondary, 94);
             aetherRewindButton.Click += (_, args) =>
             {
                 menuRewind_Click(aetherRewindButton, args);
                 gameView.Focus();
             };
-            aetherSaveButton = CreateActionButton("SAVE", AetherButtonKind.Secondary, 82);
+            aetherSaveButton = CreateActionButton("Save", AetherButtonKind.Secondary, 82);
             aetherSaveButton.Click += (_, _) =>
             {
                 QuickSave();
                 gameView.Focus();
             };
-            aetherLoadButton = CreateActionButton("LOAD", AetherButtonKind.Secondary, 82);
+            aetherLoadButton = CreateActionButton("Load", AetherButtonKind.Secondary, 82);
             aetherLoadButton.Click += (_, _) =>
             {
                 QuickLoad();
                 gameView.Focus();
             };
-            aetherTurboButton = CreateActionButton("TURBO", AetherButtonKind.Secondary, 88);
+            aetherTurboButton = CreateActionButton("Turbo", AetherButtonKind.Secondary, 88);
             aetherTurboButton.Click += aetherTurboButton_Click;
 
-            commands.Controls.Add(open);
-            commands.Controls.Add(aetherControlCenterButton);
-            commands.Controls.Add(quick);
-            commands.Controls.Add(aetherPauseButton);
-            commands.Controls.Add(aetherRewindButton);
-            commands.Controls.Add(aetherSaveButton);
-            commands.Controls.Add(aetherLoadButton);
-            commands.Controls.Add(aetherTurboButton);
+            AetherButton[] actions = [aetherDeckOpenButton, aetherControlCenterButton, quick, aetherPauseButton,
+                aetherRewindButton, aetherSaveButton, aetherLoadButton, aetherTurboButton];
+            for (int index = 0; index < actions.Length; index++)
+            {
+                actions[index].Dock = DockStyle.Fill;
+                actions[index].Margin = new Padding(0, 0, index == actions.Length - 1 ? 0 : 8, 0);
+                commands.Controls.Add(actions[index], index, 0);
+            }
             deck.Controls.Add(commands);
             return deck;
         }
@@ -482,12 +482,12 @@ namespace nanoboy
             return button;
         }
 
-        private AetherButton CreateNavButton(string text, ToolStripMenuItem menu)
+        private AetherButton CreateNavButton(string text, ToolStripMenuItem menu, string identity)
         {
             AetherButton button = CreateActionButton(text, AetherButtonKind.Ghost, 72);
             button.Height = 34;
             button.Margin = new Padding(2, 0, 2, 0);
-            button.Name = "aetherNav" + text;
+            button.Name = "aetherNav" + identity;
             button.Click += (_, _) =>
             {
                 bool same = aetherActiveNav == button;
@@ -552,9 +552,9 @@ namespace nanoboy
         private static Panel CreateMetricRow(string label, out Label value)
         {
             var row = new Panel { BackColor = AetherColors.Surface, Dock = DockStyle.Fill };
-            Label key = CreateUiLabel(label, 7.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Left, 30);
+            Label key = CreateUiLabel(label, 9f, FontStyle.Regular, AetherColors.Muted, DockStyle.Left, 30);
             key.Width = 70;
-            value = CreateUiLabel("—", 8.5f, FontStyle.Bold, AetherColors.Text, DockStyle.Fill, 30, ContentAlignment.MiddleRight);
+            value = CreateUiLabel("—", 9f, FontStyle.Bold, AetherColors.Text, DockStyle.Fill, 30, ContentAlignment.MiddleRight);
             row.Controls.Add(value);
             row.Controls.Add(key);
             return row;
@@ -578,9 +578,7 @@ namespace nanoboy
                 return;
             }
 
-            aetherInputValue.Text = state.IsConnected
-                ? state.DeviceName?.ToUpperInvariant() ?? "GAMEPAD"
-                : "KEYBOARD";
+            aetherInputValue.Text = state.IsConnected ? "Gamepad" : "Keyboard";
         }
 
         private void OpenRomFromAetherUi()
@@ -634,42 +632,35 @@ namespace nanoboy
             }
 
             aetherRomTitle.Text = snapshot?.Rom?.Title?.Trim() is { Length: > 0 } title
-                ? title.ToUpperInvariant()
-                : hasSession ? "READING HEADER" : "NO CARTRIDGE";
+                ? title
+                : hasSession ? "Loading game" : "No game open";
             aetherModelValue.Text = snapshot?.Rom == null
                 ? "—"
                 : snapshot.Rom.IsGameBoyAdvance
                     ? "GBA"
                     : snapshot.Rom.HasColorFeatures ? "CGB" : "DMG";
-            aetherFrameValue.Text = snapshot == null ? "—" : snapshot.EmulatedFrameCount.ToString("N0");
-            aetherAudioValue.Text = settings.AudioEnable
-                ? snapshot?.Rom?.IsGameBoyAdvance == true ? "ON · 65.5K" : "ON · 44.1K"
-                : "MUTED";
+            aetherAudioValue.Text = settings.AudioEnable ? "On" : "Muted";
             aetherFilterValue.Text = gameView.Filter switch
             {
-                GameDisplayFilter.Smooth => "SMOOTH",
-                GameDisplayFilter.LcdGrid => "LCD GRID",
-                _ => "SHARP"
+                GameDisplayFilter.Smooth => "Smooth",
+                GameDisplayFilter.LcdGrid => "LCD grid",
+                _ => "Sharp"
             };
             aetherSlotValue.Text = settings.SaveSlot.ToString();
 
             SessionState? state = snapshot?.State;
             string stateText = state switch
             {
-                SessionState.Starting => "SYNCING",
-                SessionState.Running when snapshot?.IsTurboEnabled == true => "TURBO",
-                SessionState.Running => "LIVE",
-                SessionState.Paused => "PAUSED",
-                SessionState.Stopping => "STOPPING",
-                SessionState.Stopped => "OFFLINE",
-                SessionState.Faulted => "FAULT",
-                _ => "IDLE"
+                SessionState.Starting => "Loading",
+                SessionState.Running when snapshot?.IsTurboEnabled == true => "Turbo",
+                SessionState.Running => "Playing",
+                SessionState.Paused => "Paused",
+                SessionState.Stopping => "Stopping",
+                SessionState.Stopped => "Stopped",
+                SessionState.Faulted => "Error",
+                _ => "Ready"
             };
             aetherStateValue.Text = stateText;
-            if (aetherStateValue.Tag is Label stateMetric)
-            {
-                stateMetric.Text = stateText;
-            }
             aetherStatusDot.SignalColor = state switch
             {
                 SessionState.Running => snapshot?.IsTurboEnabled == true ? AetherColors.Cyan : AetherColors.Success,
@@ -707,7 +698,9 @@ namespace nanoboy
             menuAudioC4.Enabled = supportsAudioChannels;
             menuItem5.Enabled = supportsAudioChannels;
             menuAudioInspector.Enabled = (features & EmulationFeature.AudioInspector) != 0;
-            aetherPauseButton.Text = snapshot?.IsPaused == true ? "RESUME" : "PAUSE";
+            aetherDeckOpenButton.Kind = hasRom ? AetherButtonKind.Secondary : AetherButtonKind.Primary;
+            aetherPauseButton.Kind = hasRom ? AetherButtonKind.Primary : AetherButtonKind.Secondary;
+            aetherPauseButton.Text = snapshot?.IsPaused == true ? "Resume" : "Pause";
             aetherPauseButton.Selected = snapshot?.IsPaused == true;
             aetherTurboButton.Selected = snapshot?.IsTurboEnabled == true;
             UpdateAetherSlotButtons();

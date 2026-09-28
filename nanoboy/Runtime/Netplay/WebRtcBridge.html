@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <title>AetherBoy · Link Bridge</title>
+  <title>AetherBoy · Online Link</title>
   <style>
     :root{color-scheme:dark;font:16px/1.55 system-ui,sans-serif;background:#070914;color:#eaeaf7;--cyan:#57dbe5;--purple:#ab82ff;--line:#30364d}
     *{box-sizing:border-box}body{margin:0}main{max-width:1060px;margin:auto;padding:40px 24px 70px}header{border-top:3px solid var(--purple);padding-top:24px;margin-bottom:28px}
@@ -12,38 +12,38 @@
     p{max-width:78ch;color:#b6bdd3}.status{padding:14px 18px;border:1px solid var(--line);border-left:3px solid var(--cyan);background:#101628;min-height:54px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:22px 0}
     section,details{background:#0e1222;border:1px solid var(--line);border-radius:12px;padding:24px}label{display:block;margin:14px 0 6px;font-size:.88rem;color:#c7cee0}textarea,input{width:100%;background:#080c19;color:#eaeaf7;border:1px solid #424962;border-radius:6px;padding:12px;font:inherit}
     textarea{min-height:190px;resize:vertical;font:12px/1.5 ui-monospace,monospace;overflow-wrap:anywhere}button{border:1px solid #61627d;border-radius:6px;background:#232a43;color:#fff;min-height:44px;padding:10px 16px;font:600 .85rem system-ui;cursor:pointer;margin:10px 8px 0 0}button.primary{background:#7451c5;border-color:#a68de3}button:disabled{opacity:.42;cursor:not-allowed}button:focus-visible,textarea:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
-    small,.note{font-size:.82rem;color:#a0abc4}.warning{color:#dfc58a}.row{display:flex;gap:16px}.row>div{flex:1}input[type=checkbox]{width:auto;margin-right:8px}summary{cursor:pointer;color:#d4c4ff}footer{margin-top:25px;color:#7f8ca7;font-size:.78rem}.danger{border-color:#ae6478}
+    small,.note{font-size:.9rem;color:#a0abc4}.warning{color:#dfc58a}.row{display:flex;gap:16px}.row>div{flex:1}input[type=checkbox]{width:auto;margin-right:8px}summary{cursor:pointer;color:#d4c4ff}footer{margin-top:25px;color:#a0abc4;font-size:.875rem}.danger{border-color:#ae6478}
     @media(max-width:720px){.grid{grid-template-columns:1fr}.row{display:block}main{padding:24px 16px}section,details{padding:18px}}
   </style>
 </head>
 <body>
 <main>
-  <header><div class="eyebrow">NekoZDevTeam · Native emulator / browser transport</div><h1>AetherBoy Link Bridge</h1><p>Zwei Rechner, ein gemeinsames Online-Link-Profil. Das Spiel bleibt im Emulator. Diese lokale Seite stellt nur die verschlüsselte, zuverlässige WebRTC-Datenverbindung für GB/GBC oder das GBA-Gen3-Entwicklungsprofil her.</p></header>
+  <header><div class="eyebrow">AetherBoy · Online Link</div><h1>Mitspieler verbinden</h1><p>Auf dieser Seite tauscht ihr die Verbindungsdaten aus. Danach spielt ihr im Emulator weiter.</p></header>
   <div id="status" class="status" role="status" aria-live="polite">Lokale Verbindung wird vorbereitet …</div>
-  <p class="warning">Entwicklungsprototyp – noch kein bestätigter Pokémon-Tauschrelease. GBA nur mit dem im Emulator ausdrücklich freigegebenen Gen3-Profil, kein universelles GBA-Kabel oder Funkadapter. Keine Kamera, kein Mikrofon und keine Übertragung von ROM-Dateien oder vollständigen Spielständen. Nutzt entbehrliche Testspielstände.</p>
+  <p class="warning">Online Link ist noch in Entwicklung. Ein Pokémon-Tausch über das Internet ist nicht bestätigt. Nutzt Testspielstände. Für GBA lassen sich nur freigegebene Gen3-Spiele starten; Funkadapter werden nicht unterstützt. ROMs und vollständige Spielstände werden nicht übertragen.</p>
   <details>
-    <summary>Optional: STUN / TURN und Verbindungsprivatsphäre</summary>
-    <p>Standardmäßig wird kein öffentlicher Vermittlungsserver kontaktiert. Direkte Verbindungen ohne STUN/TURN funktionieren nicht durch jede Firewall oder jeden Router. Eigene Server kannst du hier bewusst eintragen.</p>
+    <summary>Erweiterte Verbindungseinstellungen</summary>
+    <p>Ohne STUN oder TURN kommt die Verbindung nicht durch jeden Router. Wenn es nicht klappt, kannst du hier eigene Server eintragen. Ohne Eintrag wird kein öffentlicher Server kontaktiert.</p>
     <div class="row"><div><label for="stun">STUN-Adresse (optional)</label><input id="stun" maxlength="512" placeholder="stun:dein-server:3478" autocomplete="off" spellcheck="false"></div><div><label for="turn">TURN-Adresse (optional)</label><input id="turn" maxlength="512" placeholder="turn:dein-server:3478" autocomplete="off" spellcheck="false"></div></div>
     <div class="row"><div><label for="turnUser">TURN-Benutzername</label><input id="turnUser" maxlength="128" autocomplete="off" spellcheck="false"></div><div><label for="turnPassword">TURN-Passwort</label><input id="turnPassword" type="password" maxlength="256" autocomplete="off"></div></div>
-    <label><input id="serverConsent" type="checkbox">Ich möchte diese Server kontaktieren. Der Anbieter sieht Verbindungsdaten; TURN kann die verschlüsselten Daten weiterleiten.</label>
-    <label><input id="relayOnly" type="checkbox">Nur über meinen TURN-Server verbinden (Relay).</label>
-    <p class="note">Einladung und Antwort enthalten technische Verbindungsdaten, unter Umständen IP-Adressen. Teile sie nur mit deinem Mitspieler. Server-Zugangsdaten bleiben auf dieser Seite; sie werden nicht in Einladung oder Antwort kopiert. Keine automatische Speicherung.</p>
+    <label><input id="serverConsent" type="checkbox">Diese Server kontaktieren. Der Anbieter kann meine IP-Adresse sehen; ein TURN-Server leitet verschlüsselte Daten weiter.</label>
+    <label><input id="relayOnly" type="checkbox">Nur über meinen TURN-Server verbinden.</label>
+    <p class="note">Einladung und Antwort können IP-Adressen enthalten. Teile sie nur mit deinem Mitspieler. Server-Zugangsdaten werden nicht in Einladung oder Antwort kopiert. Verbindungsdaten werden nicht automatisch gespeichert.</p>
   </details>
   <div class="grid">
-    <section><h2>1 · Verbindung vorbereiten</h2><p>Ein Spieler erstellt eine Einladung. Der andere fügt sie ein und erstellt die Antwort. Anschließend fügt der erste Spieler die Antwort ein.</p>
+    <section><h2>1 · Einladung austauschen</h2><p>Wenn du einlädst, erstelle eine Einladung. Wenn du beitrittst, füge die Einladung unten ein und erstelle eine Antwort. Wenn du eingeladen hast, füge die Antwort hier ein.</p>
       <button id="offer" class="primary" disabled>Einladung erstellen</button>
       <label for="remote">Einladung oder Antwort des Mitspielers</label><textarea id="remote" maxlength="131072" placeholder="Verbindungsdaten hier einfügen" autocomplete="off" spellcheck="false"></textarea>
       <button id="answer" disabled>Aus Einladung eine Antwort erstellen</button><button id="accept" disabled>Antwort übernehmen</button>
     </section>
-    <section><h2>2 · Daten mit deinem Mitspieler teilen</h2><p id="localHint">Hier erscheint nach der ICE-Suche deine Einladung oder Antwort. Diesen Text manuell an den Mitspieler weitergeben.</p>
+    <section><h2>2 · Text an Mitspieler schicken</h2><p id="localHint">Deine Einladung oder Antwort erscheint hier, sobald sie fertig ist. Kopiere den Text und schick ihn deinem Mitspieler.</p>
       <label for="local">Deine Verbindungsdaten</label><textarea id="local" readonly spellcheck="false" aria-describedby="localHint"></textarea><button id="copy" disabled>Verbindungsdaten kopieren</button>
-      <p class="note">Nicht die Adresse dieser lokalen Seite teilen. Sie gehört nur zu deinem laufenden Emulator. Die Seite während des Spiels geöffnet lassen.</p>
+      <p class="note">Teile den kopierten Text, nicht die Adresse dieser Seite. Lass die Seite während des Spiels offen.</p>
     </section>
   </div>
   <button id="disconnect" class="danger">Verbindung beenden</button>
-  <p class="note">Nach „Verbunden“ zum Emulator zurückkehren. Zum kontrollierten Abschluss zuerst die Online-Sitzung im Emulator beenden. Ein Schließen dieser Seite trennt die Verbindung sofort und kann das Tauschergebnis ungeklärt lassen. Für einen neuen Versuch im Emulator eine neue Online-Link-Sitzung öffnen.</p>
-  <footer>Lokaler Helfer · Keine Downloads, Analyse-Dienste oder externen Skripte · GB/GBC / GBA Gen3 DEVELOPMENT</footer>
+  <p class="note">Sobald hier „Verbunden“ steht, spiel im Emulator weiter. Beende die Sitzung zuerst dort. Wenn du diese Seite schließt, bricht die Verbindung sofort ab und das Tauschergebnis kann ungeklärt sein. Für einen neuen Versuch starte im Emulator eine neue Sitzung.</p>
+  <footer>Diese Seite läuft auf deinem Rechner. Es werden keine externen Skripte geladen.</footer>
 </main>
 <script src="/bridge.js" defer></script>
 </body>

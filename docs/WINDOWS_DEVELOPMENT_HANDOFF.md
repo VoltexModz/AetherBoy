@@ -1,5 +1,7 @@
 # Windows-Entwicklung: Übergabe / Developer handoff
 
+**Lokaler UI-Nachtrag vom 28. September (noch uncommittet):** [Logo-Farben, frei wählbare Akzente und Hintergrund auf Windows/Wayland](UI_THEME_HANDOFF_2026-09-28.md).
+
 Nachtrag 13. September: [Native Raumcodes – Windows-Integration, Build und Abnahme](ONLINE_ROOMS_WINDOWS_HANDOFF.md).
 Enthält auch die Zusammenführung mit Voltex' Diagnose-/Session-Fix `23c6fda`.
 

@@ -3,23 +3,55 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using UiRgb = nanoboy.Core.UiRgb;
+using UiThemePalette = nanoboy.Core.UiThemePalette;
 
 namespace nanoboy.Controls
 {
     internal static class AetherColors
     {
-        public static readonly Color Void = Color.FromArgb(5, 7, 18);
-        public static readonly Color Chrome = Color.FromArgb(8, 11, 24);
-        public static readonly Color Surface = Color.FromArgb(12, 16, 31);
-        public static readonly Color SurfaceRaised = Color.FromArgb(17, 22, 41);
-        public static readonly Color Hairline = Color.FromArgb(47, 55, 83);
-        public static readonly Color Text = Color.FromArgb(241, 244, 255);
-        public static readonly Color Muted = Color.FromArgb(139, 148, 177);
-        public static readonly Color Violet = Color.FromArgb(139, 56, 255);
-        public static readonly Color Pulse = Color.FromArgb(169, 66, 245);
-        public static readonly Color Cyan = Color.FromArgb(41, 226, 237);
-        public static readonly Color Success = Color.FromArgb(84, 237, 176);
-        public static readonly Color Danger = Color.FromArgb(255, 92, 132);
+        private static UiThemePalette palette = new(null, null, null);
+        private static Color From(UiRgb value) => Color.FromArgb(value.R, value.G, value.B);
+        public static Color Void => From(palette.Background);
+        public static Color Chrome => From(palette.Chrome);
+        public static Color Surface => From(palette.Surface);
+        public static Color SurfaceRaised => From(palette.Raised);
+        public static Color Hairline => From(palette.Border);
+        public static Color Text => From(palette.Text);
+        public static Color Muted => From(palette.Muted);
+        public static Color Violet => From(palette.PrimaryText);
+        public static Color Pulse => Violet;
+        public static Color Cyan => From(palette.SecondaryText);
+        public static Color Primary => From(palette.Primary);
+        public static Color OnPrimary => From(palette.OnPrimary);
+        public static Color Success => From(palette.SuccessText);
+        public static Color Danger => From(palette.DangerText);
+
+        public static void Apply(UiThemePalette next)
+        {
+            Color[] before = [Void, Chrome, Surface, SurfaceRaised, Hairline, Text, Muted, Violet, Cyan, Primary, Success, Danger];
+            palette = next;
+            Color[] after = [Void, Chrome, Surface, SurfaceRaised, Hairline, Text, Muted, Violet, Cyan, Primary, Success, Danger];
+            foreach (Form form in Application.OpenForms)
+                Recolor(form, before, after);
+        }
+
+        private static void Recolor(Control control, Color[] before, Color[] after)
+        {
+            for (int i = 0; i < before.Length; i++)
+            {
+                if (control.BackColor == before[i]) { control.BackColor = after[i]; break; }
+            }
+            for (int i = 0; i < before.Length; i++)
+            {
+                if (control.ForeColor == before[i]) { control.ForeColor = after[i]; break; }
+            }
+            if (control is AetherStatusDot dot)
+                for (int i = 0; i < before.Length; i++)
+                    if (dot.SignalColor == before[i]) { dot.SignalColor = after[i]; break; }
+            foreach (Control child in control.Controls) Recolor(child, before, after);
+            control.Invalidate();
+        }
     }
 
     internal enum AetherButtonKind
@@ -44,7 +76,7 @@ namespace nanoboy.Controls
             Cursor = Cursors.Hand;
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
-            Font = new Font("Segoe UI", 8.5f, FontStyle.Bold, GraphicsUnit.Point);
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold, GraphicsUnit.Point);
             ForeColor = AetherColors.Text;
             Size = new Size(112, 38);
             TabStop = true;
@@ -136,11 +168,11 @@ namespace nanoboy.Controls
             graphics.Clear(Parent?.BackColor ?? AetherColors.Void);
 
             Rectangle bounds = new Rectangle(0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1));
-            using GraphicsPath path = CreateChamferedPath(bounds, Math.Min(8, Height / 3));
+            using GraphicsPath path = CreateRoundedPath(bounds, Math.Min(8, Height / 3));
 
-            Color foreground = Enabled ? AetherColors.Text : Color.FromArgb(88, AetherColors.Muted);
-            Color border = selected ? AetherColors.Cyan : AetherColors.Hairline;
-            Color surface = AetherColors.SurfaceRaised;
+            Color foreground = Enabled ? AetherColors.Text : AetherColors.Muted;
+            Color border = Focused ? AetherColors.Cyan : AetherColors.Hairline;
+            Color surface = hovered ? AetherColors.SurfaceRaised : AetherColors.Surface;
 
             if (kind == AetherButtonKind.Danger)
             {
@@ -148,32 +180,26 @@ namespace nanoboy.Controls
             }
             else if (kind == AetherButtonKind.Ghost)
             {
-                border = Color.FromArgb(hovered ? 76 : 32, AetherColors.Muted);
-                surface = hovered ? AetherColors.SurfaceRaised : AetherColors.Chrome;
+                surface = hovered ? AetherColors.SurfaceRaised : Parent?.BackColor ?? AetherColors.Chrome;
             }
 
             if (kind == AetherButtonKind.Primary && Enabled)
             {
-                Color left = pressed
-                    ? Color.FromArgb(112, 42, 213)
-                    : hovered ? Color.FromArgb(157, 70, 255) : AetherColors.Violet;
-                Color right = pressed
-                    ? Color.FromArgb(29, 177, 191)
-                    : hovered ? Color.FromArgb(67, 239, 247) : AetherColors.Cyan;
-                using var fill = new LinearGradientBrush(bounds, left, right, 0f);
+                using var fill = new SolidBrush(pressed ? Color.FromArgb(190, AetherColors.Primary) : AetherColors.Primary);
                 graphics.FillPath(fill, path);
-                foreground = AetherColors.Void;
-                border = Color.FromArgb(180, AetherColors.Cyan);
+                foreground = AetherColors.OnPrimary;
+                border = AetherColors.Primary;
             }
             else
             {
                 if (pressed)
                 {
-                    surface = Color.FromArgb(24, 30, 54);
+                    surface = AetherColors.Chrome;
                 }
-                else if (hovered || selected)
+                else if (selected)
                 {
-                    surface = Color.FromArgb(22, 28, 51);
+                    surface = AetherColors.SurfaceRaised;
+                    border = AetherColors.Primary;
                 }
 
                 using var fill = new SolidBrush(surface);
@@ -183,12 +209,6 @@ namespace nanoboy.Controls
             using (var outline = new Pen(border, selected ? 1.6f : 1f))
             {
                 graphics.DrawPath(outline, path);
-            }
-
-            if (kind != AetherButtonKind.Primary && (hovered || selected))
-            {
-                using var signal = new Pen(selected ? AetherColors.Cyan : AetherColors.Violet, 2f);
-                graphics.DrawLine(signal, 4, 4, 4, Height - 5);
             }
 
             TextRenderer.DrawText(
@@ -209,19 +229,14 @@ namespace nanoboy.Controls
             }
         }
 
-        private static GraphicsPath CreateChamferedPath(Rectangle bounds, int cut)
+        private static GraphicsPath CreateRoundedPath(Rectangle bounds, int radius)
         {
             var path = new GraphicsPath();
-            path.AddPolygon(
-                new[]
-                {
-                    new Point(bounds.Left, bounds.Top),
-                    new Point(bounds.Right - cut, bounds.Top),
-                    new Point(bounds.Right, bounds.Top + cut),
-                    new Point(bounds.Right, bounds.Bottom),
-                    new Point(bounds.Left + cut, bounds.Bottom),
-                    new Point(bounds.Left, bounds.Bottom - cut)
-                });
+            int diameter = radius * 2;
+            path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+            path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
             path.CloseFigure();
             return path;
         }
@@ -242,19 +257,19 @@ namespace nanoboy.Controls
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            e.Graphics.Clear(Parent?.BackColor ?? AetherColors.Void);
             Rectangle border = new Rectangle(0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1));
+            using var shape = new GraphicsPath();
+            shape.AddArc(border.Left, border.Top, 20, 20, 180, 90);
+            shape.AddArc(border.Right - 20, border.Top, 20, 20, 270, 90);
+            shape.AddArc(border.Right - 20, border.Bottom - 20, 20, 20, 0, 90);
+            shape.AddArc(border.Left, border.Bottom - 20, 20, 20, 90, 90);
+            shape.CloseFigure();
+            using var fill = new SolidBrush(BackColor);
+            e.Graphics.FillPath(fill, shape);
             using var borderPen = new Pen(AetherColors.Hairline);
-            e.Graphics.DrawRectangle(borderPen, border);
-
-            if (AccentEdge && Height > 2)
-            {
-                using var accent = new LinearGradientBrush(
-                    new Rectangle(0, 0, 2, Height),
-                    AetherColors.Violet,
-                    AetherColors.Cyan,
-                    LinearGradientMode.Vertical);
-                e.Graphics.FillRectangle(accent, 0, 0, 2, Height);
-            }
+            e.Graphics.DrawPath(borderPen, shape);
         }
     }
 
@@ -275,24 +290,14 @@ namespace nanoboy.Controls
                 return;
             }
 
-            using var line = new LinearGradientBrush(
-                new Rectangle(0, Height - 2, Width, 2),
-                AetherColors.Violet,
-                AetherColors.Cyan,
-                0f);
-            e.Graphics.FillRectangle(line, 0, Height - 2, Width, 2);
-
-            using var fragment = new SolidBrush(Color.FromArgb(105, AetherColors.Violet));
-            int start = Math.Max(280, Width / 3);
-            e.Graphics.FillRectangle(fragment, start, 14, 34, 3);
-            e.Graphics.FillRectangle(fragment, start + 18, 22, 22, 3);
-            e.Graphics.FillRectangle(fragment, start + 29, 30, 13, 3);
+            using var line = new SolidBrush(AetherColors.Hairline);
+            e.Graphics.FillRectangle(line, 0, Height - 1, Width, 1);
         }
     }
 
     internal sealed class AetherStagePanel : AetherSurfacePanel
     {
-        private readonly Font labelFont = new Font("Segoe UI", 7.5f, FontStyle.Bold, GraphicsUnit.Point);
+        private readonly Font labelFont = new Font("Segoe UI", 9f, FontStyle.Bold, GraphicsUnit.Point);
 
         public AetherStagePanel()
         {
@@ -306,14 +311,12 @@ namespace nanoboy.Controls
             base.OnPaint(e);
             TextRenderer.DrawText(
                 e.Graphics,
-                "DISPLAY // 160 × 144",
+                "GAME SCREEN",
                 labelFont,
                 new Rectangle(18, 12, Math.Max(1, Width - 36), 20),
                 AetherColors.Muted,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
 
-            using var signal = new Pen(AetherColors.Cyan, 2f);
-            e.Graphics.DrawLine(signal, Width - 58, 22, Width - 20, 22);
         }
 
         protected override void Dispose(bool disposing)

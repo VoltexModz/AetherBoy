@@ -21,7 +21,7 @@ public sealed class OnlineRoomTransport : IOnlineProbeConnection
     private readonly HttpClient http;
     private readonly bool host, relayOnly;
     private readonly string profile;
-    private string roomCode, participant = "", status = "Connecting to room server…";
+    private string roomCode, participant = "", status = "Connecting to the room server…";
     private int connected;
     private int admitted, peerPresent;
     private long sentPackets, receivedPackets;
@@ -73,26 +73,26 @@ public sealed class OnlineRoomTransport : IOnlineProbeConnection
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancel);
             deadline.CancelAfter(TimeSpan.FromMinutes(10));
             CancellationToken setup = deadline.Token;
-            status = "Preparing the relay connection…";
+            status = "Preparing the connection…";
             Stage("relay-preparation");
             using var peer = new NativeRtcPeer(admission.IceServers, relayOnly, incoming.Writer, Stop, Diagnostics);
             string? remote = null;
-            if (!host) { Stage("remote-offer"); status = "Waiting for the host…"; remote = await WaitForDescription(setup).ConfigureAwait(false); }
+            if (!host) { Stage("remote-offer"); status = "Waiting for the player who created the room…"; remote = await WaitForDescription(setup).ConfigureAwait(false); }
             Stage("ice-gathering");
             string local = await peer.DescriptionAsync(host, remote, setup).ConfigureAwait(false);
             Stage("publish-description");
             await Request<JsonElement>(HttpMethod.Put, "v1/rooms/" + roomCode + "/description", new { type = host ? "offer" : "answer", sdp = local }, setup).ConfigureAwait(false);
             if (host)
             {
-                status = "Room ready · Share the code with your friend.";
+                status = "Room ready. Send the code to your friend.";
                 Stage("remote-answer");
                 peer.AcceptAnswer(await WaitForDescription(setup).ConfigureAwait(false));
             }
-            status = "Connecting to your friend…";
+            status = "Connecting to the other player…";
             Stage("data-channel-open");
             await peer.WaitForOpenAsync(host, setup).ConfigureAwait(false);
             Stage("connected");
-            Volatile.Write(ref connected, 1); status = "Connected · Return to the game."; ready.TrySetResult();
+            Volatile.Write(ref connected, 1); status = "Connected. Return to the game."; ready.TrySetResult();
             while (!cancel.IsCancellationRequested)
             {
                 peer.PollDiagnostics();
@@ -160,7 +160,7 @@ public sealed class OnlineRoomTransport : IOnlineProbeConnection
                 Diagnostics.Record("sdp-remote", "received type=" + description.Type + " characters=" + description.Sdp.Length);
                 return description.Sdp;
             }
-            if (host && room.PeerPresent) status = "Your friend joined · Preparing connection…";
+            if (host && room.PeerPresent) status = "The other player joined. Connecting…";
             await Task.Delay(750, cancellation).ConfigureAwait(false);
         }
     }

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SDL3;
+using nanoboy.Core;
 
 namespace AetherBoy.Desktop;
 
@@ -26,6 +27,9 @@ internal static class LinuxSettingsStore
         public bool Channel2Enabled { get; set; } = true;
         public bool Channel3Enabled { get; set; } = true;
         public bool Channel4Enabled { get; set; } = true;
+        public string? UiPrimaryColor { get; set; }
+        public string? UiSecondaryColor { get; set; }
+        public string? UiBackgroundColor { get; set; }
 
     }
 
@@ -72,6 +76,7 @@ internal static class LinuxSettingsStore
             Settings saved = JsonSerializer.Deserialize<Settings>(stream, JsonOptions)
                 ?? throw new InvalidDataException("Settings file is empty.");
             if (saved.Version != 1) throw new InvalidDataException("Unsupported settings version.");
+            UiThemePalette theme = new(saved.UiPrimaryColor, saved.UiSecondaryColor, saved.UiBackgroundColor);
             var options = new LinuxFrontendOptions
             {
                 AudioEnabled = saved.AudioEnabled,
@@ -90,6 +95,9 @@ internal static class LinuxSettingsStore
                 Channel2Enabled = saved.Channel2Enabled,
                 Channel3Enabled = saved.Channel3Enabled,
                 Channel4Enabled = saved.Channel4Enabled,
+                UiPrimaryColor = theme.Primary.Hex,
+                UiSecondaryColor = theme.Secondary.Hex,
+                UiBackgroundColor = theme.Background.Hex,
                 Keys = LinuxKeyBindings.FromDictionary(saved.Keys),
             };
             options.SetVolume(saved.AudioVolume);
@@ -102,9 +110,14 @@ internal static class LinuxSettingsStore
         }
     }
 
-    public static byte[] SerializeSnapshotBytes(LinuxFrontendOptions options) =>
-        JsonSerializer.SerializeToUtf8Bytes(new Settings
+    public static byte[] SerializeSnapshotBytes(LinuxFrontendOptions options)
+    {
+        UiThemePalette theme = new(options.UiPrimaryColor, options.UiSecondaryColor, options.UiBackgroundColor);
+        return JsonSerializer.SerializeToUtf8Bytes(new Settings
         {
+            UiPrimaryColor = theme.Primary.Hex,
+            UiSecondaryColor = theme.Secondary.Hex,
+            UiBackgroundColor = theme.Background.Hex,
             AudioEnabled = options.AudioEnabled,
             VideoFilter = options.VideoFilter,
             Frameskip = options.Frameskip,
@@ -123,6 +136,7 @@ internal static class LinuxSettingsStore
             AudioVolume = Math.Clamp(options.AudioVolume, 0, 100),
             Keys = options.Keys.ToDictionary(),
         }, JsonOptions);
+    }
 
     public static void Save(string path, LinuxFrontendOptions options) => WriteSnapshot(path, SerializeSnapshotBytes(options));
 

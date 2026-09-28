@@ -16,6 +16,7 @@ namespace nanoboy
         public required Action ToggleFullscreen { get; init; }
         public required Action ApplyAudioSettings { get; init; }
         public Action ApplyVideoSettings { get; init; } = () => { };
+        public Action ApplyUiTheme { get; init; } = () => { };
         public Func<string> AudioOutputProvider { get; init; } = () => "No output";
         public Func<string> VideoOutputProvider { get; init; } = () => "No output";
         public Func<string> SaveFeedbackProvider { get; init; } = () => "Noch keine Save-State-Aktion.";
