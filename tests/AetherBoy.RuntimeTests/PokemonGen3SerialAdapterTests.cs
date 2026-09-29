@@ -231,10 +231,19 @@ public sealed class PokemonGen3SerialAdapterTests
     public void PeerResetCannotReinterpretAnEstablishedLocalGameAsHandshake()
     {
         using var endpoint = EstablishedHost();
-        Assert.ThrowsExactly<InvalidDataException>(() => endpoint.Adapter.Receive(new(PokemonGen3MessageKind.Reset, 2, 2)));
+        endpoint.Adapter.Receive(new(PokemonGen3MessageKind.Reset, 2, 2));
         Assert.AreEqual(1u, endpoint.Adapter.CurrentPhase);
-        Assert.IsFalse(endpoint.Adapter.IsConnected);
-        StringAssert.Contains(endpoint.Adapter.FailureReason!, "local game was still connected");
+        Assert.IsTrue(endpoint.Adapter.IsConnected);
+        Assert.IsTrue(endpoint.Adapter.ProtocolEstablished);
+        Assert.IsTrue(endpoint.Adapter.HasPendingPhaseTransition);
+        endpoint.Exchange(0);
+        for (int i = 0; i < 8; i++) Assert.AreEqual(0u, endpoint.Exchange(0));
+        Assert.IsTrue(endpoint.Adapter.ProtocolEstablished);
+        Assert.IsFalse(endpoint.Adapter.TryDequeueOutgoing(out _));
+        endpoint.Device.SerialController.WriteHalfWord(IORegs.SIOCNT, 0x2003);
+        Assert.AreEqual(2u, endpoint.Adapter.CurrentPhase);
+        Assert.IsFalse(endpoint.Adapter.ProtocolEstablished);
+        Assert.IsFalse(endpoint.Adapter.HasPendingPhaseTransition);
     }
 
     [TestMethod]

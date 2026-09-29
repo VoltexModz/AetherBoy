@@ -33,6 +33,8 @@ public sealed class PokemonGen3SerialAdapter : ISerialPeer, IDisposable
     private const int WordCycles = 18_363; // Two-player 115200 transfer + game's timer interval.
     private readonly SerialController controller;
     private readonly bool host;
+    private readonly TimeProvider timeProvider;
+    private readonly TimeSpan phaseTransitionTimeout;
     private readonly int ownerThread = Environment.CurrentManagedThreadId;
     private readonly Queue<PokemonGen3Message> outgoing = new();
     private readonly Queue<PokemonGen3Message> incoming = new();
@@ -45,7 +47,9 @@ public sealed class PokemonGen3SerialAdapter : ISerialPeer, IDisposable
     private bool disposed;
     private bool active;
     private ushort latchedWord;
-    private int handshakeRounds;
+    // History of completed responses visible to the local game's IRQ handler,
+    // not a counter belonging to the peer's network phase.
+    private bool previousLocalHandshakeReady;
     private int slot; // 0 = preceding frame checksum, 1..8 = command words.
     private ushort pairChecksum;
     private bool checksumAvailable;
@@ -55,10 +59,22 @@ public sealed class PokemonGen3SerialAdapter : ISerialPeer, IDisposable
     private ulong frameHigh;
     private long nextGuestStart;
     private long guestStartTarget;
+    private uint pendingPeerPhase;
+    private long phaseTransitionStarted;
+    private int pendingHandshakeCount;
+    private ushort pendingHandshakeWord;
 
     public PokemonGen3SerialAdapter(SerialController controller, bool isHost)
+        : this(controller, isHost, TimeProvider.System, TimeSpan.FromSeconds(30)) { }
+
+    internal PokemonGen3SerialAdapter(SerialController controller, bool isHost,
+        TimeProvider timeProvider, TimeSpan phaseTransitionTimeout)
     {
         this.controller = controller ?? throw new ArgumentNullException(nameof(controller));
+        this.timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        if (phaseTransitionTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(phaseTransitionTimeout));
+        this.phaseTransitionTimeout = phaseTransitionTimeout;
         host = isHost;
         controller.Attach(this);
         RefreshStatus();
@@ -74,12 +90,14 @@ public sealed class PokemonGen3SerialAdapter : ISerialPeer, IDisposable
     public long CommandsReceived { get; private set; }
     public long CommandsDelivered { get; private set; }
     public int PendingCommandCount => incoming.Count + (deliveringCommand ? 1 : 0);
+    internal bool HasPendingPhaseTransition => pendingPeerPhase != 0;
+    private bool HasUndeliveredLocalPayload => incoming.Count != 0 || deliveringCommand ||
+        (frameLow | frameHigh) != 0 || (ProtocolEstablished && active && slot != 0 && latchedWord != 0);
     public bool HasPendingPayload
     {
         get
         {
-            if (incoming.Count != 0 || deliveringCommand || (frameLow | frameHigh) != 0 ||
-                (ProtocolEstablished && active && slot != 0 && latchedWord != 0)) return true;
+            if (HasUndeliveredLocalPayload) return true;
             foreach (PokemonGen3Message message in outgoing)
                 if (message.Kind == PokemonGen3MessageKind.Command) return true;
             return false;
@@ -96,28 +114,64 @@ public sealed class PokemonGen3SerialAdapter : ISerialPeer, IDisposable
     {
         CheckThread();
         if (!IsConnected) return;
+        CheckPhaseTransitionTimeout();
         if (message.Sequence != incomingSequence + 1 || message.Sequence == 0 || message.Phase == 0)
             Fail("Invalid or replayed Gen3 message sequence.");
         incomingSequence = message.Sequence;
         if (message.Kind is not (PokemonGen3MessageKind.Handshake or PokemonGen3MessageKind.Command or PokemonGen3MessageKind.Reset))
             Fail("Unknown Gen3 protocol message.");
+        // Validate even superseded control messages before considering their phase.
+        if (message.Kind == PokemonGen3MessageKind.Reset &&
+            (message.HandshakeWord != 0 || message.WordsLow != 0 || message.WordsHigh != 0 || message.Checksum != 0 ||
+             (ulong)message.Phase > (ulong)CurrentPhase + 1))
+            Fail("Malformed Gen3 phase reset.");
+        if (message.Kind == PokemonGen3MessageKind.Handshake &&
+            (message.WordsLow != 0 || message.WordsHigh != 0 || message.Checksum != 0 ||
+             !IsHandshake(message.HandshakeWord) || (host && message.HandshakeWord == MasterHandshake)))
+            Fail("Invalid Gen3 player handshake or role.");
+        if (message.Kind == PokemonGen3MessageKind.Command &&
+            (message.HandshakeWord != 0 || (message.WordsLow | message.WordsHigh) == 0 ||
+             Sum(message.WordsLow, message.WordsHigh) != message.Checksum))
+            Fail("Malformed Gen3 command or checksum.");
         if (message.Phase < CurrentPhase)
         {
             if (message.Kind == PokemonGen3MessageKind.Command)
                 Fail("An undelivered Gen3 command crossed a phase reset; the outcome is uncertain.");
             return; // Superseded handshake/reset control carries no game payload.
         }
+        if (HasPendingPhaseTransition)
+        {
+            // Ordered transport guarantees all old-phase peer commands preceded
+            // its reset. Only bounded handshake metadata may follow it while
+            // our game finishes consuming the old section; never new payload.
+            if (message.Phase != pendingPeerPhase || message.Kind != PokemonGen3MessageKind.Handshake)
+                Fail("A Gen3 message crossed a pending phase reset; the outcome is uncertain.");
+            if (pendingHandshakeCount >= QueueCapacity)
+                Fail("Gen3 pending handshake limit exceeded; the local section has not ended.");
+            pendingHandshakeWord = message.HandshakeWord;
+            pendingHandshakeCount++;
+            return;
+        }
         if (message.Kind == PokemonGen3MessageKind.Reset)
         {
-            if (message.HandshakeWord != 0 || message.WordsLow != 0 || message.WordsHigh != 0 || message.Checksum != 0 ||
-                message.Phase > CurrentPhase + 1)
-                Fail("Malformed Gen3 phase reset.");
             if (message.Phase > CurrentPhase)
             {
-                EnsureNoPendingPayload();
                 if (ProtocolEstablished)
-                    Fail("The peer reset its Gen3 link while the local game was still connected; restart both sessions explicitly.");
-                ResetPhase(message.Phase);
+                {
+                    // FireRed/Emerald close after their own game has consumed
+                    // READY_CLOSE_LINK. That says nothing about our consumption.
+                    // Keep this phase intact until our game disables SIO too.
+                    pendingPeerPhase = message.Phase;
+                    phaseTransitionStarted = timeProvider.GetTimestamp();
+                }
+                else
+                {
+                    EnsureNoUndeliveredLocalPayload();
+                    // A peer-only startup reset does not run EnableSerial in
+                    // our game. Keep its last observed participant count, but
+                    // require fresh peer metadata in the new network phase.
+                    ResetPhase(message.Phase, resetLocalHandshake: false);
+                }
             }
             return;
         }
@@ -125,18 +179,12 @@ public sealed class PokemonGen3SerialAdapter : ISerialPeer, IDisposable
             Fail("Gen3 payload arrived without an agreed phase reset.");
         if (message.Kind == PokemonGen3MessageKind.Handshake)
         {
-            if (message.WordsLow != 0 || message.WordsHigh != 0 || message.Checksum != 0 ||
-                !IsHandshake(message.HandshakeWord) || (host && message.HandshakeWord == MasterHandshake))
-                Fail("Invalid Gen3 player handshake or role.");
             if (ProtocolEstablished && message.HandshakeWord != peerHandshakeWord)
                 Fail("Peer restarted its Gen3 handshake without a phase reset.");
             peerHandshakeWord = message.HandshakeWord;
             peerSeen = true;
             return;
         }
-        if (message.HandshakeWord != 0 || (message.WordsLow | message.WordsHigh) == 0 ||
-            Sum(message.WordsLow, message.WordsHigh) != message.Checksum)
-            Fail("Malformed Gen3 command or checksum.");
         if (!peerSeen)
             Fail("Gen3 command arrived before the peer handshake.");
         if (incoming.Count >= QueueCapacity)
@@ -150,6 +198,7 @@ public sealed class PokemonGen3SerialAdapter : ISerialPeer, IDisposable
     {
         CheckThread();
         if (!IsConnected) return;
+        CheckPhaseTransitionTimeout();
         RefreshStatus();
         bool enabled = controller.Mode == 2 && (controller._sioCnt & 0x4000) != 0;
         if (!enabled) return;
@@ -172,8 +221,12 @@ public sealed class PokemonGen3SerialAdapter : ISerialPeer, IDisposable
         // SIO between two owner polls cannot hide a game-internal reset.
         if (exited && IsConnected)
         {
-            EnsureNoPendingPayload();
-            ResetPhase(checked(CurrentPhase + 1));
+            CheckPhaseTransitionTimeout();
+            EnsureNoUndeliveredLocalPayload();
+            ResetPhase(checked(CurrentPhase + 1), resetLocalHandshake: true);
+            // Completed outgoing commands survive ResetPhase and precede this
+            // reset in the ordered queue. Only partial or unread payload blocks
+            // a local section exit; no successful delivery is inferred here.
             Queue(new(PokemonGen3MessageKind.Reset, CurrentPhase, NextSequence()));
         }
         controller.UpdateLinkStatus(host ? 0 : 1, IsConnected, IsConnected && controller.Mode == 2);
@@ -221,9 +274,10 @@ public sealed class PokemonGen3SerialAdapter : ISerialPeer, IDisposable
             Advertise(latchedWord);
             other = peerSeen ? peerHandshakeWord : (ushort)0;
             bool bothReady = IsHandshake(latchedWord) && IsHandshake(other);
-            handshakeRounds = bothReady ? handshakeRounds + 1 : 0;
+            bool stableLocalPair = bothReady && previousLocalHandshakeReady;
+            previousLocalHandshakeReady = bothReady;
             ushort parent = host ? latchedWord : other;
-            if (parent == MasterHandshake && bothReady && handshakeRounds >= 2)
+            if (parent == MasterHandshake && stableLocalPair)
             {
                 ProtocolEstablished = true;
                 slot = 0;
@@ -320,25 +374,39 @@ public sealed class PokemonGen3SerialAdapter : ISerialPeer, IDisposable
         Queue(new(PokemonGen3MessageKind.Handshake, CurrentPhase, NextSequence(), word));
     }
 
-    private void EnsureNoPendingPayload()
+    internal void CheckPhaseTransitionTimeout()
     {
-        if (HasPendingPayload)
+        CheckThread();
+        if (IsConnected && HasPendingPhaseTransition &&
+            timeProvider.GetElapsedTime(phaseTransitionStarted) >= phaseTransitionTimeout)
+            Fail("The local Gen3 game did not finish its link section before the phase deadline; restart both sessions.");
+    }
+
+    private void EnsureNoUndeliveredLocalPayload()
+    {
+        if (HasUndeliveredLocalPayload)
             Fail("The Gen3 phase ended with undelivered commands; session stopped to protect its outcome.");
     }
 
-    private void ResetPhase(uint phase)
+    private void ResetPhase(uint phase, bool resetLocalHandshake)
     {
         CurrentPhase = phase;
         ProtocolEstablished = false;
         active = false;
         controller.AbortTransfer();
-        peerSeen = false;
-        peerHandshakeWord = 0;
+        peerSeen = phase == pendingPeerPhase && pendingHandshakeCount != 0;
+        peerHandshakeWord = peerSeen ? pendingHandshakeWord : (ushort)0;
+        pendingPeerPhase = 0;
+        phaseTransitionStarted = 0;
+        pendingHandshakeCount = 0;
+        pendingHandshakeWord = 0;
         advertisedWord = ushort.MaxValue;
-        handshakeRounds = slot = 0;
+        if (resetLocalHandshake) previousLocalHandshakeReady = false;
+        slot = 0;
         pairChecksum = 0;
         checksumAvailable = false;
         frameLow = frameHigh = 0;
+        incomingFrame = default;
         nextGuestStart = controller.EmulatedCycles;
     }
 

@@ -190,12 +190,16 @@ public partial class frmNano
 
         bool failed = current.State == SessionState.Faulted || online.Phase == OnlineLinkPhase.Faulted;
         bool nativeRoom = onlineRoomTransport is not null;
-        string reason = failed ? (nativeRoom ? DescribeOnlineRoomFailure(onlineRoomTransport?.Fault)
-            : DescribeOnlineLinkFailure(onlineLinkTransport?.BrowserFailure))
+        bool transportFailed = onlineRoomTransport?.Fault is not null || onlineLinkTransport?.Fault is not null ||
+            onlineLinkTransport?.BrowserFailure is not null;
+        string reason = failed ? DescribeOnlineSessionFailure(current.Fault, online.Failure, nativeRoom,
+            onlineRoomTransport?.Fault ?? onlineLinkTransport?.Fault, onlineLinkTransport?.BrowserFailure)
             : "Online-Link beendet. Beide Sitzungskopien vor einer bewussten Übernahme prüfen.";
         string diagnostic = reason + "\n\nOriginalspielstände wurden nicht ersetzt. Ein Verbindungsende bestätigt keinen erfolgreichen Tausch. " +
             "Sitzungskopien: TOOLS → Online Link → Online-Spielstände öffnen.\n\n" +
-            (nativeRoom
+            (failed && !transportFailed
+                ? "Beide AetherBoy-Builds und das gewählte Kabelprofil prüfen. Die Sitzung wurde im Emulator beendet; daraus folgt kein nachgewiesener Router- oder Serverfehler."
+                : nativeRoom
                 ? "Für einen neuen Versuch das eigene Spiel öffnen und einen neuen Raum erstellen oder per Raumcode beitreten. Servereinstellungen im Raumdialog prüfen."
                 : "Für einen neuen Versuch das eigene Spiel öffnen, eine neue Online-Sitzung starten und neue Einladung/Antwort austauschen.");
         if (failed && !sessionFaultReported)
@@ -209,12 +213,111 @@ public partial class frmNano
         gamepadAwaitNeutral = true; lastOnlineStatus = null;
         gameView.ClearFrame();
         lastOnlineDiagnostic = diagnostic;
-        SetSaveFeedback(reason + " · TOOLS → Online Link → Letzte Verbindungsdiagnose", failed);
+        // Keep the action legible in the narrow status area; the menu opens the
+        // complete cause and save-safety guidance without truncating either.
+        SetSaveFeedback(failed ? "Online-Sitzung unterbrochen. Diagnose unter TOOLS → Online Link."
+            : reason + " · TOOLS → Online Link → Letzte Verbindungsdiagnose", failed);
         return true;
     }
 
-    internal static string DescribeOnlineRoomFailure(Exception? failure) => failure?.Message
-        ?? "Die Online-Raumsitzung wurde unterbrochen. Raumstatus und lokalen Diagnosebericht prüfen; die genaue Ursache ist nicht bekannt.";
+    internal static string DescribeOnlineRoomFailure(Exception? failure)
+    {
+        if (failure is OnlineRoomRequestException request)
+            return request.StatusCode switch
+            {
+                System.Net.HttpStatusCode.Unauthorized => "Der Server-Zugangsschlüssel stimmt nicht. Prüfe die Servereinstellungen.",
+                System.Net.HttpStatusCode.NotFound => "Der Raum wurde nicht gefunden oder ist abgelaufen. Prüfe den Raumcode.",
+                System.Net.HttpStatusCode.Conflict => "Der Raum ist voll oder nutzt ein anderes Spielsystem. Einen passenden neuen Raum erstellen.",
+                System.Net.HttpStatusCode.BadRequest => "Der Raumserver hat die Anfrage abgelehnt. Serverversion und gewähltes Kabelprofil prüfen.",
+                System.Net.HttpStatusCode.TooManyRequests => "Zu viele Verbindungsversuche. Warte eine Minute und versuche es erneut.",
+                _ => "Der Raumserver konnte die Anfrage nicht abschließen. Den lokalen Verbindungsbericht prüfen."
+            };
+        // Room transports can also carry arbitrary native/JSON exceptions. Never
+        // echo their free-form text, URLs or credentials in the diagnostic dialog.
+        string? known = failure?.Message switch
+        {
+            "The server access key is incorrect. Open Server settings." =>
+                "Der Server-Zugangsschlüssel stimmt nicht. Prüfe die Servereinstellungen.",
+            "Cannot reach the room server. Check its address and HTTPS certificate." =>
+                "Der Raumserver ist nicht erreichbar. Serveradresse und HTTPS-Zertifikat prüfen.",
+            "The room server returned an invalid relay configuration." or "Invalid relay configuration." or "Invalid relay URL." =>
+                "Der Raumserver hat ungültige Relay-Einstellungen geliefert. Die TURN-Konfiguration am Server prüfen.",
+            "Native online support is missing from this build. Install a complete AetherBoy build." =>
+                "Die native Online-Bibliothek fehlt. Einen vollständigen AetherBoy-Build installieren.",
+            "The native online library is incompatible. Install the complete libdatachannel 0.24.5 build." =>
+                "Die native Online-Bibliothek passt nicht zu diesem Build. Einen vollständigen AetherBoy-Build installieren.",
+            "This native build needs a TURN/UDP address. Use the manual browser connection for TURN/TCP or TLS." =>
+                "Dieser native Build benötigt TURN über UDP. Die TURN-Adresse prüfen; TCP und TLS werden hier noch nicht unterstützt.",
+            "The peer uses an incompatible data channel." or "The peer opened more than one data channel." =>
+                "Die Gegenstelle verwendet einen unpassenden Datenkanal. Beide AetherBoy-Builds prüfen.",
+            "The online receive queue is full." or "The online send queue is full." or "Invalid online packet size." =>
+                "Der Datenpuffer ist voll oder ein Paket hat eine unzulässige Größe. Die Sitzung wurde beendet; den Verbindungsbericht prüfen.",
+            "The room contains incompatible connection data." or "The room server response is too large." or
+            "The room server returned an empty response." =>
+                "Der Raumserver hat unpassende Verbindungsdaten geliefert. Serverversion und Verbindungsbericht prüfen.",
+            _ => null
+        };
+        if (known is not null) return known;
+        if (failure is TimeoutException)
+            return "Beim Raumaufbau wurde eine Wartefrist überschritten. Den Verbindungsbericht prüfen und einen neuen Raum erstellen.";
+        return "Die Online-Raumsitzung wurde unterbrochen. Raumstatus und lokalen Diagnosebericht prüfen; die genaue Ursache ist nicht bekannt.";
+    }
+
+    internal static string DescribeOnlineSessionFailure(Exception? ownerFailure, string? sessionFailure,
+        bool nativeRoom, Exception? transportFailure, WebRtcBrowserFailure? browserFailure)
+    {
+        if (transportFailure is not null || browserFailure is not null)
+            return nativeRoom ? DescribeOnlineRoomFailure(transportFailure) : DescribeOnlineLinkFailure(browserFailure);
+
+        // The owner can fail while the transport remains healthy. Do not replace a
+        // protocol/save/core error with a guessed ICE failure. Only known messages
+        // are translated; arbitrary exception text can contain paths or secrets.
+        string? failure = sessionFailure ?? ownerFailure?.GetBaseException().Message;
+        string? detail = failure switch
+        {
+            "The local game requested an internal-clock transfer, but no matching peer offer arrived before the cable timeout. Start a new session." =>
+                "Das lokale GB/GBC-Spiel wollte Daten senden, aber das passende Übertragungsangebot des Mitspielers blieb aus. Beide Sitzungen neu starten.",
+            "Both games offered a serial transfer, but the peer's readiness acknowledgement did not arrive before the cable timeout. Start a new session." =>
+                "Beide GB/GBC-Spiele boten Daten an, aber die Bereitschaftsbestätigung der Gegenstelle blieb aus. Beide Sitzungen neu starten.",
+            "The local serial byte completed, but the peer's completion acknowledgement did not arrive before the cable timeout. Start a new session." =>
+                "Das lokale GB/GBC-Byte wurde übertragen, aber die Abschlussbestätigung der Gegenstelle blieb aus. Beide Sitzungen neu starten.",
+            "The local Gen3 game reported an inconsistent serial checksum." =>
+                "Die serielle Prüfsumme des GBA-Spiels stimmt nicht mit den übertragenen Wörtern überein.",
+            "The Gen3 phase ended with undelivered commands; session stopped to protect its outcome." or
+            "An undelivered Gen3 command crossed a phase reset; the outcome is uncertain." or
+            "GBA Online ended with undelivered commands. The working copies need manual review." =>
+                "Der GBA-Linkabschnitt endete mit noch nicht zugestellten Spielbefehlen. Beide Spielstandkopien prüfen.",
+            "The local Gen3 game did not finish its link section before the phase deadline; restart both sessions." =>
+                "Der Mitspieler hat den GBA-Linkabschnitt beendet, das lokale Spiel jedoch nicht innerhalb der Wartefrist. Beide Sitzungen neu starten.",
+            "GBA Online ended before the local game finished its link section. The working copies need manual review." =>
+                "Die GBA-Sitzung endete vor dem lokalen Linkabschnitt. Beide Spielstandkopien prüfen; der Abschluss ist unbestätigt.",
+            "The game cancelled a Gen3 serial transfer during an active command frame." =>
+                "Das GBA-Spiel hat eine laufende Befehlsübertragung abgebrochen.",
+            "The Gen3 online profile requires 115200-baud multiplayer mode." or
+            "The game changed serial mode or baud during a Gen3 protocol transfer." =>
+                "Das GBA-Spiel verwendet einen seriellen Modus oder Takt, den dieses Online-Profil nicht unterstützt.",
+            "Unsupported AetherBoy online-link protocol." or
+            "Incompatible online-link handshake (GB/GBC protocol v1 required)." or
+            "GBA Gen3 needs AetherBoy protocol v2; GB/GBC and other profiles cannot be mixed." or
+            "Both peers need the same GBA Pokémon Gen3 development profile and explicit consent." =>
+                "Das empfangene Kabelprotokoll passt nicht zu dieser Sitzung. Beide Builds und Kabelprofile prüfen.",
+            "Choose one host and one guest, not two identical roles." or "Choose one host and one guest." =>
+                "Beide Teilnehmer haben dieselbe Rolle gewählt. Einer erstellt die Sitzung, der andere tritt bei.",
+            "The ROM changed after its GBA online profile was inspected." =>
+                "Die ROM-Datei wurde nach der Profilprüfung verändert. Das Spiel neu öffnen und sein Online-Profil erneut prüfen.",
+            "A session cannot connect to itself." or "A GBA online session cannot connect to itself." =>
+                "Die Sitzung wurde mit sich selbst verbunden. Die Einladung beziehungsweise den Raumcode des Mitspielers verwenden.",
+            _ => null
+        };
+        if (detail is not null) return "Online-Sitzung unterbrochen: " + detail;
+        if (ownerFailure?.GetBaseException() is InvalidDataException)
+            return "Die Sitzung hat unpassende Daten oder einen unerwarteten Ablauf erkannt. Den lokalen Diagnosebericht prüfen; die genaue Ursache ist noch nicht eingegrenzt.";
+        if (ownerFailure?.GetBaseException() is TimeoutException)
+            return "Die Online-Sitzung hat eine Wartefrist überschritten. Den lokalen Diagnosebericht prüfen; die Meldung allein belegt keinen Netzwerkfehler.";
+        if (ownerFailure is not null || !string.IsNullOrWhiteSpace(failure))
+            return "Die Online-Sitzung wurde wegen eines Fehlers im Emulator beendet. Den lokalen Diagnosebericht prüfen; die Ursache ist noch nicht eingegrenzt.";
+        return nativeRoom ? DescribeOnlineRoomFailure(null) : DescribeOnlineLinkFailure(null);
+    }
 
     internal static string DescribeOnlineLinkFailure(WebRtcBrowserFailure? failure) => failure switch
     {

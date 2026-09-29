@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.RegularExpressions;
 using AetherBoy.Runtime.Netplay;
 
 namespace AetherBoy.RuntimeTests;
@@ -25,12 +26,18 @@ public sealed class WebRtcBridgeTests
         using HttpResponseMessage response = await client.GetAsync(Origin(transport));
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
         string page = await response.Content.ReadAsStringAsync();
-        StringAssert.Contains(page, "AetherBoy Link Bridge");
-        StringAssert.Contains(page, "Keine Downloads");
+        // Check the actual local resources and CSP, not wording that may be localized.
+        string[] resources = Regex.Matches(page,
+            "<(?:script|link|img|iframe|source)\\b[^>]*\\b(?:src|href)\\s*=\\s*[\"']([^\"']+)[\"']",
+            RegexOptions.IgnoreCase).Select(match => match.Groups[1].Value).ToArray();
+        CollectionAssert.AreEqual(new[] { "/bridge.js" }, resources);
         Assert.IsFalse(page.Contains(url.Fragment[1..], StringComparison.Ordinal));
         Assert.IsFalse(response.Headers.Contains("Access-Control-Allow-Origin"));
         Assert.AreEqual("no-referrer", response.Headers.GetValues("Referrer-Policy").Single());
-        StringAssert.Contains(response.Headers.GetValues("Content-Security-Policy").Single(), "frame-ancestors 'none'");
+        string policy = response.Headers.GetValues("Content-Security-Policy").Single();
+        StringAssert.Contains(policy, "frame-ancestors 'none'");
+        StringAssert.Contains(policy, "default-src 'none'");
+        StringAssert.Contains(policy, "script-src 'self'");
         string script = await client.GetStringAsync(Origin(transport) + "/bridge.js");
         StringAssert.Contains(script, "const iceServers = [];");
         StringAssert.Contains(script, "history.replaceState");

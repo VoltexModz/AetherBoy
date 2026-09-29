@@ -13,6 +13,20 @@ namespace nanoboy.Core
     }
 
     /// <summary>
+    /// Local diagnostic state, not a wire value or a game-role decision.
+    /// ExternalClockPending is a passive listener, not an execution barrier.
+    /// </summary>
+    public enum NetworkSerialWaitReason
+    {
+        None,
+        UnpairedInternalClock,
+        ExternalClockPending,
+        PeerReady,
+        PeerCompletion,
+        Disconnected
+    }
+
+    /// <summary>
     /// Transport-neutral, bounded serial messages. IDs are scoped to one freshly
     /// authenticated session. The transport must preserve reliable message order.
     /// Offers carry an SB snapshot, SC bits 0-1, and a bit period in 4 MHz dots;
@@ -85,6 +99,25 @@ namespace nanoboy.Core
         /// </summary>
         public bool WaitingForPeer => !IsConnected || localComplete ||
             (!running && local.HasValue && (readySent || (local.Value.Control & 1) != 0));
+
+        /// <summary>
+        /// Explains the current serial wait without changing clock arbitration,
+        /// bytes or the runtime's existing execution barrier. A missing offer
+        /// does not establish whether the peer game is idle or its packet late.
+        /// </summary>
+        public NetworkSerialWaitReason WaitReason
+        {
+            get
+            {
+                if (!IsConnected) return NetworkSerialWaitReason.Disconnected;
+                if (localComplete) return NetworkSerialWaitReason.PeerCompletion;
+                if (running || !local.HasValue) return NetworkSerialWaitReason.None;
+                if (readySent) return NetworkSerialWaitReason.PeerReady;
+                return (local.Value.Control & 1) != 0
+                    ? NetworkSerialWaitReason.UnpairedInternalClock
+                    : NetworkSerialWaitReason.ExternalClockPending;
+            }
+        }
 
         public long TransfersCompleted { get; private set; }
         public string? FailureReason { get; private set; }

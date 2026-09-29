@@ -152,38 +152,41 @@ public sealed class GbaOnlineTests
     }
 
     [TestMethod]
-    [DataRow(0, false)]
-    [DataRow(10, false)]
-    [DataRow(20, false)]
-    [DataRow(30, false)]
-    [DataRow(50, false)]
-    [DataRow(100, false)]
-    [DataRow(20, true)]
-    public async Task AutonomousArmProgramsExchangeGen3CommandsThroughIndependentOwners(int delayMs, bool jitter)
+    [DataRow(0, false, false)]
+    [DataRow(10, false, false)]
+    [DataRow(20, false, false)]
+    [DataRow(30, false, false)]
+    [DataRow(50, false, false)]
+    [DataRow(100, false, false)]
+    [DataRow(20, true, false)]
+    [DataRow(0, false, true)]
+    [DataRow(100, true, true)]
+    public async Task AutonomousArmProgramsExchangeGen3CommandsThroughIndependentOwners(int delayMs, bool jitter, bool interruptDriven)
     {
+        int commandCount = interruptDriven ? 3 : 1;
         var first = CreateGame("gen3-host", 1);
         var second = CreateGame("gen3-guest", 2);
-        File.WriteAllBytes(first.Rom, GbaGen3SyntheticRom.Create(true));
-        File.WriteAllBytes(second.Rom, GbaGen3SyntheticRom.Create(false));
+        File.WriteAllBytes(first.Rom, GbaGen3SyntheticRom.Create(true, interruptDriven, commandCount));
+        File.WriteAllBytes(second.Rom, GbaGen3SyntheticRom.Create(false, interruptDriven, commandCount));
         var (left, right) = DelayedTransport.Pair(delayMs, jitter);
         var a = Start(first, "gen3-a", true, left);
         var b = Start(second, "gen3-b", false, right);
         try
         {
-            await Until(() => a.OnlineLink!.CommandsDelivered >= 1 && b.OnlineLink!.CommandsDelivered >= 1, a, b);
+            await Until(() => a.OnlineLink!.CommandsDelivered >= commandCount && b.OnlineLink!.CommandsDelivered >= commandCount, a, b);
             long frameA = a.LatestSnapshot.EmulatedFrameCount, frameB = b.LatestSnapshot.EmulatedFrameCount;
             await Until(() => a.LatestSnapshot.EmulatedFrameCount > frameA && b.LatestSnapshot.EmulatedFrameCount > frameB, a, b);
             Assert.AreEqual(GbaOnlineProfileCatalog.PokemonGen3Profile, a.OnlineLink!.ProfileId);
-            Assert.AreEqual(1L, a.OnlineLink.CommandsSent);
-            Assert.AreEqual(1L, b.OnlineLink!.CommandsSent);
-            Assert.AreEqual(1L, a.OnlineLink.CommandsDelivered);
-            Assert.AreEqual(1L, b.OnlineLink.CommandsDelivered);
+            Assert.AreEqual((long)commandCount, a.OnlineLink.CommandsSent);
+            Assert.AreEqual((long)commandCount, b.OnlineLink!.CommandsSent);
+            Assert.AreEqual((long)commandCount, a.OnlineLink.CommandsDelivered);
+            Assert.AreEqual((long)commandCount, b.OnlineLink.CommandsDelivered);
             Assert.IsLessThan(10, left.SentLengths.Count(size => size == GbaOnlineLinkProtocol.MessageLength),
                 "Whole command messages are sent, not one WAN packet per emulated serial word.");
         }
         finally { await Task.WhenAll(Stop(a), Stop(b)); }
-        CollectionAssert.AreEqual(GbaGen3SyntheticRom.ExpectedReceived(true), File.ReadAllBytes(a.OnlineLink!.WorkingSavePath)[..16]);
-        CollectionAssert.AreEqual(GbaGen3SyntheticRom.ExpectedReceived(false), File.ReadAllBytes(b.OnlineLink!.WorkingSavePath)[..16]);
+        CollectionAssert.AreEqual(GbaGen3SyntheticRom.ExpectedReceived(true, commandCount), File.ReadAllBytes(a.OnlineLink!.WorkingSavePath)[..(16 * commandCount)]);
+        CollectionAssert.AreEqual(GbaGen3SyntheticRom.ExpectedReceived(false, commandCount), File.ReadAllBytes(b.OnlineLink!.WorkingSavePath)[..(16 * commandCount)]);
         Assert.IsTrue(File.ReadAllBytes(first.Save).All(value => value == 0xCC));
         Assert.IsTrue(File.ReadAllBytes(second.Save).All(value => value == 0xCC));
     }

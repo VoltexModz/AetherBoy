@@ -15,6 +15,7 @@ namespace AetherBoy.Runtime.Netplay;
 public sealed class OnlineRoomTransport : IOnlineProbeConnection
 {
     private static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(15);
     private readonly CancellationTokenSource lifetime = new();
     private readonly TaskCompletionSource ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Channel<byte[]> incoming = Queue(), outgoing = Queue();
@@ -52,7 +53,8 @@ public sealed class OnlineRoomTransport : IOnlineProbeConnection
             DiagnosticPath = Path.Combine(Path.GetFullPath(diagnosticDirectory), "online-" + Diagnostics.SessionId + ".json");
         Diagnostics.Record("session", "role=" + (host ? "host" : "guest") + " profile=" +
             (profile is "gb-serial-v1" or "gba-pokemon-gen3-v1" or OnlineTransportProbe.Profile ? profile : "unknown"));
-        http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = address, Timeout = TimeSpan.FromSeconds(15) };
+        // Request<T> owns a single deadline covering headers AND the streamed body.
+        http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = address, Timeout = Timeout.InfiniteTimeSpan };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", settings.AccessKey);
         Completion = Task.Run(RunAsync);
     }
@@ -167,31 +169,44 @@ public sealed class OnlineRoomTransport : IOnlineProbeConnection
 
     private async Task<T> Request<T>(HttpMethod method, string path, object? body, CancellationToken cancellation)
     {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+        deadline.CancelAfter(RequestTimeout);
+        CancellationToken requestCancellation = deadline.Token;
         using var request = new HttpRequestMessage(method, path);
         if (body is not null) request.Content = new StringContent(JsonSerializer.Serialize(body, Json), Encoding.UTF8, "application/json");
-        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellation).ConfigureAwait(false);
-        // Never record the URL (contains room code), headers, response body or SDP.
-        string operation = path.EndsWith("/join", StringComparison.Ordinal) ? "join" : path.EndsWith("/description", StringComparison.Ordinal)
-            ? "description" : method == HttpMethod.Post ? "create" : method == HttpMethod.Delete ? "close" : "poll";
-        Diagnostics.Record("room-http", "operation=" + operation + " status=" + (int)response.StatusCode);
-        if (!response.IsSuccessStatusCode)
-            throw new OnlineRoomRequestException(response.StatusCode, response.StatusCode switch
-            {
-                HttpStatusCode.Unauthorized => "The server access key is incorrect. Open Server settings.",
-                HttpStatusCode.NotFound => "Room not found or expired. Check the code or create a new room.",
-                HttpStatusCode.Conflict => "The room is full or uses a different game system.",
-                HttpStatusCode.BadRequest => "The room server rejected the request. For a connection test, update the server to support transport-probe-v1.",
-                HttpStatusCode.TooManyRequests => "Too many connection attempts. Wait a minute and try again.",
-                _ => "The room server could not complete the request (" + (int)response.StatusCode + ").",
-            });
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellation).ConfigureAwait(false);
-        using var bytes = new MemoryStream(); byte[] buffer = new byte[8192]; int count;
-        while ((count = await stream.ReadAsync(buffer, cancellation).ConfigureAwait(false)) != 0)
+        try
         {
-            if (bytes.Length + count > 120_000) throw new IOException("The room server response is too large.");
-            bytes.Write(buffer, 0, count);
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestCancellation).ConfigureAwait(false);
+            // Never record the URL (contains room code), headers, response body or SDP.
+            string operation = path.EndsWith("/join", StringComparison.Ordinal) ? "join" : path.EndsWith("/description", StringComparison.Ordinal)
+                ? "description" : method == HttpMethod.Post ? "create" : method == HttpMethod.Delete ? "close" : "poll";
+            Diagnostics.Record("room-http", "operation=" + operation + " status=" + (int)response.StatusCode);
+            if (!response.IsSuccessStatusCode)
+                throw new OnlineRoomRequestException(response.StatusCode, response.StatusCode switch
+                {
+                    HttpStatusCode.Unauthorized => "The server access key is incorrect. Open Server settings.",
+                    HttpStatusCode.NotFound => "Room not found or expired. Check the code or create a new room.",
+                    HttpStatusCode.Conflict => "The room is full or uses a different game system.",
+                    HttpStatusCode.BadRequest => "The room server rejected the request. For a connection test, update the server to support transport-probe-v1.",
+                    HttpStatusCode.TooManyRequests => "Too many connection attempts. Wait a minute and try again.",
+                    _ => "The room server could not complete the request (" + (int)response.StatusCode + ").",
+                });
+            await using var stream = await response.Content.ReadAsStreamAsync(requestCancellation).ConfigureAwait(false);
+            using var bytes = new MemoryStream(); byte[] buffer = new byte[8192]; int count;
+            while ((count = await stream.ReadAsync(buffer, requestCancellation).ConfigureAwait(false)) != 0)
+            {
+                if (bytes.Length + count > 120_000) throw new IOException("The room server response is too large.");
+                bytes.Write(buffer, 0, count);
+            }
+            requestCancellation.ThrowIfCancellationRequested();
+            return JsonSerializer.Deserialize<T>(bytes.ToArray(), Json) ?? throw new IOException("The room server returned an empty response.");
         }
-        return JsonSerializer.Deserialize<T>(bytes.ToArray(), Json) ?? throw new IOException("The room server returned an empty response.");
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested && !cancellation.IsCancellationRequested)
+        {
+            // RunAsync maps this to the existing stage-specific timeout diagnosis.
+            // An outer setup deadline or a user cancellation must retain its own meaning.
+            throw new TimeoutException();
+        }
     }
     private void Stop(Exception? error = null)
     {
@@ -208,7 +223,9 @@ public sealed class OnlineRoomTransport : IOnlineProbeConnection
     public async ValueTask DisposeAsync() { Stop(); await Completion.ConfigureAwait(false); }
     public bool TryReceive(out byte[] packet)
     {
-        if (!lifetime.IsCancellationRequested && incoming.Reader.TryRead(out var next)) { packet = next; Interlocked.Increment(ref receivedPackets); return true; }
+        // A clean close can follow a final receipt before the owner thread polls it.
+        // Faults (including queue overflow) still invalidate every buffered packet.
+        if (Fault is null && incoming.Reader.TryRead(out var next) && Fault is null) { packet = next; Interlocked.Increment(ref receivedPackets); return true; }
         packet = Array.Empty<byte>(); return false;
     }
     public void Send(ReadOnlySpan<byte> packet)

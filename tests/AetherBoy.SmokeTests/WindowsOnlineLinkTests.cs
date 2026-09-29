@@ -43,9 +43,91 @@ public sealed class WindowsOnlineLinkTests
     public void NativeRoomFailureRetainsActionableReasonWithoutBrowserFallback()
     {
         const string reason = "The server access key is incorrect. Open Server settings.";
-        Assert.AreEqual(reason, frmNano.DescribeOnlineRoomFailure(new IOException(reason)));
+        StringAssert.Contains(frmNano.DescribeOnlineRoomFailure(new IOException(reason)), "Server-Zugangsschlüssel");
         StringAssert.Contains(frmNano.DescribeOnlineRoomFailure(null), "Raumstatus");
         Assert.IsFalse(frmNano.DescribeOnlineRoomFailure(null).Contains("Browser", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void HealthyTransportDoesNotHideKnownGameProtocolFailure(bool nativeRoom)
+    {
+        const string failure = "The local Gen3 game reported an inconsistent serial checksum.";
+        string description = frmNano.DescribeOnlineSessionFailure(new InvalidDataException(failure), failure,
+            nativeRoom, null, null);
+        StringAssert.Contains(description, "Prüfsumme");
+        Assert.IsFalse(description.Contains("Browser", StringComparison.Ordinal));
+        Assert.IsFalse(description.Contains("Server", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void SessionDiagnosisPreservesTransportEvidenceAndDoesNotExposeUnknownExceptionText()
+    {
+        const string privateText = "secret-token-and-private-save-path";
+        var fault = new InvalidDataException(privateText);
+        string description = frmNano.DescribeOnlineSessionFailure(fault, privateText, false, null, null);
+        StringAssert.Contains(description, "Sitzung");
+        Assert.IsFalse(description.Contains(privateText, StringComparison.Ordinal));
+        description = frmNano.DescribeOnlineSessionFailure(fault, privateText, false,
+            new IOException("transport failure"), WebRtcBrowserFailure.DataChannel);
+        StringAssert.Contains(description, "Datenkanal");
+        description = frmNano.DescribeOnlineSessionFailure(fault, privateText, true,
+            new IOException(privateText), null);
+        StringAssert.Contains(description, "Raumstatus");
+        Assert.IsFalse(description.Contains(privateText, StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    [DataRow("The local game requested an internal-clock transfer, but no matching peer offer arrived before the cable timeout. Start a new session.", "Übertragungsangebot")]
+    [DataRow("Both games offered a serial transfer, but the peer's readiness acknowledgement did not arrive before the cable timeout. Start a new session.", "Bereitschaftsbestätigung")]
+    [DataRow("The local serial byte completed, but the peer's completion acknowledgement did not arrive before the cable timeout. Start a new session.", "Abschlussbestätigung")]
+    [DataRow("The ROM changed after its GBA online profile was inspected.", "ROM-Datei")]
+    public void SessionDiagnosisKeepsTheKnownFailureStage(string failure, string expected)
+    {
+        string description = frmNano.DescribeOnlineSessionFailure(new InvalidDataException(failure), failure, true, null, null);
+        StringAssert.Contains(description, expected);
+        Assert.IsFalse(description.Contains("Router", StringComparison.Ordinal));
+        Assert.IsFalse(description.Contains("Server", StringComparison.Ordinal));
+    }
+
+    [STATestMethod]
+    [DataRow(0)]
+    [DataRow(1)]
+    [DataRow(2)]
+    public void ProtocolFaultWithHealthyTransportReachesWindowsAndProtectsSaves(int hardware)
+    {
+        using var fixture = new Fixture();
+        using var wire = new InvalidHandshakeTransport();
+        using var form = new frmNano();
+        form.OnlineLinkBrowserLauncher = _ => { };
+        form.OnlineGbaProfileInspector = SyntheticProfile;
+        form.OnlineLinkSessionStarter = (rom, save, directory, host, _, configuration, palette, allowGba) =>
+            hardware == 2 ? SyntheticGbaOwner(rom, save, directory, host, wire, configuration)
+                : EmulationSession.CreateOnlineLink(rom, save, directory, host, wire, configuration, palette);
+        form.Show();
+        try
+        {
+            form.LoadRomFile(hardware == 2 ? fixture.AdvanceRom() : fixture.Rom("protocol." + (hardware == 1 ? "gbc" : "gb"), hardware == 1));
+            PumpUntil(() => Field<EmulationSession>(form, "session").LatestSnapshot.EmulatedFrameCount > 0);
+            string original = WindowsRomLibrary.Default.GetSavePath(Field<string>(form, "currentRomPath"));
+            Assert.IsTrue(form.StartOnlineLink(true, confirm: false));
+            Field<System.Windows.Forms.Timer>(form, "updateTimer").Stop();
+            var online = Field<EmulationSession>(form, "session");
+            byte[]? before = File.Exists(original) ? File.ReadAllBytes(original) : null;
+            Assert.ThrowsExactly<InvalidDataException>(() => online.Completion.WaitAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult());
+            Assert.IsNull(wire.Fault);
+            Call(form, "updateTimer_Tick", form, EventArgs.Empty);
+            Assert.IsNull(Field<EmulationSession?>(form, "session"));
+            string diagnostic = Field<string>(form, "lastOnlineDiagnostic");
+            StringAssert.Contains(diagnostic, "Kabelprotokoll");
+            StringAssert.Contains(diagnostic, "Originalspielstände wurden nicht ersetzt");
+            Assert.IsFalse(diagnostic.Contains("Browserstatus", StringComparison.Ordinal));
+            Assert.IsFalse(diagnostic.Contains("Servereinstellungen", StringComparison.Ordinal));
+            AssertUnchanged(original, before);
+            using var lease = RomWriteLease.Acquire(original + ".lock");
+        }
+        finally { form.Close(); }
     }
 
     [STATestMethod]
@@ -385,6 +467,26 @@ public sealed class WindowsOnlineLinkTests
         ConstructorInfo constructor = typeof(EmulationSession).GetConstructors(Private)
             .Single(item => item.GetParameters()[0].ParameterType.Name == "IEmulationMachineFactory");
         return (EmulationSession)constructor.Invoke([factory, pacer]);
+    }
+
+    private sealed class InvalidHandshakeTransport : IOnlineLinkTransport
+    {
+        private readonly TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private bool sent, read;
+        public Task Ready => Task.CompletedTask;
+        public Task Completion => completion.Task;
+        public bool Connected => !Completion.IsCompleted;
+        public Exception? Fault => null;
+        public void Send(ReadOnlySpan<byte> packet) => sent = true;
+        public bool TryReceive(out byte[] packet)
+        {
+            packet = [0];
+            if (!sent || read) return false;
+            read = true;
+            return true;
+        }
+        public void Dispose() => completion.TrySetResult();
+        public ValueTask DisposeAsync() { Dispose(); return ValueTask.CompletedTask; }
     }
 
     private sealed class DelayedCloseTransport : IOnlineLinkTransport

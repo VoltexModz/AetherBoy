@@ -113,7 +113,7 @@ internal sealed class OnlineLinkCoordinator : IDisposable
             {
                 if (waitingSince == 0) waitingSince = Stopwatch.GetTimestamp();
                 if (Stopwatch.GetElapsedTime(waitingSince) > transferTimeout)
-                    throw new TimeoutException("The cable peer did not become ready within two minutes. Start a new session.");
+                    throw new TimeoutException(DescribeTransferTimeout(cable.WaitReason));
             }
             else waitingSince = 0;
             state.Publish(Waiting ? OnlineLinkPhase.WaitingForTransfer : OnlineLinkPhase.Playing, cable.TransfersCompleted);
@@ -126,6 +126,17 @@ internal sealed class OnlineLinkCoordinator : IDisposable
             throw;
         }
     }
+
+    private static string DescribeTransferTimeout(NetworkSerialWaitReason reason) => reason switch
+    {
+        NetworkSerialWaitReason.UnpairedInternalClock =>
+            "The local game requested an internal-clock transfer, but no matching peer offer arrived before the cable timeout. Start a new session.",
+        NetworkSerialWaitReason.PeerReady =>
+            "Both games offered a serial transfer, but the peer's readiness acknowledgement did not arrive before the cable timeout. Start a new session.",
+        NetworkSerialWaitReason.PeerCompletion =>
+            "The local serial byte completed, but the peer's completion acknowledgement did not arrive before the cable timeout. Start a new session.",
+        _ => "The GB/GBC cable transfer did not complete before its timeout. Start a new session."
+    };
 
     public void Dispose()
     {

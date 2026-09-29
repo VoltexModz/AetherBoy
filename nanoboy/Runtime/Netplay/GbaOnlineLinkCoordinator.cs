@@ -101,10 +101,15 @@ internal sealed class GbaOnlineLinkCoordinator : IDisposable
             {
                 Waiting = true; state.Publish(OnlineLinkPhase.WaitingForPeer, adapter.TransfersCompleted); return;
             }
+            // Heartbeats and pause messages cannot indefinitely extend a game
+            // section whose peer has already ended it.
+            adapter.CheckPhaseTransitionTimeout();
             if (closeRequested)
             {
                 // Stop generation first. A partial/in-flight application block makes the result uncertain,
                 // so it can never be laundered into a clean-stop acknowledgement.
+                if (adapter.HasPendingPhaseTransition)
+                    throw new IOException("GBA Online ended before the local game finished its link section. The working copies need manual review.");
                 if (adapter.HasPendingPayload)
                     throw new IOException("GBA Online ended with undelivered commands. The working copies need manual review.");
                 // A peer can close immediately after its final ACK was queued locally. Consume and
@@ -173,8 +178,8 @@ internal sealed class GbaOnlineLinkCoordinator : IDisposable
     {
         if (disposed) return;
         disposed = true;
-        if (adapter.HasPendingPayload && state.Snapshot.Phase != OnlineLinkPhase.Faulted)
-            state.Publish(OnlineLinkPhase.Faulted, adapter.TransfersCompleted, "GBA Online closed with undelivered commands; inspect the working copies.");
+        if ((adapter.HasPendingPayload || adapter.HasPendingPhaseTransition) && state.Snapshot.Phase != OnlineLinkPhase.Faulted)
+            state.Publish(OnlineLinkPhase.Faulted, adapter.TransfersCompleted, "GBA Online closed before all commands and link sections were completed; inspect the working copies.");
         adapter.Dispose();
         if (state.Snapshot.Phase != OnlineLinkPhase.Faulted)
             state.Publish(OnlineLinkPhase.Closed, adapter.TransfersCompleted);

@@ -67,7 +67,9 @@ public sealed class WebRtcBrowserTransport : IOnlineLinkTransport
 
     public bool TryReceive(out byte[] packet)
     {
-        if (Volatile.Read(ref stopped) == 0 && incoming.Reader.TryRead(out byte[]? received))
+        // Preserve already accepted final receipts after an orderly close, but never
+        // drain a failed connection (including an overflowed incoming queue).
+        if (Fault is null && incoming.Reader.TryRead(out byte[]? received) && Fault is null)
         {
             packet = received;
             return true;

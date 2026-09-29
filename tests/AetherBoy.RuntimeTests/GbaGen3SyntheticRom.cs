@@ -5,12 +5,16 @@ using System.Text;
 
 namespace AetherBoy.RuntimeTests;
 
-/// <summary>Self-authored ARMv4T serial test. Sends one eight-word command, then idle;
-/// receives via actual serial IRQ flags and stores nonzero peer words in SRAM. No game code.</summary>
+/// <summary>Self-authored ARMv4T serial test. Sends complete commands, then idle.
+/// Optional BIOS-dispatched IRQ mode uses Timer 3 to start host transfers and
+/// observes VBlank interrupts; it does not reproduce a retail game's VBlank pacing.</summary>
 public static class GbaGen3SyntheticRom
 {
-    public static byte[] Create(bool host)
+    public const uint IrqState = 0x03000000;
+
+    public static byte[] Create(bool host, bool interruptDriven = false, int commandCount = 1)
     {
+        if (commandCount is < 1 or > 16) throw new ArgumentOutOfRangeException(nameof(commandCount));
         var asm = new ArmProgram();
         asm.Load(1, 0x04000128); // SIOCNT
         asm.Load(2, 0x0400012A); // SIOMLT_SEND
@@ -24,6 +28,21 @@ public static class GbaGen3SyntheticRom
         asm.Emit(0xE1C1C0B0); // strh r12, [r1]
         asm.Load(7, 0xB9A0);
         asm.Emit(0xE1C270B0); // strh r7, [r2]
+        if (interruptDriven)
+        {
+            asm.Load(12, 0x03007FFC);
+            asm.LoadAddress(0, "irq-handler");
+            asm.Emit(0xE58C0000); // cartridge IRQ entry for BIOS glue
+            asm.Load(12, 0x04000004); // DISPSTAT: enable VBlank IRQ
+            asm.Emit(0xE3A00008);
+            asm.Emit(0xE1CC00B0);
+            asm.Load(12, 0x04000200); // IE: Serial, Timer 3, VBlank
+            asm.Emit(0xE3A000C1);
+            asm.Emit(0xE1CC00B0);
+            asm.Load(12, 0x04000208); // IME
+            asm.Emit(0xE3A00001);
+            asm.Emit(0xE1CC00B0);
+        }
         asm.Emit(0xE3A0B000); // stable handshake count
         asm.Label("handshake");
         asm.Branch("exchange", link: true);
@@ -61,7 +80,7 @@ public static class GbaGen3SyntheticRom
             asm.Emit(0xE35B0002);
             asm.Branch("handshake", condition: 3);
         }
-        asm.Emit(0xE3A08000); // command not yet sent
+        asm.Emit(0xE3A08000); // outgoing frame number
         asm.Emit(0xE3A09000); // first checksum ignored
         asm.Load(11, host ? 0x120u : 0x220u);
         asm.Label("frame");
@@ -71,13 +90,15 @@ public static class GbaGen3SyntheticRom
         asm.Emit(0xE3A09000); // reset pair checksum
         asm.Emit(0xE3A06000); // word index
         asm.Label("word");
-        asm.Emit(0xE3580000);
-        asm.Emit(0x008B7006); // addeq r7, r11, r6
-        asm.Emit(0x13A07000); // movne r7, #0: idle
+        asm.Emit(0xE3580000u | (uint)commandCount); // cmp r8, #commandCount
+        asm.Emit(0x308B7006); // addlo r7, r11, r6
+        asm.Emit(0x30877208); // addlo r7, r7, r8, lsl #4
+        asm.Emit(0x23A07000); // movhs r7, #0: idle
         asm.Emit(0xE1C270B0);
         asm.Branch("exchange", link: true);
         asm.Emit(0xE0899007); // checksum += own
         asm.Emit(0xE089900A); // checksum += peer
+        asm.Emit(0xE1A0000A); // keep original peer word for the end-of-frame store decision
         asm.Emit(0xE35A0000); // ignore idle when saving received command
         asm.Emit(0xE085C086); // add r12, r5, r6, lsl #1
         asm.Emit(0x15CCA000); // strbne r10, [r12]
@@ -86,11 +107,36 @@ public static class GbaGen3SyntheticRom
         asm.Emit(0xE2866001);
         asm.Emit(0xE3560008);
         asm.Branch("word", condition: 3);
-        asm.Emit(0xE3A08001);
+        // This fixture sends either eight nonzero test words or eight idle
+        // words, so its final peer word identifies a received test command.
+        asm.Emit(0xE3500000);
+        asm.Emit(0x12855010); // addne r5, r5, #16: preserve every received command
+        asm.Emit(0xE2888001); // next outgoing frame
         asm.Emit(0xE1A09809); // checksum truncate 16-bit
         asm.Emit(0xE1A09829);
         asm.Branch("frame");
         asm.Label("exchange");
+        if (interruptDriven)
+        {
+            asm.Load(12, IrqState + 4);
+            asm.Emit(0xE59C0000); // previous serial-IRQ callback count
+            if (host)
+            {
+                asm.Load(12, 0x0400010C); // Timer 3 reload + control
+                asm.Load(10, 0x00C1FF3B); // 197 * 64 cycles, IRQ enabled
+                asm.Emit(0xE58CA000);
+            }
+            asm.Load(12, IrqState + 4);
+            asm.Label("wait-irq");
+            asm.Emit(0xE59CA000);
+            asm.Emit(0xE15A0000);
+            asm.Branch("wait-irq", condition: 0);
+            asm.Emit(0xE1D4A0B0);
+            asm.Emit(host ? 0xE15400B2u : 0xE1D400B2u);
+            asm.Emit(0xE12FFF1E);
+            EmitIrqHandler(asm, host);
+            return asm.Finish();
+        }
         if (host)
         {
             asm.Load(12, 0x6083);
@@ -108,10 +154,56 @@ public static class GbaGen3SyntheticRom
         return asm.Finish();
     }
 
-    public static byte[] ExpectedReceived(bool host)
+    private static void EmitIrqHandler(ArmProgram asm, bool host)
     {
-        byte[] expected = new byte[16];
-        for (int i = 0; i < 8; i++) BinaryPrimitives.WriteUInt16LittleEndian(expected.AsSpan(i * 2), (ushort)((host ? 0x220 : 0x120) + i));
+        // Only r0-r3/r12 are used here: the HLE BIOS saves/restores these
+        // volatile registers around the cartridge callback, like its IRQ ABI.
+        asm.Label("irq-handler");
+        asm.Load(0, 0x04000202);
+        asm.Emit(0xE1D010B0); // pending IF
+        asm.Emit(0xE20110C1); // only our three IRQ sources
+        asm.Emit(0xE1C010B0); // acknowledge
+        asm.Load(2, IrqState);
+        asm.Emit(0xE3110080);
+        asm.Branch("irq-timer", condition: 0);
+        asm.Load(3, 0x04000120);
+        asm.Emit(0xE593C000); // actual serial register pair
+        asm.Emit(0xE582C010);
+        asm.Emit(0xE592C004);
+        asm.Emit(0xE28CC001);
+        asm.Emit(0xE582C004); // serial callbacks
+        asm.Label("irq-timer");
+        asm.Emit(0xE3110040);
+        asm.Branch("irq-vblank", condition: 0);
+        asm.Emit(0xE592C008);
+        asm.Emit(0xE28CC001);
+        asm.Emit(0xE582C008); // timer callbacks
+        asm.Load(3, 0x0400010E);
+        asm.Emit(0xE3A0C000);
+        asm.Emit(0xE1C3C0B0); // stop Timer 3; the main loop rearms it
+        if (host)
+        {
+            asm.Load(3, 0x04000128);
+            asm.Load(12, 0x6083);
+            asm.Emit(0xE1C3C0B0); // timer IRQ, not C#, starts the serial transfer
+        }
+        asm.Label("irq-vblank");
+        asm.Emit(0xE3110001);
+        asm.Branch("irq-return", condition: 0);
+        asm.Emit(0xE592C00C);
+        asm.Emit(0xE28CC001);
+        asm.Emit(0xE582C00C);
+        asm.Label("irq-return");
+        asm.Emit(0xE12FFF1E);
+    }
+
+    public static byte[] ExpectedReceived(bool host, int commandCount = 1)
+    {
+        byte[] expected = new byte[16 * commandCount];
+        for (int frame = 0; frame < commandCount; frame++)
+            for (int i = 0; i < 8; i++)
+                BinaryPrimitives.WriteUInt16LittleEndian(expected.AsSpan(frame * 16 + i * 2),
+                    (ushort)((host ? 0x220 : 0x120) + frame * 16 + i));
         return expected;
     }
 
@@ -121,13 +213,17 @@ public static class GbaGen3SyntheticRom
         private readonly Dictionary<string, int> labels = [];
         private readonly List<(int Position, string Label, int Condition, bool Link)> branches = [];
         private readonly List<(int Position, int Register, uint Value)> literals = [];
+        private readonly List<(int Position, int Register, string Label)> addresses = [];
         internal void Emit(uint instruction) => code.Add(instruction);
         internal void Label(string name) => labels.Add(name, code.Count);
         internal void Load(int register, uint value) { literals.Add((code.Count, register, value)); code.Add(0); }
+        internal void LoadAddress(int register, string label) { addresses.Add((code.Count, register, label)); code.Add(0); }
         internal void Branch(string target, int condition = 14, bool link = false)
         { branches.Add((code.Count, target, condition, link)); code.Add(0); }
         internal byte[] Finish()
         {
+            foreach (var address in addresses)
+                literals.Add((address.Position, address.Register, 0x08000100u + (uint)labels[address.Label] * 4));
             foreach (var branch in branches)
                 code[branch.Position] = ((uint)branch.Condition << 28) | (branch.Link ? 0x0B000000u : 0x0A000000u) |
                     ((uint)(labels[branch.Label] - branch.Position - 2) & 0xFFFFFF);
