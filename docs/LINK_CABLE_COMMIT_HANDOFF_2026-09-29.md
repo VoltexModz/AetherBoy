@@ -29,6 +29,49 @@ Das belegt weder einen echten Pokémon-Tausch noch eine Verbindung zwischen zwei
 3. Den ROM-freien Probe über den echten Raum-/TURN-Dienst gemeinsam ausführen, anschließend Rollen tauschen.
 4. Erst danach echte GB-/GBC-/GBA-Spiele getrennt mit geschützten Sitzungskopien prüfen. Einen Tausch erst nach Neustart und Kontrolle beider Sitzungsspielstände als bestätigt dokumentieren.
 
+### Native Linux-Nachprüfung am 30. September 2026
+
+`development` wurde ohne lokale Änderungen per Fast-forward von `9f50dfe` auf
+`80cc6b5` aktualisiert. Prüfung auf CachyOS/Linux x64 mit .NET SDK 10.0.302,
+Runtime 10.0.10 und der vorhandenen libdatachannel-0.24.5-Bibliothek; kein
+Globalization-Invariant-Ausweichmodus und keine produktiven Serverzugänge.
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Regulärer Linux-x64-Publish (`bash scripts/build-linux.sh`) | Erfolgreich; Ausgabe in `artifacts/AetherBoy-linux-x64/` |
+| Core | 242 bestanden, 0 Fehler |
+| Runtime mit `AETHERBOY_TEST_NATIVE_ONLINE=1`, ohne TURN | 447 bestanden, 0 übersprungen, 0 Fehler |
+| Darin: gezielte GBA-Regressionen gemäß Plattformmatrix | 80 bestanden |
+| Darin: native Raum-/Transportfälle | Alle vier tatsächlich ausgeführt und bestanden |
+| Desktop-Logik ohne native Opt-ins | 93 bestanden, 40 übersprungen, 0 Fehler |
+| Desktop auf isoliertem Weston/D-Bus, einschließlich GTK/AT-SPI | 130 bestanden, 3 Audiofälle übersprungen, 0 Fehler |
+| Browser-Bridge und Raumdienst (Node) | 8 bestanden, 0 Fehler |
+| Linux-Installation im temporären XDG-/Bin-Verzeichnis | Erfolgreich: Migration, fehlgeschlagenes Update, Minimal-PATH-Start und Deinstallation mit Datenerhalt |
+| OnlineProbe-CLI | Release-Build mit 0 Warnungen/Fehlern; `--help` erfolgreich |
+| Publish-Identität und Hyprland-Erkennung | `--version` enthält `80cc6b5`; `--platform-info` erfolgreich |
+
+Die Wayland-Prüfung lief im vorhandenen Ubuntu-24.04-Image
+`aetherboy-linux-accessibility-check:latest` mit .NET Runtime 10.0.12,
+`--network none`, schreibgeschützter Testassembly und einem eigenen Compositor.
+GTK-/Mesa-Meldungen über fehlenden Keyboard-Seat beziehungsweise Grafikgeräte
+stammen aus dieser Headless-Umgebung; alle aktivierten Tests bestanden.
+Keine Testfenster wurden auf dem Nutzerdesktop geöffnet.
+
+TRX-Nachweise: `artifacts/linux-review-20260930/{core,runtime,desktop-logic,headless}/`.
+Ein Core-Test-Restore meldete `NU1900`, weil NuGets Vulnerability-Endpunkt nicht
+erreichbar war; der Testlauf bestand. Das ist kein Compiler- oder Testfehler,
+bestätigt aber auch keine aktuelle Prüfung der Paket-Sicherheitsmeldungen.
+
+Kein Linux-spezifischer Protokollfix erforderlich. Die CI-Mindestzahlen werden
+auf den tatsächlich vorhandenen Umfang angehoben: Core 242, Runtime 447,
+Desktop 133 einschließlich Skips beziehungsweise 130 ausgeführte Headless-Fälle.
+Diese Nachprüfung aktualisiert den normalen x64-Build; vorhandene portable
+Archive wurden nicht neu erzeugt. ARM64-Ausführung, reale Audio-/Hardwaretests,
+Produktions-TURN, Rechnerpaarungen und Pokémon-Tausche bleiben offen.
+Die bekannte GB/GBC-Rollenwahl und die noch fehlende Linux-Probe-Oberfläche
+werden dadurch nicht behoben. Die lokalen CI-/Dokumentationsänderungen wurden
+nicht committed oder gepusht.
+
 ## English
 
 This package contains link-cable code, its regression tests and source-reference reviews only. Separate local UI/settings work is not included.
@@ -46,3 +89,15 @@ Pre-commit verification: a warning-free Release solution build; 242 Core tests p
 The exact staged source tree was also checked out separately from the Git index before pushing. Locked restore, the full Release build and the same Windows test suites passed again (713 passed, one POSIX-only skip). This verifies that the commit does not depend on the unrelated local UI/settings work. Generated test reports are local artifacts, not repository content.
 
 These results are **not** proof of a real Pokémon trade, a two-machine connection or native Linux WebRTC support. Build natively on Linux, run the shared regression and native loopback suites, then follow the [six-row platform/role matrix](LINK_PLATFORM_VALIDATION_2026-09-29.md). Require successful ROM-free probes on both ends before game tests; use protected session copies and verify both saves after a cold restart.
+
+September 30 native Linux x64 follow-up on `80cc6b5`: the normal Linux publish
+succeeded; 242 Core and 447 Runtime cases passed, including all 80 selected GBA
+regressions and four actual native loopback cases. Isolated Weston/D-Bus/AT-SPI
+passed 130 Desktop cases with only three audio cases skipped; eight Node tests
+and the temporary-directory installation test passed. OnlineProbe built without
+warnings/errors and its CLI help succeeded. No Linux protocol correction was
+needed; local CI test-count gates were raised to the current suite sizes. See
+the German follow-up above for environments, TRX locations and the unavailable
+NuGet vulnerability metadata warning. ARM64 execution, physical hardware/audio,
+production relay, two-machine WAN and real trades remain unverified. Portable
+archives were not rebuilt; the CI/documentation follow-up is uncommitted.

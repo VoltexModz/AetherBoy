@@ -69,17 +69,17 @@ jobs:
       - name: Test Core
         if: ${{ !cancelled() && steps.windows-build.outcome == 'success' }}
         timeout-minutes: 3
-        run: dotnet test --project .\tests\AetherBoy.CoreTests\AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 232 --timeout 2m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Core" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Core"
+        run: dotnet test --project .\tests\AetherBoy.CoreTests\AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 242 --timeout 2m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Core" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Core"
 
       - name: Test Runtime and native rooms
         if: ${{ !cancelled() && steps.windows-build.outcome == 'success' }}
         timeout-minutes: 3
-        run: dotnet test --project .\tests\AetherBoy.RuntimeTests\AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 392 --timeout 2m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Runtime" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Runtime"
+        run: dotnet test --project .\tests\AetherBoy.RuntimeTests\AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 447 --timeout 2m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Runtime" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Runtime"
 
       - name: Test portable frontend logic
         if: ${{ !cancelled() && steps.windows-build.outcome == 'success' }}
         timeout-minutes: 3
-        run: dotnet test --project .\tests\AetherBoy.DesktopTests\AetherBoy.DesktopTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 122 --timeout 2m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Desktop" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Desktop"
+        run: dotnet test --project .\tests\AetherBoy.DesktopTests\AetherBoy.DesktopTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 133 --timeout 2m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Desktop" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Desktop"
 
       - name: Test Windows UI
         if: ${{ !cancelled() && steps.windows-build.outcome == 'success' }}
@@ -178,16 +178,16 @@ jobs:
         run: dotnet build ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Test Core
-        run: dotnet test --project ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 232
+        run: dotnet test --project ./tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 242
 
       - name: Test Runtime
-        run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 392
+        run: dotnet test --project ./tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 447
 
       - name: Test browser bridge callbacks
         run: node --test tests/browser/WebRtcBridge.test.cjs services/online-rooms/server.test.mjs
 
       - name: Test native Wayland frontend logic
-        run: dotnet test --project ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 122
+        run: dotnet test --project ./tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 133
 
       - name: Smoke-test conformance CLI
         run: dotnet run --project ./tools/AetherBoy.Conformance/AetherBoy.Conformance.csproj --configuration Release --no-build -- --help
@@ -212,7 +212,7 @@ jobs:
       - name: Test native UI and accessibility on isolated Wayland and D-Bus
         shell: bash
         # Direct MTP execution counts executed tests, excluding the three optional audio playtests.
-        run: bash scripts/test-linux-headless.sh tests/AetherBoy.DesktopTests/bin/Release/net10.0/AetherBoy.DesktopTests.dll --minimum-expected-tests 118
+        run: bash scripts/test-linux-headless.sh tests/AetherBoy.DesktopTests/bin/Release/net10.0/AetherBoy.DesktopTests.dll --minimum-expected-tests 130
 
       - name: Verify Linux package scripts and publish
         run: |
