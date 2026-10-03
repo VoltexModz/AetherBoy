@@ -170,6 +170,16 @@ namespace AetherBoy.Runtime
         public override void Apply(SessionOwnerContext context) => SetResult(context.Machine.ToggleCheat(id));
     }
 
+    internal sealed class SetCheatButtonCommand(bool pressed) : EmulationCommand
+    {
+        public override void Apply(SessionOwnerContext context)
+        {
+            if (context.Machine is ICooperativeEmulationMachine)
+                throw new NotSupportedException("Cheats are disabled during Online Link.");
+            context.Machine.SetCheatButton(pressed);
+        }
+    }
+
     internal sealed class ShutdownCommand : EmulationCommand
     {
         public override void Apply(SessionOwnerContext context)

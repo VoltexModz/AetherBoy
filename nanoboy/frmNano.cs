@@ -33,11 +33,14 @@ namespace nanoboy
         private int[] displayFrame = new int[EmulationSnapshot.FramePixelCount];
         private long displayedFrameSequence;
         private HostGamepadState lastPadState;
+        private readonly GamepadRumble gamepadRumble = new();
         private string currentRomPath;
         private bool stateOperationInProgress;
         private Platform.Video.WindowsFrameTiming frameTiming;
         private bool batteryRecoveryNoticeShown;
         private bool testerRomIdentityRecorded;
+        private bool closingSettingsFlush;
+        private bool stopSessionSettingsFailed;
         private bool currentSessionUsesExternalBootRom;
         private readonly WindowsTesterSession? testerSession;
         private readonly WindowsSessionHealthMonitor? healthMonitor;
@@ -61,14 +64,13 @@ namespace nanoboy
             Text = ProductInfo.DisplayName;
             Deactivate += frmNano_Deactivate;
             settings = new NanoboySettings();
-            settings.ProfileSaveFailed += exception =>
-            {
-                testerSession?.RecordException("profile.save_failed", exception);
-                AetherSignal.Show(this, "Die Änderung konnte nicht im Spielprofil gespeichert werden.\n" +
-                    "Die bisherigen Einstellungen bleiben erhalten.\n\n" + exception.Message,
-                    "Spielprofil nicht gespeichert", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            };
+            settings.ProfileSaveFailed += exception => ReportSettingsSaveFailure(global::AetherBoy.Runtime.Localization.UiText.Get("Spielprofil"), "profile.save_failed", exception);
+            settings.ControllerSaveFailed += exception => ReportSettingsSaveFailure(global::AetherBoy.Runtime.Localization.UiText.Get("Controller-Profil"), "controller_profile.save_failed", exception);
+            settings.GlobalSaveFailed += exception => ReportSettingsSaveFailure(global::AetherBoy.Runtime.Localization.UiText.Get("Einstellungen"), "settings.save_failed", exception);
             Disposed += (_, _) => settings.Dispose();
+            Disposed += (_, _) => gamepadRumble.Dispose();
+            Disposed += (_, _) => discordPresence.Dispose();
+            Disposed += (_, _) => releaseUpdates.Dispose();
             LoadConfiguration();
             RebuildRecentFilesMenu();
             SelectSaveSlot(settings.SaveSlot);
@@ -90,9 +92,43 @@ namespace nanoboy
             updateTimer.Start();
         }
 
+        private void StopSessionAfterDirectDispose()
+        {
+            // Dispose can bypass FormClosing (including disposal during an async settings flush).
+            // Request the owner stop, but keep leases/transports alive until its final save completes.
+            CancelRomPreparation();
+            EmulationSession previous = session;
+            session = null;
+            var lease = romWriteLease; romWriteLease = null;
+            var browserTransport = onlineLinkTransport; onlineLinkTransport = null;
+            var roomTransport = onlineRoomTransport; onlineRoomTransport = null;
+            DisposeAudioOutput(previous);
+            Task stopped = previous?.ShutdownAsync() ?? Task.CompletedTask;
+            _ = stopped.ContinueWith(done =>
+            {
+                if (done.Exception is { } error) testerSession?.RecordException("session.dispose_failed", error);
+                try { browserTransport?.Dispose(); }
+                finally { try { roomTransport?.Dispose(); } finally { lease?.Dispose(); } }
+            }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
+
         private bool StopSession(bool ownsStateOperation = false)
         {
+            stopSessionSettingsFailed = false;
             if (stateOperationInProgress && !ownsStateOperation) return false;
+            // A ROM transition is a durability boundary. Ordinary slider/button changes are
+            // asynchronous, but the previous ROM's profile must be on disk before switching.
+            try { settings.FlushPendingSavesAsync().GetAwaiter().GetResult(); }
+            catch (Exception exception)
+            {
+                stopSessionSettingsFailed = true;
+                testerSession?.RecordException("settings.switch_flush_failed", exception);
+                AetherSignal.Show(this,
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Die letzten Einstellungen konnten nicht gespeichert werden. Das laufende Spiel bleibt geöffnet. Prüfe den Speicherort und versuche den Spielwechsel erneut.\n\n") +
+                    (exception.InnerException?.Message ?? global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message)),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Spielwechsel nicht möglich"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
             if (session != null && currentRomPath != null)
             {
                 FlushGameActivity();
@@ -127,7 +163,7 @@ namespace nanoboy
             bool gbaOnlineClosing = previousSession.OnlineLink?.ProfileId == AetherBoy.Runtime.Netplay.GbaOnlineProfileCatalog.PokemonGen3Profile;
             if (gbaOnlineClosing && !previousSession.Completion.IsCompleted)
             {
-                SetSaveFeedback("GBA-Online wird sicher beendet · Gegenstelle abmelden und Sitzungskopie sichern · bis zu 5 Sekunden", false);
+                SetSaveFeedback(global::AetherBoy.Runtime.Localization.UiText.Get("GBA-Online wird sicher beendet · Gegenstelle abmelden und Sitzungskopie sichern · bis zu 5 Sekunden"), false);
                 Update();
             }
             Task shutdown = previousSession.ShutdownAsync();
@@ -138,7 +174,7 @@ namespace nanoboy
             if (!ReferenceEquals(completed, shutdown))
             {
                 Debug.WriteLine("The emulation session did not stop within its bounded shutdown budget.");
-                if (gbaOnlineClosing) SetSaveFeedback("GBA-Online wird noch beendet · Sitzung und Schreibschutz bleiben erhalten · bitte erneut Beenden wählen", true);
+                if (gbaOnlineClosing) SetSaveFeedback(global::AetherBoy.Runtime.Localization.UiText.Get("GBA-Online wird noch beendet · Sitzung und Schreibschutz bleiben erhalten · bitte erneut Beenden wählen"), true);
                 return false;
             }
 
@@ -223,7 +259,7 @@ namespace nanoboy
             catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
             {
                 testerSession?.RecordException("firmware.read_failed", exception);
-                firmwareLoadWarning = "Firmware ungültig oder nicht lesbar · integrierter Start verwendet · SYSTEM → Firmware";
+                firmwareLoadWarning = global::AetherBoy.Runtime.Localization.UiText.Get("Firmware ungültig oder nicht lesbar · integrierter Start verwendet · SYSTEM → Firmware");
                 return null;
             }
         }
@@ -235,13 +271,13 @@ namespace nanoboy
             if (library.ShowDialog(this) == DialogResult.OK &&
                 library.SelectedRomPath is string path)
             {
-                LoadRomFile(path, library.ResumeRequested);
+                _ = PrepareRomLoadAsync(path, library.ResumeRequested);
             }
         }
 
         internal void LoadRomFile(string path, bool resume = false)
         {
-            if (stateOperationInProgress) { SetSaveFeedback("Bitte die laufende Speicheraktion abwarten", true); return; }
+            if (stateOperationInProgress) { SetSaveFeedback(global::AetherBoy.Runtime.Localization.UiText.Get("Bitte die laufende Speicheraktion abwarten"), true); return; }
             if (!File.Exists(path))
             {
                 testerSession?.RecordRomLoadRejected(path, "file_missing");
@@ -260,20 +296,27 @@ namespace nanoboy
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
             {
                 testerSession?.RecordException("rom.import_failed", exception);
-                AetherSignal.Show(this, $"Die ROM konnte nicht in die lokale Bibliothek übernommen werden.\n\n{exception.Message}",
-                    "ROM-Import fehlgeschlagen", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AetherSignal.Show(this, global::AetherBoy.Runtime.Localization.UiText.Format("Die ROM konnte nicht in die lokale Bibliothek übernommen werden.\n\n{0}", global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message)),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("ROM-Import fehlgeschlagen"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
+            StartImportedRomFile(path, resume);
+        }
+
+        private void StartImportedRomFile(string path, bool resume, bool allowRecovery = true, bool showFailure = true)
+        {
+            string? previousRomPath = currentRomPath;
             updateTimer.Stop();
             if (!StopSession())
             {
                 updateTimer.Start();
-                AetherSignal.Show(this,
-                    "Der laufende Emulator konnte nicht sicher beendet werden. Die neue ROM wurde nicht geladen.",
-                    "Emulator beschäftigt",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                if (!stopSessionSettingsFailed)
+                    AetherSignal.Show(this,
+                        global::AetherBoy.Runtime.Localization.UiText.Get("Der laufende Emulator konnte nicht sicher beendet werden. Die neue ROM wurde nicht geladen."),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("Emulator beschäftigt"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
                 testerSession?.RecordOperation(
                     "rom_load",
                     slot: null,
@@ -282,19 +325,17 @@ namespace nanoboy
                 return;
             }
 
-            AddRecentFile(path);
             try { settings.UseGameProfile(path); }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 settings.UseGameProfile(null);
-                AetherSignal.Show(this, "Spielprofil nicht lesbar; globale Einstellungen werden verwendet.\n\n" + ex.Message,
-                    "Spielprofil", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                AetherSignal.Show(this, global::AetherBoy.Runtime.Localization.UiText.Get("Spielprofil nicht lesbar; globale Einstellungen werden verwendet.\n\n") + global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(ex.Message),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Spielprofil"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             pendingResume = resume;
             gamepadAwaitNeutral = true;
-            pendingPlaySeconds = 0;
-            activityTimestamp = 0;
-            activityWasRunning = false;
+            sessionPlaySeconds = 0;
+            activityClock.Reset();
             lastLibraryFlush = 0;
             lastResumeSave = Environment.TickCount64;
             input.Clear();
@@ -348,11 +389,20 @@ namespace nanoboy
                 settings.UseGameProfile(null);
                 UpdateAetherSessionUi(null);
                 Debug.WriteLine($"Could not start emulation session for '{path}': {exception}");
-                AetherSignal.Show(this,
-                    $"Die ROM konnte nicht gestartet werden.\n\n{exception.Message}",
-                    "ROM konnte nicht geladen werden",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
+                bool recovered = allowRecovery && previousRomPath != null &&
+                    !string.Equals(previousRomPath, path, StringComparison.OrdinalIgnoreCase) &&
+                    File.Exists(previousRomPath) && TryRecoverPreviousRom(previousRomPath);
+                if (showFailure)
+                {
+                    string nextStep = recovered ? global::AetherBoy.Runtime.Localization.UiText.Get("Das vorherige Spiel wurde wieder geöffnet.") :
+                        previousRomPath is null ? global::AetherBoy.Runtime.Localization.UiText.Get("Wähle ein anderes Spiel aus der Bibliothek.") :
+                        global::AetherBoy.Runtime.Localization.UiText.Get("Das vorherige Spiel konnte nicht wieder geöffnet werden. Öffne es erneut über die Bibliothek.");
+                    AetherSignal.Show(this,
+                        global::AetherBoy.Runtime.Localization.UiText.Format("Die ROM konnte nicht gestartet werden.\n\n{0}\n\n{1}", global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message), nextStep),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("ROM konnte nicht geladen werden"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                }
                 updateTimer.Start();
                 return;
             }
@@ -364,10 +414,11 @@ namespace nanoboy
             }
 
             displayedFrameSequence = 0;
+            AddRecentFile(path);
             lastPadState = GamepadInput.GetState();
             UpdateAetherGamepadUi(lastPadState);
             gameView.ClearFrame();
-            SetSaveFeedback(firmwareLoadWarning ?? "F5 speichern · F8 laden · F6 State-Galerie · F11 Vollbild", firmwareLoadWarning is not null);
+            SetSaveFeedback(firmwareLoadWarning ?? global::AetherBoy.Runtime.Localization.UiText.Get("F5 speichern · F8 laden · F6 State-Galerie · F11 Vollbild"), firmwareLoadWarning is not null);
 
             if (audiotoolwindow != null && !audiotoolwindow.IsDisposed)
             {
@@ -434,8 +485,8 @@ namespace nanoboy
         private void ShowAudioUnavailableMessage()
         {
             AetherSignal.Show(this,
-                "Das Windows-Audiogerät konnte nicht geöffnet werden. AetherBoy läuft stumm weiter.",
-                "Audio nicht verfügbar",
+                global::AetherBoy.Runtime.Localization.UiText.Get("Das Windows-Audiogerät konnte nicht geöffnet werden. AetherBoy läuft stumm weiter."),
+                global::AetherBoy.Runtime.Localization.UiText.Get("Audio nicht verfügbar"),
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
         }
@@ -459,7 +510,7 @@ namespace nanoboy
             menuRecentFiles.DropDownItems.Clear();
             if (settings.RecentFiles.Count == 0)
             {
-                var dummy = new ToolStripMenuItem("Keine") { Enabled = false };
+                var dummy = new nanoboy.Controls.AetherCommand(global::AetherBoy.Runtime.Localization.UiText.Get("Keine")) { Enabled = false };
                 menuRecentFiles.DropDownItems.Add(dummy);
                 return;
             }
@@ -468,13 +519,13 @@ namespace nanoboy
             {
                 string filePath = file;
                 bool exists = File.Exists(filePath);
-                var item = new ToolStripMenuItem(
-                    exists ? Path.GetFileName(filePath) : $"{Path.GetFileName(filePath)} (fehlt)")
+                var item = new nanoboy.Controls.AetherCommand(
+                    exists ? Path.GetFileName(filePath) : global::AetherBoy.Runtime.Localization.UiText.Format("{0} (fehlt)", Path.GetFileName(filePath)))
                 {
                     Enabled = exists,
                     ToolTipText = filePath
                 };
-                item.Click += (s, e) => LoadRomFile(filePath);
+                item.Click += (s, e) => _ = PrepareRomLoadAsync(filePath);
                 menuRecentFiles.DropDownItems.Add(item);
             }
         }
@@ -507,6 +558,9 @@ namespace nanoboy
             {
                 Settings = settings,
                 SnapshotProvider = () => session?.LatestSnapshot,
+                PreviewBootIntro = () => PlayGameIntroAsync(CancellationToken.None, controlCenter),
+                SetBarcodeBoyEnabled = enabled => (session ?? throw new InvalidOperationException(global::AetherBoy.Runtime.Localization.UiText.Get("Kein Spiel geöffnet."))).SetBarcodeBoyEnabledAsync(enabled),
+                ScanBarcodeBoy = code => (session ?? throw new InvalidOperationException(global::AetherBoy.Runtime.Localization.UiText.Get("Kein Spiel geöffnet."))).ScanBarcodeBoyAsync(code),
                 GamepadProvider = () => GamepadInput.GetState(),
                 RomPathProvider = () => currentRomPath,
                 SetPalette = SetPalette,
@@ -515,6 +569,10 @@ namespace nanoboy
                 ToggleFullscreen = ToggleAetherFullscreen,
                 ApplyAudioSettings = ApplyAudioSettingsFromControlCenter,
                 ApplyVideoSettings = ApplyWindowsVideoSettings,
+                ApplyDiscordSettings = UpdateDiscordPresence,
+                DiscordStatusProvider = () => discordPresence.Status,
+                DiscordPreviewProvider = () => discordPresence.Preview,
+                Updates = releaseUpdates,
                 ApplyUiTheme = () => AetherColors.Apply(new UiThemePalette(settings.UiPrimaryColor, settings.UiSecondaryColor, settings.UiBackgroundColor)),
                 AudioOutputProvider = DescribeWindowsAudio,
                 VideoOutputProvider = DescribeWindowsVideo,
@@ -528,10 +586,19 @@ namespace nanoboy
                 DiagnosticsPreferenceStatusProvider = DescribeDiagnosticsPreference,
                 SetRecordNextSession = SetRecordNextSession,
                 OpenQuickMenu = () => _ = OpenQuickMenuAsync(),
+                OpenLibrary = () => menuOpen_Click(controlCenter, EventArgs.Empty),
+                OpenPatchLab = OpenWindowsPatchLab,
+                OpenCheats = () => menuCheats_Click(controlCenter, EventArgs.Empty),
+                CreateOnlineRoom = () => ShowOnlineRoomDialog(true),
+                JoinOnlineRoom = () => ShowOnlineRoomDialog(false),
+                TestOnlineConnection = ShowOnlineConnectionTest,
                 CaptureScreenshot = () => _ = CaptureScreenshotAsync(),
+                ToggleGameplayRecording = () => _ = ToggleGameplayRecordingAsync(),
+                GameplayRecordingActive = () => (session?.GameplayRecording ?? lastGameplayRecording)?.IsRecording == true,
+                GameplayRecordingStatus = GetGameplayRecordingStatus,
                 TogglePerformanceOverlay = TogglePerformanceOverlay,
                 MarkProblem = MarkSessionProblem,
-                HealthStatusProvider = () => healthMonitor?.Status ?? "Development-Diagnose ist nicht aktiv.",
+                HealthStatusProvider = () => healthMonitor?.Status ?? global::AetherBoy.Runtime.Localization.UiText.Get("Development-Diagnose ist nicht aktiv."),
                 SetFrameskip = SetFrameskip,
                 SetSaveSlot = SelectSaveSlot,
                 OpenControls = () => new frmControls(settings).ShowDialog(controlCenter),
@@ -561,8 +628,8 @@ namespace nanoboy
             {
                 AetherSignal.Show(
                     owner,
-                    "Starte zuerst ein Spiel. Danach zeigt das Save Safety Center den Batterie-Spielstand und seine Backups.",
-                    "Kein Spiel aktiv",
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Starte zuerst ein Spiel. Danach zeigt das Save Safety Center den Batterie-Spielstand und seine Backups."),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Kein Spiel aktiv"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
                 return;
@@ -571,15 +638,17 @@ namespace nanoboy
             {
                 AetherSignal.Show(
                     owner,
-                    "Dieses Spiel besitzt keinen unterstützten Batterie-RAM-Spielstand. Save States bleiben davon unabhängig verfügbar.",
-                    "Kein Batterie-Spielstand",
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Dieses Spiel besitzt keinen unterstützten Batterie-RAM-Spielstand. Save States bleiben davon unabhängig verfügbar."),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Kein Batterie-Spielstand"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
                 return;
             }
 
             string savePath = WindowsRomLibrary.Default.GetSavePath(romPath);
-            byte[] selectedSaveData;
+            byte[]? selectedSaveData;
+            BatterySaveAction selectedAction;
+            string? selectedSourceName;
             int generation;
             try
             {
@@ -587,12 +656,14 @@ namespace nanoboy
                     savePath,
                     rom.BatterySave.ExpectedLength,
                     string.IsNullOrWhiteSpace(rom.Title) ? Path.GetFileNameWithoutExtension(romPath) : rom.Title);
-                if (manager.ShowDialog(owner) != DialogResult.OK || manager.SelectedSaveData == null)
+                if (manager.ShowDialog(owner) != DialogResult.OK || manager.SelectedAction == BatterySaveAction.None)
                 {
                     return;
                 }
 
                 selectedSaveData = manager.SelectedSaveData;
+                selectedAction = manager.SelectedAction;
+                selectedSourceName = manager.SelectedSourceName;
                 generation = (int)manager.SelectedGeneration;
             }
             catch (Exception exception) when (
@@ -602,25 +673,24 @@ namespace nanoboy
             {
                 AetherSignal.Show(
                     owner,
-                    $"Die Sicherungen konnten nicht gelesen werden.\n\n{exception.Message}",
-                    "Save Safety nicht verfügbar",
+                    global::AetherBoy.Runtime.Localization.UiText.Format("Die Sicherungen konnten nicht gelesen werden.\n\n{0}", global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message)),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Save Safety nicht verfügbar"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
                 return;
             }
 
-            DialogResult confirmation = AetherSignal.Show(
-                owner,
-                $"Backup {generation} wirklich aktivieren?\n\nDer derzeitige Spielstand wird vorher sicher beendet und als neuestes Backup erhalten. Anschließend startet das Spiel neu.",
-                "Backup wiederherstellen",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning);
-            if (confirmation != DialogResult.Yes)
+            if (selectedAction != BatterySaveAction.ExportArchive)
             {
-                return;
+                string question = selectedAction == BatterySaveAction.ImportFile
+                    ? global::AetherBoy.Runtime.Localization.UiText.Format("{0} für dieses Spiel importieren?\n\nDie Dateigröße passt, aber die Herkunft kann nicht geprüft werden. Der bisherige Stand wird zuvor als Archiv gesichert. Danach startet das Spiel neu.", selectedSourceName)
+                    : global::AetherBoy.Runtime.Localization.UiText.Format("Backup {0} wirklich aktivieren?\n\nDer bisherige Stand wird zuvor als Archiv gesichert. Danach startet das Spiel neu.", generation);
+                if (AetherSignal.Show(owner, question,
+                    selectedAction == BatterySaveAction.ImportFile ? global::AetherBoy.Runtime.Localization.UiText.Get("Spielstand importieren") : global::AetherBoy.Runtime.Localization.UiText.Get("Backup wiederherstellen"),
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
             }
 
-            if (stateOperationInProgress) { SetSaveFeedback("Bitte die laufende Speicheraktion abwarten", true); return; }
+            if (stateOperationInProgress) { SetSaveFeedback(global::AetherBoy.Runtime.Localization.UiText.Get("Bitte die laufende Speicheraktion abwarten"), true); return; }
             stateOperationInProgress = true;
             updateTimer.Stop();
             try
@@ -629,24 +699,36 @@ namespace nanoboy
                 {
                     AetherSignal.Show(
                         owner,
-                        "Der laufende Emulator konnte nicht sicher beendet werden. Das Backup wurde nicht verändert.",
-                        "Wiederherstellung abgebrochen",
+                        global::AetherBoy.Runtime.Localization.UiText.Get("Der laufende Emulator konnte nicht sicher beendet werden. Das Backup wurde nicht verändert."),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("Wiederherstellung abgebrochen"),
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Warning);
                     updateTimer.Start();
                     return;
                 }
 
+                string archivePath;
                 using (AetherBoy.Runtime.Storage.RomWriteLease.Acquire(savePath + ".lock"))
-                    BatterySaveStore.Restore(savePath, rom.BatterySave.ExpectedLength, selectedSaveData);
+                {
+                    archivePath = WindowsSaveArchive.Export(WindowsDataPaths.Default,
+                        WindowsRomLibrary.Default.GetIdentity(romPath), savePath, rom.BatterySave.ExpectedLength);
+                    if (selectedAction != BatterySaveAction.ExportArchive)
+                        BatterySaveStore.Restore(savePath, rom.BatterySave.ExpectedLength, selectedSaveData!);
+                }
                 stateOperationInProgress = false; // Disk restore finished; the regular ROM-start guard applies again.
                 LoadRomFile(romPath);
                 if (session != null)
                 {
+                    string message = selectedAction switch
+                    {
+                        BatterySaveAction.ImportFile => global::AetherBoy.Runtime.Localization.UiText.Format("Der gewählte Spielstand ist aktiv. Der vorherige Stand liegt im Archiv:\n{0}", archivePath),
+                        BatterySaveAction.ExportArchive => global::AetherBoy.Runtime.Localization.UiText.Format("Spielstand und Sicherungen wurden exportiert:\n{0}", archivePath),
+                        _ => global::AetherBoy.Runtime.Localization.UiText.Format("Backup {0} ist aktiv. Der vorherige Stand liegt im Archiv:\n{1}", generation, archivePath)
+                    };
                     AetherSignal.Show(
                         owner,
-                        $"Backup {generation} ist jetzt aktiv. Der vorherige Stand liegt weiterhin als rotierende Sicherung vor.",
-                        "Spielstand wiederhergestellt",
+                        message,
+                        selectedAction == BatterySaveAction.ExportArchive ? global::AetherBoy.Runtime.Localization.UiText.Get("Archiv erstellt") : global::AetherBoy.Runtime.Localization.UiText.Get("Spielstand aktiviert"),
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information);
                 }
@@ -656,7 +738,7 @@ namespace nanoboy
                 exception is UnauthorizedAccessException ||
                 exception is InvalidDataException)
             {
-                Debug.WriteLine($"Could not restore battery save: {exception}");
+                Debug.WriteLine($"Could not complete battery save action: {exception}");
                 if (session == null && File.Exists(romPath))
                 {
                     stateOperationInProgress = false;
@@ -665,8 +747,8 @@ namespace nanoboy
 
                 AetherSignal.Show(
                     owner,
-                    $"Das Backup konnte nicht aktiviert werden.\n\n{exception.Message}",
-                    "Wiederherstellung fehlgeschlagen",
+                    global::AetherBoy.Runtime.Localization.UiText.Format("Die Speicheraktion konnte nicht abgeschlossen werden. Der bisherige Stand bleibt erhalten oder liegt im zuvor erstellten Archiv.\n\n{0}", global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message)),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Speicheraktion fehlgeschlagen"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }
@@ -688,11 +770,11 @@ namespace nanoboy
             menuSaveSlot3.Checked = slot == 3;
             menuSaveSlot4.Checked = slot == 4;
             menuSaveSlot5.Checked = slot == 5;
-            menuSaveSlot1.Text = slot == 1 ? "Slot 1 (Aktiv)" : "Slot 1";
-            menuSaveSlot2.Text = slot == 2 ? "Slot 2 (Aktiv)" : "Slot 2";
-            menuSaveSlot3.Text = slot == 3 ? "Slot 3 (Aktiv)" : "Slot 3";
-            menuSaveSlot4.Text = slot == 4 ? "Slot 4 (Aktiv)" : "Slot 4";
-            menuSaveSlot5.Text = slot == 5 ? "Slot 5 (Aktiv)" : "Slot 5";
+            menuSaveSlot1.Text = slot == 1 ? global::AetherBoy.Runtime.Localization.UiText.Get("Slot 1 (Aktiv)") : "Slot 1";
+            menuSaveSlot2.Text = slot == 2 ? global::AetherBoy.Runtime.Localization.UiText.Get("Slot 2 (Aktiv)") : "Slot 2";
+            menuSaveSlot3.Text = slot == 3 ? global::AetherBoy.Runtime.Localization.UiText.Get("Slot 3 (Aktiv)") : "Slot 3";
+            menuSaveSlot4.Text = slot == 4 ? global::AetherBoy.Runtime.Localization.UiText.Get("Slot 4 (Aktiv)") : "Slot 4";
+            menuSaveSlot5.Text = slot == 5 ? global::AetherBoy.Runtime.Localization.UiText.Get("Slot 5 (Aktiv)") : "Slot 5";
             UpdateAetherSlotButtons();
         }
 
@@ -701,7 +783,7 @@ namespace nanoboy
 
         private async void menuRewind_Click(object sender, EventArgs e)
         {
-            if (IsOnlineLink) { SetSaveFeedback("Rewind ist im Online-Link gesperrt", true); return; }
+            if (IsOnlineLink) { SetSaveFeedback(global::AetherBoy.Runtime.Localization.UiText.Get("Rewind ist im Online-Link gesperrt"), true); return; }
             EmulationSession currentSession = session;
             if (currentSession == null || stateOperationInProgress)
             {
@@ -719,8 +801,8 @@ namespace nanoboy
                         succeeded: false,
                         reason: "history_empty");
                     AetherSignal.Show(this,
-                        "Es ist noch kein früherer Zustand im Rewind-Puffer vorhanden.",
-                        "Rewind",
+                        global::AetherBoy.Runtime.Localization.UiText.Get("Es ist noch kein früherer Zustand im Rewind-Puffer vorhanden."),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("Rewind"),
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information);
                 }
@@ -743,8 +825,8 @@ namespace nanoboy
                     succeeded: false);
                 Debug.WriteLine($"Could not rewind: {exception}");
                 AetherSignal.Show(this,
-                    $"Zurückspulen ist fehlgeschlagen.\n\n{exception.Message}",
-                    "Rewind fehlgeschlagen",
+                    global::AetherBoy.Runtime.Localization.UiText.Format("Zurückspulen ist fehlgeschlagen.\n\n{0}", global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message)),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Rewind fehlgeschlagen"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }
@@ -796,18 +878,19 @@ namespace nanoboy
                 2 => GameDisplayFilter.LcdGrid,
                 _ => GameDisplayFilter.Sharp
             };
+            ApplyWindowsVideoSettings();
             UpdateAetherSessionUi(session?.LatestSnapshot);
         }
 
         private void menuCheats_Click(object sender, EventArgs e)
         {
-            if (IsOnlineLink) { SetSaveFeedback("Cheats sind im Online-Link gesperrt", true); return; }
+            if (IsOnlineLink) { SetSaveFeedback(global::AetherBoy.Runtime.Localization.UiText.Get("Cheats sind im Online-Link gesperrt"), true); return; }
             EmulationSession currentSession = session;
             if (currentSession == null)
             {
                 AetherSignal.Show(this,
-                    "Bitte zuerst eine ROM laden.",
-                    "Cheat Manager",
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Bitte zuerst eine ROM laden."),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Cheat Manager"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
                 return;
@@ -819,14 +902,17 @@ namespace nanoboy
         private void menuLinkCable_Click(object sender, EventArgs e)
         {
             using var link = new frmLocalLinkLab(settings, currentRomPath, () => StopSession());
-            link.ShowDialog(controlCenter is { IsDisposed: false } ? controlCenter : this);
+            discordLocalLinkOpen = true;
+            UpdateDiscordPresence();
+            try { link.ShowDialog(controlCenter is { IsDisposed: false } ? controlCenter : this); }
+            finally { discordLocalLinkOpen = false; UpdateDiscordPresence(); }
         }
 
         private void ShowUnavailableFeature(string feature)
         {
             AetherSignal.Show(this,
-                $"{feature} ist in dieser Version experimentell und vorerst deaktiviert.",
-                "Funktion deaktiviert",
+                global::AetherBoy.Runtime.Localization.UiText.Format("{0} ist in dieser Version experimentell und vorerst deaktiviert.", feature),
+                global::AetherBoy.Runtime.Localization.UiText.Get("Funktion deaktiviert"),
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
         }
@@ -840,18 +926,18 @@ namespace nanoboy
                 string model = rom.IsGameBoyAdvance
                     ? "Game Boy Advance"
                     : rom.HasColorFeatures ? "Game Boy Color" : "Game Boy";
-                string info = $"Titel: {rom.Title}\n" +
-                              $"Typ: {rom.CartridgeType}\n" +
-                              $"System: {model}\n" +
-                              $"ROM Größe: {rom.RomSize / 1024} KB\n" +
-                              $"RAM Größe: {rom.RamSize / 1024} KB\n" +
-                              $"Super Game Boy (SGB): {(rom.IsGameBoyAdvance ? "Nicht zutreffend" : rom.HasSuperGameBoyFeatures ? "Ja" : "Nein")}\n" +
-                              $"Region: {(rom.IsJapanese ? "Japan" : "International")}";
-                AetherSignal.Show(this, info, "ROM Informationen", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                string info = global::AetherBoy.Runtime.Localization.UiText.Format("Titel: {0}\n", rom.Title) +
+                              global::AetherBoy.Runtime.Localization.UiText.Format("Typ: {0}\n", rom.CartridgeType) +
+                              global::AetherBoy.Runtime.Localization.UiText.Format("System: {0}\n", model) +
+                              global::AetherBoy.Runtime.Localization.UiText.Format("ROM Größe: {0} KB\n", rom.RomSize / 1024) +
+                              global::AetherBoy.Runtime.Localization.UiText.Format("RAM Größe: {0} KB\n", rom.RamSize / 1024) +
+                              global::AetherBoy.Runtime.Localization.UiText.Format("Super Game Boy (SGB): {0}\n", (rom.IsGameBoyAdvance ? global::AetherBoy.Runtime.Localization.UiText.Get("Nicht zutreffend") : rom.HasSuperGameBoyFeatures ? global::AetherBoy.Runtime.Localization.UiText.Get("Ja") : global::AetherBoy.Runtime.Localization.UiText.Get("Nein"))) +
+                              global::AetherBoy.Runtime.Localization.UiText.Format("Region: {0}", (rom.IsJapanese ? "Japan" : "International"));
+                AetherSignal.Show(this, info, global::AetherBoy.Runtime.Localization.UiText.Get("ROM Informationen"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             else
             {
-                AetherSignal.Show(this, "Keine ROM geladen.", "ROM Informationen", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                AetherSignal.Show(this, global::AetherBoy.Runtime.Localization.UiText.Get("Keine ROM geladen."), global::AetherBoy.Runtime.Localization.UiText.Get("ROM Informationen"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 
@@ -953,6 +1039,15 @@ namespace nanoboy
 
         private void ResetSettingsToDefaults()
         {
+            try { settings.FlushPendingSavesAsync().GetAwaiter().GetResult(); }
+            catch (Exception exception)
+            {
+                AetherSignal.Show(this,
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Offene Änderungen konnten nicht gespeichert werden. Prüfe den Speicherort und versuche das Zurücksetzen erneut.\n\n") +
+                    (exception.InnerException?.Message ?? global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message)),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Zurücksetzen nicht möglich"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             if (settings.HasGameProfile) settings.ResetGameProfile();
             nanoboy.Properties.Settings.Default.Reset();
             AetherColors.Apply(new UiThemePalette(settings.UiPrimaryColor, settings.UiSecondaryColor, settings.UiBackgroundColor));
@@ -1022,6 +1117,8 @@ namespace nanoboy
         #region "Update"
         private void updateTimer_Tick(object sender, EventArgs e)
         {
+            PollDiscordPresence();
+            PollStartupUpdateCheck();
             if (FinishStoppedOnlineLink()) return;
             healthMonitor?.Pulse(session, stateOperationInProgress || quickMenuOpen ||
                 WindowState == FormWindowState.Minimized || Form.ActiveForm != this, gameView.PresentedFrames);
@@ -1052,8 +1149,8 @@ namespace nanoboy
                 // Online cleanup retains the actionable browser reason on the next tick.
                 if (currentSession.OnlineLink is not null) return;
                 AetherSignal.Show(this,
-                    $"Die Emulation wurde wegen eines Fehlers beendet.\n\n{fault?.Message}",
-                    "Emulationsfehler",
+                    global::AetherBoy.Runtime.Localization.UiText.Format("Die Emulation wurde wegen eines Fehlers beendet.\n\n{0}", fault?.Message),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Emulationsfehler"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
                 return;
@@ -1101,8 +1198,8 @@ namespace nanoboy
                 int generation = snapshot.Rom.BatterySave.LoadedGeneration;
                 AetherSignal.Show(
                     this,
-                    $"Der aktuelle Batterie-Spielstand war nicht verwendbar. AetherBoy hat automatisch Backup {generation} geladen und repariert die Hauptdatei bei der nächsten Sicherung.",
-                    "Spielstand automatisch gerettet",
+                    global::AetherBoy.Runtime.Localization.UiText.Format("Der aktuelle Batterie-Spielstand war nicht verwendbar. AetherBoy hat automatisch Backup {0} geladen und repariert die Hauptdatei bei der nächsten Sicherung.", generation),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Spielstand automatisch gerettet"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
             }
@@ -1111,7 +1208,15 @@ namespace nanoboy
         private void PollGamepad()
         {
             HostGamepadState state = GamepadInput.GetState();
+            if (bootIntro is not null)
+            {
+                if ((state.Buttons & HostGamepadButtons.South) != 0 && (lastPadState.Buttons & HostGamepadButtons.South) == 0) bootIntro.Skip();
+                lastPadState = state; return;
+            }
             bool active = Form.ActiveForm == this && ContainsFocus && Enabled;
+            EmulationSnapshot? current = session?.LatestSnapshot;
+            gamepadRumble.Update(state, settings.RumbleEnabled && active && current is { State: SessionState.Running, IsPaused: false, RumbleActive: true }
+                && !IsOnlineLink && !stateOperationInProgress && !quickMenuOpen);
             if (active) aetherCommandMenu?.ProcessGamepad(state);
             ProcessGamepadState(state, active && aetherCommandMenu is null);
         }
@@ -1119,12 +1224,14 @@ namespace nanoboy
         private void MarkSessionProblem()
         {
             bool recorded = healthMonitor?.MarkProblem() == true;
-            SetSaveFeedback(recorded ? "Problemzeitpunkt lokal im Testbericht markiert" :
-                "Diagnose nicht aktiv oder Zeitpunkt gerade erst markiert", !recorded);
+            SetSaveFeedback(recorded ? global::AetherBoy.Runtime.Localization.UiText.Get("Problemzeitpunkt lokal im Testbericht markiert") :
+                global::AetherBoy.Runtime.Localization.UiText.Get("Diagnose nicht aktiv oder Zeitpunkt gerade erst markiert"), !recorded);
         }
 
         internal void ProcessGamepadState(HostGamepadState padState, bool ownsInputFocus)
         {
+            if (padState.DeviceId != lastPadState.DeviceId) { ReleaseGamepadInput(); gamepadAwaitNeutral = true; }
+            settings.UseControllerProfile(padState);
             testerSession?.RecordGamepadIfChanged(padState);
             UpdateAetherGamepadUi(padState);
 
@@ -1154,7 +1261,7 @@ namespace nanoboy
 
             if (gamepadAwaitNeutral)
             {
-                gamepadAwaitNeutral = !GamepadNavigationInput.Neutral(padState);
+                gamepadAwaitNeutral = !settings.IsControllerNeutral(padState);
                 lastPadState = padState; return;
             }
             const HostGamepadButtons menuChord = HostGamepadButtons.LeftStick | HostGamepadButtons.RightStick;
@@ -1162,7 +1269,8 @@ namespace nanoboy
             { lastPadState = padState; _ = OpenQuickMenuAsync(); return; }
 
             GamepadBindings bindings = settings.GamepadBindings;
-            GameBoyButtons gamepadButtons = GamepadMapper.ToGameBoyButtons(padState, bindings);
+            GameBoyButtons gamepadButtons = GamepadMapper.ToGameBoyButtons(padState, bindings,
+                settings.ControllerStickEnabled ? settings.ControllerStickThreshold : 1f);
             if (input.SetGamepadButtons(gamepadButtons))
             {
                 PostInputState();
@@ -1246,6 +1354,7 @@ namespace nanoboy
         #region Joypad
         private void gameView_PreviewKeyDown(object sender, PreviewKeyDownEventArgs e)
         {
+            if (bootIntro is not null) return;
             FinishStoppedOnlineLink();
             if (e.KeyCode == Keys.F5)
             {
@@ -1379,17 +1488,18 @@ namespace nanoboy
             {
                 AetherSignal.Show(
                     this,
-                    "Für diesen Programmstart ist keine Sitzungsaufzeichnung verfügbar. " +
-                    "Im Control Center unter DIAGNOSTICS kannst du sie für den nächsten Start aktivieren. " +
-                    "Bereits vorhandene Berichte bleiben im Development-Ordner erhalten.",
-                    "Entwicklungsdiagnose ist aus",
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Für diesen Programmstart ist keine Sitzungsaufzeichnung verfügbar. ") +
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Im Control Center unter DIAGNOSTICS kannst du sie für den nächsten Start aktivieren. ") +
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Bereits vorhandene Berichte bleiben im Development-Ordner erhalten."),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Entwicklungsdiagnose ist aus"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
                 return;
             }
 
-            using var dialog = new SaveFileDialog
+            using var dialog = new AetherFileDialog
             {
+                Save = true,
                 AddExtension = true,
                 DefaultExt = "zip",
                 FileName = $"AetherBoy-TestReport-{DateTime.Now:yyyyMMdd-HHmm}.zip",
@@ -1397,7 +1507,7 @@ namespace nanoboy
                 InitialDirectory = Environment.GetFolderPath(
                     Environment.SpecialFolder.MyDocuments),
                 OverwritePrompt = true,
-                Title = "Lokalen AetherBoy-Testbericht exportieren"
+                Title = global::AetherBoy.Runtime.Localization.UiText.Get("Lokalen AetherBoy-Testbericht exportieren")
             };
             if (dialog.ShowDialog(this) != DialogResult.OK)
             {
@@ -1412,8 +1522,8 @@ namespace nanoboy
                 if (IsDisposed) return;
                 AetherSignal.Show(
                     this,
-                    $"Der lokale Testbericht wurde gespeichert.\n\n{reportPath}",
-                    "Testbericht exportiert",
+                    global::AetherBoy.Runtime.Localization.UiText.Format("Der lokale Testbericht wurde gespeichert.\n\n{0}", reportPath),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Testbericht exportiert"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
             }
@@ -1424,8 +1534,8 @@ namespace nanoboy
                 if (IsDisposed) return;
                 AetherSignal.Show(
                     this,
-                    $"Der Testbericht konnte nicht exportiert werden.\n\n{exception.Message}",
-                    "Export fehlgeschlagen",
+                    global::AetherBoy.Runtime.Localization.UiText.Format("Der Testbericht konnte nicht exportiert werden.\n\n{0}", global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message)),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Export fehlgeschlagen"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }
@@ -1454,30 +1564,65 @@ namespace nanoboy
                 testerSession.RecordException("report.open_folder_failed", exception);
                 AetherSignal.Show(
                     this,
-                    $"Der Testordner konnte nicht geöffnet werden.\n\n{exception.Message}",
-                    "Ordner nicht verfügbar",
+                    global::AetherBoy.Runtime.Localization.UiText.Format("Der Testordner konnte nicht geöffnet werden.\n\n{0}", global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message)),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Ordner nicht verfügbar"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
             }
         }
 
-        private void frmNano_FormClosing(object sender, FormClosingEventArgs e)
+        private async void frmNano_FormClosing(object sender, FormClosingEventArgs e)
         {
+            CancelRomPreparation();
+            if (closingSettingsFlush) { e.Cancel = true; return; }
+            if (settings.HasPendingSaves)
+            {
+                e.Cancel = true;
+                closingSettingsFlush = true;
+                try
+                {
+                    await settings.FlushPendingSavesAsync();
+                    if (!IsDisposed && IsHandleCreated) BeginInvoke(new Action(Close));
+                }
+                catch (Exception exception) { ReportSettingsSaveFailure("", "settings.close_flush_failed", exception); }
+                finally { closingSettingsFlush = false; }
+                return;
+            }
             updateTimer.Stop();
             if (!StopSession())
             {
                 e.Cancel = true;
                 updateTimer.Start();
-                AetherSignal.Show(this,
-                    "Der Emulator wird noch beendet. Bitte versuchen Sie es gleich erneut.",
-                    "Emulator beschäftigt",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Warning);
+                if (!stopSessionSettingsFailed)
+                    AetherSignal.Show(this,
+                        global::AetherBoy.Runtime.Localization.UiText.Get("Der Emulator wird noch beendet. Bitte versuchen Sie es gleich erneut."),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("Emulator beschäftigt"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
             }
+        }
+
+        private void ReportSettingsSaveFailure(string area, string diagnosticCode, Exception exception)
+        {
+            testerSession?.RecordException(diagnosticCode, exception);
+            if (IsDisposed || !IsHandleCreated) return;
+            if (InvokeRequired)
+            {
+                try { BeginInvoke(new Action(() => ShowSettingsSaveFailure(exception))); }
+                catch (InvalidOperationException) { /* The window has finished closing. The failure is already recorded. */ }
+                return;
+            }
+            ShowSettingsSaveFailure(exception);
+        }
+
+        private void ShowSettingsSaveFailure(Exception exception)
+        {
+            if (!IsDisposed && IsHandleCreated) settingsSaveNotice?.SetFailure(exception);
         }
 
         private void frmNano_Deactivate(object? sender, EventArgs e)
         {
+            PauseForFocusLoss();
             EmulationSession currentSession = session;
             if (turboPressed)
             {
@@ -1517,14 +1662,9 @@ namespace nanoboy
                 return;
             }
 
-            if (FormBorderStyle == FormBorderStyle.None)
-            {
-                FormBorderStyle = FormBorderStyle.Sizable;
-            }
-
             ClientSize = new Size(
                 gameView.VideoGeometry.Width * size,
-                menuStrip.Height + gameView.VideoGeometry.Height * size);
+                gameView.VideoGeometry.Height * size);
             if (settings.VideoScaleFactor != size)
             {
                 settings.VideoScaleFactor = size;

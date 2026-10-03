@@ -15,6 +15,7 @@ internal enum LinuxTextKey { Left, Right, Home, End, Backspace, Delete, SelectAl
 internal sealed class LinuxTextEditor(int maximumLength = 80)
 {
     public int MaximumLength { get; set; } = maximumLength;
+    public string LineBreakReplacement { get; set; } = "";
 
     public string Text { get; private set; } = "";
     public int Caret { get; private set; }
@@ -139,9 +140,10 @@ internal sealed class LinuxTextEditor(int maximumLength = 80)
         ScrollOffset = Math.Clamp(ScrollOffset, 0, Math.Max(0, content - width + 2));
     }
 
-    private static string Clean(string value)
+    private string Clean(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
+        value = value.ReplaceLineEndings(LineBreakReplacement);
         var result = new StringBuilder(value.Length);
         foreach (Rune rune in value.EnumerateRunes()) if (!Rune.IsControl(rune) && rune.Value is not (0x2028 or 0x2029)) result.Append(rune.ToString());
         return result.ToString();

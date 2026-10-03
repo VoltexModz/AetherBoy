@@ -13,6 +13,7 @@ namespace nanoboy
         /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
         protected override void Dispose(bool disposing)
         {
+            if (disposing) StopSessionAfterDirectDispose();
             if (disposing && (components != null))
             {
                 components.Dispose();
@@ -29,93 +30,86 @@ namespace nanoboy
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            this.menuStrip = new System.Windows.Forms.MenuStrip();
-            this.menuFile = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuOpen = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuRecentFiles = new System.Windows.Forms.ToolStripMenuItem();
-            this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
-            this.menuSaveState = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuSaveStateQuickSave = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuSaveStateQuickLoad = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuBatterySaveSafety = new System.Windows.Forms.ToolStripMenuItem();
-            this.toolStripSeparatorSave = new System.Windows.Forms.ToolStripSeparator();
-            this.menuSaveSlot1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuSaveSlot2 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuSaveSlot3 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuSaveSlot4 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuSaveSlot5 = new System.Windows.Forms.ToolStripMenuItem();
-            this.toolStripSeparatorClose = new System.Windows.Forms.ToolStripSeparator();
-            this.menuClose = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuItem1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuControlCenter = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuItem2 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuAudioOn = new System.Windows.Forms.ToolStripMenuItem();
-            this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
-            this.menuAudioC1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuAudioC2 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuAudioC3 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuAudioC4 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuItem5 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuAudioQ1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuAudioQ2 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuAudioQ3 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuAudioQ4 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuItem3 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuItem13 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuFrameSkip0 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuFrameSkip1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuFrameSkip2 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuFrameSkip3 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuFrameSkip4 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuItem19 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuSize1 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuSize2 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuSize3 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuSize4 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuSizeFull = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuPalette = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuPalettePocket = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuPalettePeaGreen = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuPaletteGBLight = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuPaletteSepia = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuPaletteCyberpunk = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuControls = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuItem21 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuAudioInspector = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuItem4 = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuRomInfo = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuAbout = new System.Windows.Forms.ToolStripMenuItem();
-            this.toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
-            this.menuVideoFilter = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuFilterSharp = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuFilterSmooth = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuFilterLCDGrid = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuCheats = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuRewind = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuLinkCable = new System.Windows.Forms.ToolStripMenuItem();
-            this.menuChangelog = new System.Windows.Forms.ToolStripMenuItem();
+            this.menuStrip = new nanoboy.Controls.AetherCommandSet();
+            this.menuFile = new nanoboy.Controls.AetherCommand();
+            this.menuOpen = new nanoboy.Controls.AetherCommand();
+            this.menuRecentFiles = new nanoboy.Controls.AetherCommand();
+            this.toolStripSeparator1 = new nanoboy.Controls.AetherCommandSeparator();
+            this.menuSaveState = new nanoboy.Controls.AetherCommand();
+            this.menuSaveStateQuickSave = new nanoboy.Controls.AetherCommand();
+            this.menuSaveStateQuickLoad = new nanoboy.Controls.AetherCommand();
+            this.menuBatterySaveSafety = new nanoboy.Controls.AetherCommand();
+            this.toolStripSeparatorSave = new nanoboy.Controls.AetherCommandSeparator();
+            this.menuSaveSlot1 = new nanoboy.Controls.AetherCommand();
+            this.menuSaveSlot2 = new nanoboy.Controls.AetherCommand();
+            this.menuSaveSlot3 = new nanoboy.Controls.AetherCommand();
+            this.menuSaveSlot4 = new nanoboy.Controls.AetherCommand();
+            this.menuSaveSlot5 = new nanoboy.Controls.AetherCommand();
+            this.toolStripSeparatorClose = new nanoboy.Controls.AetherCommandSeparator();
+            this.menuClose = new nanoboy.Controls.AetherCommand();
+            this.menuItem1 = new nanoboy.Controls.AetherCommand();
+            this.menuControlCenter = new nanoboy.Controls.AetherCommand();
+            this.menuItem2 = new nanoboy.Controls.AetherCommand();
+            this.menuAudioOn = new nanoboy.Controls.AetherCommand();
+            this.toolStripSeparator2 = new nanoboy.Controls.AetherCommandSeparator();
+            this.menuAudioC1 = new nanoboy.Controls.AetherCommand();
+            this.menuAudioC2 = new nanoboy.Controls.AetherCommand();
+            this.menuAudioC3 = new nanoboy.Controls.AetherCommand();
+            this.menuAudioC4 = new nanoboy.Controls.AetherCommand();
+            this.menuItem5 = new nanoboy.Controls.AetherCommand();
+            this.menuAudioQ1 = new nanoboy.Controls.AetherCommand();
+            this.menuAudioQ2 = new nanoboy.Controls.AetherCommand();
+            this.menuAudioQ3 = new nanoboy.Controls.AetherCommand();
+            this.menuAudioQ4 = new nanoboy.Controls.AetherCommand();
+            this.menuItem3 = new nanoboy.Controls.AetherCommand();
+            this.menuItem13 = new nanoboy.Controls.AetherCommand();
+            this.menuFrameSkip0 = new nanoboy.Controls.AetherCommand();
+            this.menuFrameSkip1 = new nanoboy.Controls.AetherCommand();
+            this.menuFrameSkip2 = new nanoboy.Controls.AetherCommand();
+            this.menuFrameSkip3 = new nanoboy.Controls.AetherCommand();
+            this.menuFrameSkip4 = new nanoboy.Controls.AetherCommand();
+            this.menuItem19 = new nanoboy.Controls.AetherCommand();
+            this.menuSize1 = new nanoboy.Controls.AetherCommand();
+            this.menuSize2 = new nanoboy.Controls.AetherCommand();
+            this.menuSize3 = new nanoboy.Controls.AetherCommand();
+            this.menuSize4 = new nanoboy.Controls.AetherCommand();
+            this.menuSizeFull = new nanoboy.Controls.AetherCommand();
+            this.menuPalette = new nanoboy.Controls.AetherCommand();
+            this.menuPalettePocket = new nanoboy.Controls.AetherCommand();
+            this.menuPalettePeaGreen = new nanoboy.Controls.AetherCommand();
+            this.menuPaletteGBLight = new nanoboy.Controls.AetherCommand();
+            this.menuPaletteSepia = new nanoboy.Controls.AetherCommand();
+            this.menuPaletteCyberpunk = new nanoboy.Controls.AetherCommand();
+            this.menuControls = new nanoboy.Controls.AetherCommand();
+            this.menuItem21 = new nanoboy.Controls.AetherCommand();
+            this.menuAudioInspector = new nanoboy.Controls.AetherCommand();
+            this.menuItem4 = new nanoboy.Controls.AetherCommand();
+            this.menuRomInfo = new nanoboy.Controls.AetherCommand();
+            this.menuAbout = new nanoboy.Controls.AetherCommand();
+            this.toolStripSeparator3 = new nanoboy.Controls.AetherCommandSeparator();
+            this.menuVideoFilter = new nanoboy.Controls.AetherCommand();
+            this.menuFilterSharp = new nanoboy.Controls.AetherCommand();
+            this.menuFilterSmooth = new nanoboy.Controls.AetherCommand();
+            this.menuFilterLCDGrid = new nanoboy.Controls.AetherCommand();
+            this.menuCheats = new nanoboy.Controls.AetherCommand();
+            this.menuRewind = new nanoboy.Controls.AetherCommand();
+            this.menuLinkCable = new nanoboy.Controls.AetherCommand();
+            this.menuChangelog = new nanoboy.Controls.AetherCommand();
             this.updateTimer = new System.Windows.Forms.Timer(this.components);
             this.gameView = new nanoboy.Controls.GameDisplayControl();
-            this.menuStrip.SuspendLayout();
             this.SuspendLayout();
             //
-            // menuStrip
+            // nanoboy.Controls.AetherCommandSet
             //
-            this.menuStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuStrip.Items.AddRange(new nanoboy.Controls.AetherCommandItem[] {
             this.menuFile,
             this.menuItem1,
             this.menuItem21,
             this.menuItem4});
-            this.menuStrip.Location = new System.Drawing.Point(0, 0);
-            this.menuStrip.Name = "menuStrip";
-            this.menuStrip.ShowItemToolTips = true;
-            this.menuStrip.Size = new System.Drawing.Size(320, 24);
-            this.menuStrip.TabIndex = 0;
-            this.menuStrip.Text = "menuStrip";
             //
             // menuFile
             //
-            this.menuFile.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuFile.DropDownItems.AddRange(new nanoboy.Controls.AetherCommandItem[] {
             this.menuOpen,
             this.menuRecentFiles,
             this.toolStripSeparator1,
@@ -130,14 +124,14 @@ namespace nanoboy
             //
             this.menuOpen.Name = "menuOpen";
             this.menuOpen.Size = new System.Drawing.Size(180, 22);
-            this.menuOpen.Text = "ROM öffnen";
+            this.menuOpen.Text = global::AetherBoy.Runtime.Localization.UiText.Get("ROM öffnen");
             this.menuOpen.Click += new System.EventHandler(this.menuOpen_Click);
             //
             // menuRecentFiles
             //
             this.menuRecentFiles.Name = "menuRecentFiles";
             this.menuRecentFiles.Size = new System.Drawing.Size(180, 22);
-            this.menuRecentFiles.Text = "Zuletzt geöffnet";
+            this.menuRecentFiles.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Zuletzt geöffnet");
             //
             // toolStripSeparator1
             //
@@ -146,7 +140,7 @@ namespace nanoboy
             //
             // menuSaveState
             //
-            this.menuSaveState.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuSaveState.DropDownItems.AddRange(new nanoboy.Controls.AetherCommandItem[] {
             this.menuSaveStateQuickSave,
             this.menuSaveStateQuickLoad,
             this.menuBatterySaveSafety,
@@ -158,29 +152,29 @@ namespace nanoboy
             this.menuSaveSlot5});
             this.menuSaveState.Name = "menuSaveState";
             this.menuSaveState.Size = new System.Drawing.Size(180, 22);
-            this.menuSaveState.Text = "Save States";
-            this.menuSaveState.ToolTipText = "ROM-gebundene, integritätsgeprüfte Spielstände in fünf Slots.";
+            this.menuSaveState.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Save States");
+            this.menuSaveState.ToolTipText = global::AetherBoy.Runtime.Localization.UiText.Get("ROM-gebundene, integritätsgeprüfte Spielstände in fünf Slots.");
             //
             // menuSaveStateQuickSave
             //
             this.menuSaveStateQuickSave.Name = "menuSaveStateQuickSave";
             this.menuSaveStateQuickSave.Size = new System.Drawing.Size(201, 22);
-            this.menuSaveStateQuickSave.Text = "Schnellspeichern (F5)";
+            this.menuSaveStateQuickSave.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Schnellspeichern (F5)");
             this.menuSaveStateQuickSave.Click += new System.EventHandler(this.menuSaveStateQuickSave_Click);
             //
             // menuSaveStateQuickLoad
             //
             this.menuSaveStateQuickLoad.Name = "menuSaveStateQuickLoad";
             this.menuSaveStateQuickLoad.Size = new System.Drawing.Size(201, 22);
-            this.menuSaveStateQuickLoad.Text = "Schnellladen (F8)";
+            this.menuSaveStateQuickLoad.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Schnellladen (F8)");
             this.menuSaveStateQuickLoad.Click += new System.EventHandler(this.menuSaveStateQuickLoad_Click);
             //
             // menuBatterySaveSafety
             //
             this.menuBatterySaveSafety.Name = "menuBatterySaveSafety";
             this.menuBatterySaveSafety.Size = new System.Drawing.Size(246, 22);
-            this.menuBatterySaveSafety.Text = "Save Safety Center";
-            this.menuBatterySaveSafety.ToolTipText = "Batterie-Spielstand und drei rotierende Backups prüfen oder wiederherstellen.";
+            this.menuBatterySaveSafety.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Save Safety Center");
+            this.menuBatterySaveSafety.ToolTipText = global::AetherBoy.Runtime.Localization.UiText.Get("Batterie-Spielstand und drei rotierende Backups prüfen oder wiederherstellen.");
             this.menuBatterySaveSafety.Click += new System.EventHandler(this.menuBatterySaveSafety_Click);
             //
             // toolStripSeparatorSave
@@ -192,7 +186,7 @@ namespace nanoboy
             //
             this.menuSaveSlot1.Name = "menuSaveSlot1";
             this.menuSaveSlot1.Size = new System.Drawing.Size(201, 22);
-            this.menuSaveSlot1.Text = "Slot 1 (Aktiv)";
+            this.menuSaveSlot1.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Slot 1 (Aktiv)");
             this.menuSaveSlot1.Click += new System.EventHandler(this.menuSaveSlot1_Click);
             //
             // menuSaveSlot2
@@ -232,12 +226,12 @@ namespace nanoboy
             //
             this.menuClose.Name = "menuClose";
             this.menuClose.Size = new System.Drawing.Size(180, 22);
-            this.menuClose.Text = "Emulator schließen";
+            this.menuClose.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Emulator schließen");
             this.menuClose.Click += new System.EventHandler(this.menuClose_Click);
             //
             // menuItem1
             //
-            this.menuItem1.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuItem1.DropDownItems.AddRange(new nanoboy.Controls.AetherCommandItem[] {
             this.menuControlCenter,
             this.menuItem2,
             this.menuItem3,
@@ -245,18 +239,18 @@ namespace nanoboy
             this.menuControls});
             this.menuItem1.Name = "menuItem1";
             this.menuItem1.Size = new System.Drawing.Size(69, 20);
-            this.menuItem1.Text = "Optionen";
+            this.menuItem1.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Optionen");
             //
             // menuControlCenter
             //
             this.menuControlCenter.Name = "menuControlCenter";
             this.menuControlCenter.Size = new System.Drawing.Size(180, 22);
-            this.menuControlCenter.Text = "Control Center";
+            this.menuControlCenter.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Control Center");
             this.menuControlCenter.Click += new System.EventHandler(this.menuControlCenter_Click);
             //
             // menuItem2
             //
-            this.menuItem2.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuItem2.DropDownItems.AddRange(new nanoboy.Controls.AetherCommandItem[] {
             this.menuAudioOn,
             this.toolStripSeparator2,
             this.menuAudioC1,
@@ -272,7 +266,7 @@ namespace nanoboy
             //
             this.menuAudioOn.Name = "menuAudioOn";
             this.menuAudioOn.Size = new System.Drawing.Size(117, 22);
-            this.menuAudioOn.Text = "An";
+            this.menuAudioOn.Text = global::AetherBoy.Runtime.Localization.UiText.Get("An");
             this.menuAudioOn.Click += new System.EventHandler(this.menuAudioOn_Click);
             //
             // toolStripSeparator2
@@ -284,40 +278,40 @@ namespace nanoboy
             //
             this.menuAudioC1.Name = "menuAudioC1";
             this.menuAudioC1.Size = new System.Drawing.Size(117, 22);
-            this.menuAudioC1.Text = "Kanal 1";
+            this.menuAudioC1.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Kanal 1");
             this.menuAudioC1.Click += new System.EventHandler(this.menuAudioC1_Click);
             //
             // menuAudioC2
             //
             this.menuAudioC2.Name = "menuAudioC2";
             this.menuAudioC2.Size = new System.Drawing.Size(117, 22);
-            this.menuAudioC2.Text = "Kanal 2";
+            this.menuAudioC2.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Kanal 2");
             this.menuAudioC2.Click += new System.EventHandler(this.menuAudioC2_Click);
             //
             // menuAudioC3
             //
             this.menuAudioC3.Name = "menuAudioC3";
             this.menuAudioC3.Size = new System.Drawing.Size(117, 22);
-            this.menuAudioC3.Text = "Kanal 3";
+            this.menuAudioC3.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Kanal 3");
             this.menuAudioC3.Click += new System.EventHandler(this.menuAudioC3_Click);
             //
             // menuAudioC4
             //
             this.menuAudioC4.Name = "menuAudioC4";
             this.menuAudioC4.Size = new System.Drawing.Size(117, 22);
-            this.menuAudioC4.Text = "Kanal 4";
+            this.menuAudioC4.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Kanal 4");
             this.menuAudioC4.Click += new System.EventHandler(this.menuAudioC4_Click);
             //
             // menuItem5
             //
-            this.menuItem5.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuItem5.DropDownItems.AddRange(new nanoboy.Controls.AetherCommandItem[] {
             this.menuAudioQ1,
             this.menuAudioQ2,
             this.menuAudioQ3,
             this.menuAudioQ4});
             this.menuItem5.Name = "menuItem5";
             this.menuItem5.Size = new System.Drawing.Size(117, 22);
-            this.menuItem5.Text = "Qualität";
+            this.menuItem5.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Qualität");
             //
             // menuAudioQ1
             //
@@ -349,48 +343,48 @@ namespace nanoboy
             //
             // menuItem3
             //
-            this.menuItem3.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuItem3.DropDownItems.AddRange(new nanoboy.Controls.AetherCommandItem[] {
             this.menuItem13,
             this.menuItem19,
             this.menuVideoFilter});
             this.menuItem3.Name = "menuItem3";
             this.menuItem3.Size = new System.Drawing.Size(180, 22);
-            this.menuItem3.Text = "Video";
+            this.menuItem3.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Video");
             //
             // menuVideoFilter
             //
-            this.menuVideoFilter.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuVideoFilter.DropDownItems.AddRange(new nanoboy.Controls.AetherCommandItem[] {
             this.menuFilterSharp,
             this.menuFilterSmooth,
             this.menuFilterLCDGrid});
             this.menuVideoFilter.Name = "menuVideoFilter";
             this.menuVideoFilter.Size = new System.Drawing.Size(145, 22);
-            this.menuVideoFilter.Text = "Grafikfilter";
+            this.menuVideoFilter.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Grafikfilter");
             //
             // menuFilterSharp
             //
             this.menuFilterSharp.Name = "menuFilterSharp";
             this.menuFilterSharp.Size = new System.Drawing.Size(190, 22);
-            this.menuFilterSharp.Text = "Scharfe Pixel (Nearest)";
+            this.menuFilterSharp.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Scharfe Pixel (Nearest)");
             this.menuFilterSharp.Click += new System.EventHandler(this.menuFilterSharp_Click);
             //
             // menuFilterSmooth
             //
             this.menuFilterSmooth.Name = "menuFilterSmooth";
             this.menuFilterSmooth.Size = new System.Drawing.Size(190, 22);
-            this.menuFilterSmooth.Text = "Sanft (Bilinear)";
+            this.menuFilterSmooth.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Sanft (Bilinear)");
             this.menuFilterSmooth.Click += new System.EventHandler(this.menuFilterSmooth_Click);
             //
             // menuFilterLCDGrid
             //
             this.menuFilterLCDGrid.Name = "menuFilterLCDGrid";
             this.menuFilterLCDGrid.Size = new System.Drawing.Size(190, 22);
-            this.menuFilterLCDGrid.Text = "LCD Subpixel Grid";
+            this.menuFilterLCDGrid.Text = global::AetherBoy.Runtime.Localization.UiText.Get("LCD Subpixel Grid");
             this.menuFilterLCDGrid.Click += new System.EventHandler(this.menuFilterLCDGrid_Click);
             //
             // menuItem13
             //
-            this.menuItem13.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuItem13.DropDownItems.AddRange(new nanoboy.Controls.AetherCommandItem[] {
             this.menuFrameSkip0,
             this.menuFrameSkip1,
             this.menuFrameSkip2,
@@ -405,7 +399,7 @@ namespace nanoboy
             //
             this.menuFrameSkip0.Name = "menuFrameSkip0";
             this.menuFrameSkip0.Size = new System.Drawing.Size(103, 22);
-            this.menuFrameSkip0.Text = "None";
+            this.menuFrameSkip0.Text = global::AetherBoy.Runtime.Localization.UiText.Get("None");
             this.menuFrameSkip0.Click += new System.EventHandler(this.menuFrameSkip0_Click);
             //
             // menuFrameSkip1
@@ -438,7 +432,7 @@ namespace nanoboy
             //
             // menuItem19
             //
-            this.menuItem19.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuItem19.DropDownItems.AddRange(new nanoboy.Controls.AetherCommandItem[] {
             this.menuSize1,
             this.menuSize2,
             this.menuSize3,
@@ -446,7 +440,7 @@ namespace nanoboy
             this.menuSizeFull});
             this.menuItem19.Name = "menuItem19";
             this.menuItem19.Size = new System.Drawing.Size(125, 22);
-            this.menuItem19.Text = "Größe";
+            this.menuItem19.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Größe");
             //
             // menuSize1
             //
@@ -480,12 +474,12 @@ namespace nanoboy
             //
             this.menuSizeFull.Name = "menuSizeFull";
             this.menuSizeFull.Size = new System.Drawing.Size(114, 22);
-            this.menuSizeFull.Text = "Vollbild";
+            this.menuSizeFull.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Vollbild");
             this.menuSizeFull.Click += new System.EventHandler(this.menuSizeFull_Click);
             //
             // menuPalette
             //
-            this.menuPalette.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuPalette.DropDownItems.AddRange(new nanoboy.Controls.AetherCommandItem[] {
             this.menuPalettePocket,
             this.menuPalettePeaGreen,
             this.menuPaletteGBLight,
@@ -493,82 +487,82 @@ namespace nanoboy
             this.menuPaletteCyberpunk});
             this.menuPalette.Name = "menuPalette";
             this.menuPalette.Size = new System.Drawing.Size(180, 22);
-            this.menuPalette.Text = "Farbpalette (DMG)";
+            this.menuPalette.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Farbpalette (DMG)");
             //
             // menuPalettePocket
             //
             this.menuPalettePocket.Name = "menuPalettePocket";
             this.menuPalettePocket.Size = new System.Drawing.Size(217, 22);
-            this.menuPalettePocket.Text = "Game Boy Pocket (Grau)";
+            this.menuPalettePocket.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Game Boy Pocket (Grau)");
             this.menuPalettePocket.Click += new System.EventHandler(this.menuPalettePocket_Click);
             //
             // menuPalettePeaGreen
             //
             this.menuPalettePeaGreen.Name = "menuPalettePeaGreen";
             this.menuPalettePeaGreen.Size = new System.Drawing.Size(217, 22);
-            this.menuPalettePeaGreen.Text = "Pea Green (Original DMG)";
+            this.menuPalettePeaGreen.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Pea Green (Original DMG)");
             this.menuPalettePeaGreen.Click += new System.EventHandler(this.menuPalettePeaGreen_Click);
             //
             // menuPaletteGBLight
             //
             this.menuPaletteGBLight.Name = "menuPaletteGBLight";
             this.menuPaletteGBLight.Size = new System.Drawing.Size(217, 22);
-            this.menuPaletteGBLight.Text = "Game Boy Light (Türkis)";
+            this.menuPaletteGBLight.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Game Boy Light (Türkis)");
             this.menuPaletteGBLight.Click += new System.EventHandler(this.menuPaletteGBLight_Click);
             //
             // menuPaletteSepia
             //
             this.menuPaletteSepia.Name = "menuPaletteSepia";
             this.menuPaletteSepia.Size = new System.Drawing.Size(217, 22);
-            this.menuPaletteSepia.Text = "Sepia (Warm)";
+            this.menuPaletteSepia.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Sepia (Warm)");
             this.menuPaletteSepia.Click += new System.EventHandler(this.menuPaletteSepia_Click);
             //
             // menuPaletteCyberpunk
             //
             this.menuPaletteCyberpunk.Name = "menuPaletteCyberpunk";
             this.menuPaletteCyberpunk.Size = new System.Drawing.Size(217, 22);
-            this.menuPaletteCyberpunk.Text = "Cyberpunk (Neon)";
+            this.menuPaletteCyberpunk.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Cyberpunk (Neon)");
             this.menuPaletteCyberpunk.Click += new System.EventHandler(this.menuPaletteCyberpunk_Click);
             //
             // menuControls
             //
             this.menuControls.Name = "menuControls";
             this.menuControls.Size = new System.Drawing.Size(180, 22);
-            this.menuControls.Text = "Hotkeys";
+            this.menuControls.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Hotkeys");
             this.menuControls.Click += new System.EventHandler(this.menuControls_Click);
             //
             // menuItem21
             //
-            this.menuItem21.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuItem21.DropDownItems.AddRange(new nanoboy.Controls.AetherCommandItem[] {
             this.menuAudioInspector,
             this.menuCheats,
             this.menuRewind,
             this.menuLinkCable});
             this.menuItem21.Name = "menuItem21";
             this.menuItem21.Size = new System.Drawing.Size(79, 20);
-            this.menuItem21.Text = "Werkzeuge";
+            this.menuItem21.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Werkzeuge");
             //
             // menuAudioInspector
             //
             this.menuAudioInspector.Name = "menuAudioInspector";
             this.menuAudioInspector.Size = new System.Drawing.Size(250, 22);
-            this.menuAudioInspector.Text = "Audio Inspector";
+            this.menuAudioInspector.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Audio Inspector");
             this.menuAudioInspector.Click += new System.EventHandler(this.menuAudioInspector_Click);
             //
             // menuCheats
             //
             this.menuCheats.Name = "menuCheats";
             this.menuCheats.Size = new System.Drawing.Size(250, 22);
-            this.menuCheats.Text = "GameShark-Cheats (experimentell)";
-            this.menuCheats.ToolTipText = "Experimentelle RAM-Codes im Format 01XXYYZZ.";
+            this.menuCheats.Text = global::AetherBoy.Runtime.Localization.UiText.Get("GameShark-Cheats (experimentell)");
+            this.menuCheats.ToolTipText = global::AetherBoy.Runtime.Localization.UiText.Get("Experimentelle RAM-Codes im Format 01XXYYZZ.");
             this.menuCheats.Click += new System.EventHandler(this.menuCheats_Click);
             //
             // menuRewind
             //
             this.menuRewind.Name = "menuRewind";
             this.menuRewind.Size = new System.Drawing.Size(250, 22);
-            this.menuRewind.Text = "Zurückspulen";
-            this.menuRewind.ToolTipText = "Springt zum vorherigen Zustand im begrenzten Rewind-Puffer.";
+            this.menuRewind.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Zurückspulen");
+            this.menuRewind.ToolTipText = global::AetherBoy.Runtime.Localization.UiText.Get("Springt zum vorherigen Zustand im begrenzten Rewind-Puffer.");
             this.menuRewind.Click += new System.EventHandler(this.menuRewind_Click);
             //
             // menuLinkCable
@@ -576,40 +570,40 @@ namespace nanoboy
             this.menuLinkCable.Enabled = true;
             this.menuLinkCable.Name = "menuLinkCable";
             this.menuLinkCable.Size = new System.Drawing.Size(250, 22);
-            this.menuLinkCable.Text = "Lokales Link-Kabel · GB/GBC/GBA (experimentell)";
-            this.menuLinkCable.ToolTipText = "Zwei Spielansichten auf einem PC mit getrennten Spielständen. Zwei GB/GBC oder zwei GBA; kein Netzwerk oder Wireless.";
+            this.menuLinkCable.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Lokales Link-Kabel · GB/GBC/GBA (experimentell)");
+            this.menuLinkCable.ToolTipText = global::AetherBoy.Runtime.Localization.UiText.Get("Zwei Spielansichten auf einem PC mit getrennten Spielständen. Zwei GB/GBC oder zwei GBA; kein Netzwerk oder Wireless.");
             this.menuLinkCable.Click += new System.EventHandler(this.menuLinkCable_Click);
             //
             // menuItem4
             //
-            this.menuItem4.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuItem4.DropDownItems.AddRange(new nanoboy.Controls.AetherCommandItem[] {
             this.menuChangelog,
             this.menuRomInfo,
             this.menuAbout,
             this.toolStripSeparator3});
             this.menuItem4.Name = "menuItem4";
             this.menuItem4.Size = new System.Drawing.Size(44, 20);
-            this.menuItem4.Text = "Hilfe";
+            this.menuItem4.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Hilfe");
             //
             // menuChangelog
             //
             this.menuChangelog.Name = "menuChangelog";
             this.menuChangelog.Size = new System.Drawing.Size(250, 22);
-            this.menuChangelog.Text = "Projektgeschichte && Changelog";
+            this.menuChangelog.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Projektgeschichte && Changelog");
             this.menuChangelog.Click += new System.EventHandler(this.menuChangelog_Click);
             //
             // menuRomInfo
             //
             this.menuRomInfo.Name = "menuRomInfo";
             this.menuRomInfo.Size = new System.Drawing.Size(180, 22);
-            this.menuRomInfo.Text = "ROM Informationen";
+            this.menuRomInfo.Text = global::AetherBoy.Runtime.Localization.UiText.Get("ROM Informationen");
             this.menuRomInfo.Click += new System.EventHandler(this.menuRomInfo_Click);
             //
             // menuAbout
             //
             this.menuAbout.Name = "menuAbout";
             this.menuAbout.Size = new System.Drawing.Size(180, 22);
-            this.menuAbout.Text = "Informationen";
+            this.menuAbout.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Informationen");
             this.menuAbout.Click += new System.EventHandler(this.menuAbout_Click);
             //
             // toolStripSeparator3
@@ -638,14 +632,10 @@ namespace nanoboy
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(320, 312);
             this.Controls.Add(this.gameView);
-            this.Controls.Add(this.menuStrip);
-            this.MainMenuStrip = this.menuStrip;
             this.Name = "frmNano";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "AetherBoy 4.8.0-alpha.1 (Alpha)";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.frmNano_FormClosing);
-            this.menuStrip.ResumeLayout(false);
-            this.menuStrip.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -653,72 +643,72 @@ namespace nanoboy
 
         #endregion
 
-        private System.Windows.Forms.MenuStrip menuStrip;
-        private System.Windows.Forms.ToolStripMenuItem menuFile;
-        private System.Windows.Forms.ToolStripMenuItem menuOpen;
-        private System.Windows.Forms.ToolStripMenuItem menuRecentFiles;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
-        private System.Windows.Forms.ToolStripMenuItem menuSaveState;
-        private System.Windows.Forms.ToolStripMenuItem menuSaveStateQuickSave;
-        private System.Windows.Forms.ToolStripMenuItem menuSaveStateQuickLoad;
-        private System.Windows.Forms.ToolStripMenuItem menuBatterySaveSafety;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparatorSave;
-        private System.Windows.Forms.ToolStripMenuItem menuSaveSlot1;
-        private System.Windows.Forms.ToolStripMenuItem menuSaveSlot2;
-        private System.Windows.Forms.ToolStripMenuItem menuSaveSlot3;
-        private System.Windows.Forms.ToolStripMenuItem menuSaveSlot4;
-        private System.Windows.Forms.ToolStripMenuItem menuSaveSlot5;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparatorClose;
-        private System.Windows.Forms.ToolStripMenuItem menuClose;
-        private System.Windows.Forms.ToolStripMenuItem menuItem1;
-        private System.Windows.Forms.ToolStripMenuItem menuControlCenter;
-        private System.Windows.Forms.ToolStripMenuItem menuItem2;
-        private System.Windows.Forms.ToolStripMenuItem menuItem3;
-        private System.Windows.Forms.ToolStripMenuItem menuPalette;
-        private System.Windows.Forms.ToolStripMenuItem menuPalettePocket;
-        private System.Windows.Forms.ToolStripMenuItem menuPalettePeaGreen;
-        private System.Windows.Forms.ToolStripMenuItem menuPaletteGBLight;
-        private System.Windows.Forms.ToolStripMenuItem menuPaletteSepia;
-        private System.Windows.Forms.ToolStripMenuItem menuPaletteCyberpunk;
-        private System.Windows.Forms.ToolStripMenuItem menuControls;
-        private System.Windows.Forms.ToolStripMenuItem menuAudioOn;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
-        private System.Windows.Forms.ToolStripMenuItem menuAudioC1;
-        private System.Windows.Forms.ToolStripMenuItem menuAudioC2;
-        private System.Windows.Forms.ToolStripMenuItem menuAudioC3;
-        private System.Windows.Forms.ToolStripMenuItem menuAudioC4;
-        private System.Windows.Forms.ToolStripMenuItem menuItem13;
-        private System.Windows.Forms.ToolStripMenuItem menuFrameSkip0;
-        private System.Windows.Forms.ToolStripMenuItem menuFrameSkip1;
-        private System.Windows.Forms.ToolStripMenuItem menuFrameSkip2;
-        private System.Windows.Forms.ToolStripMenuItem menuFrameSkip3;
-        private System.Windows.Forms.ToolStripMenuItem menuFrameSkip4;
-        private System.Windows.Forms.ToolStripMenuItem menuItem19;
-        private System.Windows.Forms.ToolStripMenuItem menuSize1;
-        private System.Windows.Forms.ToolStripMenuItem menuSize2;
-        private System.Windows.Forms.ToolStripMenuItem menuSize3;
-        private System.Windows.Forms.ToolStripMenuItem menuSize4;
-        private System.Windows.Forms.ToolStripMenuItem menuSizeFull;
+        private nanoboy.Controls.AetherCommandSet menuStrip;
+        private nanoboy.Controls.AetherCommand menuFile;
+        private nanoboy.Controls.AetherCommand menuOpen;
+        private nanoboy.Controls.AetherCommand menuRecentFiles;
+        private nanoboy.Controls.AetherCommandSeparator toolStripSeparator1;
+        private nanoboy.Controls.AetherCommand menuSaveState;
+        private nanoboy.Controls.AetherCommand menuSaveStateQuickSave;
+        private nanoboy.Controls.AetherCommand menuSaveStateQuickLoad;
+        private nanoboy.Controls.AetherCommand menuBatterySaveSafety;
+        private nanoboy.Controls.AetherCommandSeparator toolStripSeparatorSave;
+        private nanoboy.Controls.AetherCommand menuSaveSlot1;
+        private nanoboy.Controls.AetherCommand menuSaveSlot2;
+        private nanoboy.Controls.AetherCommand menuSaveSlot3;
+        private nanoboy.Controls.AetherCommand menuSaveSlot4;
+        private nanoboy.Controls.AetherCommand menuSaveSlot5;
+        private nanoboy.Controls.AetherCommandSeparator toolStripSeparatorClose;
+        private nanoboy.Controls.AetherCommand menuClose;
+        private nanoboy.Controls.AetherCommand menuItem1;
+        private nanoboy.Controls.AetherCommand menuControlCenter;
+        private nanoboy.Controls.AetherCommand menuItem2;
+        private nanoboy.Controls.AetherCommand menuItem3;
+        private nanoboy.Controls.AetherCommand menuPalette;
+        private nanoboy.Controls.AetherCommand menuPalettePocket;
+        private nanoboy.Controls.AetherCommand menuPalettePeaGreen;
+        private nanoboy.Controls.AetherCommand menuPaletteGBLight;
+        private nanoboy.Controls.AetherCommand menuPaletteSepia;
+        private nanoboy.Controls.AetherCommand menuPaletteCyberpunk;
+        private nanoboy.Controls.AetherCommand menuControls;
+        private nanoboy.Controls.AetherCommand menuAudioOn;
+        private nanoboy.Controls.AetherCommandSeparator toolStripSeparator2;
+        private nanoboy.Controls.AetherCommand menuAudioC1;
+        private nanoboy.Controls.AetherCommand menuAudioC2;
+        private nanoboy.Controls.AetherCommand menuAudioC3;
+        private nanoboy.Controls.AetherCommand menuAudioC4;
+        private nanoboy.Controls.AetherCommand menuItem13;
+        private nanoboy.Controls.AetherCommand menuFrameSkip0;
+        private nanoboy.Controls.AetherCommand menuFrameSkip1;
+        private nanoboy.Controls.AetherCommand menuFrameSkip2;
+        private nanoboy.Controls.AetherCommand menuFrameSkip3;
+        private nanoboy.Controls.AetherCommand menuFrameSkip4;
+        private nanoboy.Controls.AetherCommand menuItem19;
+        private nanoboy.Controls.AetherCommand menuSize1;
+        private nanoboy.Controls.AetherCommand menuSize2;
+        private nanoboy.Controls.AetherCommand menuSize3;
+        private nanoboy.Controls.AetherCommand menuSize4;
+        private nanoboy.Controls.AetherCommand menuSizeFull;
         private nanoboy.Controls.GameDisplayControl gameView;
-        private System.Windows.Forms.ToolStripMenuItem menuItem21;
-        private System.Windows.Forms.ToolStripMenuItem menuAudioQ1;
-        private System.Windows.Forms.ToolStripMenuItem menuAudioQ2;
-        private System.Windows.Forms.ToolStripMenuItem menuAudioQ3;
-        private System.Windows.Forms.ToolStripMenuItem menuAudioQ4;
-        private System.Windows.Forms.ToolStripMenuItem menuItem5;
+        private nanoboy.Controls.AetherCommand menuItem21;
+        private nanoboy.Controls.AetherCommand menuAudioQ1;
+        private nanoboy.Controls.AetherCommand menuAudioQ2;
+        private nanoboy.Controls.AetherCommand menuAudioQ3;
+        private nanoboy.Controls.AetherCommand menuAudioQ4;
+        private nanoboy.Controls.AetherCommand menuItem5;
         private System.Windows.Forms.Timer updateTimer;
-        private System.Windows.Forms.ToolStripMenuItem menuAudioInspector;
-        private System.Windows.Forms.ToolStripMenuItem menuRomInfo;
-        private System.Windows.Forms.ToolStripMenuItem menuAbout;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
-        private System.Windows.Forms.ToolStripMenuItem menuItem4;
-        private System.Windows.Forms.ToolStripMenuItem menuVideoFilter;
-        private System.Windows.Forms.ToolStripMenuItem menuFilterSharp;
-        private System.Windows.Forms.ToolStripMenuItem menuFilterSmooth;
-        private System.Windows.Forms.ToolStripMenuItem menuFilterLCDGrid;
-        private System.Windows.Forms.ToolStripMenuItem menuCheats;
-        private System.Windows.Forms.ToolStripMenuItem menuRewind;
-        private System.Windows.Forms.ToolStripMenuItem menuLinkCable;
-        private System.Windows.Forms.ToolStripMenuItem menuChangelog;
+        private nanoboy.Controls.AetherCommand menuAudioInspector;
+        private nanoboy.Controls.AetherCommand menuRomInfo;
+        private nanoboy.Controls.AetherCommand menuAbout;
+        private nanoboy.Controls.AetherCommandSeparator toolStripSeparator3;
+        private nanoboy.Controls.AetherCommand menuItem4;
+        private nanoboy.Controls.AetherCommand menuVideoFilter;
+        private nanoboy.Controls.AetherCommand menuFilterSharp;
+        private nanoboy.Controls.AetherCommand menuFilterSmooth;
+        private nanoboy.Controls.AetherCommand menuFilterLCDGrid;
+        private nanoboy.Controls.AetherCommand menuCheats;
+        private nanoboy.Controls.AetherCommand menuRewind;
+        private nanoboy.Controls.AetherCommand menuLinkCable;
+        private nanoboy.Controls.AetherCommand menuChangelog;
     }
 }

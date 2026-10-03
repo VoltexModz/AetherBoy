@@ -145,7 +145,7 @@ Auf dieser Basis wurden unter anderem ergänzt oder korrigiert:
 | Audioausgabe und vier Kanalschalter | Ja | Ja, PSG plus Direct Sound |
 | Batterie-Saves mit Backups | Ja | Ja |
 | Save States und Rewind | Ja | Ja |
-| Cheats | GB-GameShark-RAM | Raw, CodeBreaker, GameShark v1/v2 |
+| [Sitzungs-Cheats](CHEAT_SUPPORT.md) | GameShark `01`, Game Genie (6/9), CodeBreaker, Raw; mehrzeilige Sets | CodeBreaker, GameShark v1/v2, Action Replay v3: Master/Reseed, Bedingungen, Fills, Hooks, Zeiger, ROM-Patches, Gerätetaste; dokumentierte Ausnahmen |
 | Diagnose im Control Center | Ja, Hoststatus | Ja, zusätzlich Kernevents |
 | Lokale Link-Hardwarebasis | Serielle Clock vorhanden | Zwei-Core-Peer vorhanden |
 
@@ -181,8 +181,9 @@ Firmware für die automatischen Tests.
   Open-Bus-, Prefetch-, DMA-, PPU- und APU-Kanten können abweichen.
 - Die lokale GBA-Linkbasis besitzt noch keinen fertigen Zwei-Sitzungs-Host,
   keinen sichtbaren Link-Lab-Ablauf und keinen TCP-/IPC-/Internettransport.
-- Action Replay/PAR v3 sowie komplexe CodeBreaker-Hook-/Fill-/List- und
-  verschlüsselte Mastercode-Streams fehlen.
+- Action Replay v3 unterstützt nur direkte RAM-Schreib- und Additionscodes;
+  Master-/Reseed-/Hook-/Bedingungs-/Indirekt-/ROM-Patch-Befehle sowie komplexe
+  CodeBreaker-Hook-/Fill-/List- und verschlüsselte Mastercode-Streams fehlen.
 - Spezialhardware wie Pocket Camera, HuC1/HuC3, MMM01 und weitere seltene
   Mapper ist nicht freigegeben.
 - Ältere experimentelle GBA-Save-States vor Kernschema 5 sind nicht kompatibel.

@@ -89,6 +89,20 @@ namespace nanoboy.Controls
                 UseMnemonic = false
             };
             Controls.Add(messageLabel);
+            if (messageHeight > messageLabel.Height)
+            {
+                // Long paths and safety explanations must remain selectable and
+                // reachable rather than disappearing below the clamped dialog.
+                var fullMessage = new AetherTextBox
+                {
+                    Name = "aetherSignalFullMessage", Bounds = messageLabel.Bounds,
+                    Font = messageLabel.Font, Text = message, Multiline = true,
+                    ReadOnly = true, ScrollBars = ScrollBars.Vertical,
+                    AccessibleName = global::AetherBoy.Runtime.Localization.UiText.Get("Vollständige Meldung")
+                };
+                messageLabel.Visible = false;
+                Controls.Add(fullMessage);
+            }
 
             var divider = new Panel
             {
@@ -102,7 +116,7 @@ namespace nanoboy.Controls
             BuildButtons(contentHeight);
             AetherDialog.Apply(
                 this,
-                $"SYSTEM SIGNAL // {signal.Code}",
+                global::AetherBoy.Runtime.Localization.UiText.Format("SYSTEM SIGNAL // {0}", signal.Code),
                 signal.Description);
             category.ForeColor = signal.Color;
             messageLabel.ForeColor = AetherColors.Text;
@@ -168,27 +182,27 @@ namespace nanoboy.Controls
                 return icon switch
                 {
                     MessageBoxIcon.Error => new(
-                        "ERR",
-                        "ACTION COULD NOT COMPLETE",
-                        "AetherBoy hat den Vorgang sicher abgebrochen.",
+                        global::AetherBoy.Runtime.Localization.UiText.Get("ERR"),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("ACTION COULD NOT COMPLETE"),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("AetherBoy hat den Vorgang sicher abgebrochen."),
                         "×",
                         AetherColors.Danger),
                     MessageBoxIcon.Warning => new(
-                        "WARN",
-                        "ATTENTION REQUIRED",
-                        "Bitte prüfe die folgenden Informationen.",
+                        global::AetherBoy.Runtime.Localization.UiText.Get("WARN"),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("ATTENTION REQUIRED"),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("Bitte prüfe die folgenden Informationen."),
                         "!",
                         Color.FromArgb(255, 190, 92)),
                     MessageBoxIcon.Question => new(
-                        "QUERY",
-                        "DECISION REQUIRED",
-                        "AetherBoy wartet auf deine Entscheidung.",
+                        global::AetherBoy.Runtime.Localization.UiText.Get("QUERY"),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("DECISION REQUIRED"),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("AetherBoy wartet auf deine Entscheidung."),
                         "?",
                         AetherColors.Violet),
                     _ => new(
-                        "INFO",
-                        "STATUS UPDATE",
-                        "Neue Information aus der laufenden Sitzung.",
+                        global::AetherBoy.Runtime.Localization.UiText.Get("INFO"),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("STATUS UPDATE"),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("Neue Information aus der laufenden Sitzung."),
                         "i",
                         AetherColors.Cyan)
                 };
@@ -207,30 +221,30 @@ namespace nanoboy.Controls
                 {
                     MessageBoxButtons.OKCancel => new[]
                     {
-                        new ButtonSpec("ABBRECHEN", DialogResult.Cancel, AetherButtonKind.Ghost),
+                        new ButtonSpec(global::AetherBoy.Runtime.Localization.UiText.Get("ABBRECHEN"), DialogResult.Cancel, AetherButtonKind.Ghost),
                         new ButtonSpec("OK", DialogResult.OK, AetherButtonKind.Primary, true)
                     },
                     MessageBoxButtons.YesNo => new[]
                     {
-                        new ButtonSpec("NEIN", DialogResult.No, AetherButtonKind.Secondary),
-                        new ButtonSpec("JA", DialogResult.Yes, AetherButtonKind.Primary, true)
+                        new ButtonSpec(global::AetherBoy.Runtime.Localization.UiText.Get("NEIN"), DialogResult.No, AetherButtonKind.Secondary),
+                        new ButtonSpec(global::AetherBoy.Runtime.Localization.UiText.Get("JA"), DialogResult.Yes, AetherButtonKind.Primary, true)
                     },
                     MessageBoxButtons.YesNoCancel => new[]
                     {
-                        new ButtonSpec("ABBRECHEN", DialogResult.Cancel, AetherButtonKind.Ghost),
-                        new ButtonSpec("NEIN", DialogResult.No, AetherButtonKind.Secondary),
-                        new ButtonSpec("JA", DialogResult.Yes, AetherButtonKind.Primary, true)
+                        new ButtonSpec(global::AetherBoy.Runtime.Localization.UiText.Get("ABBRECHEN"), DialogResult.Cancel, AetherButtonKind.Ghost),
+                        new ButtonSpec(global::AetherBoy.Runtime.Localization.UiText.Get("NEIN"), DialogResult.No, AetherButtonKind.Secondary),
+                        new ButtonSpec(global::AetherBoy.Runtime.Localization.UiText.Get("JA"), DialogResult.Yes, AetherButtonKind.Primary, true)
                     },
                     MessageBoxButtons.RetryCancel => new[]
                     {
-                        new ButtonSpec("ABBRECHEN", DialogResult.Cancel, AetherButtonKind.Ghost),
-                        new ButtonSpec("ERNEUT", DialogResult.Retry, AetherButtonKind.Primary, true)
+                        new ButtonSpec(global::AetherBoy.Runtime.Localization.UiText.Get("ABBRECHEN"), DialogResult.Cancel, AetherButtonKind.Ghost),
+                        new ButtonSpec(global::AetherBoy.Runtime.Localization.UiText.Get("ERNEUT"), DialogResult.Retry, AetherButtonKind.Primary, true)
                     },
                     MessageBoxButtons.AbortRetryIgnore => new[]
                     {
-                        new ButtonSpec("ABBRECHEN", DialogResult.Abort, AetherButtonKind.Danger),
-                        new ButtonSpec("IGNORIEREN", DialogResult.Ignore, AetherButtonKind.Secondary),
-                        new ButtonSpec("ERNEUT", DialogResult.Retry, AetherButtonKind.Primary, true)
+                        new ButtonSpec(global::AetherBoy.Runtime.Localization.UiText.Get("ABBRECHEN"), DialogResult.Abort, AetherButtonKind.Danger),
+                        new ButtonSpec(global::AetherBoy.Runtime.Localization.UiText.Get("IGNORIEREN"), DialogResult.Ignore, AetherButtonKind.Secondary),
+                        new ButtonSpec(global::AetherBoy.Runtime.Localization.UiText.Get("ERNEUT"), DialogResult.Retry, AetherButtonKind.Primary, true)
                     },
                     _ => new[]
                     {

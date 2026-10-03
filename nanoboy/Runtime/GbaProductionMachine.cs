@@ -116,6 +116,7 @@ namespace AetherBoy.Runtime
                 new TestDebugger(),
                 skipBios);
             device.ConfigureAudioCallback(OnCoreAudio);
+            cheatEngine.Attach(device);
 
             this.savePath = savePath;
             rtcSavePath = savePath + ".rtc";
@@ -144,7 +145,8 @@ namespace AetherBoy.Runtime
                     saveStatus.IsEnabled,
                     saveStatus.ExpectedLength,
                     (int)saveStatus.LoadedFrom,
-                    saveStatus.InvalidPrimaryDetected));
+                    saveStatus.InvalidPrimaryDetected))
+            { CartridgeHeaderTitle = info.Title };
             // Paired machines must both begin at the unadvanced hardware state:
             // state capture can run cycles while seeking an instruction boundary.
             if (initializeRewind)
@@ -264,6 +266,7 @@ namespace AetherBoy.Runtime
         {
             ThrowIfDisposed();
             device.Reset(skipBios);
+            cheatEngine.ButtonPressed = false;
             pressedButtons = GameBoyButtons.None;
             pressedAdvanceButtons = GameBoyAdvanceButtons.None;
             framesSincePersistentFlush = 0;
@@ -309,6 +312,12 @@ namespace AetherBoy.Runtime
             return cheatEngine.Toggle(id);
         }
 
+        public void SetCheatButton(bool pressed)
+        {
+            ThrowIfDisposed();
+            cheatEngine.ButtonPressed = pressed;
+        }
+
         public bool TryCopyVideoFrame(int[] destination, ref long sequence)
         {
             ThrowIfDisposed();
@@ -348,7 +357,7 @@ namespace AetherBoy.Runtime
                         entry.Category.ToString(),
                         entry.Message,
                         entry.Address))
-                    .ToArray());
+                    .ToArray(), cheatButtonPressed: cheatEngine.ButtonPressed);
         }
 
         public void Dispose()

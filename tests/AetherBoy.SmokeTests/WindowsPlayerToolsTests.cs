@@ -97,7 +97,7 @@ public sealed class WindowsPlayerToolsTests
         string rom = Path.Combine(child, "Generated.gba"); File.WriteAllBytes(rom, new byte[512]);
         File.WriteAllText(Path.Combine(child, "ignore.txt"), "not a rom");
         using var browser = new frmRomBrowser(root); browser.Show(); Application.DoEvents();
-        var list = (ListView)browser.Controls.Find("romBrowserFiles", true).Single();
+        var list = (nanoboy.Controls.AetherList)browser.Controls.Find("romBrowserFiles", true).Single();
         list.Focus(); list.Items[0].Selected = true;
         GamepadNavigation.Navigate(browser, PadUiAction.Accept);
         Assert.AreEqual(1, list.Items.Count); Assert.AreEqual("Generated.gba", list.Items[0].Text);
@@ -112,7 +112,7 @@ public sealed class WindowsPlayerToolsTests
         Control key = GamepadNavigation.Targets(keyboard).First(control => control.Text == "1");
         key.Focus(); GamepadNavigation.Navigate(keyboard, PadUiAction.Accept); Assert.AreEqual("Test1", keyboard.Value);
         Capture(keyboard, "controller-keyboard.png");
-        GamepadNavigation.Targets(keyboard).First(control => control.Text == "ÜBERNEHMEN").Focus();
+        GamepadNavigation.Targets(keyboard).First(control => control.Text == AetherBoy.Runtime.Localization.UiText.Get("ÜBERNEHMEN")).Focus();
         GamepadNavigation.Navigate(keyboard, PadUiAction.Accept); Assert.AreEqual(DialogResult.OK, keyboard.DialogResult);
     }
     [STATestMethod]
@@ -128,8 +128,8 @@ public sealed class WindowsPlayerToolsTests
             defaults.AudioEnable = false; defaults.BootRomEnable = false;
             using var main = new frmNano(); main.Show(); main.LoadRomFile(imported);
             var session = Field<EmulationSession>(main, "session");
-            PumpUntil(() => session.LatestSnapshot.EmulatedFrameCount >= 2);
             Field<System.Windows.Forms.Timer>(main, "updateTimer").Stop();
+            PumpUntil(() => session.LatestSnapshot.EmulatedFrameCount >= 2);
             var view = Field<GameDisplayControl>(main, "gameView");
             main.Activate(); view.Focus(); Application.DoEvents();
             main.ProcessGamepadState(new(HostGamepadButtons.None), true); main.ProcessGamepadState(new(HostGamepadButtons.DPadRight), true);

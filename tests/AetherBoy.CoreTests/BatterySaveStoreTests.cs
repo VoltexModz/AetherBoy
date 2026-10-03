@@ -7,6 +7,73 @@ namespace AetherBoy.CoreTests;
 public sealed class BatterySaveStoreTests
 {
     [TestMethod]
+    public void Rotation_ReusesDurableBackupFilesAndRetainsEveryGeneration()
+    {
+        WithSavePath(path =>
+        {
+            for (byte value = 1; value <= 4; value++) BatterySaveStore.Write(path, Filled(64, value));
+            var timestamp = new DateTime(2020, 1, 2, 3, 4, 6, DateTimeKind.Utc);
+            File.SetLastWriteTimeUtc(path + ".bak1", timestamp);
+            File.SetLastWriteTimeUtc(path + ".bak1.guard", timestamp);
+            BatterySaveStore.Write(path, Filled(64, 5));
+            Assert.AreEqual(timestamp, File.GetLastWriteTimeUtc(path + ".bak2"));
+            Assert.AreEqual(timestamp, File.GetLastWriteTimeUtc(path + ".bak2.guard"));
+            for (int i = 0; i <= 3; i++)
+                CollectionAssert.AreEqual(Filled(64, (byte)(5 - i)), File.ReadAllBytes(i == 0 ? path : path + $".bak{i}"));
+            Assert.IsTrue(BatterySaveStore.Inspect(path, 64).All(file => file.IsValid));
+            Assert.IsFalse(BatterySaveStore.GetActiveWrites().Any(write => write.ThreadId == Environment.CurrentManagedThreadId));
+        });
+    }
+
+    [TestMethod]
+    public void Rotation_CompactsValidGenerationsAndUpgradesLegacyBackups()
+    {
+        WithSavePath(path =>
+        {
+            File.WriteAllBytes(path, new byte[3]); // invalid primary, valid legacy backups
+            File.WriteAllBytes(path + ".bak1", Filled(32, 2));
+            File.WriteAllBytes(path + ".bak2", Filled(32, 1));
+            BatterySaveStore.Write(path, Filled(32, 3));
+            Assert.IsTrue(BatterySaveStore.Inspect(path, 32).Take(3).All(file => file.IsValid && file.HasIntegrityMetadata));
+            CollectionAssert.AreEqual(Filled(32, 2), File.ReadAllBytes(path + ".bak1"));
+            CollectionAssert.AreEqual(Filled(32, 1), File.ReadAllBytes(path + ".bak2"));
+        });
+    }
+
+    [TestMethod]
+    public void Rotation_InterruptedGuardPublicationLeavesPrimaryAndRecoverableBackup()
+    {
+        WithSavePath(path =>
+        {
+            for (byte value = 1; value <= 3; value++) BatterySaveStore.Write(path, Filled(64, value));
+            // Force failure after the backup data rename, before guard publication.
+            Directory.CreateDirectory(path + ".bak3.guard");
+            Exception error = Assert.Throws<Exception>(() => BatterySaveStore.Write(path, Filled(64, 4)));
+            Assert.IsTrue(error is IOException or UnauthorizedAccessException);
+            Assert.AreEqual("publish-backup-guard", error.Data["battery_save_stage"]);
+            Assert.AreEqual(3, error.Data["battery_save_generation"]);
+            CollectionAssert.AreEqual(Filled(64, 3), BatterySaveStore.Load(path, 64).Data);
+            CollectionAssert.AreEqual(Filled(64, 1), File.ReadAllBytes(path + ".bak3"));
+            Assert.IsTrue(File.Exists(path + ".bak3.guard.next"));
+            Assert.IsFalse(BatterySaveStore.GetActiveWrites().Any(write => write.ThreadId == Environment.CurrentManagedThreadId));
+        });
+    }
+
+    [TestMethod]
+    public void Rotation_UsesPendingGuardFromInterruptedPreviousCommit()
+    {
+        WithSavePath(path =>
+        {
+            for (byte value = 1; value <= 3; value++) BatterySaveStore.Write(path, Filled(64, value));
+            File.Move(path + ".bak1.guard", path + ".bak1.guard.next");
+            File.WriteAllText(path + ".bak1.guard", "interrupted-old-guard");
+            BatterySaveStore.Write(path, Filled(64, 4));
+            Assert.IsTrue(BatterySaveStore.Inspect(path, 64).All(file => file.IsValid));
+            CollectionAssert.AreEqual(Filled(64, 2), File.ReadAllBytes(path + ".bak2"));
+        });
+    }
+
+    [TestMethod]
     public void Write_RotatesThreeIntegrityProtectedBackups()
     {
         WithSavePath(savePath =>

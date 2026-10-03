@@ -33,7 +33,7 @@ namespace nanoboy
             this.levelDisplayControl3 = new nanoboy.Controls.LevelDisplayControl();
             this.levelDisplayControl4 = new nanoboy.Controls.LevelDisplayControl();
             this.timer1 = new System.Windows.Forms.Timer(this.components);
-            this.checkBox1 = new System.Windows.Forms.CheckBox();
+            this.checkBox1 = new nanoboy.Controls.AetherCheckBox();
             this.label1 = new System.Windows.Forms.Label();
             this.groupBox1 = new nanoboy.Controls.AetherGroupBox();
             this.groupBox2 = new nanoboy.Controls.AetherGroupBox();
@@ -116,7 +116,7 @@ namespace nanoboy
             this.checkBox1.Name = "checkBox1";
             this.checkBox1.Size = new System.Drawing.Size(86, 17);
             this.checkBox1.TabIndex = 1;
-            this.checkBox1.Text = "Aktualisieren";
+            this.checkBox1.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Aktualisieren");
             this.checkBox1.UseVisualStyleBackColor = true;
             this.checkBox1.CheckedChanged += new System.EventHandler(this.checkBox1_CheckedChanged);
             //
@@ -169,7 +169,7 @@ namespace nanoboy
             this.groupBox1.Size = new System.Drawing.Size(126, 170);
             this.groupBox1.TabIndex = 6;
             this.groupBox1.TabStop = false;
-            this.groupBox1.Text = "Kanal Lautstärke";
+            this.groupBox1.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Kanal Lautstärke");
             //
             // groupBox2
             //
@@ -194,7 +194,7 @@ namespace nanoboy
             this.groupBox2.Size = new System.Drawing.Size(200, 170);
             this.groupBox2.TabIndex = 7;
             this.groupBox2.TabStop = false;
-            this.groupBox2.Text = "Quad Kanal 1 (Q1)";
+            this.groupBox2.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Quad Kanal 1 (Q1)");
             //
             // labelQ1SoundLength
             //
@@ -212,7 +212,7 @@ namespace nanoboy
             this.label7.Name = "label7";
             this.label7.Size = new System.Drawing.Size(77, 13);
             this.label7.TabIndex = 14;
-            this.label7.Text = "Sound Length:";
+            this.label7.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Sound Length:");
             //
             // labelQ1EnvelDirection
             //
@@ -230,7 +230,7 @@ namespace nanoboy
             this.label5.Name = "label5";
             this.label5.Size = new System.Drawing.Size(88, 13);
             this.label5.TabIndex = 12;
-            this.label5.Text = "Envel. Direction: ";
+            this.label5.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Envel. Direction: ");
             //
             // labelQ1EnvelSweep
             //
@@ -248,7 +248,7 @@ namespace nanoboy
             this.label3.Name = "label3";
             this.label3.Size = new System.Drawing.Size(76, 13);
             this.label3.TabIndex = 10;
-            this.label3.Text = "Envel. Sweep:";
+            this.label3.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Envel. Sweep:");
             //
             // labelQ1WaveDuty
             //
@@ -266,7 +266,7 @@ namespace nanoboy
             this.label10.Name = "label10";
             this.label10.Size = new System.Drawing.Size(67, 13);
             this.label10.TabIndex = 8;
-            this.label10.Text = "Wave Duty: ";
+            this.label10.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Wave Duty: ");
             //
             // labelQ1SweepDirection
             //
@@ -284,7 +284,7 @@ namespace nanoboy
             this.label8.Name = "label8";
             this.label8.Size = new System.Drawing.Size(88, 13);
             this.label8.TabIndex = 6;
-            this.label8.Text = "Sweep Direction:";
+            this.label8.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Sweep Direction:");
             //
             // labelQ1SweepShift
             //
@@ -302,7 +302,7 @@ namespace nanoboy
             this.label6.Name = "label6";
             this.label6.Size = new System.Drawing.Size(70, 13);
             this.label6.TabIndex = 4;
-            this.label6.Text = "Sweep Shift: ";
+            this.label6.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Sweep Shift: ");
             //
             // labelQ1SweepCycles
             //
@@ -320,7 +320,7 @@ namespace nanoboy
             this.label4.Name = "label4";
             this.label4.Size = new System.Drawing.Size(77, 13);
             this.label4.TabIndex = 2;
-            this.label4.Text = "Sweep Cycles:";
+            this.label4.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Sweep Cycles:");
             //
             // labelQ1Freq
             //
@@ -338,7 +338,7 @@ namespace nanoboy
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(54, 13);
             this.label2.TabIndex = 0;
-            this.label2.Text = "Frequenz:";
+            this.label2.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Frequenz:");
             //
             // groupBox3
             //
@@ -363,7 +363,7 @@ namespace nanoboy
             this.groupBox3.Size = new System.Drawing.Size(185, 170);
             this.groupBox3.TabIndex = 16;
             this.groupBox3.TabStop = false;
-            this.groupBox3.Text = "Quad Kanal 2 (Q2)";
+            this.groupBox3.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Quad Kanal 2 (Q2)");
             //
             // labelQ2SoundLength
             //
@@ -381,7 +381,7 @@ namespace nanoboy
             this.label11.Name = "label11";
             this.label11.Size = new System.Drawing.Size(63, 13);
             this.label11.TabIndex = 14;
-            this.label11.Text = "Klanglänge:";
+            this.label11.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Klanglänge:");
             //
             // labelQ2EnvelDirection
             //
@@ -399,7 +399,7 @@ namespace nanoboy
             this.label13.Name = "label13";
             this.label13.Size = new System.Drawing.Size(88, 13);
             this.label13.TabIndex = 12;
-            this.label13.Text = "Envel. Direction: ";
+            this.label13.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Envel. Direction: ");
             //
             // labelQ2EnvelSweep
             //
@@ -417,7 +417,7 @@ namespace nanoboy
             this.label15.Name = "label15";
             this.label15.Size = new System.Drawing.Size(76, 13);
             this.label15.TabIndex = 10;
-            this.label15.Text = "Envel. Sweep:";
+            this.label15.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Envel. Sweep:");
             //
             // labelQ2WaveDuty
             //
@@ -435,7 +435,7 @@ namespace nanoboy
             this.label17.Name = "label17";
             this.label17.Size = new System.Drawing.Size(67, 13);
             this.label17.TabIndex = 8;
-            this.label17.Text = "Wave Duty: ";
+            this.label17.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Wave Duty: ");
             //
             // labelQ2SweepDirection
             //
@@ -453,7 +453,7 @@ namespace nanoboy
             this.label19.Name = "label19";
             this.label19.Size = new System.Drawing.Size(88, 13);
             this.label19.TabIndex = 6;
-            this.label19.Text = "Sweep Direction:";
+            this.label19.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Sweep Direction:");
             //
             // labelQ2SweepShift
             //
@@ -471,7 +471,7 @@ namespace nanoboy
             this.label21.Name = "label21";
             this.label21.Size = new System.Drawing.Size(70, 13);
             this.label21.TabIndex = 4;
-            this.label21.Text = "Sweep Shift: ";
+            this.label21.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Sweep Shift: ");
             //
             // labelQ2SweepCycles
             //
@@ -489,7 +489,7 @@ namespace nanoboy
             this.label23.Name = "label23";
             this.label23.Size = new System.Drawing.Size(77, 13);
             this.label23.TabIndex = 2;
-            this.label23.Text = "Sweep Cycles:";
+            this.label23.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Sweep Cycles:");
             //
             // labelQ2Freq
             //
@@ -507,7 +507,7 @@ namespace nanoboy
             this.label25.Name = "label25";
             this.label25.Size = new System.Drawing.Size(54, 13);
             this.label25.TabIndex = 0;
-            this.label25.Text = "Frequenz:";
+            this.label25.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Frequenz:");
             //
             // groupBox4
             //
@@ -521,7 +521,7 @@ namespace nanoboy
             this.groupBox4.Size = new System.Drawing.Size(332, 156);
             this.groupBox4.TabIndex = 17;
             this.groupBox4.TabStop = false;
-            this.groupBox4.Text = "Wellen Kanal (W)";
+            this.groupBox4.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Wellen Kanal (W)");
             //
             // labelWSoundLength
             //
@@ -548,7 +548,7 @@ namespace nanoboy
             this.label12.Name = "label12";
             this.label12.Size = new System.Drawing.Size(63, 13);
             this.label12.TabIndex = 2;
-            this.label12.Text = "Klanglänge:";
+            this.label12.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Klanglänge:");
             //
             // label9
             //
@@ -557,7 +557,7 @@ namespace nanoboy
             this.label9.Name = "label9";
             this.label9.Size = new System.Drawing.Size(54, 13);
             this.label9.TabIndex = 1;
-            this.label9.Text = "Frequenz:";
+            this.label9.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Frequenz:");
             //
             // waveDataControl1
             //
@@ -589,7 +589,7 @@ namespace nanoboy
             this.groupBox5.Size = new System.Drawing.Size(185, 156);
             this.groupBox5.TabIndex = 18;
             this.groupBox5.TabStop = false;
-            this.groupBox5.Text = "Geräuschkanal (N)";
+            this.groupBox5.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Geräuschkanal (N)");
             //
             // labelNSoundLength
             //
@@ -670,7 +670,7 @@ namespace nanoboy
             this.label24.Name = "label24";
             this.label24.Size = new System.Drawing.Size(63, 13);
             this.label24.TabIndex = 18;
-            this.label24.Text = "Klanglänge:";
+            this.label24.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Klanglänge:");
             //
             // label22
             //
@@ -679,7 +679,7 @@ namespace nanoboy
             this.label22.Name = "label22";
             this.label22.Size = new System.Drawing.Size(93, 13);
             this.label22.TabIndex = 4;
-            this.label22.Text = "Result Frequency:";
+            this.label22.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Result Frequency:");
             //
             // label26
             //
@@ -688,7 +688,7 @@ namespace nanoboy
             this.label26.Name = "label26";
             this.label26.Size = new System.Drawing.Size(88, 13);
             this.label26.TabIndex = 17;
-            this.label26.Text = "Envel. Direction: ";
+            this.label26.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Envel. Direction: ");
             //
             // label20
             //
@@ -697,7 +697,7 @@ namespace nanoboy
             this.label20.Name = "label20";
             this.label20.Size = new System.Drawing.Size(79, 13);
             this.label20.TabIndex = 3;
-            this.label20.Text = "Dividing Ratio: ";
+            this.label20.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Dividing Ratio: ");
             //
             // label27
             //
@@ -706,7 +706,7 @@ namespace nanoboy
             this.label27.Name = "label27";
             this.label27.Size = new System.Drawing.Size(76, 13);
             this.label27.TabIndex = 16;
-            this.label27.Text = "Envel. Sweep:";
+            this.label27.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Envel. Sweep:");
             //
             // label18
             //
@@ -715,7 +715,7 @@ namespace nanoboy
             this.label18.Name = "label18";
             this.label18.Size = new System.Drawing.Size(50, 13);
             this.label18.TabIndex = 2;
-            this.label18.Text = "Counter: ";
+            this.label18.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Counter: ");
             //
             // label16
             //
@@ -724,7 +724,7 @@ namespace nanoboy
             this.label16.Name = "label16";
             this.label16.Size = new System.Drawing.Size(67, 13);
             this.label16.TabIndex = 1;
-            this.label16.Text = "Counter Bits:";
+            this.label16.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Counter Bits:");
             //
             // label14
             //
@@ -733,7 +733,7 @@ namespace nanoboy
             this.label14.Name = "label14";
             this.label14.Size = new System.Drawing.Size(93, 13);
             this.label14.TabIndex = 0;
-            this.label14.Text = "Clock Frequency: ";
+            this.label14.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Clock Frequency: ");
             //
             // btnRecordWav
             //
@@ -741,7 +741,7 @@ namespace nanoboy
             this.btnRecordWav.Name = "btnRecordWav";
             this.btnRecordWav.Size = new System.Drawing.Size(185, 23);
             this.btnRecordWav.TabIndex = 19;
-            this.btnRecordWav.Text = "Audio aufnehmen (.wav)";
+            this.btnRecordWav.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Audio aufnehmen (.wav)");
             this.btnRecordWav.UseVisualStyleBackColor = true;
             this.btnRecordWav.Click += new System.EventHandler(this.btnRecordWav_Click);
             //
@@ -757,10 +757,10 @@ namespace nanoboy
             this.Controls.Add(this.groupBox2);
             this.Controls.Add(this.groupBox1);
             this.Controls.Add(this.checkBox1);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow;
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
             this.MaximizeBox = false;
             this.Name = "frmAudioTool";
-            this.Text = "AetherBoy GBC Emulator - Audio-Inspector";
+            this.Text = global::AetherBoy.Runtime.Localization.UiText.Get("AetherBoy GBC Emulator - Audio-Inspector");
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
             this.groupBox2.ResumeLayout(false);

@@ -1,6 +1,29 @@
 # Linux-Entwicklung: Übergabe an Windows und den nächsten ChatGPT
 
-**Lokaler UI-Nachtrag vom 28. September (noch uncommittet):** [Logo-Farben, frei wählbare Akzente und Hintergrund auf Windows/Wayland](UI_THEME_HANDOFF_2026-09-28.md).
+**02.10.2026 – Barcode Boy gemeinsam für Windows und Linux umgesetzt:**
+[Protokoll, UI, Referenzen, Grenzen und Spieltestauftrag](WINDOWS_ROADMAP.md#phase-62--barcode-boy-02102026).
+Auf Linux: Settings → Tools → Open Barcode Boy. WSLg/Wayland-UI und synthetisches
+GB-Programm getestet; bitte Battle Space mit eigener ROM auf nativem Linux
+abnehmen. Noch keine behauptete Originalspiel-Kompatibilität. Beide Frontends
+nutzen das neue Nutzerlogo; kein separater Linux-Zubehör-Core nötig.
+English: shared Barcode Boy implementation, native UI test passed; real-game test pending.
+
+**01.10.2026 – Phase 3 bereits in Windows und Linux angebunden:**
+[AVI-Einzelspielaufnahme, permanenter ZIP/7z-ROM-Import und Abnahmeauftrag](LINUX_ROADMAP.md#phase-3--medien-und-rom-archive-01102026).
+Bitte unter nativem Wayland Portal/Drop, Bibliothek nach Entfernen des Archivs
+und AVI-Wiedergabe mit Ton prüfen. Shared Runtime und Lizenzdateien sind gemeinsam;
+keine zweite Decoder-/Recorder-Implementierung anlegen. Fortsetzung: Mehrfach-ROM-
+Archivauswahl mit Hashbindung sowie ausdrückliches **Patch and play** sind eingebaut.
+Vier zusätzliche native Wayland-Fälle stehen in `LinuxAsyncOpenTests` und
+`LinuxPatchLabTests`; unter Windows sind sie bewusst übersprungen.
+Gespeicherte automatische Patch-Zuordnungen beim Laden,
+MP4 und Local-Link-Split-Video sind noch nicht implementiert.
+
+**Windows-Rückgabe zu `9f50dfe`:** [Einstellungssuche, Unterseiten, Bildskalierung und Controller-Einrichtung jetzt auch unter Windows; Tests und Grenzen](WINDOWS_SETTINGS_PARITY_2026-09-28.md).
+
+**Windows-Rückgabe vom 28. September:** [2a91c9f integriert, CI-Testkorrektur, visuelle Farbprüfung und Slot-Layoutfix](WINDOWS_UI_INTEGRATION_2026-09-28.md).
+
+**UI-Lieferstand vom 28. September (`2a91c9f`):** [Logo-Farben, frei wählbare Akzente und Hintergrund auf Windows/Wayland](UI_THEME_HANDOFF_2026-09-28.md).
 
 **Aktueller Arbeitsauftrag an den Linux-ChatGPT (27. September):**
 [Vollständige nächste Schritte: Server, WAN-Test, Linux-Testdialog und Pokémon-Abnahme](LINUX_ONLINE_NEXT_STEPS_2026-09-27.md).
@@ -332,6 +355,31 @@ Linux besitzt bereits Save-Import/-Export; der in der Windows-Handoff offene
 Windows-Punkt 7 ist dadurch **nicht** automatisch erledigt. Ebenso bedeuten die
 gemeinsamen Inspector-Snapshots noch keine Linux-Inspector-Oberfläche; die
 Linux-Patch-Oberfläche ist inzwischen separat ergänzt.
+
+## Phase 2: gemeinsamer Cheat-Ausbau am 01.10.2026
+
+Die frühere GBA-Beschränkung auf direkte RAM-Codes ist aufgehoben. Windows und
+Linux nutzen `GbaCheatProgram`/`GbaCheatEngine`: CodeBreaker inklusive
+Master-Entschlüsselung/Slide/List, GS v1/v2 und AR v3 inklusive Reseed, Bedingungen,
+Zeigern, Thumb-Hooks, ROM-Patches und Gerätetaste. GB/GBC ergänzt CodeBreaker/Raw
+zu GameShark `01` und Game Genie. Vollständige Matrix und Grenzen:
+[CHEAT_SUPPORT.md](CHEAT_SUPPORT.md). Nicht als Unterstützung aller Codes verkaufen.
+
+Linux **Tools** hat Formatwahl neben ADD sowie HOLD/RELEASE DEVICE BUTTON.
+`LinuxTextEditor.LineBreakReplacement` wird nur für Cheatfelder auf ` + ` gesetzt:
+Paste einer mehrzeiligen Liste zerstört damit nicht mehr ihre Zeilengrenzen.
+Keine zweite Linux-Engine hinzufügen. C#-Cipher-Adaption/Tabellen aus mGBA stehen
+unter MPL-2.0; `licenses/mgba-cheats/LICENSE.txt` und `NOTICE.txt` mitliefern und
+die dazugehörigen geänderten Quellen beim Release zugänglich halten.
+
+Frische Windows-Host-Verifikation dieses Pakets: Core 253 bestanden; Runtime
+473 bestanden/5 übersprungen; Windows 252 bestanden/4 übersprungen; portables
+Desktop 114 bestanden/44 übersprungen. Keine Fehler. Windows-Cheatdialog mit
+synthetischer GBA-ROM und Screenshot geprüft; nativer Wayland-Lauf und echte
+Spielcodes stehen aus. Dies sind keine aktualisierten Linux-Hardware-Testzahlen.
+Nativ nachprüfen: Tools-Formatwechsel, mehrzeiliges Paste, ADD/Toggle/Remove,
+Gerätetaste/Reset, GB/GBC/GBA mit eigenen passenden Codes und gesicherten Saves.
+Keine Änderung am Online-Link-Protokoll, keine ROM-/Spielstand-Übertragung.
 
 Für den nächsten ChatGPT: erst diesen Stand mit Code und Git abgleichen, dann
 den konkreten Nutzerauftrag bearbeiten. Keine bereits implementierten Funktionen

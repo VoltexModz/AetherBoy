@@ -1,5 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.Linq;
 using Windows.Gaming.Input;
 using WindowsGamepad = Windows.Gaming.Input.Gamepad;
 using WindowsGamepadButtons = Windows.Gaming.Input.GamepadButtons;
@@ -48,7 +50,8 @@ namespace nanoboy.Input
             string? deviceName = null,
             GamepadInputSource source = GamepadInputSource.WindowsGamingInput,
             ushort vendorId = 0,
-            ushort productId = 0)
+            ushort productId = 0,
+            string? deviceId = null)
         {
             IsConnected = true;
             Buttons = buttons;
@@ -62,6 +65,7 @@ namespace nanoboy.Input
             Source = source;
             VendorId = vendorId;
             ProductId = productId;
+            DeviceId = deviceId;
         }
 
         public bool IsConnected { get; }
@@ -76,6 +80,7 @@ namespace nanoboy.Input
         public GamepadInputSource Source { get; }
         public ushort VendorId { get; }
         public ushort ProductId { get; }
+        public string? DeviceId { get; }
 
         public bool IsButtonDown(HostGamepadButtons button) =>
             button != HostGamepadButtons.None && (Buttons & button) == button;
@@ -86,6 +91,30 @@ namespace nanoboy.Input
 
     public static class GamepadInput
     {
+        internal static string? SelectedDeviceId { get; set; }
+
+        internal static HostGamepadState[] GetDevices()
+        {
+            var devices = new List<HostGamepadState>();
+            for (int i = 0; i < 16; i++)
+            {
+                HostGamepadState state = WindowsGamepadSource.GetState(i);
+                if (state.IsConnected) devices.Add(state);
+            }
+            if (devices.Count > 0) return devices.ToArray(); // Do not enumerate the same pad through two backends.
+            for (int i = 0; i < 4; i++)
+            {
+                HostGamepadState state = FromXInput(XInputGamepad.GetState(i), i);
+                if (state.IsConnected) devices.Add(state);
+            }
+            return devices.ToArray();
+        }
+
+        public static HostGamepadState GetState() => SelectDevice(GetDevices(), SelectedDeviceId);
+
+        internal static HostGamepadState SelectDevice(HostGamepadState[] devices, string? selectedId) =>
+            selectedId is null ? devices.FirstOrDefault() : devices.FirstOrDefault(device => device.DeviceId == selectedId);
+
         /// <summary>
         /// Selects the first two connected local controllers from one backend only.
         /// WGI uses a dense device collection; XInput slots can contain holes and are
@@ -102,9 +131,9 @@ namespace nanoboy.Input
             ReadOnlySpan<HostGamepadState> fallback =
             [
                 FromXInput(XInputGamepad.GetState(0)),
-                FromXInput(XInputGamepad.GetState(1)),
-                FromXInput(XInputGamepad.GetState(2)),
-                FromXInput(XInputGamepad.GetState(3))
+                FromXInput(XInputGamepad.GetState(1), 1),
+                FromXInput(XInputGamepad.GetState(2), 2),
+                FromXInput(XInputGamepad.GetState(3), 3)
             ];
             return SelectLocalPairStates(modern, fallback);
         }
@@ -127,7 +156,7 @@ namespace nanoboy.Input
             return (first, HostGamepadState.Disconnected);
         }
 
-        public static HostGamepadState GetState(int playerIndex = 0)
+        public static HostGamepadState GetState(int playerIndex)
         {
             if (playerIndex < 0)
             {
@@ -140,10 +169,10 @@ namespace nanoboy.Input
                 return modernState;
             }
 
-            return FromXInput(XInputGamepad.GetState(playerIndex));
+            return FromXInput(XInputGamepad.GetState(playerIndex), playerIndex);
         }
 
-        internal static HostGamepadState FromXInput(XInputGamepadState state)
+        internal static HostGamepadState FromXInput(XInputGamepadState state, int slot = 0)
         {
             if (!state.IsConnected)
             {
@@ -175,7 +204,7 @@ namespace nanoboy.Input
                 state.LeftTrigger,
                 state.RightTrigger,
                 "XInput Controller",
-                GamepadInputSource.XInput);
+                GamepadInputSource.XInput, deviceId: "xinput:" + slot);
         }
 
         private static void AddXInputButton(
@@ -223,7 +252,8 @@ namespace nanoboy.Input
                     rawController?.DisplayName ?? "Windows Gamepad",
                     GamepadInputSource.WindowsGamingInput,
                     rawController?.HardwareVendorId ?? 0,
-                    rawController?.HardwareProductId ?? 0);
+                    rawController?.HardwareProductId ?? 0,
+                    "wgi:" + (rawController?.NonRoamableId ?? playerIndex.ToString()));
             }
             catch (Exception exception) when (
                 exception is COMException ||

@@ -72,6 +72,11 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     private string? romPath;
     private readonly LinuxDataPaths dataPaths;
     private readonly LinuxDiagnostics diagnostics;
+    private readonly LinuxSessionHealth sessionHealth = new();
+    private LinuxHealthSample? latestHealthSample;
+    private string? latestHealthHint;
+    private long audioFramesObserved;
+    private long lastProblemMarkerAt = long.MinValue;
     private long lastDiagnosticsAt;
     private long nextAudioRetryAt;
     private readonly bool vsyncEnabled;
@@ -80,7 +85,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     private LinuxRomStorage? pendingStorage;
     private string? StateBasePath => IsOnlineLink ? null : storage?.StateBasePath;
     private bool HasSelectedState => !IsOnlineLink && StateCard(options.SaveSlot) is { Exists: true, Error: null };
-    private string statusMessage = "OPEN OR DROP A ROM";
+    private string statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("OPEN OR DROP A ROM");
     private string? audioError;
     private bool running = true;
     private bool isFullscreen;
@@ -98,8 +103,10 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             : LinuxDataPaths.Isolated(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(settingsPath))!, "storage"));
         hiddenWindow = hidden;
         library = new LinuxLibrary(dataPaths);
+        releaseUpdates = UpdateServiceFactory(Path.Combine(dataPaths.Cache, "updates"));
         this.diagnostics = diagnostics ?? new LinuxDiagnostics(dataPaths, false);
         options = LinuxSettingsStore.Load(this.settingsPath, out string? settingsError);
+        AetherBoy.Runtime.Localization.UiText.Initialize(options.DisplayLanguage);
         Colors = new UiColors(new UiThemePalette(options.UiPrimaryColor, options.UiSecondaryColor, options.UiBackgroundColor));
         globalProfile = LinuxGameProfile.Capture(options);
         loadError = settingsError;
@@ -134,7 +141,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         args = args.Where(arg => arg != "--accessible").ToArray();
         if (args.Length > 1)
         {
-            throw new ArgumentException("Usage: AetherBoy.Desktop [--accessible] [game.gb|game.gbc|game.gba]");
+            throw new ArgumentException(global::AetherBoy.Runtime.Localization.UiText.Get("Usage: AetherBoy.Desktop [--accessible] [game.gb|game.gbc|game.gba]"));
         }
 
         if (accessible) OpenAccessibleControls();
@@ -152,13 +159,20 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             }
 
             DrainDialogSelections();
+            UpdateBootIntro();
             CompletePendingLoad();
             CompletePendingPatch();
             CompletePendingScreenshot();
+            PollSofaController();
             try { UpdateEmulation(); }
             catch (Exception exception) { ReportError(exception); }
+            try { UpdateLocalLink(); }
+            catch (Exception exception) { ReportError(exception); StopLocalLink(); }
             FlushSettingsIfDue();
             UpdateDiagnostics();
+            PollDiscordPresence();
+            PollStartupUpdateCheck();
+            UpdateOnlineProbe();
             UpdateComfort();
             if (!minimized)
             {
@@ -168,8 +182,9 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             }
             UpdateAccessibleControls();
             // Idle/paused views do not need to redraw at the monitor's maximum rate.
-            bool idle = session is null || session.LatestSnapshot.IsPaused || minimized;
-            SDL.Delay(idle ? 50u : vsyncEnabled ? 0u : 2u);
+            bool idle = (session is null || session.LatestSnapshot.IsPaused)
+                && (localLinkSession is null || localLinkSession.LatestSnapshot.IsPaused) || minimized;
+            SDL.Delay(introClock is not null ? 16u : idle ? 50u : vsyncEnabled ? 0u : 2u);
         }
 
         return session?.Fault is null ? 0 : 1;
@@ -184,6 +199,9 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
         accessibleControls?.Dispose(); accessibleControls = null;
         disposed = true;
+        FinishBootIntro(false);
+        discordPresence.Dispose();
+        releaseUpdates.Dispose();
         // Finish a started import before shutting down; its worker never touches SDL.
         try { libraryMutation?.GetAwaiter().GetResult(); } catch { }
         try { pendingPatch?.GetAwaiter().GetResult(); } catch { /* Reported during normal completion. */ }
@@ -195,7 +213,32 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             pendingScreenshot = null;
         }
         FinishRomPreparation();
+        StopLocalLink();
+        try { localLinkPlanTask?.Wait(TimeSpan.FromSeconds(2)); } catch { }
+        try { localLinkStartupTask?.Wait(TimeSpan.FromSeconds(2)); } catch { }
+        if (localLinkStartupTask is { IsCompletedSuccessfully: true } unclaimedStartup)
+        {
+            try { unclaimedStartup.Result.ShutdownAsync().Wait(TimeSpan.FromSeconds(2)); }
+            catch (Exception exception) { diagnostics.Failure("local_link_shutdown", exception); }
+        }
+        else if (localLinkStartupTask is { IsCompleted: false } finishingStartup)
+        {
+            // A constructor may finish after the bounded window shutdown wait. It must not
+            // leave a newly created local-link owner running without a UI to collect it.
+            _ = finishingStartup.ContinueWith(async finished =>
+            {
+                if (finished.IsCompletedSuccessfully) await finished.Result.ShutdownAsync().ConfigureAwait(false);
+                else _ = finished.Exception;
+            }, TaskScheduler.Default).Unwrap();
+        }
+        try { localLinkStopTask?.Wait(TimeSpan.FromSeconds(2)); } catch { }
+        ReleaseLocalLinkTextures();
+        CloseSecondLocalGamepad();
         FlushSettingsIfDue(force: true);
+        StopOnlineProbe();
+        try { onlineProbeStopTask?.Wait(TimeSpan.FromSeconds(2)); } catch { }
+        onlineProbe?.Dispose();
+        onlineProbe = null;
         DisposeSession(pendingSession);
         pendingSession = null;
         pendingStorage?.Dispose();
@@ -207,6 +250,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         audioOutput = null;
         if (gamepad != IntPtr.Zero)
         {
+            StopControllerRumble();
             SDL.CloseGamepad(gamepad);
             gamepad = IntPtr.Zero;
         }
@@ -218,6 +262,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         }
 
         if (brandTexture != IntPtr.Zero) SDL.DestroyTexture(brandTexture);
+        ClearLibraryPreviews();
         ClearPreviewTextures();
         textRenderer.Dispose();
         SDL.DestroyRenderer(renderer);
@@ -279,6 +324,8 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 windowFocused = false;
                 if (options.PauseOnFocusLoss && session is not null && session.State == SessionState.Running)
                 { resumeAfterFocus = true; session.SetPausedAsync(true).GetAwaiter().GetResult(); audioOutput?.Clear(); }
+                if (localLinkSession is { State: SessionState.Running } link)
+                { resumeLocalLinkAfterFocus = true; _ = link.SetPausedAsync(true); localLinkAudioMixer.Clear(); audioOutput?.Clear(); }
                 mouseTurbo = false;
                 draggingVolume = false;
                 rebindingAction = null;
@@ -297,10 +344,15 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 if (IsLoading) break;
                 if (resumeAfterFocus && session is not null)
                 {
-                    if (controlCenterVisible) resumeAfterControlCenter = true;
+                    if (showSofaLibrary) sofaResumeOnClose = true;
+                    else if (showQuickDeck) quickDeckResumeOnClose = true;
+                    else if (controlCenterVisible) resumeAfterControlCenter = true;
                     else session.SetPausedAsync(false).GetAwaiter().GetResult();
                 }
                 resumeAfterFocus = false;
+                if (resumeLocalLinkAfterFocus && localLinkSession is { } resumedLink && !controlCenterVisible)
+                    _ = resumedLink.SetPausedAsync(false);
+                resumeLocalLinkAfterFocus = false;
                 break;
             case SDL.EventType.GamepadButtonDown:
             case SDL.EventType.GamepadButtonUp:
@@ -311,23 +363,31 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 {
                     TryOpenGamepad(currentEvent.GDevice.Which);
                 }
+                else OpenSecondLocalGamepad();
                 break;
             case SDL.EventType.GamepadRemoved:
+                if (secondGamepad != IntPtr.Zero && SDL.GetGamepadID(secondGamepad) == currentEvent.GDevice.Which)
+                { CloseSecondLocalGamepad(); localLinkMessage = global::AetherBoy.Runtime.Localization.UiText.Get("The second controller disconnected. Player 2 can use the remaining controller."); }
                 if (gamepad != IntPtr.Zero && SDL.GetGamepadID(gamepad) == currentEvent.GDevice.Which)
                 {
+                    StopControllerRumble();
                     SDL.CloseGamepad(gamepad);
                     gamepad = IntPtr.Zero;
                     rebindingGamepad = null;
                     if (session is not null && !IsOnlineLink) session.SetTurboAsync(false).GetAwaiter().GetResult();
+                    // Promote the remaining pad through the normal profile path without two live SDL handles to it.
+                    CloseSecondLocalGamepad();
                     OpenFirstAvailableGamepad();
-                    statusMessage = gamepad == IntPtr.Zero ? "Controller disconnected. Keyboard is ready." : "Switched to another controller.";
+                    statusMessage = gamepad == IntPtr.Zero ? global::AetherBoy.Runtime.Localization.UiText.Get("Controller disconnected. Keyboard is ready.") : global::AetherBoy.Runtime.Localization.UiText.Get("Switched to another controller.");
+                    OpenSecondLocalGamepad();
                 }
                 break;
             case SDL.EventType.DropFile:
                 string? droppedPath = Marshal.PtrToStringUTF8(currentEvent.Drop.Data);
                 if (!string.IsNullOrWhiteSpace(droppedPath))
                 {
-                    if (controlCenterVisible && controlCenterPage == ControlCenterPage.Library && showPatchLab)
+                    if (showLocalLinkPage) localLinkMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Use Choose game for player 1 or player 2 before starting.");
+                    else if (controlCenterVisible && controlCenterPage == ControlCenterPage.Library && showPatchLab)
                         SelectPatchFile(droppedPath, LinuxRomPatchService.IsPatchPath(droppedPath) ? PatchSelection.Patch : PatchSelection.Source);
                     else TryLoadRom(droppedPath);
                 }
@@ -337,6 +397,13 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void HandleKeyboard(SDL.KeyboardEvent keyEvent, bool isPressed)
     {
+        if (introClock is not null)
+        {
+            if (isPressed && !keyEvent.Repeat && keyEvent.Scancode is SDL.Scancode.Escape or SDL.Scancode.Return or SDL.Scancode.Space) FinishBootIntro(true);
+            return;
+        }
+        if (HandleSofaKeyboard(keyEvent, isPressed)) return;
+        if (archiveSelection is not null) { HandleArchiveKeyboard(keyEvent, isPressed); return; }
         if (IsLoading)
         {
             if (isPressed && !keyEvent.Repeat)
@@ -357,28 +424,31 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             if (keyEvent.Scancode == SDL.Scancode.Escape)
             {
                 rebindingAction = null;
-                statusMessage = "Key change cancelled.";
+                statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Key change cancelled.");
             }
             else if (!LinuxKeyBindings.CanBind(keyEvent.Scancode))
             {
-                statusMessage = "That key is reserved for the app. Choose another, or Esc to cancel.";
+                statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("That key is reserved for the app. Choose another, or Esc to cancel.");
             }
             else
             {
                 options.Keys.Bind(action, keyEvent.Scancode);
                 rebindingAction = null;
                 MarkSettingsChanged();
-                statusMessage = $"{action} is now {KeyLabel(keyEvent.Scancode)}. Occupied keys are swapped.";
+                statusMessage = global::AetherBoy.Runtime.Localization.UiText.Format("{0} is now {1}. Occupied keys are swapped.", global::AetherBoy.Runtime.Localization.UiLabels.Input(action.ToString()), KeyLabel(keyEvent.Scancode));
             }
             return;
         }
 
         if (rebindingGamepad is not null && isPressed && keyEvent.Scancode == SDL.Scancode.Escape)
-        { rebindingGamepad = null; statusMessage = "Controller change cancelled."; return; }
+        { rebindingGamepad = null; statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Controller change cancelled."); return; }
         if (controlCenterVisible && isPressed && !keyEvent.Repeat && keyEvent.Scancode == SDL.Scancode.K &&
             (keyEvent.Mod & SDL.Keymod.Ctrl) != 0)
         { FocusSettingsSearch(); return; }
         if (HandleTextEditorKey(keyEvent, isPressed)) return;
+        if (showQuickDeck && !controlCenterVisible && isPressed && !keyEvent.Repeat
+            && keyEvent.Scancode is SDL.Scancode.Escape or SDL.Scancode.F4)
+        { CloseQuickDeck(); return; }
         if (controlCenterVisible && isPressed && keyEvent.Scancode == SDL.Scancode.Escape && ShowingSettingsSearch)
         { ClearSettingsSearch(); return; }
         if (!controlCenterVisible && isPressed && !keyEvent.Repeat)
@@ -459,6 +529,23 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 }
             }
         }
+        if (showLocalLinkPage && !controlCenterVisible)
+        {
+            if (isPressed) pressedKeys.Add(keyEvent.Scancode);
+            else pressedKeys.Remove(keyEvent.Scancode);
+            if (isPressed && !keyEvent.Repeat && keyEvent.Scancode is SDL.Scancode.Escape or SDL.Scancode.F11)
+            {
+                if (keyEvent.Scancode == SDL.Scancode.Escape) ToggleLocalLinkPause();
+                else { isFullscreen = !isFullscreen; SDL.SetWindowFullscreen(window, isFullscreen); }
+            }
+            return;
+        }
+        if (showQuickDeck && !controlCenterVisible)
+        {
+            if (isPressed && !keyEvent.Repeat && keyEvent.Scancode == SDL.Scancode.F6)
+                return; // Focus routing above already handled this key.
+            return; // Do not send game or app shortcuts through a modal quick menu.
+        }
         if (isPressed)
         {
             if (!controlCenterVisible) focusedControl = -1;
@@ -530,6 +617,9 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             case SDL.Scancode.F10:
                 OpenOnlineLinkPage();
                 break;
+            case SDL.Scancode.F4:
+                ToggleQuickDeck();
+                break;
             case SDL.Scancode.Alpha1:
                 SelectSaveSlot(1);
                 break;
@@ -550,11 +640,24 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void HandleMouseClick(float x, float y)
     {
+        if (introClock is not null)
+        {
+            return;
+        }
+        if (archiveSelection is not null)
+        {
+            DrawShell();
+            foreach (var command in shellCommands)
+                if (Hit(x, y, command.Bounds.X, command.Bounds.Y, command.Bounds.W, command.Bounds.H))
+                { command.Action(); return; }
+            return;
+        }
         if (IsLoading)
         {
             if (Hit(x, y, LogicalWidth / 2f - 105, LogicalHeight / 2f + 33, 210, 42)) CancelRomLoad();
             return;
         }
+        if (sofaMode) DrawShell(); // Reconcile modal/page actions before handling queued clicks.
         focusedControl = -1;
         foreach (var command in shellCommands)
         {
@@ -580,7 +683,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 {
                     options.AudioEnabled = !options.AudioEnabled;
                     MarkSettingsChanged();
-                    TryUiAction(ApplyEmulatorConfiguration, options.AudioEnabled ? "AUDIO ENABLED" : "Sound muted");
+                    TryUiAction(ApplyEmulatorConfiguration, options.AudioEnabled ? global::AetherBoy.Runtime.Localization.UiText.Get("AUDIO ENABLED") : global::AetherBoy.Runtime.Localization.UiText.Get("Sound muted"));
                 }
                 else if (Hit(x, y, 300, 326, 72, 40))
                 {
@@ -625,7 +728,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                     rebindingAction = null;
                     pressedKeys.Clear();
                     MarkSettingsChanged();
-                    statusMessage = "Default keys restored.";
+                    statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Default keys restored.");
                 }
                 break;
 
@@ -652,12 +755,14 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         bool pause = !session.LatestSnapshot.IsPaused;
         session.SetPausedAsync(pause).GetAwaiter().GetResult();
         audioOutput?.Clear();
-        statusMessage = pause ? $"Paused. Press {KeyLabel(options.Keys[LinuxInputAction.Pause])} to resume." : "Playing";
+        statusMessage = pause ? global::AetherBoy.Runtime.Localization.UiText.Format("Paused. Press {0} to resume.", KeyLabel(options.Keys[LinuxInputAction.Pause])) : global::AetherBoy.Runtime.Localization.UiText.Get("Playing");
     }
 
     private void ToggleControlCenter()
     {
+        if (sofaMode) { if (!showSofaLibrary) ToggleQuickDeck(); return; }
         if (IsLoading) return;
+        if (showQuickDeck) CloseQuickDeck();
         if (controlCenterVisible)
         {
             CloseControlCenter();
@@ -680,14 +785,23 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 currentSession.SetPausedAsync(true).GetAwaiter().GetResult();
             }
         }
+        if (localLinkSession is { } local)
+        {
+            resumeLocalLinkAfterSettings = !local.LatestSnapshot.IsPaused;
+            if (resumeLocalLinkAfterSettings) _ = local.SetPausedAsync(true);
+            localLinkAudioMixer.Clear(); audioOutput?.Clear();
+        }
     }
 
     private void CloseControlCenter()
     {
-        if (editingTitleIdentity is not null) { statusMessage = "Save or cancel the title before leaving."; return; }
+        pendingPatchLaunch = false;
+        if (editingTitleIdentity is not null) { statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Save or cancel the title before leaving."); return; }
+        if (showOnlineProbePage) LeaveOnlineProbePage();
         editingSettingsSearch = false;
         editingSearch = false;
         editingCheat = false;
+        editingBarcode = false;
         onlineEditingField = TextField.None;
         titleEditVersion++; editingTitleIdentity = null;
         SDL.StopTextInput(window);
@@ -705,6 +819,9 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         }
 
         resumeAfterControlCenter = false;
+        if (resumeLocalLinkAfterSettings && localLinkSession is { } local)
+            _ = local.SetPausedAsync(false);
+        resumeLocalLinkAfterSettings = false;
     }
 
     private void SetVideoFilter(LinuxVideoFilter filter)
@@ -716,14 +833,14 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             SDL.SetTextureScaleMode(frameTexture, options.TextureScaleMode);
         }
 
-        statusMessage = filter switch { LinuxVideoFilter.Sharp => "Sharp pixel edges selected.", LinuxVideoFilter.Smooth => "Smooth picture selected.", _ => "LCD grid selected." };
+        statusMessage = filter switch { LinuxVideoFilter.Sharp => global::AetherBoy.Runtime.Localization.UiText.Get("Sharp pixel edges selected."), LinuxVideoFilter.Smooth => global::AetherBoy.Runtime.Localization.UiText.Get("Smooth picture selected."), _ => global::AetherBoy.Runtime.Localization.UiText.Get("LCD grid selected.") };
     }
 
     private void SetFrameskip(int frameskip)
     {
         options.Frameskip = Math.Clamp(frameskip, 0, 2);
         MarkSettingsChanged();
-        TryUiAction(ApplyEmulatorConfiguration, options.Frameskip == 0 ? "Displaying every frame." : $"Skipping {options.Frameskip} display frames between updates.");
+        TryUiAction(ApplyEmulatorConfiguration, options.Frameskip == 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("Displaying every frame.") : global::AetherBoy.Runtime.Localization.UiText.Format("Skipping {0} display frames between updates.", options.Frameskip));
     }
 
     private void SetPalette(int paletteIndex)
@@ -734,7 +851,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         {
             TryUiAction(
                 () => session.SetPaletteAsync(options.PaletteIndex).GetAwaiter().GetResult(),
-                $"DMG PALETTE {options.PaletteIndex + 1}");
+                global::AetherBoy.Runtime.Localization.UiText.Format("DMG PALETTE {0}", options.PaletteIndex + 1));
         }
     }
 
@@ -750,7 +867,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         }
 
         MarkSettingsChanged();
-        TryUiAction(ApplyEmulatorConfiguration, $"AUDIO CHANNEL {index + 1} UPDATED");
+        TryUiAction(ApplyEmulatorConfiguration, global::AetherBoy.Runtime.Localization.UiText.Format("AUDIO CHANNEL {0} UPDATED", index + 1));
     }
 
     private void TryUiAction(Action action, string successMessage)
@@ -762,7 +879,8 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         }
         catch (Exception exception)
         {
-            statusMessage = $"SETTING FAILED · {exception.Message}";
+            diagnostics.Failure("ui_action", exception);
+            statusMessage = DescribeActionFailure(exception);
             Console.Error.WriteLine(exception);
         }
     }
@@ -799,7 +917,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             // The preparation worker may still be awaiting this owner. Cancel it first;
             // disposal on the following tick must not race those Runtime commands.
             if (IsLoading) { CancelRomLoad(); return; }
-            ReportError(currentSession.Fault ?? new InvalidOperationException("The emulator stopped."));
+            ReportError(currentSession.Fault ?? new InvalidOperationException(global::AetherBoy.Runtime.Localization.UiText.Get("The emulator stopped.")));
             CloseSession();
             romPath = null;
             return;
@@ -843,7 +961,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     private GameBoyButtons ReadButtons()
     {
         GameBoyButtons buttons = GameBoyButtons.None;
-        if (controlCenterVisible || !windowFocused || fileDialogOpen != 0 || IsLoading)
+        if (controlCenterVisible || showQuickDeck || showSofaLibrary || sofaAwaitNeutral || !windowFocused || fileDialogOpen != 0 || IsLoading)
         {
             return buttons;
         }
@@ -883,7 +1001,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     private GameBoyAdvanceButtons ReadAdvanceButtons()
     {
         GameBoyAdvanceButtons buttons = GameBoyAdvanceButtons.None;
-        if (controlCenterVisible || !windowFocused || fileDialogOpen != 0 || IsLoading)
+        if (controlCenterVisible || showQuickDeck || showSofaLibrary || sofaAwaitNeutral || !windowFocused || fileDialogOpen != 0 || IsLoading)
         {
             return buttons;
         }
@@ -913,7 +1031,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         pendingSession = null;
         if (candidate.State == SessionState.Faulted)
         {
-            ReportError(candidate.Fault ?? new InvalidOperationException("The ROM could not be started."));
+            ReportError(candidate.Fault ?? new InvalidOperationException(global::AetherBoy.Runtime.Localization.UiText.Get("The ROM could not be started.")));
             DisposeSession(candidate);
             pendingStorage?.Dispose();
             pendingStorage = null;
@@ -924,17 +1042,22 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         }
         CloseSession();
         session = candidate;
+        if (sofaMode) { showSofaLibrary = false; sofaPausedSession = null; sofaResumeOnClose = false; sofaAwaitNeutral = true; }
         pendingGameProfile?.ApplyTo(options);
         usingGameProfile = pendingGameProfile is not null;
         pendingGameProfile = null;
         storage = pendingStorage;
         diagnostics.Record("rom_loaded", new { hash = storage?.Identity });
+        diagnostics.Record("rom.started", new { rom_sha256 = storage?.Identity,
+            model = candidate.LatestSnapshot.Rom?.IsGameBoyAdvance == true ? "GBA"
+                : candidate.LatestSnapshot.Rom?.HasColorFeatures == true ? "GBC" : "GB",
+            battery_save_enabled = candidate.LatestSnapshot.Rom?.BatterySave.IsEnabled });
         pendingStorage = null;
         pendingBatteryRestore = null;
         showBackups = false;
         romPath = pendingRomPath;
         try { library.Remember(storage!.Identity, romPath!); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { diagnostics.Failure("library_write", ex); }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException) { diagnostics.Failure("library_write", ex); }
         pendingRomPath = null;
         resumeAfterLoad = false;
         if (audioOutput is not null) session.AudioSamplesAvailable += OnAudioSamplesAvailable;
@@ -953,11 +1076,11 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         if (frameTexture != IntPtr.Zero) SDL.SetTextureScaleMode(frameTexture, options.TextureScaleMode);
         RequestDiskRefresh();
         nextResumeAt = Environment.TickCount64 + 60_000;
-        lastPlayTick = Environment.TickCount64;
+        playtimeClock.Reset();
         displayedFrameSequence = 0;
         postedButtons = GameBoyButtons.None;
         postedAdvanceButtons = GameBoyAdvanceButtons.None;
-        statusMessage = profileNotice ?? storage?.MigrationNotice ?? "Playing. Saves are stored safely in your AetherBoy library.";
+        statusMessage = profileNotice ?? storage?.MigrationNotice ?? global::AetherBoy.Runtime.Localization.UiText.Get("Playing. Saves are stored safely in your AetherBoy library.");
         SDL.SetWindowTitle(window, $"AetherBoy · {Path.GetFileNameWithoutExtension(romPath)}");
         bool continueRequested = pendingResumeIdentity == storage?.Identity;
         pendingResumeIdentity = null;
@@ -966,9 +1089,11 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void ResumeAfterFailedLoad()
     {
+        if (showSofaLibrary && loadError is not null) sofaNotice = global::AetherBoy.Runtime.Localization.UiText.Get("The game could not be opened. Your previous game is unchanged. Leave sofa mode to inspect the error.");
         if ((resumeAfterLoad || resumeAfterFocus) && session is not null && session.State == SessionState.Paused)
         {
-            if (controlCenterVisible) { resumeAfterControlCenter = true; resumeAfterFocus = false; }
+            if (showSofaLibrary) { sofaResumeOnClose = true; resumeAfterFocus = false; }
+            else if (controlCenterVisible) { resumeAfterControlCenter = true; resumeAfterFocus = false; }
             else if (!windowFocused && options.PauseOnFocusLoss) resumeAfterFocus = true;
             else { session.SetPausedAsync(false).GetAwaiter().GetResult(); resumeAfterFocus = false; }
         }
@@ -979,6 +1104,20 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     {
         if (Environment.TickCount64 - lastDiagnosticsAt < 1000) return;
         lastDiagnosticsAt = Environment.TickCount64;
+        if (session is { } observed)
+        {
+            EmulationSnapshot snapshot = observed.LatestSnapshot;
+            latestHealthSample = new LinuxHealthSample(snapshot.State, snapshot.EmulatedFrameCount,
+                snapshot.VideoFrameSequence, displayedFrameSequence, Interlocked.Read(ref audioFramesObserved),
+                snapshot.IsPaused || !windowFocused || minimized || controlCenterVisible || showQuickDeck);
+            foreach (var hint in sessionHealth.Observe(latestHealthSample, Environment.TickCount64))
+            {
+                latestHealthHint = hint.Code;
+                diagnostics.Record("session.health_hint", new { code = hint.Code, duration_ms = hint.DurationMs,
+                    suspected_only = true });
+            }
+        }
+        else { latestHealthSample = null; latestHealthHint = null; }
         if (audioError is not null && options.AudioEnabled && session is not null && Environment.TickCount64 >= nextAudioRetryAt)
         {
             nextAudioRetryAt = Environment.TickCount64 + 3000;
@@ -990,8 +1129,10 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 diagnostics.Record("audio_recovered");
             }
         }
-        diagnostics.Record("progress", new { state = StateLabel, frame = session?.LatestSnapshot.EmulatedFrameCount,
-            presented = displayedFrameSequence, audio = audioOutput?.DriverName, desktop = desktop.DisplayName,
+        diagnostics.Record("progress", new { state = localLinkSession is null ? StateLabel : "LocalLink",
+            frame = session?.LatestSnapshot.EmulatedFrameCount ?? localLinkSession?.LatestSnapshot.FrameCount,
+            presented = session is null && localLinkSession is not null ? Math.Min(localLinkFrameSequences[0], localLinkFrameSequences[1]) : displayedFrameSequence,
+            audio_frames = Interlocked.Read(ref audioFramesObserved), audio = audioOutput?.DriverName, desktop = desktop.DisplayName,
             queued_ms = audioOutput?.QueuedMilliseconds, dropped_blocks = audioOutput?.DroppedBlocks,
             empty_queue_observations = audioOutput?.EmptyQueueObservations, vsync = vsyncEnabled });
     }
@@ -1000,23 +1141,31 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     {
         Directory.CreateDirectory(path);
         if (!SDL.OpenURL(new Uri(Path.GetFullPath(path) + Path.DirectorySeparatorChar).AbsoluteUri))
-            throw new IOException("Could not open the folder. " + SDL.GetError());
-    }, "Folder opened.");
+            throw new IOException(global::AetherBoy.Runtime.Localization.UiText.Get("Could not open the folder. ") + SDL.GetError());
+    }, global::AetherBoy.Runtime.Localization.UiText.Get("Folder opened."));
 
     private void ExportDiagnostics() => TryUiAction(() =>
     {
         string exports = Path.Combine(dataPaths.State, "exports");
         diagnostics.Export(exports);
         OpenFolder(exports);
-    }, "Diagnostic ZIP saved to the reports folder.");
+    }, global::AetherBoy.Runtime.Localization.UiText.Get("Diagnostic ZIP saved to the reports folder."));
 
     private void ReportError(Exception exception)
     {
         diagnostics.Failure("host_action", exception);
-        loadError = exception.GetBaseException().Message;
-        statusMessage = "Could not complete the action. Open another ROM to try again.";
+        loadError = DescribeActionFailure(exception);
+        statusMessage = loadError;
         Console.Error.WriteLine(exception);
     }
+
+    private static string DescribeActionFailure(Exception exception) => exception.GetBaseException() switch
+        {
+            UnauthorizedAccessException => global::AetherBoy.Runtime.Localization.UiText.Get("File access was denied. Check permissions and try again."),
+            InvalidDataException => global::AetherBoy.Runtime.Localization.UiText.Get("The selected data is invalid. Check the file and try again."),
+            IOException => global::AetherBoy.Runtime.Localization.UiText.Get("A file could not be read or saved. Check the drive and try again."),
+            _ => global::AetherBoy.Runtime.Localization.UiText.Get("The action failed. Review the local report and try again.")
+        };
 
     private static void DisposeSession(EmulationSession? current)
     {
@@ -1031,7 +1180,14 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void CloseSession()
     {
+        showQuickDeck = false;
+        quickDeckResumeOnClose = false;
+        latestHealthSample = null;
+        latestHealthHint = null;
+        sessionHealth.Reset();
+        Interlocked.Exchange(ref audioFramesObserved, 0);
         SaveResumeOnClose();
+        FlushPlaytimeOnClose();
         preserveResumeAfterFailure = false;
         FlushSettingsIfDue(force: true);
         globalProfile.ApplyTo(options);
@@ -1096,6 +1252,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         try
         {
             if (!ReferenceEquals(sender, session)) return;
+            Interlocked.Add(ref audioFramesObserved, eventArgs.SampleCount);
             float[] samples = eventArgs.GetInterleavedSamplesCopy();
             recorder?.Submit(samples, eventArgs.SampleRate, eventArgs.Channels);
             output.Submit(samples, eventArgs.SampleRate, eventArgs.Channels,
@@ -1141,7 +1298,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
         pressedKeys.Clear();
         if (session is not null && !IsOnlineLink) session.SetTurboAsync(false).GetAwaiter().GetResult();
-        statusMessage = "Choose a ROM in the file picker. You can also drop a file here.";
+        statusMessage = pickingBarcode ? global::AetherBoy.Runtime.Localization.UiText.Get("Choose a UTF-8 text file containing one 13-digit barcode.") : global::AetherBoy.Runtime.Localization.UiText.Get("Choose a ROM in the file picker. You can also drop a file here.");
         string? defaultLocation = romPath is null ? null : Path.GetDirectoryName(romPath);
         try
         {
@@ -1162,6 +1319,9 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             Interlocked.Exchange(ref fileDialogOpen, 0);
             pickingPatch = PatchSelection.None;
             pickingFirmware = pickingBatterySave = false;
+            pickingLocalLinkPlayer = -1;
+            pickingIntroImage = null;
+            pickingBarcode = false;
             ReportError(exception);
         }
     }
@@ -1184,12 +1344,15 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         {
             if (!string.IsNullOrWhiteSpace(selection.Error))
             {
-                if (pickingPatch != PatchSelection.None) { patchFailed = true; patchMessage = "File picker failed: " + selection.Error; }
+                if (pickingPatch != PatchSelection.None) { patchFailed = true; patchMessage = global::AetherBoy.Runtime.Localization.UiText.Get("File picker failed: ") + selection.Error; }
                 ReportError(new IOException(selection.Error));
             }
             else if (!string.IsNullOrWhiteSpace(selection.Path))
             {
-                if (pickingPatch != PatchSelection.None)
+                if (pickingBarcode) ImportBarcode(selection.Path);
+                else if (pickingIntroImage is bool image) ImportIntroAsset(selection.Path, image);
+                else if (pickingLocalLinkPlayer >= 0) SelectLocalLinkRom(selection.Path);
+                else if (pickingPatch != PatchSelection.None)
                 {
                     SelectPatchFile(selection.Path, pickingPatch);
                 }
@@ -1205,12 +1368,15 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             }
             else
             {
-                statusMessage = "File picker closed. Previous selection kept.";
+                statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("File picker closed. Previous selection kept.");
                 if (pickingPatch != PatchSelection.None) patchMessage = statusMessage;
             }
             pickingFirmware = false;
+            pickingBarcode = false;
+            pickingIntroImage = null;
             pickingBatterySave = false;
             pickingPatch = PatchSelection.None;
+            pickingLocalLinkPlayer = -1;
             Interlocked.Exchange(ref fileDialogOpen, 0);
         }
     }
@@ -1245,23 +1411,26 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     }
 
     private static string KeyLabel(SDL.Scancode scan) =>
-        SDL.GetKeyName(SDL.GetKeyFromScancode(scan, SDL.Keymod.None, false)) ?? SDL.GetScancodeName(scan);
+        global::AetherBoy.Runtime.Localization.UiLabels.Key(
+            SDL.GetKeyName(SDL.GetKeyFromScancode(scan, SDL.Keymod.None, false)) ?? SDL.GetScancodeName(scan));
 
     private SDL.FRect GetGameDestination(VideoGeometry geometry)
     {
+        float areaX = sofaMode ? 0 : GameAreaX, areaY = sofaMode ? 0 : GameAreaY;
+        float areaWidth = sofaMode ? LogicalWidth : GameAreaWidth, areaHeight = sofaMode ? LogicalHeight : GameAreaHeight;
         // The UI uses logical coordinates, but whole-pixel scaling must use output pixels,
         // including compositor/HiDPI scaling and the logical letterbox transform.
         float presentationScale = SDL.GetRenderOutputSize(renderer, out int outputWidth, out int outputHeight)
             ? Math.Min(outputWidth / (float)LogicalWidth, outputHeight / (float)LogicalHeight) : 1;
         if (presentationScale <= 0) presentationScale = 1;
-        float scale = options.GameScale((int)MathF.Floor(GameAreaWidth * presentationScale),
-            (int)MathF.Floor(GameAreaHeight * presentationScale), geometry.Width, geometry.Height) / presentationScale;
+        float scale = options.GameScale((int)MathF.Floor(areaWidth * presentationScale),
+            (int)MathF.Floor(areaHeight * presentationScale), geometry.Width, geometry.Height) / presentationScale;
         float width = geometry.Width * scale;
         float height = geometry.Height * scale;
         return new SDL.FRect
         {
-            X = GameAreaX + (GameAreaWidth - width) / 2f,
-            Y = GameAreaY + (GameAreaHeight - height) / 2f,
+            X = areaX + (areaWidth - width) / 2f,
+            Y = areaY + (areaHeight - height) / 2f,
             W = width,
             H = height
         };
@@ -1295,16 +1464,17 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void DrawAudioPage()
     {
-        Ink(300, 194, "Sound output", 14, Colors.Muted);
+        if (showAudioInspector) { DrawAudioInspector(); return; }
+        Ink(300, 194, global::AetherBoy.Runtime.Localization.UiText.Get("Sound output"), 14, Colors.Muted);
         DrawButton(
             300,
             224,
             220,
             44,
-            options.AudioEnabled ? "Sound on" : "Sound muted",
+            options.AudioEnabled ? global::AetherBoy.Runtime.Localization.UiText.Get("Sound on") : global::AetherBoy.Runtime.Localization.UiText.Get("Sound muted"),
             options.AudioEnabled && audioOutput is not null);
 
-        Ink(300, 302, "Volume", 14, Colors.Muted);
+        Ink(300, 302, global::AetherBoy.Runtime.Localization.UiText.Get("Volume"), 14, Colors.Muted);
         DrawButton(300, 326, 72, 40, "-1%", false, options.AudioVolume > 0);
         Ink(426, 340, $"{options.AudioVolume}%", 14, Colors.Text);
         DrawButton(560, 326, 72, 40, "+1%", false, options.AudioVolume < 100);
@@ -1312,10 +1482,10 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         Paint(300, 389, options.AudioVolume * 5.7f, 6, Colors.Primary);
         Paint(300 + options.AudioVolume * 5.7f - 7, 381, 14, 22, Colors.Cyan);
         Ink(300, 410, "0%", 14, Colors.Muted);
-        Ink(360, 410, "Drag, or use Left / Right for 1% steps.", 14, Colors.Muted);
+        Ink(360, 410, global::AetherBoy.Runtime.Localization.UiText.Get("Drag, or use Left / Right for 1% steps."), 14, Colors.Muted);
         Ink(838, 410, "100%", 14, Colors.Muted);
 
-        Ink(300, 452, "Game Boy sound channels", 14, Colors.Muted);
+        Ink(300, 452, global::AetherBoy.Runtime.Localization.UiText.Get("Game Boy sound channels"), 14, Colors.Muted);
         bool[] channels =
         {
             options.Channel1Enabled,
@@ -1325,14 +1495,15 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         };
         for (int index = 0; index < channels.Length; index++)
         {
-            DrawButton(300 + (index * 146), 480, 132, 40, $"Channel {index + 1}", channels[index]);
+            DrawButton(300 + (index * 146), 480, 132, 40, global::AetherBoy.Runtime.Localization.UiText.Format("Channel {0}", index + 1), channels[index]);
         }
 
-        string backend = audioOutput is null ? "NOT OPEN" : audioOutput.DriverName;
-        Ink(300, 536, $"Audio driver: {Truncate(backend, 56)}", 14, Colors.Text);
+        string backend = audioOutput is null ? global::AetherBoy.Runtime.Localization.UiText.Get("NOT OPEN") : audioOutput.DriverName;
+        Ink(300, 536, global::AetherBoy.Runtime.Localization.UiText.Format("Audio driver: {0}", Truncate(backend, 56)), 14, Colors.Text);
+        ActionButton(880, 529, 230, 42, global::AetherBoy.Runtime.Localization.UiText.Get("OPEN AUDIO INSPECTOR"), () => { showAudioInspector = true; focusedControl = -1; });
         if (!string.IsNullOrWhiteSpace(audioError))
         {
-            Ink(300, 558, Truncate($"LAST ERROR  {audioError}", 80), 14, Colors.Danger);
+            Ink(300, 558, Truncate(global::AetherBoy.Runtime.Localization.UiText.Format("LAST ERROR  {0}", audioError), 80), 14, Colors.Danger);
         }
     }
 
@@ -1341,21 +1512,21 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         if (showController) { DrawControllerPage(); return; }
         DrawInputTabs();
         if (showInputShortcuts) { DrawInputShortcuts(); return; }
-        Ink(300, 238, "Choose a key to change it. Escape cancels; occupied keys swap.", 14, Colors.Muted);
+        Ink(300, 238, global::AetherBoy.Runtime.Localization.UiText.Get("Choose a key to change it. Escape cancels; occupied keys swap."), 14, Colors.Muted);
         for (int index = 0; index < BindingActions.Length; index++)
         {
             LinuxInputAction action = BindingActions[index];
             float x = 300 + (index / 6) * 330;
             float y = 276 + (index % 6) * 44;
-            Ink(x, y + 8, action is LinuxInputAction.L or LinuxInputAction.R ? $"{action} (GBA)" : action.ToString(), 14, Colors.Text);
+            Ink(x, y + 8, action is LinuxInputAction.L or LinuxInputAction.R ? $"{action} (GBA)" : global::AetherBoy.Runtime.Localization.UiLabels.Input(action.ToString()), 14, Colors.Text);
             DrawButton(x + 124, y, 156, 36,
-                rebindingAction == action ? "Press a key..." : BindingLabel(action),
+                rebindingAction == action ? global::AetherBoy.Runtime.Localization.UiText.Get("Press a key...") : BindingLabel(action),
                 rebindingAction == action || (rebindingAction is null && focusedControl < 0 && focusedBinding == index));
         }
-        DrawButton(300, 548, 210, 40, "Reset keys", false);
-        string controller = gamepad == IntPtr.Zero ? "No controller connected" : SDL.GetGamepadName(gamepad) ?? "Controller connected";
+        DrawButton(300, 548, 210, 40, global::AetherBoy.Runtime.Localization.UiText.Get("Reset keys"), false);
+        string controller = gamepad == IntPtr.Zero ? global::AetherBoy.Runtime.Localization.UiText.Get("No controller connected") : SDL.GetGamepadName(gamepad) ?? global::AetherBoy.Runtime.Localization.UiText.Get("Controller connected");
         Ink(536, 548, textRenderer.Fit(controller, 380), 14, Colors.Muted);
-        Ink(536, 570, "Use the Controller tab to change its buttons.", 14, Colors.Muted);
+        Ink(536, 570, global::AetherBoy.Runtime.Localization.UiText.Get("Use the Controller tab to change its buttons."), 14, Colors.Muted);
     }
 
     private string BindingLabel(LinuxInputAction action) => KeyLabel(options.Keys[action]);
@@ -1367,12 +1538,17 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         rebindingAction = BindingActions[index];
         pressedKeys.Clear();
         loadError = null;
-        statusMessage = $"Press a new key for {rebindingAction}. Esc cancels; occupied keys swap.";
+        statusMessage = global::AetherBoy.Runtime.Localization.UiText.Format("Press a new key for {0}. Esc cancels; occupied keys swap.", global::AetherBoy.Runtime.Localization.UiLabels.Input(rebindingAction.Value.ToString()));
     }
 
     private void SelectControlCenterPage(ControlCenterPage page)
     {
-        if (editingTitleIdentity is not null) { statusMessage = "Save or cancel the title before changing sections."; return; }
+        pendingPatchLaunch = false;
+        if (editingTitleIdentity is not null) { statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Save or cancel the title before changing sections."); return; }
+        if (showOnlineProbePage) LeaveOnlineProbePage();
+        if (page != ControlCenterPage.Audio) showAudioInspector = false;
+        showGameplayCapture = false;
+        showBarcodeBoy = editingBarcode = false;
         ResetSettingsNavigation();
         showController = false;
         showBackups = false;
@@ -1407,7 +1583,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         TryUiAction(() =>
         {
             if (audioOutput is not null) audioOutput.Volume = options.AudioVolume / 100f;
-        }, $"Volume {options.AudioVolume}%");
+        }, global::AetherBoy.Runtime.Localization.UiText.Format("Volume {0}%", options.AudioVolume));
     }
 
     private void MarkSettingsChanged()
@@ -1422,8 +1598,8 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         if (IsOnlineLink) { DrawOnlineLinkPage(); return; }
         if (showBackups) { DrawBackupPage(); return; }
         if (showGallery) { DrawStateGallery(); return; }
-        ActionButton(890, 232, 210, 42, "BACKUPS / EXPORT", () => showBackups = true);
-        Text(300, 198, "ACTIVE SAVE-STATE SLOT", 161, 173, 192);
+        ActionButton(890, 232, 210, 42, global::AetherBoy.Runtime.Localization.UiText.Get("BACKUPS / EXPORT"), () => showBackups = true);
+        Text(300, 198, global::AetherBoy.Runtime.Localization.UiText.Get("ACTIVE SAVE-STATE SLOT"), 161, 173, 192);
         for (int index = 0; index < 5; index++)
         {
             int slot = index + 1;
@@ -1433,26 +1609,26 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
                 232,
                 100,
                 42,
-                StateCard(slot) is null ? $"{slot} ..." : StateCard(slot)?.Error is not null ? $"{slot} ERROR" : exists ? $"{slot} SAVED" : $"{slot} EMPTY",
+                StateCard(slot) is null ? $"{slot} ..." : StateCard(slot)?.Error is not null ? global::AetherBoy.Runtime.Localization.UiText.Format("{0} ERROR", slot) : exists ? global::AetherBoy.Runtime.Localization.UiText.Format("{0} SAVED", slot) : global::AetherBoy.Runtime.Localization.UiText.Format("{0} EMPTY", slot),
                 options.SaveSlot == slot);
         }
 
         var selectedCard = StateCard(options.SaveSlot);
-        Text(300, 286, selectedCard is null ? "Loading save information…" : selectedCard.Error is not null ? "State cannot be read. Refresh or select another slot." : selectedCard.Exists ? $"Slot {options.SaveSlot} saved {selectedCard.SavedAt:yyyy-MM-dd HH:mm}" : $"Slot {options.SaveSlot} is empty. Save here with F5.", 161, 173, 192);
-        DrawButton(300, 342, 180, 44, "SAVE [F5]", false, session is not null);
-        DrawButton(494, 342, 180, 44, "LOAD [F8]", false, HasSelectedState);
-        DrawButton(688, 342, 180, 44, "REWIND [F7]", false, session is not null);
+        Text(300, 286, selectedCard is null ? global::AetherBoy.Runtime.Localization.UiText.Get("Loading save information…") : selectedCard.Error is not null ? global::AetherBoy.Runtime.Localization.UiText.Get("State cannot be read. Refresh or select another slot.") : selectedCard.Exists ? global::AetherBoy.Runtime.Localization.UiText.Format("Slot {0} saved {1:yyyy-MM-dd HH:mm}", options.SaveSlot, selectedCard.SavedAt) : global::AetherBoy.Runtime.Localization.UiText.Format("Slot {0} is empty. Save here with F5.", options.SaveSlot), 161, 173, 192);
+        DrawButton(300, 342, 180, 44, global::AetherBoy.Runtime.Localization.UiText.Get("SAVE [F5]"), false, session is not null);
+        DrawButton(494, 342, 180, 44, global::AetherBoy.Runtime.Localization.UiText.Get("LOAD [F8]"), false, HasSelectedState);
+        DrawButton(688, 342, 180, 44, global::AetherBoy.Runtime.Localization.UiText.Get("REWIND [F7]"), false, session is not null);
 
-        Text(300, 438, "BATTERY SAVE", 161, 173, 192);
+        Text(300, 438, global::AetherBoy.Runtime.Localization.UiText.Get("BATTERY SAVE"), 161, 173, 192);
         EmulationSnapshot? snapshot = session?.LatestSnapshot;
         string battery = snapshot?.Rom?.BatterySave.IsEnabled == true
-            ? $"ACTIVE · {snapshot.Rom.BatterySave.ExpectedLength} BYTES"
-            : session is null ? "NO ROM LOADED" : "CARTRIDGE HAS NO BATTERY RAM";
+            ? global::AetherBoy.Runtime.Localization.UiText.Format("ACTIVE · {0} BYTES", snapshot.Rom.BatterySave.ExpectedLength)
+            : session is null ? global::AetherBoy.Runtime.Localization.UiText.Get("NO ROM LOADED") : global::AetherBoy.Runtime.Localization.UiText.Get("CARTRIDGE HAS NO BATTERY RAM");
         Text(300, 470, battery, 218, 222, 242);
-        Text(300, 514, "Saves follow cartridge content, even when you move the ROM.", 161, 173, 192);
-        ActionButton(565, 560, 250, 42, "GALLERY / RESUME", () => { showGallery = true; focusedControl = -1; RequestDiskRefresh(); });
-        ActionButton(835, 560, 270, 42, "UNDO LAST LOAD", UndoLoad, enabled: undoState is not null && stateOperation is null);
-        ActionButton(300, 560, 242, 42, "OPEN SAVE FOLDER", () => OpenFolder(storage is null ? Path.Combine(dataPaths.Data, "saves") : Path.GetDirectoryName(storage.SavePath)!));
+        Text(300, 514, global::AetherBoy.Runtime.Localization.UiText.Get("Saves follow cartridge content, even when you move the ROM."), 161, 173, 192);
+        ActionButton(565, 560, 250, 42, global::AetherBoy.Runtime.Localization.UiText.Get("GALLERY / RESUME"), () => { showGallery = true; focusedControl = -1; RequestDiskRefresh(); });
+        ActionButton(835, 560, 270, 42, global::AetherBoy.Runtime.Localization.UiText.Get("UNDO LAST LOAD"), UndoLoad, enabled: undoState is not null && stateOperation is null);
+        ActionButton(300, 560, 242, 42, global::AetherBoy.Runtime.Localization.UiText.Get("OPEN SAVE FOLDER"), () => OpenFolder(storage is null ? Path.Combine(dataPaths.Data, "saves") : Path.GetDirectoryName(storage.SavePath)!));
     }
 
     private static string Truncate(string value, int maximumLength) =>
@@ -1463,7 +1639,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private void Rewind()
     {
-        if (IsOnlineLink) { statusMessage = "Rewind is disabled during Online Link."; return; }
+        if (IsOnlineLink) { statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Rewind is disabled during Online Link."); return; }
         if (session is null || stateOperation is not null || IsLoading)
         {
             return;
@@ -1473,7 +1649,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         {
             if (!session.RewindAsync().GetAwaiter().GetResult())
             {
-                statusMessage = "REWIND BUFFER IS EMPTY";
+                statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("REWIND BUFFER IS EMPTY");
                 return;
             }
 
@@ -1481,11 +1657,11 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             audioOutput?.Clear();
             displayedFrameSequence = 0;
             diagnostics.Record("rewind");
-            statusMessage = "REWOUND · ONE STEP";
+            statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("REWOUND · ONE STEP");
         }
         catch (Exception exception)
         {
-            statusMessage = $"REWIND FAILED · {exception.Message}";
+            statusMessage = global::AetherBoy.Runtime.Localization.UiText.Format("REWIND FAILED · {0}", global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message));
             Console.Error.WriteLine(exception);
         }
     }
@@ -1494,7 +1670,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     {
         options.SelectSaveSlot(slot);
         MarkSettingsChanged();
-        statusMessage = $"SAVE STATE SLOT {slot}";
+        statusMessage = global::AetherBoy.Runtime.Localization.UiText.Format("SAVE STATE SLOT {0}", slot);
     }
 
     private void OpenFirstAvailableGamepad()
@@ -1511,14 +1687,14 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         IntPtr candidate = SDL.OpenGamepad(instanceId);
         if (candidate == IntPtr.Zero)
         {
-            statusMessage = $"GAMEPAD ERROR · {SDL.GetError()}";
+            statusMessage = global::AetherBoy.Runtime.Localization.UiText.Format("GAMEPAD ERROR · {0}", SDL.GetError());
             return;
         }
 
         gamepad = candidate;
         SelectGamepadProfile(instanceId);
         diagnostics.Record("controller_connected");
-        statusMessage = $"GAMEPAD READY · {SDL.GetGamepadName(gamepad) ?? "SDL3"}";
+        statusMessage = global::AetherBoy.Runtime.Localization.UiText.Format("GAMEPAD READY · {0}", SDL.GetGamepadName(gamepad) ?? "SDL3");
     }
 
     private void AddKey(SDL.Scancode key, GameBoyButtons button, ref GameBoyButtons buttons)

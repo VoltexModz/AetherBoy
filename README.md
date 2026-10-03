@@ -6,22 +6,53 @@
 
 <p align="center"><strong>by NekoZDevTeam</strong></p>
 
+## Development update — 3 October 2026
+
+Both frontends now provide German/English display-language selection, six themes
+with custom colors, controller-oriented sofa mode, AVI capture, ZIP/7z import and
+expanded session cheats. Windows uses shared custom Aether controls; Linux retains
+its native Wayland interface. Implementation does not establish full hardware or
+game compatibility.
+
+The latest stabilization work reduces redundant battery-backup writes, adds
+privacy-conscious save-phase diagnostics and replaces blocking Windows background
+save-error dialogs with a persistent retry notice. Eight complete Runtime stress
+runs passed without reproducing the previous GBA shutdown timeout. Real-device and
+long-session acceptance remains open. [Changes, exact test results and remaining
+limits (DE/EN)](docs/STABILIZATION_2026-10-02.md).
+
+Search Settings for **language** to choose English, German or System; restart to
+apply. German system languages, including Germany, Austria and Switzerland, select
+German automatically; all others select English. This does not translate games.
+
+Current plans: [Windows](docs/WINDOWS_ROADMAP.md) · [Linux](docs/LINUX_ROADMAP.md).
+
+### Shared features and development links
+
+Phase 3, shared implementation: Windows and Linux now have single-game AVI
+capture (picture + game audio) and persistent ROM import from ZIP/7z archives,
+including an explicit game selector for archives with multiple ROMs.
+IPS/BPS/UPS Patch Lab offers save-only or **Patch and play**; results remain
+separate saved ROMs. No nearby patches are applied automatically.
+[Usage, limits and remaining work](docs/WINDOWS_ROADMAP.md#phase-3--erster-gemeinsamer-ausbau-01102026).
+
 Windows ↔ Linux: shared turbo-audio, screenshot and performance services, plus
 custom Windows menus. [Delivered changes and remaining parity work (DE/EN)](docs/PLATFORM_PARITY.md).
-Full 1:1 feature parity is still in progress.
+The platform roadmaps distinguish implemented tools from remaining hardware and game tests.
 
 New on Windows: Firmware Station for user-provided boot ROMs/BIOS and configurable,
 bounded local diagnostics. [Usage, privacy and developer handoff (DE/EN)](docs/WINDOWS_FIRMWARE_DIAGNOSTICS.md).
 
-Experimental Windows Local Link Lab: run two GB/GBC or two GBA games in one coordinated
+Experimental Windows and Linux Local Link Lab: run two GB/GBC or two GBA games in one coordinated
 local session, with separate player saves. This lab is local-only and has no verified
-commercial-game support yet; Linux local-link UI integration is pending.
+commercial-game support yet; the native Linux two-player UI is now implemented.
 [Quick start, limitations and Linux handoff (DE/EN)](docs/LOCAL_LINK_LAB.md).
 [GBA serial/CPU integration](docs/GBA_LOCAL_LINK_HANDOFF.md) ·
 [Latest Linux contribution and integration review](docs/LINUX_UPSTREAM_INTEGRATION_REVIEW.md).
 
 New, separate **GB/GBC Online Link prototype** for Windows and Linux: one local game
-per player, private session saves and a browser-assisted encrypted WebRTC connection.
+per player and private session saves. Native room-code connections use a configured
+private room service; manual browser-assisted WebRTC pairing remains available.
 No verified Pokémon trade yet; Internet traversal may require
 explicit STUN/TURN configuration. [Setup, safety and limits (DE/EN)](docs/ONLINE_LINK_HANDOFF.md).
 
@@ -71,14 +102,14 @@ favorites/playtime, controller profiles and Patch Lab.
 
 ## A look at AetherBoy
 
-The desktop interface puts the game first: a clear **Open game** action, a readable play area, and familiar pause, save, load and rewind controls. The sidebar keeps only the current game and essential settings in view; the remaining options live in Settings. The shared Windows and Linux design uses calm dark surfaces and one accent for the next action.
+The desktop interface puts the game first: **Open game**, a readable play area, and pause, save, load and rewind controls. Shared Aether styling uses diagonally cut controls and violet/cyan accents, with dark and light theme choices. Further options live in Settings.
 
-The logo's violet and cyan are the default UI accents. In **Settings → Appearance** on Windows, or **Settings → System → Appearance colors** on Linux, you can choose both accent colors and the background. These global UI colors are saved separately from game video palettes.
+Six theme presets and independent custom accent/background colors are available in Appearance. These global UI colors are saved separately from game video palettes.
 
 <p align="center">
   <img src="docs/images/aetherboy-linux.png" alt="AetherBoy on Linux: main window with ROM selection, session sidebar, five save slots and quick gameplay actions" width="1000">
   <br>
-  <sub>Actual screenshot of the native Linux frontend, with no game loaded.</sub>
+  <sub>Earlier native Linux layout, with no game loaded. Current builds also include updated Aether styling and language selection.</sub>
 </p>
 
 <details>
@@ -111,10 +142,17 @@ Nine sections cover overview, video, audio, controls, saves, system, diagnostics
 | **Saves and rewind** | Battery saves, five save-state slots and rewind for GB, GBC and GBA. |
 | **Save protection** | Atomic `.sav` writes, integrity checks and three rotating backups. |
 | **Local preferences** | Persistent display, audio and input settings in the Control Center. |
+| **Library and sofa mode** | Favorites, tags, ratings, playtime and controller-oriented fullscreen navigation. |
+| **Capture and archives** | Screenshots, WAV audio, single-game AVI video with audio, ZIP/7z ROM import and selection. |
+| **Patching** | IPS/BPS/UPS with explicit patch-and-play; patched ROMs remain separate saved files. |
+| **Session cheats** | Shared GB/GBC and GBA decoders; [formats and unsupported commands](docs/CHEAT_SUPPORT.md). |
+| **Customization** | German/English, six themes, custom colors, configurable pre-game intro and optional Discord activity. |
+| **Portable storage** | `--portable` or `aetherboy.portable` keeps data beside the application; no automatic profile migration. |
+| **Barcode Boy** | Shared accessory implementation and manual barcode entry; supported-game validation remains pending. |
 
 ### Windows and Linux compared
 
-Both frontends share the same platform-neutral Core and Runtime. The available desktop tools still differ:
+Both frontends share the platform-neutral Core and Runtime. Corresponding tools are implemented, but platform integration and real-device acceptance remain separate:
 
 | | Windows | Linux |
 | --- | --- | --- |
@@ -126,11 +164,12 @@ Both frontends share the same platform-neutral Core and Runtime. The available d
 | **Cartridge Vault, cheat management, Save Safety Center** | Available, partly experimental | Linux library, session cheats and backup recovery available |
 | **WAV recording and boot ROM selection** | Available | Available under Tools / System |
 | **State gallery/resume and per-game profiles** | Available | Available, including undo after state load |
-| **Quick Deck** | Available | Separate frontend follow-up |
+| **Quick menu / Audio Inspector** | Available | Available in the native frontend |
 | **Native screenshots / performance overlay** | Available | F12 / F9 and Tools, shared services |
 | **IPS / BPS / UPS Patch Lab** | Integrated; UPS undo is explicit | Available under Library → Patch Lab; explicit UPS undo |
 | **Stereo playback** | GB/GBC/GBA end-to-end | GB/GBC/GBA end-to-end |
-| **Local GB/GBC/GBA link** | Experimental two-player Local Link Lab; same hardware family only, no commercial-game validation yet | Shared Core/Runtime available; native UI pending |
+| **Local GB/GBC/GBA link** | Experimental two-player Local Link Lab | Native two-player UI; shared runtime and same-hardware-family restrictions |
+| **Language / themes / sofa mode / AVI / archives** | Implemented | Implemented; native desktop testing still required |
 
 See [Windows → Linux: UI status](docs/LINUX_UI_PARITY.md) for the detailed mapping.
 
@@ -158,7 +197,7 @@ bash scripts/build-linux.sh
 bash scripts/run-linux.sh
 ```
 
-Then open a `.gb`, `.gbc` or `.gba` file using **OPEN ROM**, the **O** key or drag-and-drop. Extract archives first. You can also pass a ROM path directly:
+Then open a `.gb`, `.gbc` or `.gba` file using **Open game**, the **O** key or drag-and-drop. ZIP/7z archives are supported; choose a game if an archive contains several. Imported games remain separate persistent ROMs. You can also pass a ROM path directly:
 
 ```bash
 bash scripts/run-linux.sh "/path/to/your-game.gba"
@@ -213,7 +252,7 @@ If the file dialog does not appear on Hyprland, check the [portal configuration]
 
 ## Windows build
 
-Requires Windows and the same **.NET SDK 10.0.302**, or a newer patch within the `10.0.3xx` feature band. Audio output requires a working Windows WinMM device.
+Requires Windows and the same **.NET SDK 10.0.302**, or a newer patch within the `10.0.3xx` feature band. Audio requires a working Windows output device; WASAPI and WinMM backends are available.
 
 Run these commands in PowerShell from the repository directory:
 
@@ -243,7 +282,7 @@ Managed Windows data lives under `%LOCALAPPDATA%\AetherBoy`:
 | `Library/` | Per-ROM title, favorites, playtime and preview metadata |
 | `Screenshots/<SHA-256>/` | Manually captured native-resolution gameplay PNGs |
 | `Firmware/` | Optional user-supplied boot ROMs/BIOS |
-| `Recordings/` | Default destination for manually saved WAV recordings |
+| `Recordings/` | Audio and gameplay recordings |
 | `development/Sessions/` | Diagnostic session reports |
 | `development/Crashes/` | Development crash logs |
 
@@ -265,7 +304,9 @@ and are never uploaded. **Diagnostics** can manually export the active report as
 a ZIP. Frame progress alone does not prove correct game rendering or compatibility.
 
 For USB distribution, copy the entire published application directory, including
-its dependencies. Personal game data stays on each player's PC. See the
+its dependencies. By default, personal game data stays on each player's PC.
+[`--portable` or the marker file](docs/PORTABLE_MODE.md) keeps new data beside the
+application instead; existing profiles are not automatically migrated. See the
 [Windows roadmap](docs/WINDOWS_ROADMAP.md) for the next development steps.
 
 The historical `nanoboy` file and directory names remain in the source tree; the product is called **AetherBoy**.
@@ -313,7 +354,9 @@ are unchanged by this update. [Compatibility details](docs/WINDOWS_DEVELOPMENT_H
 
 **GBA:** A vendored, MIT-licensed [GBADotnet core](third_party/GBADotnet.Core/README.md) is connected to video, input, audio, SRAM/Flash/EEPROM/RTC, save states and rewind. Fully cycle-accurate timing, additional renderer edge cases and broader real-world testing remain outstanding.
 
-**Other limitations:** Game Genie is disabled. Cheat support is partial; Action Replay/PAR v3 is not supported. The Windows GB/GBC/GBA Local Link Lab is experimental and has not been validated with commercial games. Separate [GB/GBC Online Link](docs/ONLINE_LINK_HANDOFF.md) and [GBA Pokémon Gen3 online](docs/GBA_ONLINE_HANDOFF.md) development profiles are not verified Pokémon trading releases. Generic GBA network multiplayer, GBA wireless, Joybus and four-player link remain unavailable. GBA cannot link to GB/GBC. The debugger remains experimental.
+**Session cheats:** [The support matrix](docs/CHEAT_SUPPORT.md) covers GB/GBC GameShark `01` writes, CodeBreaker, raw addresses and six-/nine-character Game Genie overlays. GBA includes CodeBreaker master streams, GameShark v1/v2 and Action Replay v3 with conditions, fills, hooks, indirect writes and reversible in-memory ROM patches. Windows and Linux share the decoder and provide format selection and a virtual device button. Sets are not persisted; correct game/version selection and required master codes remain the user's responsibility. AR-v3 slowdown and disable-all-code conditions, plus GB bank-switching GameShark variants, remain unsupported. Parsing a code does not verify its effect in a game.
+
+**Other limitations:** The Windows/Linux GB/GBC/GBA Local Link Lab is experimental and has not been validated with commercial games. Separate [GB/GBC Online Link](docs/ONLINE_LINK_HANDOFF.md) and [GBA Pokémon Gen3 online](docs/GBA_ONLINE_HANDOFF.md) development profiles are not verified Pokémon trading releases. Generic GBA network multiplayer, GBA wireless, Joybus and four-player link remain unavailable. GBA cannot link to GB/GBC. The debugger remains experimental.
 
 Details and reproducible results: [Compatibility matrix](COMPATIBILITY.md) · [GBA status](GBA.md) · [Project status](docs/PROJECT_STATUS_EN.md).
 
@@ -369,9 +412,11 @@ This learning and regression tool writes `artifacts/gba-prototype.bmp`. It is in
 
 | Topic | Start here |
 | --- | --- |
+| Latest stabilization and test limits | [Save finalization, error handling and localization (DE/EN)](docs/STABILIZATION_2026-10-02.md) |
 | Current Windows development package | [DE/EN handoff, shared contracts, test results and follow-ups](docs/WINDOWS_DEVELOPMENT_HANDOFF.md) |
 | Project status and next steps | [English](docs/PROJECT_STATUS_EN.md) · [Deutsch](docs/PROJECT_STATUS_DE.md) |
 | Linux setup and usage | [User Guide (EN)](docs/LINUX_USER_GUIDE.md) · [Wayland / Hyprland (DE)](docs/LINUX_WAYLAND.md) |
+| USB and portable storage | [Portable Mode (DE)](docs/PORTABLE_MODE.md) |
 | Windows and Linux interfaces | [UI mapping and remaining features](docs/LINUX_UI_PARITY.md) |
 | Emulation compatibility | [Test matrix](COMPATIBILITY.md) · [GBA status](GBA.md) |
 | GBA implementation and provenance | [Architecture](docs/GBA_CORE_ARCHITECTURE.md) · [GBADotnet review](docs/GBADOTNET_REVIEW.md) |

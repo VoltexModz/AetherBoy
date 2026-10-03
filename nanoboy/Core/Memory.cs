@@ -30,6 +30,7 @@ namespace nanoboy.Core
         public bool BootROMEnabled;
 
         public ROM ROM => rom;
+        public CheatEngine? RomCheats { get; set; }
         public IMemoryDevice MBC => mbc;
         public HDMA HDMA => hdma;
         internal bool CpuIsHalted => cpu.WaitForInterrupt;
@@ -78,7 +79,7 @@ namespace nanoboy.Core
                 }
             }
             if (address <= 0x7FFF) {
-                return mbc.ReadByte(address);
+                return ReadCartridgeRom(address);
             } else if (address <= 0x9FFF) {
                 return Video.ReadVRAM(address - 0x8000);
             } else if (address <= 0xBFFF) {
@@ -299,7 +300,7 @@ namespace nanoboy.Core
                 }
             }
             if (address <= 0x7FFF) {
-                return mbc.ReadByte(address);
+                return ReadCartridgeRom(address);
             }
             if (address <= 0x9FFF) {
                 return Video.ReadVRAMDirect(Video.VRAMBank, address - 0x8000);
@@ -321,6 +322,12 @@ namespace nanoboy.Core
             }
 
             return ReadByte(address);
+        }
+
+        private byte ReadCartridgeRom(int address)
+        {
+            byte original = mbc.ReadByte(address);
+            return RomCheats?.ApplyRomRead(address, original) ?? original;
         }
 
         public void WriteByte(int address, byte value)
@@ -706,6 +713,7 @@ namespace nanoboy.Core
             serialClock = 0;
             serialBitsRemaining = 0;
             serialTransferActive = false;
+            if (serial is BarcodeBoy scanner) scanner.Reset();
         }
 
         private void StartSerialTransfer()
@@ -871,6 +879,7 @@ namespace nanoboy.Core
 
         internal byte[] CaptureSerialStatePayload()
         {
+            if (serial is BarcodeBoy scanner) return scanner.Capture();
             if (serial is not SerialConsole) {
                 throw new NotSupportedException(
                     $"Serial device {serial.GetType().Name} does not expose deterministic state.");
@@ -880,14 +889,24 @@ namespace nanoboy.Core
 
         internal Action PrepareSerialStateRestore(byte[] payload)
         {
-            if (serial is not SerialConsole) {
+            if (serial is not SerialConsole && serial is not BarcodeBoy) {
                 throw new NotSupportedException(
                     $"Serial device {serial.GetType().Name} does not expose deterministic state.");
             }
-            if (payload == null || payload.Length != 0) {
-                throw new InvalidDataException("SerialConsole state must be empty.");
-            }
-            return () => { };
+            ArgumentNullException.ThrowIfNull(payload);
+            ISerialDevice restored = payload.Length == 0 ? new SerialConsole() : BarcodeBoy.Decode(this, payload);
+            // Restore after the memory registers, without AttachSerialDevice resetting them.
+            return () => serial = restored;
+        }
+
+        public BarcodeBoy? BarcodeScanner => serial as BarcodeBoy;
+
+        public void SetBarcodeBoyEnabled(bool enabled)
+        {
+            if (serial is not SerialConsole && serial is not BarcodeBoy)
+                throw new InvalidOperationException("The serial port is already occupied.");
+            if (enabled == (serial is BarcodeBoy)) return;
+            AttachSerialDevice(enabled ? new BarcodeBoy(this) : new SerialConsole());
         }
     }
 }

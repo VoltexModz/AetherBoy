@@ -88,10 +88,15 @@ the vendored CPU still has static instruction scratch fields. Independently
 running concurrent GBA sessions remain an architectural follow-up; the IRQ
 bridge is not a fix for that separate issue.
 
-GBA cheats use a separate validated EWRAM/IWRAM engine instead of applying GB
-address rules. It accepts raw patches, common CodeBreaker programs and raw or
-encrypted GameShark v1/v2 RAM writes. Action Replay/PAR v3 and complex
-hook/fill/list commands remain unavailable. A deterministic local link peer is
+GBA cheats use the shared runtime compiler/interpreter rather than GB address rules.
+Raw address patches remain restricted to EWRAM/IWRAM; device commands can target
+mapped memory and I/O. CodeBreaker master encryption, fills/lists, GameShark v1/v2,
+Action Replay v3 conditions, hooks, indirect writes and reversible ROM patches are
+implemented; see [the support matrix](CHEAT_SUPPORT.md) for precise exceptions.
+A Thumb instruction-boundary callback runs hooked sets on the owner thread, once
+per matching instruction. Cheat bus access preserves CPU wait-state accounting.
+The cipher adaptation/reseed tables retain mGBA's MPL-2.0 notices; the existing
+GBADotnet core license is unchanged. A deterministic local link peer is
 present at core level; a second-session application host and networking are not.
 Save states and rewind use only the GBA-specific contract; the GB format is
 never reused.

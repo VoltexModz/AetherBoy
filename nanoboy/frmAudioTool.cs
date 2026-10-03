@@ -39,13 +39,13 @@ namespace nanoboy
         {
             InitializeComponent();
             Branding.AppBrand.ApplyIcon(this);
-            Text = $"Audio Inspector \u2013 {ProductInfo.DisplayName}";
+            Text = global::AetherBoy.Runtime.Localization.UiText.Format("Audio Inspector – {0}", ProductInfo.DisplayName);
             FormClosing += frmAudioTool_FormClosing;
             ConfigureAetherLayout();
             AetherDialog.Apply(
                 this,
-                "APU TELEMETRY // 06",
-                "GB/GBC: vier PSG-Kanäle · GBA: PSG + Direct Sound A/B · Stereo-WAV",
+                global::AetherBoy.Runtime.Localization.UiText.Get("APU TELEMETRY // 06"),
+                global::AetherBoy.Runtime.Localization.UiText.Get("GB/GBC: vier PSG-Kanäle · GBA: PSG + Direct Sound A/B · Stereo-WAV"),
                 showMinimize: true);
         }
 
@@ -56,7 +56,7 @@ namespace nanoboy
 
             groupBox1.Location = new System.Drawing.Point(24, 24);
             groupBox1.Size = new System.Drawing.Size(180, 220);
-            groupBox1.Text = "OUTPUT LEVELS";
+            groupBox1.Text = global::AetherBoy.Runtime.Localization.UiText.Get("OUTPUT LEVELS");
             levelDisplayControl1.Location = new System.Drawing.Point(22, 56);
             levelDisplayControl2.Location = new System.Drawing.Point(58, 56);
             levelDisplayControl3.Location = new System.Drawing.Point(94, 56);
@@ -66,36 +66,36 @@ namespace nanoboy
 
             groupBox2.Location = new System.Drawing.Point(222, 24);
             groupBox2.Size = new System.Drawing.Size(318, 220);
-            groupBox2.Text = "PULSE 01 // SWEEP";
+            groupBox2.Text = global::AetherBoy.Runtime.Localization.UiText.Get("PULSE 01 // SWEEP");
 
             groupBox3.Location = new System.Drawing.Point(558, 24);
             groupBox3.Size = new System.Drawing.Size(318, 220);
-            groupBox3.Text = "PULSE 02 // TONE";
+            groupBox3.Text = global::AetherBoy.Runtime.Localization.UiText.Get("PULSE 02 // TONE");
 
             groupBox4.Location = new System.Drawing.Point(24, 264);
             groupBox4.Size = new System.Drawing.Size(516, 238);
-            groupBox4.Text = "WAVE CHANNEL // RAM SCOPE";
+            groupBox4.Text = global::AetherBoy.Runtime.Localization.UiText.Get("WAVE CHANNEL // RAM SCOPE");
             waveDataControl1.Location = new System.Drawing.Point(14, 70);
             waveDataControl1.Size = new System.Drawing.Size(488, 150);
 
             groupBox5.Location = new System.Drawing.Point(558, 264);
             groupBox5.Size = new System.Drawing.Size(318, 238);
-            groupBox5.Text = "NOISE CHANNEL // LFSR";
+            groupBox5.Text = global::AetherBoy.Runtime.Localization.UiText.Get("NOISE CHANNEL // LFSR");
 
-            var directGroup = new GroupBox { Text = "DIRECT SOUND // GBA · LIVE SNAPSHOT",
+            var directGroup = new AetherGroupBox { Text = global::AetherBoy.Runtime.Localization.UiText.Get("DIRECT SOUND // GBA · LIVE SNAPSHOT"),
                 Bounds = new System.Drawing.Rectangle(24, 514, 852, 102) };
             directSoundStatus = new Label { Name = "audioDirectSoundStatus", AutoSize = false,
-                Bounds = new System.Drawing.Rectangle(16, 26, 820, 64), Text = "Kein GBA-Spiel aktiv." };
+                Bounds = new System.Drawing.Rectangle(16, 26, 820, 64), Text = global::AetherBoy.Runtime.Localization.UiText.Get("Kein GBA-Spiel aktiv.") };
             directGroup.Controls.Add(directSoundStatus); Controls.Add(directGroup);
             mixStatus = new Label { Name = "audioStereoMixStatus", AutoSize = false,
-                Bounds = new System.Drawing.Rectangle(24, 668, 852, 28), Text = "Stereo-Mix: noch keine Audiodaten." };
+                Bounds = new System.Drawing.Rectangle(24, 668, 852, 28), Text = global::AetherBoy.Runtime.Localization.UiText.Get("Stereo-Mix: noch keine Audiodaten.") };
             Controls.Add(mixStatus);
             checkBox1.Location = new System.Drawing.Point(24, 636);
-            checkBox1.Text = "LIVE REFRESH";
+            checkBox1.Text = global::AetherBoy.Runtime.Localization.UiText.Get("LIVE REFRESH");
 
             btnRecordWav.Location = new System.Drawing.Point(646, 626);
             btnRecordWav.Size = new System.Drawing.Size(230, 42);
-            btnRecordWav.Text = "AUDIO AUFNEHMEN  //  WAV";
+            btnRecordWav.Text = global::AetherBoy.Runtime.Localization.UiText.Get("AUDIO AUFNEHMEN  //  WAV");
             if (btnRecordWav is AetherButton recordButton)
             {
                 recordButton.Kind = AetherButtonKind.Primary;
@@ -160,8 +160,8 @@ namespace nanoboy
                     if (!Volatile.Read(ref isClosing))
                     {
                         AetherSignal.Show(this,
-                            $"Die WAV-Aufnahme wurde wegen eines Schreibfehlers beendet.\n\n{exception.Message}",
-                            "Audio Recorder",
+                            global::AetherBoy.Runtime.Localization.UiText.Format("Die WAV-Aufnahme wurde wegen eines Schreibfehlers beendet.\n\n{0}", global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message)),
+                            global::AetherBoy.Runtime.Localization.UiText.Get("Audio Recorder"),
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Error);
                     }
@@ -178,8 +178,8 @@ namespace nanoboy
                     !IsDisposed)
                 {
                     AetherSignal.Show(this,
-                        "Aufnahme gestoppt und WAV-Datei gespeichert!",
-                        "Audio Recorder",
+                        global::AetherBoy.Runtime.Localization.UiText.Get("Aufnahme gestoppt und WAV-Datei gespeichert!"),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("Audio Recorder"),
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information);
                 }
@@ -197,14 +197,14 @@ namespace nanoboy
             if (audio == null)
             {
                 AetherSignal.Show(this,
-                    "Kein Spiel oder Audio aktiv.",
-                    "Audio Recorder",
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Kein Spiel oder Audio aktiv."),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Audio Recorder"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
                 return;
             }
 
-            using (var sfd = new SaveFileDialog())
+            using (var sfd = new AetherFileDialog { Save = true })
             {
                 sfd.Filter = "WAV Audio (*.wav)|*.wav";
                 sfd.FileName = $"AetherBoy-{DateTime.Now:yyyyMMdd-HHmmss}.wav";
@@ -246,17 +246,17 @@ namespace nanoboy
             AudioSnapshot? audio = Volatile.Read(ref session)?.LatestSnapshot.Audio;
             if (audio == null)
             {
-                directSoundStatus.Text = "Kein Spiel aktiv.";
-                mixStatus.Text = "Stereo-Mix: keine Audiodaten.";
+                directSoundStatus.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Kein Spiel aktiv.");
+                mixStatus.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Stereo-Mix: keine Audiodaten.");
                 return;
             }
 
             directSoundStatus.Text = audio.DirectSoundA is not null && audio.DirectSoundB is not null
                 ? DescribeDirectSound("A", audio.DirectSoundA) + "\r\n" + DescribeDirectSound("B", audio.DirectSoundB)
-                : "GB/GBC verwendet die vier PSG-Kanäle oben. Direct Sound gibt es nur bei GBA.";
+                : global::AetherBoy.Runtime.Localization.UiText.Get("GB/GBC verwendet die vier PSG-Kanäle oben. Direct Sound gibt es nur bei GBA.");
             bool freshAudio = Environment.TickCount64 - Volatile.Read(ref audioReceivedAt) < 500;
             mixStatus.Text = $"MIX · L {(freshAudio ? Volatile.Read(ref peakLeft) : 0):P0} · R {(freshAudio ? Volatile.Read(ref peakRight) : 0):P0}" +
-                $" · letzter Audioblock · {audio.SampleRate:N0} Hz · WAV: Stereo vor Windows-Lautstärke";
+                global::AetherBoy.Runtime.Localization.UiText.Format(" · letzter Audioblock · {0:N0} Hz · WAV: Stereo vor Windows-Lautstärke", audio.SampleRate);
 
             PulseChannelSnapshot channel1 = audio.Channel1;
             PulseChannelSnapshot channel2 = audio.Channel2;
@@ -275,41 +275,41 @@ namespace nanoboy
             labelQ1Freq.Text = channel1.Frequency + "Hz";
             labelQ1SweepCycles.Text = SweepClockTable[channel1.SweepTime].ToString();
             labelQ1SweepShift.Text = channel1.SweepShift.ToString();
-            labelQ1SweepDirection.Text = channel1.SweepIncreasing ? "Up" : "Down";
+            labelQ1SweepDirection.Text = channel1.SweepIncreasing ? global::AetherBoy.Runtime.Localization.UiText.Get("Steigend") : global::AetherBoy.Runtime.Localization.UiText.Get("Fallend");
             labelQ1EnvelSweep.Text = channel1.EnvelopeSweep.ToString();
-            labelQ1EnvelDirection.Text = channel1.EnvelopeIncreasing ? "Up" : "Down";
+            labelQ1EnvelDirection.Text = channel1.EnvelopeIncreasing ? global::AetherBoy.Runtime.Localization.UiText.Get("Steigend") : global::AetherBoy.Runtime.Localization.UiText.Get("Fallend");
             labelQ1SoundLength.Text =
                 channel1.SoundLength +
-                (!channel1.StopsWhenLengthExpires ? " (ignored)" : "");
+                (!channel1.StopsWhenLengthExpires ? global::AetherBoy.Runtime.Localization.UiText.Get(" (ignored)") : "");
             labelQ1WaveDuty.Text =
                 WaveDutyTable[channel1.WavePatternDuty].ToString();
 
             labelQ2Freq.Text = channel2.Frequency + "Hz";
             labelQ2EnvelSweep.Text = channel2.EnvelopeSweep.ToString();
-            labelQ2EnvelDirection.Text = channel2.EnvelopeIncreasing ? "Up" : "Down";
+            labelQ2EnvelDirection.Text = channel2.EnvelopeIncreasing ? global::AetherBoy.Runtime.Localization.UiText.Get("Steigend") : global::AetherBoy.Runtime.Localization.UiText.Get("Fallend");
             labelQ2SoundLength.Text =
                 channel2.SoundLength +
-                (!channel2.StopsWhenLengthExpires ? " (ignored)" : "");
+                (!channel2.StopsWhenLengthExpires ? global::AetherBoy.Runtime.Localization.UiText.Get(" (ignored)") : "");
             labelQ2WaveDuty.Text =
                 WaveDutyTable[channel2.WavePatternDuty].ToString();
 
             labelWFreq.Text = channel3.Frequency + "Hz";
             labelWSoundLength.Text =
                 channel3.SoundLength +
-                (!channel3.StopsWhenLengthExpires ? " (ignored)" : "");
+                (!channel3.StopsWhenLengthExpires ? global::AetherBoy.Runtime.Localization.UiText.Get(" (ignored)") : "");
             waveDataControl1.WaveForm = channel3.GetWaveRamCopy();
-            groupBox4.Text = audio.DirectSoundA == null ? "WAVE CHANNEL // 32 SAMPLES" : "WAVE CHANNEL // 2 BANKS · 64 SAMPLES";
+            groupBox4.Text = audio.DirectSoundA == null ? global::AetherBoy.Runtime.Localization.UiText.Get("WAVE CHANNEL // 32 SAMPLES") : global::AetherBoy.Runtime.Localization.UiText.Get("WAVE CHANNEL // 2 BANKS · 64 SAMPLES");
 
             labelNClockFreq.Text = channel4.ClockFrequency.ToString();
             labelNDividingRatio.Text = channel4.DividingRatio.ToString();
-            labelNCounterBits.Text = channel4.UsesSevenBitCounter ? "7 bits" : "15 bits";
+            labelNCounterBits.Text = channel4.UsesSevenBitCounter ? global::AetherBoy.Runtime.Localization.UiText.Get("7 bits") : global::AetherBoy.Runtime.Localization.UiText.Get("15 bits");
             labelNCounter.Text = channel4.Counter.ToString();
             labelNResultFreq.Text = channel4.Frequency.ToString();
             labelNEnvelSweep.Text = channel4.EnvelopeSweep.ToString();
-            labelNEnvelDirection.Text = channel4.EnvelopeIncreasing ? "Up" : "Down";
+            labelNEnvelDirection.Text = channel4.EnvelopeIncreasing ? global::AetherBoy.Runtime.Localization.UiText.Get("Steigend") : global::AetherBoy.Runtime.Localization.UiText.Get("Fallend");
             labelNSoundLength.Text =
                 channel4.SoundLength +
-                (!channel4.StopsWhenLengthExpires ? " (ignored)" : "");
+                (!channel4.StopsWhenLengthExpires ? global::AetherBoy.Runtime.Localization.UiText.Get(" (ignored)") : "");
         }
 
         private void checkBox1_CheckedChanged(object sender, EventArgs e)
@@ -318,8 +318,8 @@ namespace nanoboy
         }
 
         private static string DescribeDirectSound(string name, DirectSoundChannelSnapshot channel) =>
-            $"FIFO {name} · Sample {channel.CurrentSample,4} · Füllung {channel.FifoSamples}/32 · Timer {channel.Timer} · " +
-            $"Pegel {(channel.FullVolume ? 100 : 50)}% · L {(channel.LeftEnabled ? "AN" : "AUS")} / R {(channel.RightEnabled ? "AN" : "AUS")} · Master {(channel.MasterEnabled ? "AN" : "AUS")}";
+            global::AetherBoy.Runtime.Localization.UiText.Format("FIFO {0} · Sample {1,4} · Füllung {2}/32 · Timer {3} · ", name, channel.CurrentSample, channel.FifoSamples, channel.Timer) +
+            global::AetherBoy.Runtime.Localization.UiText.Format("Pegel {0}% · L {1} / R {2} · Master {3}", (channel.FullVolume ? 100 : 50), (channel.LeftEnabled ? global::AetherBoy.Runtime.Localization.UiText.Get("AN") : global::AetherBoy.Runtime.Localization.UiText.Get("AUS")), (channel.RightEnabled ? global::AetherBoy.Runtime.Localization.UiText.Get("AN") : global::AetherBoy.Runtime.Localization.UiText.Get("AUS")), (channel.MasterEnabled ? global::AetherBoy.Runtime.Localization.UiText.Get("AN") : global::AetherBoy.Runtime.Localization.UiText.Get("AUS")));
 
         private void DetachSession()
         {
@@ -348,7 +348,7 @@ namespace nanoboy
             }
 
             btnRecordWav.Enabled = false;
-            btnRecordWav.Text = "Aufnahme wird gespeichert…";
+            btnRecordWav.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Aufnahme wird gespeichert…");
             recordingStopTask = StopRecorderCoreAsync(currentStartTask, showErrors);
             return recordingStopTask;
         }
@@ -379,8 +379,8 @@ namespace nanoboy
                         if (!Volatile.Read(ref isClosing))
                         {
                             AetherSignal.Show(this,
-                                $"Die WAV-Datei konnte nicht vollständig gespeichert werden.\n\n{exception.Message}",
-                                "Audio Recorder",
+                                global::AetherBoy.Runtime.Localization.UiText.Format("Die WAV-Datei konnte nicht vollständig gespeichert werden.\n\n{0}", global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message)),
+                                global::AetherBoy.Runtime.Localization.UiText.Get("Audio Recorder"),
                                 MessageBoxButtons.OK,
                                 MessageBoxIcon.Error);
                         }
@@ -402,7 +402,7 @@ namespace nanoboy
         {
             Volatile.Write(ref recordingSession, null);
             btnRecordWav.Enabled = false;
-            btnRecordWav.Text = "Aufnahme wird gestartet…";
+            btnRecordWav.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Aufnahme wird gestartet…");
 
             recordingStartTask = Task.Run(() => recorder.Start(filePath, sampleRate, channels: 2));
             try
@@ -417,7 +417,7 @@ namespace nanoboy
 
                 Volatile.Write(ref recordingSession, sourceSession);
                 btnRecordWav.Enabled = true;
-                btnRecordWav.Text = "Aufnahme stoppen";
+                btnRecordWav.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Aufnahme stoppen");
             }
             catch (Exception exception)
             {
@@ -427,8 +427,8 @@ namespace nanoboy
                     ReferenceEquals(sourceSession, Volatile.Read(ref session)))
                 {
                     AetherSignal.Show(this,
-                        $"Die WAV-Datei konnte nicht angelegt werden.\n\n{exception.Message}",
-                        "Audio Recorder",
+                        global::AetherBoy.Runtime.Localization.UiText.Format("Die WAV-Datei konnte nicht angelegt werden.\n\n{0}", global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message)),
+                        global::AetherBoy.Runtime.Localization.UiText.Get("Audio Recorder"),
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Error);
                 }
@@ -443,7 +443,7 @@ namespace nanoboy
             }
 
             btnRecordWav.Enabled = !Volatile.Read(ref isClosing);
-            btnRecordWav.Text = "Audio aufnehmen (.wav)";
+            btnRecordWav.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Audio aufnehmen (.wav)");
         }
 
         private void TryPostToUi(Action action)

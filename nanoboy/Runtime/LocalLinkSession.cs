@@ -14,7 +14,11 @@ public sealed record LocalLinkPlayerConfiguration(
     string SavePath,
     byte[]? BootRom,
     EmulatorConfiguration Configuration,
-    int PaletteIndex = 0);
+    int PaletteIndex = 0)
+{
+    /// <summary>Optional platform storage lease. Defaults to SavePath + ".lock".</summary>
+    public string? WriteLeasePath { get; init; }
+}
 
 public sealed record LocalLinkSnapshot(
     SessionState State,
@@ -84,12 +88,15 @@ public sealed class LocalLinkSession : IDisposable, IAsyncDisposable
     private bool shutdownRequested;
     private Exception? fault;
     private int ownerThreadId;
+    private string ownerPhase = "starting";
+    private readonly Action<int>? beforeMachineDispose;
     private LocalLinkSnapshot snapshot = new(SessionState.Starting, false, 0, 0, true, null, null);
 
     public LocalLinkSession(LocalLinkPlayerConfiguration first, LocalLinkPlayerConfiguration second)
         : this(first, second, new RealTimeFramePacer()) { }
 
-    internal LocalLinkSession(LocalLinkPlayerConfiguration first, LocalLinkPlayerConfiguration second, IFramePacer pacer)
+    internal LocalLinkSession(LocalLinkPlayerConfiguration first, LocalLinkPlayerConfiguration second, IFramePacer pacer,
+        Action<int>? beforeMachineDispose = null)
     {
         players = [ValidateAndCopy(first), ValidateAndCopy(second)];
         IsGameBoyAdvance = IsAdvance(players[0]);
@@ -98,7 +105,11 @@ public sealed class LocalLinkSession : IDisposable, IAsyncDisposable
         var pathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         if (string.Equals(players[0].SavePath, players[1].SavePath, pathComparison))
             throw new ArgumentException("Each linked player needs a separate battery-save path.", nameof(second));
+        if (string.Equals(LeasePath(players[0]), LeasePath(players[1]), pathComparison))
+            throw new ArgumentException("Each linked player needs a separate storage lease.", nameof(second));
         this.pacer = pacer ?? throw new ArgumentNullException(nameof(pacer));
+        // Internal deterministic slow/failing-finalization seam; unused by frontends.
+        this.beforeMachineDispose = beforeMachineDispose;
         VideoGeometry geometry = IsGameBoyAdvance ? VideoGeometry.GameBoyAdvance : VideoGeometry.GameBoy;
         foreach (var exchange in frames) exchange.Configure(geometry);
         snapshot = snapshot with { VideoGeometry = geometry };
@@ -115,6 +126,9 @@ public sealed class LocalLinkSession : IDisposable, IAsyncDisposable
     public Task Completion => completion.Task;
     public bool IsGameBoyAdvance { get; }
     internal int OwnerThreadId => Volatile.Read(ref ownerThreadId);
+    // Coarse owner-thread checkpoints, with no ROM paths or game data. Useful
+    // when a timeout cannot distinguish emulation, save I/O and final cleanup.
+    internal string OwnerPhase => Volatile.Read(ref ownerPhase);
 
     public VideoGeometry GetVideoGeometry(int player)
     {
@@ -215,9 +229,13 @@ public sealed class LocalLinkSession : IDisposable, IAsyncDisposable
             // Acquire both before constructing either machine: never partially start a pair
             // which would write the same save as another live window.
             for (int player = 0; player < 2; player++)
-                leases[player] = RomWriteLease.Acquire(players[player].SavePath + ".lock");
+            {
+                Volatile.Write(ref ownerPhase, "acquiring-save-lease");
+                leases[player] = RomWriteLease.Acquire(LeasePath(players[player]));
+            }
             for (int player = 0; player < 2; player++)
             {
+                Volatile.Write(ref ownerPhase, "creating-machine");
                 machines[player] = LocalLinkMachine.Create(players[player], IsGameBoyAdvance);
                 int side = player;
                 handlers[player] = (_, args) => ForwardAudio(side, args);
@@ -229,15 +247,18 @@ public sealed class LocalLinkSession : IDisposable, IAsyncDisposable
             ready.TrySetResult();
             while (!owner.Stopping)
             {
+                Volatile.Write(ref ownerPhase, "commands");
                 DrainCommands(owner);
                 if (owner.Stopping) break;
                 if (owner.Paused)
                 {
+                    Volatile.Write(ref ownerPhase, "paused");
                     commandAvailable.WaitOne();
                     continue;
                 }
 
                 long frameEnd = checked((owner.FrameCount + 1) * owner.Machines[0].TicksPerFrame);
+                Volatile.Write(ref ownerPhase, "emulating-frame");
                 while (Math.Min(owner.Dots[0], owner.Dots[1]) < frameEnd)
                 {
                     int side = owner.Dots[0] <= owner.Dots[1] ? 0 : 1;
@@ -254,6 +275,7 @@ public sealed class LocalLinkSession : IDisposable, IAsyncDisposable
                 Publish(owner);
                 try
                 {
+                    Volatile.Write(ref ownerPhase, "pacing");
                     pacer.WaitForNextFrame(stopPacing.Token);
                 }
                 catch (OperationCanceledException) when (stopPacing.IsCancellationRequested)
@@ -270,9 +292,12 @@ public sealed class LocalLinkSession : IDisposable, IAsyncDisposable
         }
         finally
         {
+            Volatile.Write(ref snapshot, LatestSnapshot with { State = SessionState.Stopping });
+            Volatile.Write(ref ownerPhase, "stopping-audio");
             // Stop dispatch without waiting for user callbacks; they must not delay save
             // flush or owner shutdown. Each subscriber is isolated from this owner thread.
             foreach (var dispatcher in audioDispatchers) dispatcher.StopWithoutWaiting();
+            Volatile.Write(ref ownerPhase, "disconnecting-cable");
             try { cable?.Dispose(); }
             catch (Exception exception) { ownerFault = Combine(ownerFault, exception); }
             for (int side = 0; side < 2; side++)
@@ -282,17 +307,21 @@ public sealed class LocalLinkSession : IDisposable, IAsyncDisposable
                     if (machines[side] is { } machine)
                     {
                         machine.AudioAvailable -= handlers[side];
+                        Volatile.Write(ref ownerPhase, side == 0 ? "saving-player-1" : "saving-player-2");
+                        beforeMachineDispose?.Invoke(side);
                         machine.Dispose();
                     }
                 }
                 catch (Exception exception) { ownerFault = Combine(ownerFault, exception); }
                 finally
                 {
+                    Volatile.Write(ref ownerPhase, "releasing-save-lease");
                     try { leases[side]?.Dispose(); }
                     catch (Exception exception) { ownerFault = Combine(ownerFault, exception); }
                 }
             }
             lock (lifecycleGate) acceptingCommands = false;
+            Volatile.Write(ref ownerPhase, "completing");
             var rejection = new InvalidOperationException("The local link session ended before the command was applied.", ownerFault);
             while (commands.TryDequeue(out var command)) command.Completion.TrySetException(rejection);
             if (ownerFault is not null) Volatile.Write(ref fault, ownerFault);
@@ -304,6 +333,7 @@ public sealed class LocalLinkSession : IDisposable, IAsyncDisposable
             });
             commandAvailable.Dispose();
             stopPacing.Dispose();
+            Volatile.Write(ref ownerPhase, "stopped");
             if (ownerFault is null)
             {
                 ready.TrySetResult();
@@ -402,6 +432,9 @@ public sealed class LocalLinkSession : IDisposable, IAsyncDisposable
     private static bool IsAdvance(LocalLinkPlayerConfiguration player) =>
         Path.GetExtension(player.RomPath).Equals(".gba", StringComparison.OrdinalIgnoreCase);
 
+    private static string LeasePath(LocalLinkPlayerConfiguration player) =>
+        player.WriteLeasePath ?? player.SavePath + ".lock";
+
     private static LocalLinkPlayerConfiguration ValidateAndCopy(LocalLinkPlayerConfiguration player)
     {
         ArgumentNullException.ThrowIfNull(player);
@@ -418,6 +451,7 @@ public sealed class LocalLinkSession : IDisposable, IAsyncDisposable
         {
             RomPath = Path.GetFullPath(player.RomPath),
             SavePath = Path.GetFullPath(player.SavePath),
+            WriteLeasePath = player.WriteLeasePath is null ? null : Path.GetFullPath(player.WriteLeasePath),
             BootRom = player.BootRom is null ? null : (byte[])player.BootRom.Clone()
         };
     }

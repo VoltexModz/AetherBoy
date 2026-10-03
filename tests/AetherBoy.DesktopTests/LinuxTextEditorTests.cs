@@ -7,6 +7,18 @@ namespace AetherBoy.Desktop.Tests;
 [DoNotParallelize]
 public sealed class LinuxTextEditorTests
 {
+    [TestMethod]
+    public void CheatPasteKeepsCodeBoundariesAndOrdinaryFieldsKeepTheirSingleLineBehavior()
+    {
+        var editor = new LinuxTextEditor(32768) { LineBreakReplacement = " + " };
+        var clipboard = new Clipboard { Value = "9ABCDEF0 1234\r\n932C7D22 AC8D\n82000004 BEEF" };
+        editor.Key(LinuxTextKey.Paste, false, clipboard);
+        Assert.AreEqual("9ABCDEF0 1234 + 932C7D22 AC8D + 82000004 BEEF", editor.Text);
+        editor.LineBreakReplacement = "";
+        editor.SetText("room\rcode");
+        Assert.AreEqual("roomcode", editor.Text);
+    }
+
     private sealed class Clipboard : ILinuxTextClipboard
     {
         public string Value = "";
@@ -179,10 +191,13 @@ public sealed class LinuxTextEditorTests
             Assert.AreEqual("Title😀", Field<string>(host, "titleInput"));
             Assert.IsFalse(Field<LinuxTextEditor>(host, "textEditor").IsComposing);
             Call(host, "DrawShell");
-            Call(host, "HandleTextPointerDown", 322f, 340f, false);
+            var entries = Field<System.Collections.IDictionary>(host, "textEntryBounds");
+            object titleKey = entries.Keys.Cast<object>().Single(key => key.ToString() == "Title");
+            var titleBounds = (SDL.FRect)entries[titleKey]!;
+            Call(host, "HandleTextPointerDown", titleBounds.X + 12, titleBounds.Y + titleBounds.H / 2, false);
             Assert.IsTrue(SDL.TextInputActive(Field<IntPtr>(host, "window")));
             Assert.AreEqual(0, Field<LinuxTextEditor>(host, "textEditor").Caret);
-            Call(host, "HandleTextPointerMotion", 1100f);
+            Call(host, "HandleTextPointerMotion", titleBounds.X + titleBounds.W - 12);
             Assert.IsTrue(Field<LinuxTextEditor>(host, "textEditor").AllSelected);
             Set(host, "draggingTextSelection", false);
             Call(host, "CloseControlCenter"); Assert.IsTrue(Field<bool>(host, "controlCenterVisible"));

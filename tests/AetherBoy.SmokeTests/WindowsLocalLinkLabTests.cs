@@ -54,9 +54,9 @@ public sealed class WindowsLocalLinkLabTests
         main.LoadRomFile(first);
         EmulationSession original = Field<EmulationSession>(main, "session");
         PumpUntil(() => original.LatestSnapshot.Rom is not null);
-        var tools = Field<ToolStripMenuItem>(main, "menuItem21");
+        var tools = Field<nanoboy.Controls.AetherCommand>(main, "menuItem21");
         Assert.IsTrue(tools.DropDownItems.ContainsKey("menuLinkCable"));
-        var entry = (ToolStripMenuItem)tools.DropDownItems["menuLinkCable"]!;
+        var entry = (nanoboy.Controls.AetherCommand)tools.DropDownItems["menuLinkCable"]!;
         Assert.IsTrue(entry.Enabled);
 
         bool seen = false;
@@ -307,23 +307,63 @@ public sealed class WindowsLocalLinkLabTests
         WindowsLocalLinkPlan plan = new WindowsLocalLinkStorage(WindowsDataPaths.Default).CreatePlan(first, second);
         using var lab = new frmLocalLinkLab(fixture.Settings, first, () => true);
         lab.SetRom(1, second);
-        lab.Show();
-        try
+        LocalLinkSession? session = null;
+        Exception? failure = null;
+        using var deadline = new System.Windows.Forms.Timer { Interval = 15000 };
+        deadline.Tick += (_, _) =>
         {
-            Pump(lab.StartAsync());
-            LocalLinkSession session = Session(lab)!;
-            PumpUntil(() => session.LatestSnapshot.FrameCount >= 2);
+            deadline.Stop();
+            failure = new AssertFailedException("Local Link window did not finish closing within 15 seconds.");
+            lab.Dispose();
+            Application.ExitThread();
+        };
+        async Task StartAndCloseAsync()
+        {
+            await lab.StartAsync();
+            session = Session(lab)!;
+            while (session.LatestSnapshot.FrameCount < 2 && !lab.IsDisposed) await Task.Delay(5);
+            if (lab.IsDisposed) return;
             Assert.ThrowsExactly<IOException>(() => RomWriteLease.Acquire(plan.FirstSavePath + ".lock"));
             Assert.ThrowsExactly<IOException>(() => RomWriteLease.Acquire(plan.SecondSavePath + ".lock"));
             lab.Close();
-            PumpUntil(() => lab.IsDisposed);
+        }
+        lab.Shown += async (_, _) =>
+        {
+            try
+            {
+                await StartAndCloseAsync();
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+                lab.Dispose();
+                Application.ExitThread();
+            }
+        };
+        try
+        {
+            // Exercise the real top-level message loop. DoEvents after the last
+            // window closes can stay inside native GetMessage with no remaining
+            // timer/window to wake it, bypassing the old PumpUntil deadline.
+            deadline.Start();
+            Application.Run(lab);
+            deadline.Stop();
+            if (failure is not null) throw failure;
+            Assert.IsTrue(lab.IsDisposed);
+            Assert.IsNotNull(session);
             Assert.IsTrue(session.Completion.IsCompletedSuccessfully);
             Assert.AreEqual((byte)0x31, File.ReadAllBytes(plan.FirstSavePath)[1]);
             Assert.AreEqual((byte)0x62, File.ReadAllBytes(plan.SecondSavePath)[1]);
             using var firstLease = RomWriteLease.Acquire(plan.FirstSavePath + ".lock");
             using var secondLease = RomWriteLease.Acquire(plan.SecondSavePath + ".lock");
         }
-        finally { StopAndClose(lab); }
+        finally
+        {
+            deadline.Stop();
+            // Retain owner cleanup even when the UI watchdog disposed the form.
+            session?.ShutdownAsync().WaitAsync(TimeSpan.FromSeconds(15)).GetAwaiter().GetResult();
+            StopAndClose(lab);
+        }
     }
 
     [STATestMethod]

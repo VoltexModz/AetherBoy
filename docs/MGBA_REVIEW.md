@@ -1,7 +1,11 @@
 # mGBA-Referenzprüfung und eigener Ausbau
 
-Stand: 2026-09-08. Ergebnis: **mGBA als technische Referenz, keine direkte
-Einbindung und keine mechanische C-nach-C#-Übersetzung.** Unser GB/GBC-Kern bleibt
+Ursprünglicher Stand: 2026-09-08. Damaliges Ergebnis: **mGBA als technische
+Referenz, keine direkte Einbindung oder C-nach-C#-Übersetzung.** Nachtrag
+01.10.2026: Für Cheat-Entschlüsselung und Reseed-Tabellen werden jetzt ausdrücklich
+MPL-2.0-lizenzierte Adaptionen verwendet; siehe den Cheat-Abgleich unten und
+`third_party/mgba-cheats`. Es wird weiterhin kein mGBA-Emulatorkern eingebunden.
+Unser GB/GBC-Kern bleibt
 bestehen. Ein eigener ARM/Bus/Mode-3-Prototyp läuft. Der spätere produktive
 GBA-Pfad verwendet den separat geprüften
 [MIT-lizenzierten GBADotnet-Snapshot](GBADOTNET_REVIEW.md); kommerzielle GBA-Spiele
@@ -72,7 +76,7 @@ sichtbare Implementierungen, nicht eine von uns verifizierte Spielgarantie.
 | GBA | Voller eigener Systemkern im Referenzprojekt | Produktiver gepflegter C#-Kern mit CPU, PPU, DMA, Timern, IRQ, PSG/Direct Sound, Saves/RTC, Zuständen und HLE-BIOS | Reale Spiele systematisch testen und Timing-/PPU-Randfälle härten |
 | Speicherstände/Rewind | Save-Erkennung, Zustände, konfigurierbarer Rewind | Atomare Batterie-Saves, Backups, ROM-gebundene Zustände, begrenzter Rewind | Unsere Sicherungen behalten; für GBA nicht einfach GB-Formate verwenden |
 | Archive/Patches | ZIP/7z und IPS/UPS/BPS laut README | Normaler GB/GBC-Dateilader | Sinnvolle spätere Komfortfunktion; Größenlimits und unveränderte Originaldateien voraussetzen |
-| Cheats | Mehrere Systeme/Formate, auch GBA | Begrenzter GameShark-Pfad; Game Genie nicht freigegeben | Systembezogen testen und mit Capability-Flags anzeigen |
+| Cheats | Getrennte Code-Sets, Game Genie, GBA-Geräte-Decoder | Gemeinsamer GB/GBC/GBA-Pfad für Windows/Linux; GBA inklusive Master-Streams, Bedingungen, Hooks, Zeiger und ROM-Patches | [Befehlsmatrix](CHEAT_SUPPORT.md) und synthetische Regressionen; keine pauschale Spielcode-Kompatibilität behaupten |
 | Debugging/Scripting | Speicher-/Registerinformationen, Debugger, Lua laut README | Diagnose und Conformance-CLI, kein vergleichbarer Debugger | Später wertvoll für Fehleranalyse; Plugins/Skripte sind zusätzlicher Sicherheitsumfang |
 | Aufnahme | Screenshots und Videoformate dokumentiert | WAV-Aufnahme | Komfortausbau, keine Verbesserung der Emulationsgenauigkeit an sich |
 | Oberfläche/Architektur | Eigenes plattformübergreifendes Frontend | Eigene Aether-Wave-UI, Control Center, immutable Snapshots/Owner-Thread | Unsere Produktidentität und Grenzen erhalten |
@@ -207,3 +211,60 @@ keinen mGBA-A/B-Benchmark und noch keinen vollständigen kommerziellen GBA-Spiel
 
 Weiterhin keine Telemetrie und kein Upload oder Commit von ROM-, BIOS- oder
 Save-Daten. Dieses Dokument beschreibt nur den Referenz- und Entwicklungsweg.
+
+## Cheat-Abgleich vom 01.10.2026
+
+Im bereitgestellten mGBA-Quellarchiv wurden `src/core/cheats.c`,
+`src/gb/cheats.c`, `src/gba/cheats.c` sowie die GBA-Decoder für CodeBreaker,
+GameShark und PAR v3 erneut als Verhaltensreferenz geprüft. mGBA fasst mehrere
+Zeilen in einem schaltbaren Code-Set zusammen. Beim GB ist Game Genie eine
+ROM-Leseüberlagerung mit optionalem Vergleich gegen das ursprüngliche Byte;
+GameShark arbeitet hingegen mit Speicherschreibzugriffen. Daher reicht das
+bloße Erkennen eines Game-Genie-Strings nicht als Unterstützung aus.
+
+AetherBoy verbindet die GB/GBC-ROM-Leseüberlagerung nun mit dem Speicherbus,
+akzeptiert sechs- und neunstellige Game-Genie-Codes und behandelt mehrere
+GB/GBC-Zeilen atomar als ein Set. Die ROM-Datei wird dabei nicht verändert.
+Windows und Linux verwenden denselben Kern und zeigen die tatsächlich
+verfügbaren Formate an. GB/GBC akzeptiert zusätzlich CodeBreaker `00AAAA-VV`
+und direkte `AAAA:VV`-Speicherschreibzugriffe. Die bankumschaltenden GB-GameShark-
+Varianten werden nicht durch Ignorieren ihres Befehlsbytes vorgetäuscht.
+
+Nicht gleichgesetzt werden dürfen ein eingelesener Code, ein wirksamer Code
+und ein für ein konkretes Spiel passender Code. Die Spieler wählen ihre Codes
+selbst. Der Emulator prüft das Format und die implementierte Operation, aber
+nicht die Zugehörigkeit zum Spiel. Die Cheatliste gilt derzeit nur für die
+laufende Sitzung.
+
+Für den GBA-Ausbau ist mGBAs Trennung wichtig: PAR v3 besitzt einen eigenen
+Decoder und Befehlsumfang; verschlüsselte CodeBreaker-Streams brauchen einen
+zustandsbehafteten Mastercode-/Tabellenpfad. Beides lässt sich nicht korrekt
+durch Umbenennen vorhandener GameShark-Codes erreichen. AetherBoy dekodiert
+PAR v3 deshalb separat und nimmt mit `AR3:` verschlüsselte beziehungsweise
+mit `AR3RAW:` bereits entschlüsselte Programme an. Bedingungen (ein/zwei Befehle
+oder Block mit ELSE/ENDIF), signed/unsigned Vergleiche, Fills/Slides, Additionen,
+Zeiger, ROM-Patches und virtuelle Gerätetaste sind implementiert. CodeBreaker
+hat jetzt Master-Verschlüsselung, Slide/List und Hooks; GameShark v1/v2 ergänzt
+Reseed, Gruppen, Bedingungen, Hooks, Gerätetaste und ROM-Patches. Thumb-Hooks
+werden im CPU-Owner-Thread genau einmal pro passender Instruktion ausgeführt.
+Speicherzugriffe verändern nicht das CPU-Waitstate-Budget. ROM-Patches werden
+nur auf die geladene Kopie angewandt und beim Abschalten überlappungsfest entfernt.
+
+Die vollständige Matrix samt Grenzen steht in [CHEAT_SUPPORT.md](CHEAT_SUPPORT.md).
+Auch mGBA implementiert im geprüften PAR-v3-Pfad keine Slowdown-/Disable-all-
+Operationen; AetherBoy weist diese ab. Die Wahl passender Spielcodes wird nicht
+automatisiert. Master und zugehörige Zeilen sollten gemeinsam eingegeben werden.
+
+Die C#-Cipher-Adaption und vier Reseed-Tabellen in `GbaCheatCipher.cs` und
+`GbaCheatTables.cs` basieren jetzt auf mGBA-Code unter MPL-2.0, mit Copyright,
+vollständiger Lizenz und Quellenhinweis im Produkt. Die frühere Aussage, es
+seien keinerlei Funktionskörper übernommen/adaptiert, gilt nur für die historischen
+Review-/BIOS-Schritte, nicht für diesen Cheat-Ausbau. Testvektoren für CB, GS und
+AR3 wurden zusätzlich mit separat kompilierten originalen mGBA-C-Routinen erzeugt
+und in den Tests festgehalten; die Produktion nutzt keinen C-Helper. Das ist kein
+End-to-end-Kompatibilitätstest des gesamten mGBA-Emulators oder echter Spielcodes.
+
+Zusätzlicher Formatabgleich: [EnHacklopedia GBA](https://doc.kodewerx.org/hacking_gba.html).
+Die dokumentierten AR-v3-I/O-Breiten C6/C7 werden mit 16/32 Bit umgesetzt und
+getestet; einzelne Implementierungsdetails des Referenzcodes werden nicht blind
+übernommen.

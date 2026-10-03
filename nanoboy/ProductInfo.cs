@@ -24,11 +24,15 @@ namespace nanoboy
         public static bool IsDevelopmentBuild => string.Equals(BuildChannel, "development",
             System.StringComparison.OrdinalIgnoreCase);
 
+        public static string BuildId => typeof(ProductInfo).Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(attribute => attribute.Key == "AetherBoyBuildId")?.Value ?? "";
+
         public static string Version
         {
             get
             {
-                var attribute = Assembly.GetEntryAssembly()
+                var attribute = typeof(ProductInfo).Assembly
                     ?.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
                 var value = attribute?.InformationalVersion;
 
@@ -42,6 +46,7 @@ namespace nanoboy
             }
         }
 
-        public static string DisplayName => $"{Name} {Version} ({Status})";
+        public static string DisplayName => $"{Name} {Version} ({Status})" +
+            (string.IsNullOrWhiteSpace(BuildId) ? "" : $" · Build {BuildId}");
     }
 }

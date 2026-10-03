@@ -22,33 +22,35 @@ internal sealed class frmStateGallery : Form
         Func<bool> canUndo, Func<bool> busy)
     {
         this.rom = rom; this.save = save; this.load = load; this.canUndo = canUndo; this.busy = busy;
-        Text = "State-Galerie";
+        Text = global::AetherBoy.Runtime.Localization.UiText.Get("State-Galerie");
         ClientSize = new Size(1010, 710);
         StartPosition = FormStartPosition.CenterParent;
         var footer = new Panel { Dock = DockStyle.Bottom, Height = 66 };
-        undoButton = new AetherButton { Name = "stateGalleryUndoButton", Text = "LETZTES LADEN RÜCKGÄNGIG", Bounds = new(18, 12, 330, 40) };
+        undoButton = new AetherButton { Name = "stateGalleryUndoButton", Text = global::AetherBoy.Runtime.Localization.UiText.Get("LETZTES LADEN RÜCKGÄNGIG"), Bounds = new(18, 12, 330, 40) };
         undoButton.Click += async (_, _) => await RunAction(() => load(0, true));
         footer.Controls.Add(undoButton);
-        footer.Controls.Add(new Label { Text = "Fortsetzen: eigener Slot · Auto alle 60 s und beim Beenden\r\nRückgängig gilt einmalig in dieser Sitzung; Batterie-Saves bleiben getrennt.",
+        footer.Controls.Add(new Label { Text = global::AetherBoy.Runtime.Localization.UiText.Get("Fortsetzen: eigener Slot · Auto alle 60 s und beim Beenden\r\nRückgängig gilt einmalig in dieser Sitzung; Batterie-Saves bleiben getrennt."),
             ForeColor = AetherColors.Muted, Bounds = new(370, 10, 610, 48) });
-        var flow = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new(12), BackColor = AetherColors.Void };
+        var flow = new FlowLayoutPanel { Padding = new(12), BackColor = AetherColors.Void };
+        var viewport = new AetherScrollViewport { Name = "stateGalleryViewport", Dock = DockStyle.Fill };
+        viewport.SetContent(flow, Size.Empty, measureChildren: true);
         foreach (int slot in new[] { 1, 2, 3, 4, 5, 0 })
         {
             var card = new AetherSurfacePanel { Size = new(310, 298), Margin = new(6), AccentEdge = true };
-            card.Controls.Add(new Label { Text = slot == 0 ? "FORTSETZEN // AUTO" : $"SLOT {slot}", ForeColor = AetherColors.Cyan,
+            card.Controls.Add(new Label { Text = slot == 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("FORTSETZEN // AUTO") : $"SLOT {slot}", ForeColor = AetherColors.Cyan,
                 Font = new Font("Segoe UI", 10, FontStyle.Bold), Bounds = new(14, 10, 280, 24) });
             var picture = new PictureBox { BackColor = Color.Black, SizeMode = PictureBoxSizeMode.Zoom, Bounds = new(14, 42, 282, 146) };
             var details = new Label { Bounds = new(14, 196, 282, 48), AutoEllipsis = true, ForeColor = AetherColors.Text };
-            var saveButton = new AetherButton { Text = "SPEICHERN", Name = $"stateGallerySave{slot}", Bounds = new(14, 252, 134, 34) };
-            var loadButton = new AetherButton { Text = slot == 0 ? "FORTSETZEN" : "LADEN", Name = $"stateGalleryLoad{slot}", Bounds = new(162, 252, 134, 34), Kind = AetherButtonKind.Primary };
+            var saveButton = new AetherButton { Text = global::AetherBoy.Runtime.Localization.UiText.Get("SPEICHERN"), Name = $"stateGallerySave{slot}", Bounds = new(14, 252, 134, 34) };
+            var loadButton = new AetherButton { Text = slot == 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("FORTSETZEN") : global::AetherBoy.Runtime.Localization.UiText.Get("LADEN"), Name = $"stateGalleryLoad{slot}", Bounds = new(162, 252, 134, 34), Kind = AetherButtonKind.Primary };
             saveButton.Click += async (_, _) => await RunAction(() => save(slot, false));
             loadButton.Click += async (_, _) => await RunAction(() => load(slot, false));
             card.Controls.AddRange(new Control[] { picture, details, saveButton, loadButton });
             cards.Add(slot, (picture, details, saveButton, loadButton));
             flow.Controls.Add(card);
         }
-        Controls.Add(flow); Controls.Add(footer);
-        AetherDialog.Apply(this, "STATE BANK // VORSCHAU", "Fünf manuelle Slots, Fortsetzen und ein Rückkehrpunkt nach Schnellladen");
+        Controls.Add(viewport); Controls.Add(footer);
+        AetherDialog.Apply(this, global::AetherBoy.Runtime.Localization.UiText.Get("STATE BANK // VORSCHAU"), global::AetherBoy.Runtime.Localization.UiText.Get("Fünf manuelle Slots, Fortsetzen und ein Rückkehrpunkt nach Schnellladen"));
         Shown += async (_, _) => await RefreshSlotsAsync();
         Disposed += (_, _) => { refreshGeneration++; foreach (var card in cards.Values) card.Picture.Image?.Dispose(); };
     }
@@ -73,9 +75,9 @@ internal sealed class frmStateGallery : Form
             Image? previous = card.Picture.Image;
             card.Picture.Image = WindowsSaveStateStore.DecodePreview(state.Preview?.Png);
             previous?.Dispose();
-            card.Details.Text = !state.Exists ? "LEER\r\nNoch kein Zustand gespeichert" :
+            card.Details.Text = !state.Exists ? global::AetherBoy.Runtime.Localization.UiText.Get("LEER\r\nNoch kein Zustand gespeichert") :
                 $"{state.Preview?.Title ?? "State-Datei"} · {state.WrittenUtc?.ToLocalTime():g}\r\n" +
-                (state.Warning ?? $"Frame {state.Preview?.Frame:N0} · Vorschau zugeordnet");
+                (state.Warning ?? global::AetherBoy.Runtime.Localization.UiText.Format("Frame {0:N0} · Vorschau zugeordnet", state.Preview?.Frame));
             card.Save.Enabled = !busy();
             card.Load.Enabled = !busy() && state.Exists;
         }

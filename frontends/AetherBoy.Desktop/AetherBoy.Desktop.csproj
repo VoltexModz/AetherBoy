@@ -16,10 +16,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AetherBoyChannel Condition="'$(AetherBoyChannel)' == ''">development</AetherBoyChannel>
+    <InformationalVersion Condition="'$(AetherBoyBuildId)' != ''">$(Version)+$(AetherBoyBuildId)</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <AssemblyMetadata Include="AetherBoyChannel" Value="$(AetherBoyChannel)" />
+    <AssemblyMetadata Include="AetherBoyBuildId" Value="$(AetherBoyBuildId)" />
     <PackageReference Include="SDL3-CS" Version="3.4.16" ExcludeAssets="analyzers" />
     <PackageReference Include="SDL3-CS.Linux" Version="3.4.16" />
   </ItemGroup>
@@ -38,7 +40,7 @@
 
   <ItemGroup>
     <Content Include="../../branding/fonts/*" Link="Assets/Fonts/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="../../branding/exports/aetherboy-mark-256.png" Link="Assets/aetherboy-mark.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../branding/exports/aetherboy-mark-512.png" Link="Assets/aetherboy-mark.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using nanoboy.Controls;
 
 namespace nanoboy.Input;
 
@@ -71,8 +72,9 @@ internal sealed class GamepadNavigation
         foreach (Control child in parent.Controls)
         {
             if (!child.Visible || !child.Enabled) continue;
-            if (child.TabStop && child.CanSelect && child is ButtonBase or ListView or ListBox or ComboBox or TextBoxBase or TrackBar or NumericUpDown)
+            if (child.TabStop && child.CanSelect && child is ButtonBase or AetherList or AetherTextBox or AetherSelect or AetherScrollBar or ComboBox or TextBoxBase or TrackBar or NumericUpDown)
                 yield return child;
+            if (child is AetherTextBox or AetherList) continue;
             foreach (Control nested in Targets(child)) yield return nested;
         }
     }
@@ -80,6 +82,24 @@ internal sealed class GamepadNavigation
     internal static void Navigate(Form form, PadUiAction action)
     {
         if (action == PadUiAction.None) return;
+        if (AetherPopup.Active is { } editMenu)
+        {
+            editMenu.Navigate(action switch { PadUiAction.Back => Keys.Escape, PadUiAction.Accept => Keys.Enter, PadUiAction.Up or PadUiAction.Previous => Keys.Up, _ => Keys.Down });
+            return;
+        }
+        var openChoice = Targets(form).OfType<AetherSelect>().FirstOrDefault(choice => choice.IsOpen);
+        if (openChoice is not null)
+        {
+            switch (action)
+            {
+                case PadUiAction.Back: openChoice.CloseDropDown(); break;
+                case PadUiAction.Accept: openChoice.AcceptHighlight(); break;
+                case PadUiAction.Up: case PadUiAction.Left: openChoice.MoveHighlight(-1); break;
+                case PadUiAction.Down: case PadUiAction.Right: openChoice.MoveHighlight(1); break;
+                default: openChoice.CloseDropDown(); break;
+            }
+            return;
+        }
         if (action == PadUiAction.Back)
         {
             if (form.CancelButton != null) form.CancelButton.PerformClick();
@@ -104,28 +124,33 @@ internal sealed class GamepadNavigation
                 case CheckBox check: check.Checked = !check.Checked; break;
                 case RadioButton radio: radio.Checked = true; break;
                 case ComboBox combo when combo.Items.Count > 0: combo.SelectedIndex = (combo.SelectedIndex + 1) % combo.Items.Count; break;
-                case TextBox text when !text.ReadOnly:
+                case AetherSelect choice: choice.OpenDropDown(); break;
+                case AetherTextBox text when !text.ReadOnly:
                     using (var keyboard = new frmControllerKeyboard(text.Text))
                         if (keyboard.ShowDialog(form) == DialogResult.OK) text.Text = keyboard.Value;
                     break;
-                case ListView or ListBox: form.AcceptButton?.PerformClick(); break;
+                case AetherList: form.AcceptButton?.PerformClick(); break;
             }
             return;
         }
         int delta = action is PadUiAction.Left or PadUiAction.Up ? -1 : 1;
         bool horizontal = action is PadUiAction.Left or PadUiAction.Right;
+        if (horizontal && current is AetherSelect choiceField && choiceField.Items.Count > 0)
+        { choiceField.SelectedIndex = Math.Clamp(choiceField.SelectedIndex + delta, 0, choiceField.Items.Count - 1); return; }
+        if (current is AetherScrollBar aetherScroll)
+        { aetherScroll.Value += delta * Math.Max(16, aetherScroll.Font.Height) * 3; return; }
         if (horizontal && current is ComboBox options && options.Items.Count > 0)
         { options.SelectedIndex = Math.Clamp(options.SelectedIndex + delta, 0, options.Items.Count - 1); return; }
         if (horizontal && current is TrackBar slider)
         { slider.Value = Math.Clamp(slider.Value + slider.SmallChange * delta, slider.Minimum, slider.Maximum); return; }
         if (horizontal && current is NumericUpDown number)
         { number.Value = Math.Clamp(number.Value + number.Increment * delta, number.Minimum, number.Maximum); return; }
-        if (!horizontal && current is RichTextBox report && report.ReadOnly && report.Lines.Length > 0)
+        if (!horizontal && current is AetherTextBox report && report.Multiline && report.ReadOnly && report.Lines.Length > 0)
         {
             int line = Math.Clamp(report.GetLineFromCharIndex(report.SelectionStart) + delta * 3, 0, report.Lines.Length - 1);
             report.SelectionStart = Math.Max(0, report.GetFirstCharIndexFromLine(line)); report.ScrollToCaret(); return;
         }
-        if (current is ListView list && list.Items.Count > 0)
+        if (current is AetherList list && list.Items.Count > 0)
         {
             int index = list.SelectedIndices.Count > 0 ? list.SelectedIndices[0] : 0;
             int columns = list.View == View.LargeIcon ? Math.Max(1, list.ClientSize.Width / Math.Max(1, list.Items[0].Bounds.Width)) : 1;
@@ -153,7 +178,8 @@ internal sealed class GamepadNavigation
     {
         control.Focus();
         for (Control? parent = control.Parent; parent != null; parent = parent.Parent)
-            if (parent is ScrollableControl scroll) scroll.ScrollControlIntoView(control);
+            if (parent is AetherScrollViewport viewport) viewport.Reveal(control);
+            else if (parent is ScrollableControl scroll) scroll.ScrollControlIntoView(control);
         control.Invalidate();
     }
 }

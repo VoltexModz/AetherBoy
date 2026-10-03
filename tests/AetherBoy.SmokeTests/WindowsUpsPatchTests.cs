@@ -114,7 +114,7 @@ public sealed class WindowsUpsPatchTests
         }
         else File.WriteAllText(fixture.Patch, format == "IPS" ? "PATCHbroken" : "BPS1broken");
         using var form = new frmRomPatcher(fixture.Source); form.Show(); Application.DoEvents();
-        ((TextBox)form.Controls.Find("patchFile", true).Single()).Text = fixture.Patch;
+        ((nanoboy.Controls.AetherTextBox)form.Controls.Find("patchFile", true).Single()).Text = fixture.Patch;
         var apply = (AetherButton)form.Controls.Find("patchApply", true).Single();
         int before = WindowsRomLibrary.Default.GetRoms().Count;
         ui.Click(apply); PumpUntil(() => form.Controls.Find("patchDone", true).Single().Enabled);
@@ -134,8 +134,8 @@ public sealed class WindowsUpsPatchTests
         using var ui = new UiThreadContext();
         var fixture = Fixture(".gba");
         using var form = new frmRomPatcher(reverse ? fixture.Target : fixture.Source); form.Show(); Application.DoEvents();
-        ((TextBox)form.Controls.Find("patchFile", true).Single()).Text = fixture.Patch;
-        ((TextBox)form.Controls.Find("patchTitle", true).Single()).Text = reverse ? "UPS UI ORIGINAL" : "UPS UI HACK";
+        ((nanoboy.Controls.AetherTextBox)form.Controls.Find("patchFile", true).Single()).Text = fixture.Patch;
+        ((nanoboy.Controls.AetherTextBox)form.Controls.Find("patchTitle", true).Single()).Text = reverse ? "UPS UI ORIGINAL" : "UPS UI HACK";
         var checkbox = (CheckBox)form.Controls.Find("patchReverseUps", true).Single();
         var apply = (AetherButton)form.Controls.Find("patchApply", true).Single();
         Control status = form.Controls.Find("patchStatus", true).Single(), done = form.Controls.Find("patchDone", true).Single();
@@ -145,7 +145,7 @@ public sealed class WindowsUpsPatchTests
             ui.Click(apply); PumpUntil(() => done.Enabled);
             Assert.IsNull(form.ImportedRomPath); StringAssert.Contains(status.Text, "bereits gepatcht");
             Assert.IsTrue(checkbox.Enabled); Assert.IsTrue(apply.Enabled);
-            checkbox.Checked = true; StringAssert.Contains(apply.Text, "RÜCKPATCHEN");
+            checkbox.Checked = true; Assert.AreEqual("Original wiederherstellen", apply.Text);
         }
         ui.Click(apply); PumpUntil(() => done.Enabled);
         Assert.IsNotNull(form.ImportedRomPath, status.Text);

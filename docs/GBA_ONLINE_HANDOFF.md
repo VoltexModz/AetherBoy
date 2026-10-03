@@ -229,6 +229,15 @@ behält seine zu dessen aktivierten Bedingungen passende Grenze von 116.
 
 ### Offener Befund: sporadisch langsamer Speicherabschluss
 
+**Update 03.10.2026:** Stacks aus tatsächlich fehlgeschlagenen Vollastläufen zeigen
+Backup-/Guard-Flush und Handle-Schließen. Die folgende Reparatur reduziert das
+erneute Schreiben älterer Backups und ergänzt aktive Phasen-/Dauermessung, ohne
+Save-Schutz oder Zwölf-Sekunden-Testfrist zu schwächen. Acht neue vollständige
+Runtime-Prozesse (je vier gleichzeitig) bestehen: 5108 bestanden, 40 Skips.
+Kein erneuter Shutdown-Timeout; die genaue tiefere OS-/Datenträgerschicht bleibt
+unbelegt. [Aktuelle Reparatur und Prüfgrenzen](STABILIZATION_2026-10-02.md#reparaturrunde-vom-03102026-speichern-fehleranzeige-sprache).
+Die folgenden Absätze dokumentieren den älteren Untersuchungsstand.
+
 Zwei frühere Gesamtläufe überschritten bei unterschiedlichen GBA-Online-Testfällen die
 unveränderte Zwölf-Sekunden-Frist zum Beenden. Ein Lauf fand gleichzeitig mit Ubuntu-
 Tests statt. Die private Sitzung war beim anschließenden Test-Cleanup noch gesperrt.

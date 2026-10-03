@@ -15,7 +15,24 @@ implementation; no C function body, BIOS binary or test ROM was copied into the
 product. The archive identity, inspected areas, hardware-documentation sources
 for the newly written code and limitations are recorded in
 [docs/MGBA_REVIEW.md](docs/MGBA_REVIEW.md). This is not a claim of formal clean-room
-development. Any future source reuse requires its own provenance/license review.
+development. The later cheat-decoder source reuse is recorded below separately.
+
+### mGBA cheat cipher adaptations (2026-10-01)
+
+`nanoboy/Runtime/GbaCheatCipher.cs` and `GbaCheatTables.cs` include C# adaptations
+of the GameShark/Action Replay TEA/reseed and CodeBreaker cipher algorithms and
+four protocol tables from `src/gba/cheats/{gameshark,parv3,codebreaker}.c`.
+Copyright (c) 2013-2016 Jeffrey Pfau. These covered files retain MPL-2.0, including
+AetherBoy's modifications; this does not replace the license of unrelated files.
+The runtime compiler/executor and host UI are integrated in AetherBoy, not an
+embedded mGBA emulator or frontend. The supplied archive's SHA-256 is recorded
+in [docs/MGBA_REVIEW.md](docs/MGBA_REVIEW.md).
+
+Full license and provenance: [third_party/mgba-cheats](third_party/mgba-cheats).
+Build/publish includes both under `licenses/mgba-cheats/`. Distributors must
+make corresponding source, including modifications to covered files, available
+under MPL-2.0; keep the supplied notices and make the source for the actual binary
+revision available. Reference upstream: <https://github.com/mgba-emu/mgba>.
 
 The GBA runtime includes a source snapshot of
 [DaveTCode/GBADotnet](https://github.com/DaveTCode/GBADotnet) at commit
@@ -137,3 +154,28 @@ The optional room service image uses Node.js 24's official Alpine image.
 Its runtime and operating system retain the notices shipped in that image.
 Coturn is independently deployed by the server administrator, not bundled into
 the emulator.
+
+## ZIP / 7z ROM import (2026-10-01)
+
+Both frontends use the unmodified **SharpCompress 0.50.4** NuGet package (MIT),
+by Adam Hathcock and contributors. Source revision:
+https://github.com/adamhathcock/sharpcompress/tree/c083c6efd843a844b0c8f7878787360e815be781.
+Upstream license: https://github.com/adamhathcock/sharpcompress/blob/0.50.4/LICENSE.txt.
+The license is shipped as `licenses/sharpcompress/LICENSE.txt`, from
+`third_party/sharpcompress/LICENSE.txt`. Package metadata additionally states
+Copyright (c) 2025 Adam Hathcock. Archive selection, staging, bounds, import and
+the AVI capture writer are AetherBoy implementation, not copied upstream code.
+
+## Optional Discord activity (2026-10-02)
+
+Both frontends use the unmodified **DiscordRichPresence 1.6.1.70** NuGet package
+by Lachee (MIT, Copyright (c) 2021 Lachee), plus **Newtonsoft.Json 13.0.4**
+(MIT, Copyright (c) 2007 James Newton-King). The RPC library performs local
+Discord IPC only when the configured activity setting is enabled; application policy and UI are
+AetherBoy code. No Discord Social SDK native binary is bundled.
+
+- Source: https://github.com/Lachee/discord-rpc-csharp/tree/v1.6.1
+- Source: https://github.com/JamesNK/Newtonsoft.Json/tree/13.0.4
+- License texts: `licenses/discord-rpc/LICENSE.txt` and
+  `licenses/discord-rpc/Newtonsoft.Json-LICENSE.txt`, copied from
+  `third_party/discord-rpc/` in Windows and Linux builds/publish output.

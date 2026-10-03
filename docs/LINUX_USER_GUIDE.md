@@ -58,7 +58,7 @@ bash scripts/run-linux.sh "$HOME/Games/Pokemon.gbc"
 ```
 
 Or open AetherBoy without a game and press `O`, click `OPEN ROM`, or drag a
-`.gb`, `.gbc` or `.gba` file onto the window. The open button uses the native
+`.gb`, `.gbc`, `.gba`, `.zip` or `.7z` file onto the window. The open button uses the native
 asynchronous XDG Desktop Portal path:
 
 ```bash
@@ -67,7 +67,17 @@ bash scripts/run-linux.sh
 
 The host shows loading and recoverable errors in the window. When a replacement
 ROM fails to initialize, the previous game resumes. Local `file://` drops and
-filenames with spaces are supported; extract archives before opening them.
+filenames with spaces are supported. ZIP/7z archives with multiple GB/GBC/GBA
+ROMs show a game selector. Select a row and choose **Open selected game**.
+Up/Down or the controller D-pad selects a game, Left/Right changes pages,
+Enter/South opens the selected game when no button has keyboard focus,
+and Escape/East cancels. Tab cycles buttons; Enter activates the focused button.
+The existing session is kept until the replacement is prepared. If the archive
+changes after selection, open it again. Imported
+ROMs remain in the app's `roms/<SHA256>` folder even if you remove the archive.
+Archive saves and patches are not imported or applied. Password-protected and
+multi-part archives are not supported. Limits: 128 MiB archive/declared total
+contents, 512 entries, 1024 characters per entry name and a 32 MiB ROM.
 
 The Linux shell now follows the Windows Aether layout: title navigation, game
 stage, right session rail, bottom command deck, and the nine-section Control
@@ -308,9 +318,18 @@ and the remaining Windows-only tools.
   South activates and East closes. Right-stick click cancels button remapping.
 - **System:** configure focus-loss pause and import DMG (256 B), CGB (2304 B), or
   GBA (16384 B) firmware. It applies on the next cartridge start; firmware is optional.
-- **Tools:** record WAV audio or add/toggle/remove supported session cheats.
-  Start recording, then close settings to resume gameplay. Recording is capped
+- **Tools:** record WAV audio or add/toggle/remove [session cheats](CHEAT_SUPPORT.md). GB/GBC accepts GameShark `01` writes, six-/nine-character Game Genie, CodeBreaker `00AAAA-VV` and raw `AAAA:VV`. GBA supports CodeBreaker, GameShark v1/v2 and Action Replay v3, including master/reseed streams, conditions, hooks, fills, indirect writes and in-memory ROM patches. Choose the format next to **ADD**; put a master and its dependent codes in one set. Pasted newlines become `+` separators. **HOLD DEVICE BUTTON / RELEASE DEVICE BUTTON** controls the physical-cheat-device button, not the GBA keypad. AR-v3 slowdown and disable-all-code conditions remain unsupported; details and examples are in the cheat guide. Wrong codes can change saved progress. Online Link does not accept cheats.
+  Start WAV recording, then close settings to resume gameplay. WAV recording is capped
   at 128 MiB and ends on cartridge/audio-format changes. Cheats are not persisted.
+- **Tools → Record video:** start/stop native-resolution AVI video with game audio.
+  Return to the game after starting. `Open recordings` opens the output folder
+  (`$XDG_DATA_HOME/aetherboy/recordings`, or `~/.local/share/aetherboy/recordings`).
+  Capture runs before speaker volume, without microphone or desktop audio.
+  Pauses add no movie time. Turbo, rewind, reset, state loading and audio-rate
+  changes end the clip. AVI is currently uncompressed (roughly 250–410 MiB/minute),
+  limited to 2 GiB and only records a single game, not the local-link split view.
+  Slow writes stop the recording with a notice; an I/O failure may leave an
+  unfinished `.avi.partial` file. Do not treat that as a completed recording.
 - **Diagnostics:** inspect queue and frame counters, export a local ZIP and set
   whether the next application session records diagnostic events. Reports are
   capped at 8 MiB each and 20 sessions; they contain no ROM/save bytes or ROM paths.
@@ -327,8 +346,11 @@ keeping game data. Older releases are preserved until uninstall. Optional
 Open **Control Center → Library → Patch Lab**. Choose the source `.gb`, `.gbc`
 or `.gba` cartridge and the `.ips`, `.bps` or `.ups` file. You can also drop
 both files onto this page, or select **Use Current Game** for the source.
-The source game keeps running or paused as before; applying a patch does not
-switch cartridges automatically.
+The source game keeps running or paused as before. **Apply Patch** does not
+switch cartridges. **Patch and play** explicitly saves and starts the result;
+**Restore and play** does the same for UPS undo. Leaving this page or choosing
+another game while the patch is being prepared cancels the requested start,
+but the patch result is still saved.
 
 Select **Apply Patch**, wait for the result, then choose **Open Result** to play
 or **Open Result Folder** to find the file. New results are stored under
@@ -336,6 +358,9 @@ or **Open Result Folder** to find the file. New results are stored under
 and added to the library. Original ROMs and their saves are preserved. Different
 ROM contents use separate central saves; original save files are never copied
 into a patched game. An already known matching result is reused.
+Later, open the saved result directly from Library; the original and patch are
+not needed again. There is no remembered automatic base-ROM/patch association,
+and patches found alongside a ROM or inside an archive are never applied silently.
 
 For UPS undo, select the **patched** ROM and the same UPS file, change
 **UPS Direction** to **Restore Original**, then confirm with **Restore Original**.

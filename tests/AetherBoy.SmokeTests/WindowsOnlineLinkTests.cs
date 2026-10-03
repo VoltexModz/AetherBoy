@@ -176,7 +176,7 @@ public sealed class WindowsOnlineLinkTests
             StringAssert.Contains(diagnostic, "TURN");
             StringAssert.Contains(diagnostic, "Originalspielstände wurden nicht ersetzt");
             Assert.IsFalse(diagnostic.Contains(page.Fragment[1..], StringComparison.Ordinal));
-            Assert.IsTrue(((ToolStripMenuItem)Field<ToolStripMenuItem>(form, "menuItem21").DropDownItems["menuOnlineLink"]!).DropDownItems.ContainsKey("menuOnlineDiagnostic"));
+            Assert.IsTrue(((nanoboy.Controls.AetherCommand)Field<nanoboy.Controls.AetherCommand>(form, "menuItem21").DropDownItems["menuOnlineLink"]!).DropDownItems.ContainsKey("menuOnlineDiagnostic"));
             Call(form, "updateTimer_Tick", form, EventArgs.Empty);
             Assert.AreEqual(diagnostic, Field<string>(form, "lastOnlineDiagnostic"));
             AssertUnchanged(originalSave, before); AssertUnchanged(resume, resumeBefore);
@@ -288,7 +288,7 @@ public sealed class WindowsOnlineLinkTests
         form.Show();
         try
         {
-            var tools = Field<ToolStripMenuItem>(form, "menuItem21");
+            var tools = Field<nanoboy.Controls.AetherCommand>(form, "menuItem21");
             Assert.IsTrue(tools.DropDownItems.ContainsKey("menuOnlineLink"));
             Assert.IsFalse(form.StartOnlineLink(isHost, confirm: false));
             Assert.AreEqual(0, opened.Count);

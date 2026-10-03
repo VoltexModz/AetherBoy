@@ -26,7 +26,7 @@ public sealed class WindowsExperienceTests
         Assert.IsNotNull(status);
         Assert.IsTrue(coffee.Visible);
         Assert.IsTrue(coffee.Enabled);
-        Assert.AreEqual("BUY US A COFFEE", coffee.Text);
+        Assert.AreEqual(AetherBoy.Runtime.Localization.UiText.Get("Spendiert uns einen Kaffee"), coffee.Text);
         Assert.AreEqual(ProductInfo.SupportUri is null, status.Visible);
         if (ProductInfo.SupportUri is null)
             StringAssert.Contains(coffee.AccessibleDescription, "noch nicht hinterlegt");
@@ -75,7 +75,7 @@ public sealed class WindowsExperienceTests
         Form center = Field<Form>(main, "controlCenter");
         foreach (string name in new[] { "controlCenterGpuButton", "controlCenterVSyncButton", "controlCenterIntegerButton", "controlCenterStateFeedback" })
             Assert.AreEqual(1, center.Controls.Find(name, true).Length, name);
-        Assert.IsTrue(center.Controls.Find("aetherDialogViewport", true).Single() is Panel { AutoScroll: true });
+        Assert.IsTrue(center.Controls.Find("aetherDialogViewport", true).Single() is AetherScrollViewport { AutoScroll: false });
         center.Close();
         main.Close();
     }

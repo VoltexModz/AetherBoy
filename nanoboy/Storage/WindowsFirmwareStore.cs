@@ -15,9 +15,9 @@ internal sealed record WindowsFirmwareStatus(
     internal string SourceLabel => Source switch
     {
         WindowsFirmwareSource.Managed => "AppData",
-        WindowsFirmwareSource.WorkingDirectory => "Arbeitsordner",
-        WindowsFirmwareSource.Executable => "Programmordner",
-        _ => "Keine Datei"
+        WindowsFirmwareSource.WorkingDirectory => global::AetherBoy.Runtime.Localization.UiText.Get("Arbeitsordner"),
+        WindowsFirmwareSource.Executable => global::AetherBoy.Runtime.Localization.UiText.Get("Programmordner"),
+        _ => global::AetherBoy.Runtime.Localization.UiText.Get("Keine Datei")
     };
 }
 
@@ -87,12 +87,12 @@ internal sealed class WindowsFirmwareStore
             catch (InvalidDataException)
             {
                 return new(kind, WindowsFirmwareState.Invalid, candidate.Source, candidate.Path,
-                    $"Falsche Größe; erwartet: {ExpectedLength(kind):N0} Bytes.");
+                    global::AetherBoy.Runtime.Localization.UiText.Format("Falsche Größe; erwartet: {0:N0} Bytes.", ExpectedLength(kind)));
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
                 return new(kind, WindowsFirmwareState.Unreadable, candidate.Source, candidate.Path,
-                    "Datei ist gesperrt oder nicht lesbar.");
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Datei ist gesperrt oder nicht lesbar."));
             }
         }
         return new(kind, WindowsFirmwareState.Missing, WindowsFirmwareSource.None, null, null);
@@ -116,7 +116,7 @@ internal sealed class WindowsFirmwareStore
     {
         ArgumentNullException.ThrowIfNull(import);
         if (import.Length != ExpectedLength(import.Kind))
-            throw new InvalidDataException("Ungültiger Firmware-Import; keine Datei wurde geändert.");
+            throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Ungültiger Firmware-Import; keine Datei wurde geändert."));
         string destination = PathFor(import.Kind);
         Directory.CreateDirectory(DirectoryPath);
         string temporary = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
@@ -152,12 +152,12 @@ internal sealed class WindowsFirmwareStore
         int expected = ExpectedLength(kind);
         using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         if (input.Length != expected)
-            throw new InvalidDataException($"Für {ModelName(kind)} werden exakt {expected:N0} Bytes benötigt. " +
-                "Diese Datei hat eine andere Größe; es wurde nichts importiert.");
+            throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Format("Für {0} werden exakt {1:N0} Bytes benötigt. ", ModelName(kind), expected) +
+                global::AetherBoy.Runtime.Localization.UiText.Get("Diese Datei hat eine andere Größe; es wurde nichts importiert."));
         var bytes = new byte[expected];
         input.ReadExactly(bytes);
         if (input.ReadByte() != -1)
-            throw new InvalidDataException("Die Firmware-Datei hat sich beim Lesen geändert.");
+            throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Die Firmware-Datei hat sich beim Lesen geändert."));
         return bytes;
     }
 }

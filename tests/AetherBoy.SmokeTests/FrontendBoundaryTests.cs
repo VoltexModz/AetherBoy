@@ -72,9 +72,9 @@ public sealed class FrontendBoundaryTests
 
         foreach (string menuName in menuNames)
         {
-            ToolStripMenuItem menu = formType
+            nanoboy.Controls.AetherCommand menu = formType
                 .GetField(menuName, BindingFlags.Instance | BindingFlags.NonPublic)
-                ?.GetValue(form) as ToolStripMenuItem
+                ?.GetValue(form) as nanoboy.Controls.AetherCommand
                 ?? throw new AssertFailedException($"Missing menu item: {menuName}");
             Assert.IsTrue(menu.Enabled, $"Verified feature is unexpectedly disabled: {menuName}");
             Assert.IsFalse(
@@ -108,7 +108,7 @@ public sealed class FrontendBoundaryTests
         Button save = GetRequiredField<Button>(formType, form, "aetherSaveButton");
         Button load = GetRequiredField<Button>(formType, form, "aetherLoadButton");
         Button turbo = GetRequiredField<Button>(formType, form, "aetherTurboButton");
-        var legacyMenu = GetRequiredField<MenuStrip>(formType, form, "menuStrip");
+        var legacyMenu = GetRequiredField<nanoboy.Controls.AetherCommandSet>(formType, form, "menuStrip");
         var gameView = GetRequiredField<Control>(formType, form, "gameView");
         var slots = GetRequiredField<Array>(formType, form, "aetherSlotButtons");
 
@@ -183,9 +183,9 @@ public sealed class FrontendBoundaryTests
                 Control diagnosticsPage = center.Controls
                     .Find("controlCenterPageDiagnostics", true)
                     .Single();
-                RichTextBox diagnosticsText = center.Controls
+                nanoboy.Controls.AetherTextBox diagnosticsText = center.Controls
                     .Find("controlCenterDiagnosticsText", true)
-                    .Single() as RichTextBox
+                    .Single() as nanoboy.Controls.AetherTextBox
                     ?? throw new AssertFailedException("Diagnostics text is missing.");
                 Button exportTesterReport = center.Controls
                     .Find("controlCenterExportTesterReportButton", true)
@@ -197,7 +197,7 @@ public sealed class FrontendBoundaryTests
                     ?? throw new AssertFailedException("Tester report folder action is missing.");
                 Assert.IsTrue(diagnosticsPage.Visible);
                 StringAssert.Contains(diagnosticsText.Text, "AETHERBOY");
-                StringAssert.Contains(diagnosticsText.Text, "CARTRIDGE");
+                StringAssert.Contains(diagnosticsText.Text, AetherBoy.Runtime.Localization.UiText.Get("CARTRIDGE       None"));
                 StringAssert.Contains(diagnosticsText.Text, "DIAGNOSE");
                 Assert.IsFalse(exportTesterReport.Enabled);
                 Assert.IsTrue(openTesterFolder.Enabled, "Previously recorded reports remain accessible when recording is off.");
@@ -268,7 +268,7 @@ public sealed class FrontendBoundaryTests
         Assert.AreEqual(true, startupMethod.Invoke(null, gbaStartupArguments));
         Assert.AreEqual(Path.GetFullPath(@"C:\roms\demo.gba"), gbaStartupArguments[1]);
 
-        object?[] invalidStartupArguments = { new[] { @"C:\roms\demo.zip" }, null };
+        object?[] invalidStartupArguments = { new[] { @"C:\roms\demo.rar" }, null };
         Assert.AreEqual(false, startupMethod.Invoke(null, invalidStartupArguments));
     }
 
@@ -318,7 +318,7 @@ public sealed class FrontendBoundaryTests
         Button host = GetRequiredField<Button>(formType, form, "btnHost");
         Button connect = GetRequiredField<Button>(formType, form, "btnConnect");
         Button disconnect = GetRequiredField<Button>(formType, form, "btnDisconnect");
-        TextBox address = GetRequiredField<TextBox>(formType, form, "txtIP");
+        nanoboy.Controls.AetherTextBox address = GetRequiredField<nanoboy.Controls.AetherTextBox>(formType, form, "txtIP");
 
         Assert.IsFalse(host.Enabled);
         Assert.IsFalse(connect.Enabled);
@@ -341,14 +341,14 @@ public sealed class FrontendBoundaryTests
         {
             using var form = new frmRomLibrary(new[] { availableRom, missingRom });
             Type formType = form.GetType();
-            ListView list = GetRequiredField<ListView>(formType, form, "romList");
+            nanoboy.Controls.AetherList list = GetRequiredField<nanoboy.Controls.AetherList>(formType, form, "romList");
             Button browse = GetRequiredField<Button>(formType, form, "browseButton");
 
             Assert.AreEqual(FormBorderStyle.None, form.FormBorderStyle);
             Assert.IsTrue(form.AllowDrop);
             Assert.AreEqual(2, list.Items.Count);
-            Assert.AreEqual("READY", list.Items[0].SubItems[2].Text);
-            Assert.AreEqual("MISSING", list.Items[1].SubItems[2].Text);
+            Assert.AreEqual(AetherBoy.Runtime.Localization.UiText.Get("READY"), list.Items[0].SubItems[2].Text);
+            Assert.AreEqual(AetherBoy.Runtime.Localization.UiText.Get("MISSING"), list.Items[1].SubItems[2].Text);
             Assert.IsTrue(browse.Enabled);
             Assert.AreEqual(1, form.Controls.Find("romLibraryOpenFolderButton", true).Length);
             Assert.IsNull(form.SelectedRomPath);
@@ -381,7 +381,7 @@ public sealed class FrontendBoundaryTests
                 args: new object[] { savePath, 32, "TEST GAME" },
                 culture: null) as Form
                 ?? throw new AssertFailedException("Save Safety Center could not be created.");
-            ListView list = form.Controls.Find("batterySaveGenerationList", true).Single() as ListView
+            nanoboy.Controls.AetherList list = form.Controls.Find("batterySaveGenerationList", true).Single() as nanoboy.Controls.AetherList
                 ?? throw new AssertFailedException("Save generation list is missing.");
             Button restore = form.Controls.Find("batterySaveRestoreButton", true).Single() as Button
                 ?? throw new AssertFailedException("Save restore button is missing.");
@@ -389,10 +389,10 @@ public sealed class FrontendBoundaryTests
             Assert.AreEqual(FormBorderStyle.None, form.FormBorderStyle);
             Assert.AreEqual(1, form.Controls.Find("aetherDialogHeader", true).Length);
             Assert.AreEqual(4, list.Items.Count);
-            Assert.AreEqual("BEREIT", list.Items[0].SubItems[1].Text);
-            Assert.AreEqual("LEGACY", list.Items[0].SubItems[4].Text);
-            Assert.AreEqual("BEREIT", list.Items[1].SubItems[1].Text);
-            Assert.AreEqual("NICHT VORHANDEN", list.Items[3].SubItems[1].Text);
+            Assert.AreEqual(AetherBoy.Runtime.Localization.UiText.Get("BEREIT"), list.Items[0].SubItems[1].Text);
+            Assert.AreEqual(AetherBoy.Runtime.Localization.UiText.Get("LEGACY"), list.Items[0].SubItems[4].Text);
+            Assert.AreEqual(AetherBoy.Runtime.Localization.UiText.Get("BEREIT"), list.Items[1].SubItems[1].Text);
+            Assert.AreEqual(AetherBoy.Runtime.Localization.UiText.Get("NICHT VORHANDEN"), list.Items[3].SubItems[1].Text);
             Assert.IsFalse(restore.Enabled, "Restore stays gated until a backup is selected in the shown dialog.");
         }
         finally

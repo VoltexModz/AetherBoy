@@ -10,6 +10,11 @@ namespace nanoboy.Input
         HostGamepadButtons QuickLoad,
         HostGamepadButtons QuickSave)
     {
+        public HostGamepadButtons Up { get; init; } = HostGamepadButtons.DPadUp;
+        public HostGamepadButtons Down { get; init; } = HostGamepadButtons.DPadDown;
+        public HostGamepadButtons Left { get; init; } = HostGamepadButtons.DPadLeft;
+        public HostGamepadButtons Right { get; init; } = HostGamepadButtons.DPadRight;
+
         public static GamepadBindings Default { get; } = new GamepadBindings(
             HostGamepadButtons.South,
             HostGamepadButtons.East | HostGamepadButtons.West,
@@ -40,13 +45,13 @@ namespace nanoboy.Input
                 return GameBoyButtons.None;
             }
 
-            bool up = state.IsButtonDown(HostGamepadButtons.DPadUp) ||
+            bool up = state.IsButtonDown(bindings.Up == HostGamepadButtons.None ? HostGamepadButtons.DPadUp : bindings.Up) ||
                       state.LeftThumbY > stickThreshold;
-            bool down = state.IsButtonDown(HostGamepadButtons.DPadDown) ||
+            bool down = state.IsButtonDown(bindings.Down == HostGamepadButtons.None ? HostGamepadButtons.DPadDown : bindings.Down) ||
                         state.LeftThumbY < -stickThreshold;
-            bool left = state.IsButtonDown(HostGamepadButtons.DPadLeft) ||
+            bool left = state.IsButtonDown(bindings.Left == HostGamepadButtons.None ? HostGamepadButtons.DPadLeft : bindings.Left) ||
                         state.LeftThumbX < -stickThreshold;
-            bool right = state.IsButtonDown(HostGamepadButtons.DPadRight) ||
+            bool right = state.IsButtonDown(bindings.Right == HostGamepadButtons.None ? HostGamepadButtons.DPadRight : bindings.Right) ||
                          state.LeftThumbX > stickThreshold;
 
             GameBoyButtons buttons = GameBoyButtons.None;

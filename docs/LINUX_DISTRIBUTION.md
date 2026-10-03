@@ -14,18 +14,36 @@ GNU tar, gzip and the usual Linux command-line tools:
 ```bash
 bash scripts/package-linux.sh
 bash scripts/package-linux.sh --runtime linux-arm64
+bash scripts/package-linux.sh --channel stable
+bash scripts/package-linux.sh --build-id 7ced237-20261002-check01-local
 ```
 
 The default architecture is the host's `linux-x64` or `linux-arm64`. Use
 `--output "/path/with spaces"` to choose the destination. Build output is under
 `artifacts/packages` by default, with a `.tar.gz` and companion `.sha256` file.
 The script fails on unsupported architectures or missing licenses/assets.
+The default channel is `development`; `--channel stable` embeds the stable channel
+in the application and `package-info.json`. The channel controls whether the update
+checker considers prereleases; it does not change the version in `Directory.Build.props`.
 
 The script takes an isolated source snapshot before building. It restores locked
 NuGet dependencies and uses separate build intermediates, leaving development
 `bin`/`obj` directories alone. The package records the Git revision, whether the
 checkout was modified, SDK and runtime versions in `package-info.json`. That
 metadata identifies a local modified build honestly; it is not a release tag.
+
+For paired Windows/Linux test packages, supply the same `--build-id` here and
+`-BuildId` to `scripts/package-windows.ps1`. The identifier is embedded in the
+Linux informational version and both `package-info.json` files. An explicitly
+named Linux test build uses that identifier instead of `self-contained` in its
+archive name; it is for manual sharing, not the release updater. With no explicit
+ID, release-compatible filenames stay unchanged. Existing archives are never
+silently overwritten. `TEST_BUILD_CHECKLIST.txt` contains a shared DE/EN smoke test.
+
+`python3 scripts/test-package-pair.py WINDOWS.zip LINUX.tar.gz` checks the shared
+ID/commit/channel, all Windows file hashes and the actual shared Core/Runtime/GBA
+source in both nested source archives. It does not claim identical platform
+binaries or prove cross-platform gameplay.
 
 The archive contains the corresponding Linux source in `source.tar.gz`, the
 project license, full runtime/package/font/vendored notices and the required UI
@@ -57,10 +75,28 @@ cd AetherBoy-4.8.0-alpha.1-linux-x64-self-contained
 ./launch-linux.sh "/path/to/game.gba"
 ```
 
-This format does not install a menu entry, change the existing installation or
-provide automatic updates. Extract a newer build into a new folder and launch
-that folder. The existing development launcher and user installer keep their
-current behavior.
+This format does not install a menu entry or replace an existing installation.
+The app can now check GitHub releases and download a matching package through
+**Settings → App & files → Files & updates → Updates**. Startup checks are optional
+and off by default; downloads always require a click. A download is checked against
+GitHub's SHA-256 digest and size, not an independent publisher signature.
+Extract the newer build into a **new folder** and launch that folder. Keep the old
+installation until the new one works. Existing development launchers and the user
+installer keep their behavior; no distro package manager is invoked.
+
+Downloads use `$XDG_CACHE_HOME/aetherboy/updates` (normally
+`~/.cache/aetherboy/updates`). With `--portable` or `aetherboy.portable`, this becomes
+`AetherBoyData/cache/updates`. A new folder is not automatically portable: after
+closing the old application, deliberately copy the existing `AetherBoyData` and
+marker to the new program folder, or continue using `--portable`. Never delete the
+old data simply because an archive was downloaded. No automatic migration is done.
+
+For maintainers: publish a SemVer tag matching the built version and attach exactly
+one `AetherBoy-<version>-linux-<x64|arm64>-self-contained.tar.gz` per architecture.
+GitHub's asset API must report `state: uploaded`, size and `digest: sha256:…`.
+A commit alone is not an update; unchanged semantic versions, drafts, missing
+checksums and ambiguous assets are not offered. Signing, automatic installation
+and rollback remain on the roadmap. Do not distribute ROMs, BIOS or user saves.
 
 ## Host requirements and limits
 

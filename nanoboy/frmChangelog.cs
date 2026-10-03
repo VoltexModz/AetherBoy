@@ -16,8 +16,8 @@ namespace nanoboy
             ConfigureAetherLayout();
             AetherDialog.Apply(
                 this,
-                "PROJECT LOG // 02",
-                "Release-Historie, technische Meilensteine und nächste Schritte");
+                global::AetherBoy.Runtime.Localization.UiText.Get("PROJECT LOG // 02"),
+                global::AetherBoy.Runtime.Localization.UiText.Get("Release-Historie, technische Meilensteine und nächste Schritte"));
             txtChangelog.SelectionStart = 0;
             txtChangelog.SelectionLength = 0;
             txtChangelog.TabStop = false;
@@ -42,14 +42,14 @@ namespace nanoboy
                 ForeColor = AetherColors.Muted,
                 Location = new Point(24, 552),
                 Size = new Size(420, 20),
-                Text = "READ ONLY  //  CHANGELOG.MD"
+                Text = global::AetherBoy.Runtime.Localization.UiText.Get("READ ONLY  //  CHANGELOG.MD")
             };
             Controls.Add(sourceLabel);
 
             btnClose.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
             btnClose.Location = new Point(768, 542);
             btnClose.Size = new Size(128, 40);
-            btnClose.Text = "SCHLIESSEN";
+            btnClose.Text = global::AetherBoy.Runtime.Localization.UiText.Get("SCHLIESSEN");
             if (btnClose is AetherButton aetherButton)
             {
                 aetherButton.Kind = AetherButtonKind.Secondary;
@@ -60,18 +60,18 @@ namespace nanoboy
 
         private void LoadChangelogText()
         {
-            Text = $"Changelog – {ProductInfo.DisplayName}";
+            Text = global::AetherBoy.Runtime.Localization.UiText.Format("Changelog – {0}", ProductInfo.DisplayName);
             string path = Path.Combine(AppContext.BaseDirectory, "CHANGELOG.md");
 
             try
             {
                 txtChangelog.Text = File.Exists(path)
                     ? File.ReadAllText(path)
-                    : $"{ProductInfo.DisplayName}\r\n\r\nDas vollständige CHANGELOG.md wurde nicht mitkopiert.";
+                    : global::AetherBoy.Runtime.Localization.UiText.Format("{0}\r\n\r\nDas vollständige CHANGELOG.md wurde nicht mitkopiert.", ProductInfo.DisplayName);
             }
             catch (IOException ex)
             {
-                txtChangelog.Text = $"Changelog konnte nicht gelesen werden:\r\n{ex.Message}";
+                txtChangelog.Text = global::AetherBoy.Runtime.Localization.UiText.Format("Changelog konnte nicht gelesen werden:\r\n{0}", global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(ex.Message));
             }
         }
 

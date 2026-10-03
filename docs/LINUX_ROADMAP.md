@@ -1,5 +1,317 @@
 # Linux-Ausbau
 
+## Reparatur nach der Nachprüfung — 03.10.2026
+
+Deutsche Einstellungsüberschrift/Suchhilfe sind getrennt, Navigationshinweise
+mehrzeilig und Patch-Aktionen breiter. Tastennamen werden lokalisiert angezeigt;
+Pfeil- und Bildtasten ausgeschrieben, da Pfeilzeichen in der Schrift fehlen.
+Gespeicherte Scancodes, Themes und Customize bleiben unverändert. 96 native
+Weston-Bilder neu erzeugt, betroffene Ansichten auch mit großer Schrift geprüft.
+Die gemeinsame Backup-Rotation und neue Speicherphasen-Diagnose gelten ebenso
+für Linux; elf Speichertests nativ bestanden. Desktop: 202 bestanden, drei
+Audio-Hardware-Skips. Echte Hyprland-/GPU-/Audio-Abnahme und Langzeitspiele bleiben
+offen; Windows-Lastbefunde sind kein Nachweis desselben OS-Problems unter Linux.
+[Reparaturen, Nachweise und Grenzen](STABILIZATION_2026-10-02.md#reparaturrunde-vom-03102026-speichern-fehleranzeige-sprache).
+
+## Anzeigesprache — 02.10.2026
+
+Gleicher DE/EN-Katalog und dieselbe automatische Spracherkennung wie Windows.
+Auswahl unter **App and files → Display language** (deutsch: App und System →
+Anzeigesprache), außerdem über die Einstellungssuche. Deutsch, English oder
+Systemsprache; gilt nach Neustart. Alte Einstellungen ohne Sprachfeld bleiben
+kompatibel. Spielprofile dürfen die Sprache nicht überschreiben. Die eigene
+Wayland-Oberfläche und Themes/Customize bleiben bestehen.
+
+Die native Sprachseite wurde in beiden Sprachen unter privatem Weston/Wayland
+geprüft. Das ist keine vollständige Übersetzungs-/Layoutabnahme jedes Dialogs.
+Die Vervollständigungsrunde ergänzt Controller-/Audio-Details, Dateifilter,
+Profile, Fehler-/Abbruchpfade, Wiederherstellung, lesbare Diagnosezustände und
+die lokale Browserbrücke. Gemeinsamer Katalog: **2376 DE/EN-Einträge**.
+Genres/Sortierung/Tasten werden nur zur Anzeige übersetzt; gespeicherte IDs,
+SDL-Tastennamen und Protokollwerte bleiben stabil. Native Fremdfehler behalten
+unter „Technische Details“ ihren Originaltext. Die vollständige native Desktop-
+Prüfung besteht mit **202 Fällen und 3 Audio-Skips**; echte Hardware und sämtliche
+Fenster bei hoher DPI bleiben separat abzunehmen.
+Gemeinsame offene Liste und Grenzen:
+[Sprachmigration](WINDOWS_ROADMAP.md#anzeigesprache--lokaler-zwischenstand-vom-02102026).
+
+## Nächste Priorität — 02.10.2026
+
+Auf Nutzerwunsch bleibt Phase 5.3 beim vorbereiteten Prüfen/Herunterladen.
+Selbstinstallation, Signaturen, Release-Pipeline und Rückfall sind für später
+auf der gemeinsamen Merkliste. Das ursprüngliche Aether-Wave-Design ist lokal
+für beide Frontends wiederhergestellt; **alle sechs Themes und frei wählbare
+Farben bleiben bestehen**. Kantige Panels, diagonal geschnittene Buttons und
+gezielte Akzentverläufe verwenden gemeinsame Farben/Geometrie. Die bestehende
+Wayland-Bedienung bleibt erhalten. Phase 6.1 ist inzwischen als **eigene
+Startanimation** umgesetzt; auch **6.2 Barcode Boy** ist jetzt in beiden Frontends
+und im gemeinsamen Core implementiert. Der erste echte Spieltest steht noch aus.
+Details und Grenzen stehen in der
+[gemeinsamen Reihenfolge](WINDOWS_ROADMAP.md#aktuelle-priorität-und-zurückgestellte-arbeiten--02102026).
+Der Designumbau ist gebaut, aber **noch nicht unter echtem Wayland visuell
+abgenommen**. Testbefehl und Theme-/Customize-Prüfschritte stehen im
+[UI-Handoff](UI_THEME_HANDOFF_2026-09-28.md#aether-wave-wiederhergestellt-themes-erhalten--02102026).
+Kein Commit/Push durch diese Änderung.
+
+## Phase 6.2 — Barcode Boy, 02.10.2026
+
+**Settings → Tools → Open Barcode Boy** oder Suche „Barcode“: Scanner verbinden,
+13-stelligen Kartencode eingeben oder aus einer UTF-8-Textdatei laden, dann scannen.
+Gleiche Runtime/Serial-Implementierung wie Windows; kein zweiter Zubehör-Core.
+Die neue Seite wurde unter WSLg/Wayland bedient und als Screenshot geprüft.
+Das synthetische GB-Testprogramm empfängt unter Linux beide vollständigen Pakete.
+
+Erster echter Testtitel: **Battle Space (Japan, GB)**. Eigene ROM noch ausstehend;
+Scanner-Erkennung/Bytezähler allein bestätigen keine im Spiel akzeptierte Karte.
+**Auf Nutzerwunsch für später vorgemerkt:** Battle-Space-Spielabnahme auf Windows
+und nativem Linux, anschließend Scanner-Timing und die übrigen vier Spiele.
+Die gemeinsame offene Checkliste steht im unten verlinkten Windows-Plan;
+dieser Prüfpunkt blockiert vorerst keine weitere Entwicklung.
+Kein GBA e-Reader, kein Bardigun und kein gleichzeitiger Link-Kabel-Betrieb.
+512 Basis-Dots je Scanner-Bit sind eine vorläufige Emulationsrate, noch kein
+Hardware-Timingnachweis. Native Abnahme am Linux-Rechner bleibt auf der Merkliste.
+
+[Gemeinsame Implementierung, Referenzen und vollständiger Spieltestplan](WINDOWS_ROADMAP.md#phase-62--barcode-boy-02102026).
+
+## Phase 6.1 — Logo und Klang vor dem Spiel, 02.10.2026
+
+Dieselbe globale Intro-Einstellung, dieselbe Dauer und dieselben Dateiregeln wie
+Windows: 2,4 Sekunden vor einem Einzelspiel (GB/GBC/GBA), standardmäßig an,
+separat abschaltbarer Ton, Vorschau, eigenes PNG und kurzes PCM-WAV. Kein Intro
+beim reinen App-Start, Reset oder Schnellladen und keine Wartephase in Link-Sitzungen.
+Eigene Dateien werden unter `data/BootIntro` im bestehenden XDG-/Portable-Profil
+kopiert; eine eigene Datei muss nicht an ihrem ursprünglichen Ort bleiben.
+
+**Settings → App & files → Firmware → Logo and start animation**, oder Suche
+`Intro`/`Startanimation`. Die Bezeichnung Firmware bleibt technisch getrennt:
+das AetherBoy-Intro emuliert keine Boot-ROM und verändert `UseFirmware` nicht.
+SDL zeichnet die Animation, Tastatur/Controller überspringen sie; kein sichtbarer
+Überspringen-Button und keine unsichtbare Maus-Trefferfläche. Ein
+vorhandenes Einzelspiel pausiert. Vollständige Regeln, Testnachweise und offene
+Abnahme: [gemeinsame Phase 6.1](WINDOWS_ROADMAP.md#phase-61--eigene-startanimation-02102026).
+Die drei neuen Introtests wurden unter WSLg/Wayland bestanden; der ältere
+Ladefehlertest erwartet noch einen inzwischen anders formulierten Fehlertext.
+Audio-Hardwareabnahme und der Test auf dem Linux-Rechner des Kollegen bleiben offen.
+
+## Phase 5.3 — Update-Prüfung und Paketdownload, 02.10.2026
+
+**Settings → App & files → Files & updates → Updates** oder Suche `Updates`.
+Dieselbe `ReleaseUpdateService`-Implementierung wie Windows; keine getrennte
+Versions-/Downloadlogik. Englischsprachige Oberfläche, manuelle Prüfung und
+Paketdownload, optional einmalige Prüfung beim Programmstart (zunächst aus).
+Linux x64 und ARM64 werden getrennt ausgewählt. Downloads bleiben im XDG-Cache
+beziehungsweise unter `AetherBoyData/cache/updates` im Portable Mode.
+
+Release-Version, Paketverfügbarkeit, Fehler, Downloadfortschritt und SHA-256-
+Abschluss werden unterschieden. Noch **keine automatische Installation** und kein
+Eingriff in Benutzerinstaller, Systempakete oder laufende Spiele. Anweisungen,
+Sicherheitsgrenzen, Release-Konventionen und verbleibende Selbstinstaller-Arbeit:
+[gemeinsame Phase 5.3](WINDOWS_ROADMAP.md#phase-53--updates-prüfen-und-herunterladen-02102026).
+
+`package-linux.sh` unterstützt nun `--channel development|stable`; der Kanal steht
+auch in `package-info.json`. Die Quellpaket-Auswahl enthält die neuen Lizenzordner
+für Discord/Newtonsoft, SharpCompress und den Cheat-Code. Der Pakettester prüft
+diese Dateien. Tatsächlicher self-contained Build/Start unter Linux und die neue
+Wayland-Seite müssen auf Linux validiert werden; ein Windows-Build belegt das nicht.
+
+Tests: globale Einstellung mit Neustart/Backup-Wiederherstellung, Profile ohne
+Update-Freigabe, Suche und englische Statusmeldungen. Der native UI-Test läuft nur
+mit `AETHERBOY_UI_TESTS=1` in einer echten Wayland-Sitzung. Für alle Plattformen
+kommen synthetische Download-, Versions-, Redirect- und Abbruchtests im Runtime-
+Projekt hinzu. Die reale Release-API lieferte zum Prüfzeitpunkt noch keine Pakete.
+
+## Phase 5.2 — Discord activity, 02.10.2026
+
+Gleicher gemeinsamer Dienst wie Windows, auf Nutzerwunsch **standardmäßig an**,
+Spieltitel zunächst ausgeblendet. Die öffentliche Application ID
+`1555427237908586616` ist bereits hinterlegt. Ein einmal ausgeschalteter Status
+bleibt aus; ROM-Profile verändern diese globale Freigabe nicht.
+
+**Settings → App & files → Desktop & accessibility → Discord activity** oder
+Suche nach `Discord`. **Privacy** enthält beide Schalter und die Vorschau;
+**Setup** zeigt die bereits konfigurierte öffentliche ID für Entwickler.
+Keine Bot-Tokens eingeben. Die vollständige ID lässt sich über den vorhandenen
+SDL-Texteditor samt Zwischenablage und Bildschirmtastatur bearbeiten.
+
+System/Pausenstatus für GB, GBC und GBA, optional der echte ROM-Header-Titel.
+Ohne Einzelspiel und im Link-Modus wird die Aktivität entfernt. Keine Pfade,
+Spielstände oder Raumcodes. Derselbe IPC-Adapter, dieselben Lebenszyklus- und
+Datenschutzregeln wie unter Windows; kein X11-Pfad und kein Raumdienst erforderlich.
+Laufende Discord-Desktop-App mit demselben Benutzerkonto nötig. Bei Flatpak/Snap
+kann der lokale IPC-Socket unerreichbar sein. AetherBoy ändert keine Sandbox-Regeln.
+
+Automatisiert: Einstellungen/Migration, Profilisolation, Backup-Recovery,
+ungültige IDs und gemeinsamer RPC-Dienst. Der native Test
+`LinuxDiscordTests.NativeSettingsCanEditIdWithoutEnablingActivity` benötigt
+`AETHERBOY_UI_TESTS=1` unter Wayland. UI-Tests benutzen einen Fake-Discord-Client;
+sie veröffentlichen auch mit hinterlegter Standard-ID keine Aktivitäten.
+Echte Discord-Anzeige, Linux-Paketvarianten und Darstellung bei großer Schrift
+bleiben manuelle Abnahme, nicht als bestanden behauptet.
+
+Details und gemeinsame Abnahmeliste:
+[Phase 5.2 auf Windows und Linux](WINDOWS_ROADMAP.md#phase-52--discord-spielstatus-02102026).
+
+## Phase 5.1 — Sofa mode, 01.10.2026
+
+Implementiert passend zur Windows-Sofa-Ansicht: sichtbarer Einstieg **Sofa mode**,
+Vollbild-Bibliothek mit Recent/Favorites/My selection/All games, Vorschauen,
+getrennt gespeicherter eigener Auswahl, Controller-/Tastaturbedienung und kleinem
+Spielmenü. **F10**, **Esc** oder **L3+R3** öffnen im Sofa-Spiel das Menü;
+**Ctrl+Shift+F11** oder **Leave sofa mode** beenden den Modus. Außerhalb des Sofa-Modus
+bleibt F10 für Online Link reserviert. Kein automatischer Start, keine Kiosksperre.
+
+Die Metadaten-/Filtertests laufen auch auf Windows. Der native Test
+`LinuxSofaTests.NativeSofaNavigationRestoresWindowAndPreservesAlreadyPausedSession`
+benötigt `AETHERBOY_UI_TESTS=1` unter echtem Wayland. Dort bitte zusätzlich Controller
+abziehen/wieder verbinden, Laden abbrechen, Slot laden, lange Titel, alle Themes,
+Monitorwechsel und Rückkehr in ein vorher pausiertes Spiel prüfen.
+Der normale Linux-Fenstermanager besitzt die Fensterposition; die App stellt den
+vorherigen Fullscreen-Zustand über SDL wieder her, ohne X11-spezifische Positionierung.
+Umfang, Sicherheitsgrenzen und Abnahme: [gemeinsame Sofa-Liste](WINDOWS_ROADMAP.md#phase-51--sofa-modus-01102026).
+
+## Phase 3 — Medien und ROM-Archive, 01.10.2026
+
+Der erste Ausbau ist auf beiden Oberflächen angebunden. Umfang, Grenzen und
+offene Folgearbeit stehen in der [gemeinsamen Phase-3-Liste](WINDOWS_ROADMAP.md#phase-3--erster-gemeinsamer-ausbau-01102026).
+
+Die offenen Phase-3-Punkte sind auf Nutzerwunsch vom 01.10.2026 auf die
+[Merkliste für später](WINDOWS_ROADMAP.md#noch-offen--bewusst-nicht-als-fertig-gewertet)
+gesetzt: optionale gespeicherte Patch-Zuordnungen, native Wayland-Abnahme,
+Video-/Audio-Langzeittests, platzsparendes Videoformat, längere Clips und
+Aufnahme der lokalen Zwei-Spieler-Ansicht. Keine sofortige Umsetzung; weiterhin offen.
+
+- [x] ZIP-/7z-ROMs über den normalen Ladeauftrag vorbereiten und dauerhaft nach
+  `data/roms/<SHA256>/` importieren. Die Bibliothek verweist auf diese Kopie;
+  archivierte Saves werden nicht übernommen. Mehrere ROMs öffnen eine Spielauswahl
+  mit Seiten, Tastatur/Controller und Abbruch; die Auswahl ist an den Archivhash gebunden.
+- [x] **Tools → Record video** und Suchziel `AVI` öffnen die gemeinsame
+  Einzelspiel-AVI-Aufnahme mit Bild und Ton. Ausgabe unter `data/recordings`.
+  Pausen werden ausgelassen; Turbo und Zeitsprünge beenden den Clip.
+- [x] Vorhandene Patch-Lab-Ergebnisse bleiben erhalten. Tests für GB/GBC/GBA-
+  Archivimporte, Wiederverwendung der Kopie und Patch-Persistenz ergänzt.
+- [x] **Patch and play** bzw. **Restore and play** importieren und fordern danach
+  den Start über den normalen sicheren Ladeablauf an. **Apply Patch** bleibt ohne
+  Spielwechsel. Verlassen der Patch-Seite oder Öffnen eines anderen Spiels verwirft
+  den vorgemerkten Start, nicht das gespeicherte Ergebnis.
+- [ ] Unter nativem Wayland testen: Archiv über Portal und Drop öffnen,
+  Bibliotheks-Neustart ohne Originalarchiv, Video starten/beenden, ROM-Wechsel,
+  Pause/Turbo und Tonratenwechsel. Die portable Testsuite auf Windows kann
+  diese UI-/Treiberprüfung nicht ersetzen.
+- [ ] Neue Wayland-Tests ausführen: `NativeArchiveChoiceSupportsPagesCancelAndLoadsOnlySelectedGame`,
+  `NativeArchiveChangedAfterChoiceKeepsPreviousSession` und beide Fälle von
+  `NativePatchAndPlayStartsOnlyWhileRequestRemainsOnPatchPage`. Dazu
+  `AETHERBOY_UI_TESTS=1 dotnet test tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj -c Release`
+  in der nativen Wayland-Sitzung verwenden. Abbruch/Seitenwechsel und geändertes Archiv
+  zusätzlich manuell mit Controller prüfen.
+- [ ] Längere Clips in einem Videoplayer ansehen und hören. AVI ist noch
+  unkomprimiert und auf 2 GiB begrenzt; MP4, Local-Link-Split-Video und automatische
+  Patch-Auswahl sind nicht Teil des ersten Lieferumfangs.
+
+## Phase-1-Nachprüfung — 01.10.2026
+
+### Update: Phase 1.1 implementiert
+
+- [x] Spielzeit wird unabhängig von Resume/Savestates gesichert: Checkpoint etwa
+  alle 30 Sekunden über höchstens einen Hintergrundauftrag und eigener Flush beim
+  Schließen, auch bei gestoppter/fehlerhafter Sitzung oder gescheitertem Resume.
+  Fehlgeschlagene Schreibvorgänge bleiben pro ROM für einen erneuten Versuch erhalten;
+  erfolgreich gesicherte Zeit wird nicht erneut addiert. Das gilt auch bei Spielwechsel.
+- [x] Gemeinsame `ActivePlaytimeClock` mit Windows. Gezählt wird aktive Echtzeit,
+  nicht emulierte Zeit. Pause, Menüs, Laden, Online-Sitzungen, Start/Stop/Fault und
+  Abtastlücken ab zwei Sekunden zählen nicht. Online-Spielzeit bleibt bewusst ausgenommen.
+- [x] Gemeinsame Metadatengrenzen, atomare Library-Schreibvorgänge mit Flush und
+  letzter gültiger `.bak`. Wiederhergestellte oder unlesbare Einträge werden
+  in der Bibliothek gemeldet. Identität und relativer Pfad werden geprüft.
+  Ohne gültige Sicherung bleibt beschädigtes JSON unangetastet.
+- [x] SDL-Rumble-Rückgabewerte werden ausgewertet. Fehlgeschlagene Ausgabe wird
+  protokolliert und begrenzt wiederholt, nicht als erfolgreiche Erstaktivierung geführt.
+  Erfolgreiche Impulse sind weiterhin auf 180 ms begrenzt; Gerätewechsel und Stopp
+  sind unabhängig von SDL-Hardware regressiert.
+- [x] Die gemeinsame portable Schreibprobe schreibt und flusht tatsächlich ein Byte.
+- [ ] Native Wayland-/Controller-Abnahme und vollständige portable App-Starts mit
+  Flag/Marker, echtem USB-Medium, Schreibschutz/vollem Datenträger bleiben offen.
+
+`LinuxPhase11RegressionTests` prüft Recovery, defekte Felder/Pfade, Schreibfehler,
+Spielzeit-Retry und Rumble-Ausgabe ohne native Geräte. Zusätzlich sind zwei native
+Komforttests für Resume-Fehler/gestoppte Sitzung ergänzt: auf einem Windows-Host
+werden sie ausdrücklich übersprungen, nicht als bestanden gewertet.
+Aktueller vollständiger Desktop-Testlauf: **124 bestanden, 46 übersprungen,
+0 fehlgeschlagen**. Runtime: 491 bestanden/5 übersprungen. Release-Build des
+Frontends unter Windows erfolgreich, 0 Warnungen/Fehler. Das ist keine native
+Wayland-Ausführung; die nativen Komfortfälle benötigen `AETHERBOY_UI_TESTS=1`
+in einer isolierten Wayland-Sitzung.
+Bei normal funktionierendem Datenträger begrenzen Checkpoints das Crash-Verlustfenster
+auf ungefähr 30 Sekunden plus laufende I/O-Zeit. Bei dauerhaftem Schreibfehler oder
+Prozessabbruch kann noch ungesicherte Zeit verloren gehen; Batterie-Saves sind getrennt.
+Kein allgemeines GBA-Rumble, kein neues gemeinsames Windows/Linux-USB-Datenformat.
+
+### Arbeitsstatus und zurückgestellte Abnahme
+
+Phase 1 einschließlich 1.1 ist für diese Implementierungsrunde vorerst abgeschlossen.
+Die offenen Controller-, Portable-/USB-, Speicherfehler- und Wayland-Prüfungen sind
+in der [gemeinsamen Phase-1-Merkliste](WINDOWS_ROADMAP.md#arbeitsstatus-und-merkliste-nach-phase-11)
+einzeln festgehalten. Sie bleiben bis zur tatsächlichen Durchführung offen.
+Phase 2 ist im vereinbarten Umfang ebenfalls vorerst abgeschlossen; offene
+Cheat-Spezialbefehle und echte Spieltests bleiben auf der
+[Phase-2-Merkliste](CHEAT_SUPPORT.md#merkliste-offene-cheat-arbeit-01102026).
+Kein Anspruch auf vollständige Hardware- oder Code-Kompatibilität.
+
+### Historischer Ausgangsbefund vor der Reparatur
+
+Das neue Phase-1-Paket (Portable Mode, Bibliotheksmetadaten, Rumble plus vorhandene
+Spielzeit) ist in Grundzügen eingebaut, aber noch nicht vollständig abgenommen.
+Der folgende Ausgangsbefund war die Analyse/Merkliste; aktueller Reparaturstand oben.
+Plattformübergreifende Übersicht und Windows-Befunde:
+[Windows-Phase-1-Nachprüfung](WINDOWS_ROADMAP.md#phase-1-nachprüfung--01102026).
+Offene Cheat-Spezialbefehle und Spieltests:
+[Phase-2-Merkliste](CHEAT_SUPPORT.md#merkliste-offene-cheat-arbeit-01102026).
+
+Vorhanden: `--portable`/Marker, isolierte Data/Config/State/Cache-Pfade,
+hashgeprüfte portable ROM-Kopie, relative Bibliothekspfade beim Verschieben,
+Genre/Bewertung/Tags mit Suche/Sortierung/Filter, MBC5-Rumble-Ausgabe über SDL
+und konfigurierbare Aktivierung. Die portable Runtime deckt GB/GBC-MBC5 ab;
+GBA liefert noch kein eigenes Rumble-Signal. Native Ausgabe ist dadurch nicht
+automatisch für alle Controller nachgewiesen.
+
+### Historische Reparaturliste vor Phase 1.1
+
+1. [ ] **P2: Spielzeit unabhängig von Resume sichern.**
+   `WaylandEmulatorHost.Comfort.cs/SaveResumeOnClose` schreibt Spielzeit erst
+   nach erfolgreicher State-Sicherung im selben try-Block. Bei Resume-Fehler
+   überspringt die Ausführung das Update; bei Faulted/Stopped erfolgt bereits
+   vorher der Rücksprung. Es gibt keine regelmäßigen Spielzeit-Checkpoints.
+   Das kann die gesamte ungesicherte Sitzungszeit verlieren, nicht den Spielsave.
+   Zeit-Flush vom Savestate entkoppeln, in begrenzten Abständen sichern, ausstehende
+   Zeit bei I/O-Fehlern behalten und beim normalen Schließen separat abschließen.
+2. [ ] **P2: Aktive Zeit exakt definieren und regressieren.**
+   `UpdateComfort` prüft bisher im Zähler nicht explizit `State == Running`
+   und verwendet andere Menüs-/Online-/Pause-Regeln als Windows. Starten,
+   Pause, Menüs, Laden, Fault, Suspend, Turbo und Online-Warten mit kontrollierter
+   Uhr testen; dabei keine künstlichen Emulationssekunden zählen.
+3. [ ] **P2: Daten-/Fehlerfestigkeit der Library angleichen.**
+   Linux normalisiert Titel/Zeit schon beim Lesen, Windows hat dafür noch eine
+   nachgewiesene Lücke. Linux wiederum ersetzt Library-JSON atomar, führt hier
+   aber keine letzte lesbare `.bak` wie Windows. Beschädigte Einträge nicht
+   nur still überspringen; Meldung/Recovery ergänzen und gemeinsame Grenzen prüfen.
+4. [ ] **P2: Native Rumble-Abnahme und Fehlerstatus.**
+   Erfolg von `SDL.RumbleGamepad` wird bislang nicht ausgewertet. Controller ohne
+   Motor/mit fehlender Treiberunterstützung von erfolgreicher Ausgabe unterscheiden;
+   Fokusverlust, Pause, Hotplug, Ausschalten und Beenden nativ testen. Virtuelle
+   Controller-Eingabetests beweisen keinen Vibrationsmotor.
+5. [ ] **P2: Portable-Start als echter Ablauf prüfen.**
+   Nicht nur Store-Methoden testen: Flag/Marker, anderer Arbeitsordner, verschobener
+   kompletter Datenbaum samt Saves/States/Firmware/Settings, voller oder gesperrter
+   USB-Datenträger, abgebrochener Import. Keine automatische Profilübernahme und
+   kein stiller XDG-Fallback. Plattformübergreifendes USB-Profil wäre ein eigener
+   Format-/Migrationsschritt, nicht heute bereits garantiert.
+
+Neue Tests dieser Analyse: `LinuxPhase1LibraryTests` 3/3 auf dem Windows-Host,
+zusätzlich gemeinsame Runtime 2/2 und Windows 2/2. Kein neuer nativer Wayland-
+oder physischer Controller-Test; alte Linux-Hardware-Ergebnisse unten sind
+historische Nachweise. Keine Produktionscode-Änderung und kein Push.
+
+## Historischer Linux-Plan
+
 Aktueller Stand: **12. September 2026**, Runde 3 auf `22a77ef` plus lokale Änderungen.
 Ursprünglicher Plan: 11. September nach Aktualisierung auf `d983ed4`
 (`feat(windows): centralize app data and development diagnostics`).

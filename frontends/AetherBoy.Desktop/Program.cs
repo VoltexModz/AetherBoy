@@ -1,4 +1,5 @@
 using SDL3;
+using AetherBoy.Runtime;
 
 namespace AetherBoy.Desktop;
 
@@ -7,6 +8,11 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        args = PortableStorage.Configure(args);
+        AetherBoy.Runtime.Localization.UiText.Initialize(LinuxSettingsStore.Load(LinuxSettingsStore.DefaultPath, out _).DisplayLanguage);
+        try { PortableStorage.EnsureWritable(); }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        { return Fail("Portable data folder is not writable. Move AetherBoy to a writable folder or start without --portable. " + exception.Message); }
         if (args.Length == 1 && args[0] == "--version") { Console.WriteLine(LinuxBuildInfo.Version); return 0; }
         LinuxDesktopProfile desktop = LinuxDesktopProfile.Detect();
         if (args.Length == 1 && args[0].Equals("--platform-info", StringComparison.OrdinalIgnoreCase))

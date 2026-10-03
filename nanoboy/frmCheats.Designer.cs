@@ -17,15 +17,15 @@ namespace nanoboy
 
         private void InitializeComponent()
         {
-            this.lstCheats = new System.Windows.Forms.ListView();
+            this.lstCheats = new nanoboy.Controls.AetherList();
             this.colStatus = new System.Windows.Forms.ColumnHeader();
             this.colName = new System.Windows.Forms.ColumnHeader();
             this.colCode = new System.Windows.Forms.ColumnHeader();
             this.colType = new System.Windows.Forms.ColumnHeader();
             this.lblName = new System.Windows.Forms.Label();
-            this.txtName = new System.Windows.Forms.TextBox();
+            this.txtName = new nanoboy.Controls.AetherTextBox();
             this.lblCode = new System.Windows.Forms.Label();
-            this.txtCode = new System.Windows.Forms.TextBox();
+            this.txtCode = new nanoboy.Controls.AetherTextBox();
             this.btnAdd = new nanoboy.Controls.AetherButton();
             this.btnToggle = new nanoboy.Controls.AetherButton();
             this.btnRemove = new nanoboy.Controls.AetherButton();
@@ -56,17 +56,17 @@ namespace nanoboy
             //
             // colName
             //
-            this.colName.Text = "Name / Beschreibung";
+            this.colName.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Name / Beschreibung");
             this.colName.Width = 160;
             //
             // colCode
             //
-            this.colCode.Text = "Cheat Code";
+            this.colCode.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Cheat Code");
             this.colCode.Width = 120;
             //
             // colType
             //
-            this.colType.Text = "Typ";
+            this.colType.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Typ");
             this.colType.Width = 100;
             //
             // lblName
@@ -117,7 +117,7 @@ namespace nanoboy
             this.btnToggle.Name = "btnToggle";
             this.btnToggle.Size = new System.Drawing.Size(100, 25);
             this.btnToggle.TabIndex = 6;
-            this.btnToggle.Text = "An / Aus";
+            this.btnToggle.Text = global::AetherBoy.Runtime.Localization.UiText.Get("An / Aus");
             this.btnToggle.UseVisualStyleBackColor = true;
             this.btnToggle.Click += new System.EventHandler(this.btnToggle_Click);
             //
@@ -127,7 +127,7 @@ namespace nanoboy
             this.btnRemove.Name = "btnRemove";
             this.btnRemove.Size = new System.Drawing.Size(100, 25);
             this.btnRemove.TabIndex = 7;
-            this.btnRemove.Text = "Löschen";
+            this.btnRemove.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Löschen");
             this.btnRemove.UseVisualStyleBackColor = true;
             this.btnRemove.Click += new System.EventHandler(this.btnRemove_Click);
             //
@@ -138,7 +138,7 @@ namespace nanoboy
             this.lblExperimentalInfo.Name = "lblExperimentalInfo";
             this.lblExperimentalInfo.Size = new System.Drawing.Size(389, 15);
             this.lblExperimentalInfo.TabIndex = 8;
-            this.lblExperimentalInfo.Text = "Experimentell: nur GameShark-RAM-Codes im Format 01XXYYZZ.";
+            this.lblExperimentalInfo.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Experimentell: nur GameShark-RAM-Codes im Format 01XXYYZZ.");
             //
             // frmCheats
             //
@@ -154,11 +154,11 @@ namespace nanoboy
             this.Controls.Add(this.txtName);
             this.Controls.Add(this.lblName);
             this.Controls.Add(this.lstCheats);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
             this.MaximizeBox = false;
             this.Name = "frmCheats";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "GameShark Cheat Manager (experimentell) - AetherBoy";
+            this.Text = global::AetherBoy.Runtime.Localization.UiText.Get("GameShark Cheat Manager (experimentell) - AetherBoy");
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -166,15 +166,15 @@ namespace nanoboy
 
         #endregion
 
-        private System.Windows.Forms.ListView lstCheats;
+        private nanoboy.Controls.AetherList lstCheats;
         private System.Windows.Forms.ColumnHeader colStatus;
         private System.Windows.Forms.ColumnHeader colName;
         private System.Windows.Forms.ColumnHeader colCode;
         private System.Windows.Forms.ColumnHeader colType;
         private System.Windows.Forms.Label lblName;
-        private System.Windows.Forms.TextBox txtName;
+        private nanoboy.Controls.AetherTextBox txtName;
         private System.Windows.Forms.Label lblCode;
-        private System.Windows.Forms.TextBox txtCode;
+        private nanoboy.Controls.AetherTextBox txtCode;
         private System.Windows.Forms.Button btnAdd;
         private System.Windows.Forms.Button btnToggle;
         private System.Windows.Forms.Button btnRemove;

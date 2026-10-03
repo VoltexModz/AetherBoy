@@ -19,10 +19,11 @@ internal sealed class WindowsSessionHealthMonitor : IDisposable
     private long videoSequence;
     private int? uniform;
     private bool disposed;
-    private string status = "Noch keine Sitzung beobachtet.";
+    private string status = AetherBoy.Runtime.Localization.UiText.Get("Noch keine Sitzung beobachtet.");
     private SessionHealthSample? latestSample;
     private SessionHealthSample? recentPlaying;
     private long markedAt = long.MinValue;
+    private long lastStorageReport;
 
     internal WindowsSessionHealthMonitor(WindowsTesterSession report)
     {
@@ -58,6 +59,13 @@ internal sealed class WindowsSessionHealthMonitor : IDisposable
             if (disposed) return;
             try
             {
+                long now = Environment.TickCount64;
+                if (now - lastStorageReport >= 5000 && System.Linq.Enumerable.Any(
+                    nanoboy.Core.BatterySaveStore.GetActiveWrites(), write => write.ElapsedMilliseconds >= 2000))
+                {
+                    lastStorageReport = now;
+                    report.RecordSlowBatteryWrites();
+                }
                 UiPulse ui = Volatile.Read(ref pulse);
                 if (!ReferenceEquals(observed, ui.Session))
                 {
@@ -66,7 +74,7 @@ internal sealed class WindowsSessionHealthMonitor : IDisposable
                     if (observed != null) observed.AudioSamplesAvailable += CountAudio;
                     analyzer = new(); pixels = Array.Empty<int>(); videoSequence = 0; uniform = null;
                     Interlocked.Exchange(ref audioFrames, 0); latestSample = null; recentPlaying = null;
-                    Volatile.Write(ref status, "Beobachtung aktiv; Hinweise sind keine bestätigten Fehler.");
+                    Volatile.Write(ref status, AetherBoy.Runtime.Localization.UiText.Get("Beobachtung aktiv; Hinweise sind keine bestätigten Fehler."));
                 }
                 if (observed == null) return;
                 EmulationSnapshot snapshot = observed.LatestSnapshot;
@@ -79,7 +87,7 @@ internal sealed class WindowsSessionHealthMonitor : IDisposable
                 foreach (SessionHealthHint hint in analyzer.Observe(latestSample, Environment.TickCount64))
                 {
                     report.RecordHealthHint(hint, latestSample);
-                    Volatile.Write(ref status, "Letzter Verdacht: " + hint.Code + " (" + hint.DurationMs / 1000 + " s). Kein bestätigter Absturz.");
+                    Volatile.Write(ref status, AetherBoy.Runtime.Localization.UiText.Format("Letzter Verdacht: {0} ({1} s). Kein bestätigter Absturz.", AetherBoy.Runtime.Localization.UiLabels.Health(hint.Code), hint.DurationMs / 1000));
                 }
             }
             catch (Exception exception) when (exception is ObjectDisposedException or ArgumentException or InvalidOperationException)

@@ -250,6 +250,28 @@ public sealed class LinuxComfortPlaytestTests
     }
 
     [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void NativePlaytimePersistsEvenWhenResumeFailsOrSessionStopped(bool stopped)
+    {
+        WithNativeHost((host, settings) =>
+        {
+            string rom = Rom("playtime-resume-failure.gb"); Load(host, rom);
+            var session = Field<EmulationSession>(host, "session");
+            Call(host, "UpdateComfort"); Thread.Sleep(120); Call(host, "UpdateComfort");
+            double played = Field<double>(host, "playedSeconds"); Assert.IsTrue(played >= 0.10);
+            if (stopped) session.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            else
+            {
+                string resume = LinuxStateGallery.PathFor(Field<LinuxRomStorage>(host, "storage").StateBasePath, 0);
+                Directory.CreateDirectory(resume); // Directory at the target blocks the state write.
+            }
+            Call(host, "CloseSession");
+            Assert.AreEqual(played, Field<LinuxLibrary>(host, "library").Read().Single().PlaySeconds);
+        });
+    }
+
+    [TestMethod]
     public void NativeImmediateProfileToggleKeepsPendingGlobalVolumeInGlobalScope()
     {
         WithNativeHost((host, settings) =>
@@ -327,13 +349,13 @@ public sealed class LinuxComfortPlaytestTests
             library.Update(hashA, entry => entry with { Title = "Same name", HasCustomTitle = true, LastPlayed = DateTime.UtcNow.AddMinutes(2) });
             library.Update(hashB, entry => entry with { Title = "Same name", HasCustomTitle = true, LastPlayed = DateTime.UtcNow });
             Call(host, "ToggleControlCenter"); SelectPage(host, "Library"); RefreshCatalog(host);
-            FocusByKeyboard(host, 980, 310);
+            FocusByKeyboard(host, "rename:" + hashA);
             // Disabling an earlier open button shifts every following numerical focus index.
             File.Delete(a); RefreshCatalog(host);
             Key(host, SDL.Scancode.Return);
             Assert.AreEqual(hashA, Field<string?>(host, "editingTitleIdentity"), "A disabled preceding button must not shift focus to another action.");
             Key(host, SDL.Scancode.Escape);
-            RefreshCatalog(host); FocusByKeyboard(host, 980, 310);
+            RefreshCatalog(host); FocusByKeyboard(host, "rename:" + hashA);
             library.Update(hashB, entry => entry with { LastPlayed = DateTime.UtcNow.AddMinutes(4) });
             RefreshCatalog(host);
             Key(host, SDL.Scancode.Return);
@@ -364,7 +386,8 @@ public sealed class LinuxComfortPlaytestTests
             Assert.IsTrue(SpinWait.SpinUntil(() => { Call(host, "CompletePendingLoad"); return Field<Task?>(host, "romPreparation") is null; }, TimeSpan.FromSeconds(10)));
             Assert.IsNull(Field<EmulationSession?>(host, "session"));
             Assert.IsNull(Field<object?>(host, "pendingSession"));
-            Assert.Contains("changed", Field<string>(host, "statusMessage"));
+            Assert.AreEqual("Cartridge could not be opened. Check the file and the local report, then try again.",
+                Field<string>(host, "statusMessage"));
         });
     }
 
@@ -394,7 +417,7 @@ public sealed class LinuxComfortPlaytestTests
             var library = Field<LinuxLibrary>(host, "library"); library.Remember(hash, rom);
             library.Update(hash, entry => entry with { Title = "A long custom cartridge title to replace using the keyboard", HasCustomTitle = true });
             Call(host, "ToggleControlCenter"); SelectPage(host, "Library"); RefreshCatalog(host);
-            FocusByKeyboard(host, 980, 310); Key(host, SDL.Scancode.Return);
+            FocusByKeyboard(host, "rename:" + hash); Key(host, SDL.Scancode.Return);
             Call(host, "HandleKeyboard", new SDL.KeyboardEvent { Scancode = SDL.Scancode.A, Mod = SDL.Keymod.Ctrl }, true);
             Assert.IsTrue(Field<bool>(host, "titleSelectedAll"));
             string? folder = Environment.GetEnvironmentVariable("AETHERBOY_COMFORT_CAPTURE_DIR");
@@ -445,15 +468,17 @@ public sealed class LinuxComfortPlaytestTests
         int index = Field<int>(host, "focusedControl"); Assert.IsTrue(index >= 0, "No keyboard focus.");
         return Field<List<SDL.FRect>>(host, "focusTargets")[index];
     }
-    private static void FocusByKeyboard(object host, float x, float y)
+    private static void FocusByKeyboard(object host, string action)
     {
         for (int i = 0; i < 80; i++)
         {
             Key(host, SDL.Scancode.Tab);
-            SDL.FRect focused = Focus(host);
-            if (focused.X == x && focused.Y == y) return;
+            int index = Field<int>(host, "focusedControl");
+            Assert.IsTrue(index >= 0, "No keyboard focus.");
+            object identity = Field<System.Collections.IList>(host, "focusIdentities")[index]!;
+            if ((string?)identity.GetType().GetProperty("Action")!.GetValue(identity) == action) return;
         }
-        Assert.Fail("Requested button could not be reached by Tab.");
+        Assert.Fail("Requested action could not be reached by Tab: " + action);
     }
 
     private static void CapturePage(object host, string page, string name, bool gallery = false)

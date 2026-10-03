@@ -69,12 +69,12 @@ internal sealed class LinuxProfileStore(LinuxDataPaths paths)
         {
             string file = FilePath(identity);
             if (!File.Exists(file)) return null;
-            if (new FileInfo(file).Length > 16384) throw new InvalidDataException("Profile too large.");
-            var profile = JsonSerializer.Deserialize<LinuxGameProfile>(File.ReadAllText(file)) ?? throw new InvalidDataException("Empty profile.");
+            if (new FileInfo(file).Length > 16384) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Profile too large."));
+            var profile = JsonSerializer.Deserialize<LinuxGameProfile>(File.ReadAllText(file)) ?? throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Empty profile."));
             Validate(profile); return profile;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException or ArgumentException)
-        { error = "Game profile could not be read; global settings are in use."; return null; }
+        { error = global::AetherBoy.Runtime.Localization.UiText.Get("Game profile could not be read; global settings are in use."); return null; }
     }
     public static byte[] SerializeSnapshotBytes(LinuxGameProfile profile)
     {
@@ -95,7 +95,7 @@ internal sealed class LinuxProfileStore(LinuxDataPaths paths)
         if (profile.VideoFilter.HasValue && !Enum.IsDefined(profile.VideoFilter.Value)
             || profile.VideoScaling.HasValue && !Enum.IsDefined(profile.VideoScaling.Value)
             || profile.Frameskip is < 0 or > 2 || profile.PaletteIndex is < 0 or > 4 || profile.AudioVolume is < 0 or > 100)
-            throw new InvalidDataException("Invalid game profile.");
+            throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Invalid game profile."));
         if (profile.Keys is not null) _ = LinuxKeyBindings.FromDictionary(profile.Keys);
     }
 }

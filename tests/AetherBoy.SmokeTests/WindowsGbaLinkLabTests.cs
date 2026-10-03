@@ -77,7 +77,7 @@ public sealed class WindowsGbaLinkLabTests
         lab.Show();
         lab.SetRom(1, fixture.Gb());
         Assert.IsFalse(Find<AetherButton>(lab, "linkStart").Enabled);
-        StringAssert.Contains(Find<Label>(lab, "linkStatus").Text, "NICHT KOMPATIBEL");
+        Assert.AreEqual(AetherBoy.Runtime.Localization.UiText.Get("Nicht kompatibel: GB/GBC und GBA können nicht miteinander verkabelt werden."), Find<Label>(lab, "linkStatus").Text);
         Pump(lab.StartAsync());
         Assert.AreEqual(0, preparations);
         Assert.IsNull(Session(lab));

@@ -142,7 +142,7 @@ Work on that foundation includes:
 | Audio and four channel switches | Yes | Yes, PSG plus Direct Sound |
 | Protected battery saves | Yes | Yes |
 | Save states and rewind | Yes | Yes |
-| Cheats | GB GameShark RAM | Raw, CodeBreaker, GameShark v1/v2 |
+| [Session cheats](CHEAT_SUPPORT.md) | GameShark `01`, Game Genie (6/9), CodeBreaker, raw; multi-line sets | CodeBreaker, GameShark v1/v2, Action Replay v3: master/reseed, conditions, fills, hooks, indirect writes, ROM patches, device button; documented exceptions |
 | Control Center diagnostics | Host status | Host status plus core events |
 | Local link hardware foundation | Serial clocks present | Two-core peer present |
 
@@ -177,8 +177,9 @@ or Nintendo firmware is required by the automated test suite.
   DMA, PPU and APU edges can still differ from hardware.
 - The local GBA link foundation does not yet have a finished two-session host,
   visible Link Lab flow or TCP/IPC/internet transport.
-- Action Replay/PAR v3, complex CodeBreaker hook/fill/list commands and
-  encrypted master-code streams are not supported.
+- Action Replay v3 supports only direct RAM writes/additions; master, reseed,
+  hook, conditional, indirect and ROM-patch commands, complex CodeBreaker
+  hook/fill/list commands and encrypted master-code streams are not supported.
 - Special hardware such as Pocket Camera, HuC1/HuC3, MMM01 and other uncommon
   mappers is not released.
 - Experimental GBA save states older than core schema 5 are incompatible.

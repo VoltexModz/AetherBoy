@@ -18,33 +18,33 @@ internal sealed class frmQuickMenu : Form
         Action openLibrary, Action openSettings, Action openGallery, Func<string> feedback, Action? markProblem = null)
     {
         this.feedback = feedback; PauseOnExit = wasPaused;
-        Text = "Quick Deck"; ClientSize = new Size(760, 510); StartPosition = FormStartPosition.CenterParent;
-        Add("WEITER ZUM SPIEL", "quickMenuContinue", 20, 18, 350, Close).Kind = AetherButtonKind.Primary;
+        Text = global::AetherBoy.Runtime.Localization.UiText.Get("Quick Deck"); ClientSize = new Size(760, 510); StartPosition = FormStartPosition.CenterParent;
+        Add(global::AetherBoy.Runtime.Localization.UiText.Get("WEITER ZUM SPIEL"), "quickMenuContinue", 20, 18, 350, Close).Kind = AetherButtonKind.Primary;
         AetherButton? pause = null;
-        pause = Add(PauseOnExit ? "BEIM SCHLIESSEN PAUSIERT" : "BEIM SCHLIESSEN WEITERSPIELEN", "quickMenuPause", 390, 18, 350,
-            () => { PauseOnExit = !PauseOnExit; pause!.Text = PauseOnExit ? "BEIM SCHLIESSEN PAUSIERT" : "BEIM SCHLIESSEN WEITERSPIELEN"; });
-        Controls.Add(new Label { Text = "MANUELLER SLOT", Bounds = new(20, 82, 150, 30) });
-        var slots = new ComboBox { Name = "quickMenuSlot", DropDownStyle = ComboBoxStyle.DropDownList, Bounds = new(176, 78, 96, 30) };
+        pause = Add(PauseOnExit ? global::AetherBoy.Runtime.Localization.UiText.Get("BEIM SCHLIESSEN PAUSIERT") : global::AetherBoy.Runtime.Localization.UiText.Get("BEIM SCHLIESSEN WEITERSPIELEN"), "quickMenuPause", 390, 18, 350,
+            () => { PauseOnExit = !PauseOnExit; pause!.Text = PauseOnExit ? global::AetherBoy.Runtime.Localization.UiText.Get("BEIM SCHLIESSEN PAUSIERT") : global::AetherBoy.Runtime.Localization.UiText.Get("BEIM SCHLIESSEN WEITERSPIELEN"); });
+        Controls.Add(new Label { Text = global::AetherBoy.Runtime.Localization.UiText.Get("MANUELLER SLOT"), Bounds = new(20, 82, 150, 30) });
+        var slots = new AetherSelect { Name = "quickMenuSlot", Bounds = new(176, 78, 96, 30) };
         slots.Items.AddRange(new object[] { "1", "2", "3", "4", "5" }); slots.SelectedIndex = settings.SaveSlot - 1;
         slots.SelectedIndexChanged += (_, _) => selectSlot(slots.SelectedIndex + 1); Controls.Add(slots);
-        Add("SPEICHERN", "quickMenuSave", 292, 72, 216, () => Run(save));
-        Add("LADEN", "quickMenuLoad", 524, 72, 216, () => Run(load));
-        Add("STATE-GALERIE", "quickMenuGallery", 20, 142, 350, () => Defer(openGallery));
-        Add("EINSTELLUNGEN", "quickMenuSettings", 390, 142, 350, () => Defer(openSettings));
-        Add("SPIELBIBLIOTHEK", "quickMenuLibrary", 20, 204, 350, () => Defer(openLibrary));
-        Add("VOLLBILD UMSCHALTEN", "quickMenuFullscreen", 390, 204, 350, toggleFullscreen);
+        Add(global::AetherBoy.Runtime.Localization.UiText.Get("SPEICHERN"), "quickMenuSave", 292, 72, 216, () => Run(save));
+        Add(global::AetherBoy.Runtime.Localization.UiText.Get("LADEN"), "quickMenuLoad", 524, 72, 216, () => Run(load));
+        Add(global::AetherBoy.Runtime.Localization.UiText.Get("STATE-GALERIE"), "quickMenuGallery", 20, 142, 350, () => Defer(openGallery));
+        Add(global::AetherBoy.Runtime.Localization.UiText.Get("EINSTELLUNGEN"), "quickMenuSettings", 390, 142, 350, () => Defer(openSettings));
+        Add(global::AetherBoy.Runtime.Localization.UiText.Get("SPIELBIBLIOTHEK"), "quickMenuLibrary", 20, 204, 350, () => Defer(openLibrary));
+        Add(global::AetherBoy.Runtime.Localization.UiText.Get("VOLLBILD UMSCHALTEN"), "quickMenuFullscreen", 390, 204, 350, toggleFullscreen);
         Add("SCREENSHOT · F12", "quickMenuScreenshot", 20, 266, 350, () => Run(screenshot));
         AetherButton? overlay = null;
-        overlay = Add("PERFORMANCE · " + (settings.PerformanceOverlay ? "AN" : "AUS"), "quickMenuOverlay", 390, 266, 350,
-            () => { toggleOverlay(); overlay!.Text = "PERFORMANCE · " + (settings.PerformanceOverlay ? "AN" : "AUS"); });
+        overlay = Add(global::AetherBoy.Runtime.Localization.UiText.Get("PERFORMANCE · ") + (settings.PerformanceOverlay ? global::AetherBoy.Runtime.Localization.UiText.Get("AN") : global::AetherBoy.Runtime.Localization.UiText.Get("AUS")), "quickMenuOverlay", 390, 266, 350,
+            () => { toggleOverlay(); overlay!.Text = global::AetherBoy.Runtime.Localization.UiText.Get("PERFORMANCE · ") + (settings.PerformanceOverlay ? global::AetherBoy.Runtime.Localization.UiText.Get("AN") : global::AetherBoy.Runtime.Localization.UiText.Get("AUS")); });
         if (markProblem != null)
-            Add("PROBLEM MARKIEREN", "quickMenuMarkProblem", 20, 328, 350,
+            Add(global::AetherBoy.Runtime.Localization.UiText.Get("PROBLEM MARKIEREN"), "quickMenuMarkProblem", 20, 328, 350,
                 () => { markProblem(); status.Text = feedback(); });
         status = new Label { Name = "quickMenuStatus", Text = feedback(), AutoEllipsis = true, Bounds = new(390, 332, 350, 62) };
         Controls.Add(status);
-        Controls.Add(new Label { Text = "Das Spiel pausiert, solange das Quick Deck offen ist.\r\nD-Pad / Stick: bewegen · A/South: wählen · B/East: zurück · LB/RB: Fokus\r\nF10 oder beide Stick-Tasten (L3+R3): Quick Deck öffnen", Bounds = new(20, 410, 720, 76) });
+        Controls.Add(new Label { Text = global::AetherBoy.Runtime.Localization.UiText.Get("Das Spiel pausiert, solange das Quick Deck offen ist.\r\nD-Pad / Stick: bewegen · A/South: wählen · B/East: zurück · LB/RB: Fokus\r\nF10 oder beide Stick-Tasten (L3+R3): Quick Deck öffnen"), Bounds = new(20, 410, 720, 76) });
         FormClosing += (_, e) => { if (busy) e.Cancel = true; };
-        AetherDialog.Apply(this, "QUICK DECK // GAMEPAD", "Pause, Speicherstände und Anzeige ohne Tastatur erreichbar");
+        AetherDialog.Apply(this, global::AetherBoy.Runtime.Localization.UiText.Get("QUICK DECK // GAMEPAD"), global::AetherBoy.Runtime.Localization.UiText.Get("Pause, Speicherstände und Anzeige ohne Tastatur erreichbar"));
     }
     private void Defer(Action action) { NextAction = action; Close(); }
     private async void Run(Func<Task> action)

@@ -12,18 +12,18 @@ internal sealed class WindowsRomPatchService(WindowsDataPaths paths)
 {
     internal PatchedRomImport ApplyAndImport(string sourcePath, string patchPath, string title, bool reverseUps = false)
     {
-        if (!RomFiles.IsSupportedPath(sourcePath)) throw new InvalidDataException("Bitte eine .gb-, .gbc- oder .gba-Basis-ROM wählen.");
+        if (!RomFiles.IsSupportedPath(sourcePath)) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Bitte eine .gb-, .gbc- oder .gba-Basis-ROM wählen."));
         byte[] source = ReadBounded(sourcePath, RomPatcher.MaximumRomSize);
         string extension = System.IO.Path.GetExtension(sourcePath).ToLowerInvariant();
         if (source.Length < (extension == ".gba" ? 0xC0 : 0x150))
-            throw new InvalidDataException("Die Basis-ROM ist zu klein für das gewählte System.");
+            throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Die Basis-ROM ist zu klein für das gewählte System."));
         byte[] patch = ReadBounded(patchPath, RomPatcher.MaximumPatchSize);
         RomPatchResult result = RomPatcher.Apply(source, patch, reverseUps);
         if (result.Image.Length < (extension == ".gba" ? 0xC0 : 0x150))
-            throw new InvalidDataException("Das Patch-Ergebnis ist zu klein für eine unterstützte ROM.");
+            throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Das Patch-Ergebnis ist zu klein für eine unterstützte ROM."));
         string sourceHash = Convert.ToHexString(SHA256.HashData(source));
         string targetHash = Convert.ToHexString(SHA256.HashData(result.Image));
-        if (sourceHash == targetHash) throw new InvalidDataException("Der Patch verändert diese ROM nicht. Es wurde kein Duplikat importiert.");
+        if (sourceHash == targetHash) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Der Patch verändert diese ROM nicht. Es wurde kein Duplikat importiert."));
         string patchHash = Convert.ToHexString(SHA256.HashData(patch));
         string targetDirectory = System.IO.Path.Combine(paths.Roms, targetHash);
         bool alreadyImported = Directory.Exists(targetDirectory) && Directory.EnumerateFiles(targetDirectory).Any(RomFiles.IsSupportedPath);
@@ -47,14 +47,15 @@ internal sealed class WindowsRomPatchService(WindowsDataPaths paths)
                     checksums_verified = result.ChecksumsVerified, reversed = result.Reversed });
                 var library = new WindowsGameLibraryStore(paths);
                 string displayTitle = string.IsNullOrWhiteSpace(title) ? (result.Reversed ? "Restored ROM" : "Patched ROM") : title.Trim();
-                if (displayTitle.Length > 96) displayTitle = displayTitle[..96];
+                displayTitle = new string(displayTitle.Where(c => !char.IsControl(c)).Take(AetherBoy.Runtime.LibraryMetadata.MaximumTitleLength).ToArray());
+                if (string.IsNullOrWhiteSpace(displayTitle)) displayTitle = "Patched ROM";
                 // Undo may return to an original already in the library. Keep its name,
                 // favorites, playtime, settings and saves instead of relabeling it as a hack.
                 if (!result.Reversed || !alreadyImported)
                     library.Update(imported, entry => entry with { Title = displayTitle, HasCustomTitle = true });
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException)
-            { warning = "ROM importiert; Titel oder Patch-Herkunft konnten nicht gespeichert werden."; }
+            { warning = global::AetherBoy.Runtime.Localization.UiText.Get("ROM importiert; Titel oder Patch-Herkunft konnten nicht gespeichert werden."); }
             return new(imported, result.Format, result.ChecksumsVerified, sourceHash, targetHash, warning, result.Reversed);
         }
         finally
@@ -67,7 +68,7 @@ internal sealed class WindowsRomPatchService(WindowsDataPaths paths)
     private static byte[] ReadBounded(string path, int maximum)
     {
         using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (input.Length <= 0 || input.Length > maximum) throw new InvalidDataException("Datei ist leer oder überschreitet die unterstützte Größe.");
+        if (input.Length <= 0 || input.Length > maximum) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Datei ist leer oder überschreitet die unterstützte Größe."));
         byte[] result = new byte[(int)input.Length]; input.ReadExactly(result); return result;
     }
 }

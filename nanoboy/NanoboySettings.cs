@@ -1,14 +1,37 @@
 using System;
 using System.Configuration;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using nanoboy.Input;
+using nanoboy.Storage;
 
 namespace nanoboy
 {
     public sealed partial class NanoboySettings : IDisposable
     {
+        private static readonly ConcurrentDictionary<string, OrderedSnapshotWriter<IReadOnlyDictionary<string, string?>>> globalWriters =
+            new(StringComparer.OrdinalIgnoreCase);
+        private readonly OrderedSnapshotWriter<IReadOnlyDictionary<string, string?>> globalWriter;
+        internal event Action<Exception>? GlobalSaveFailed;
+
+        // Language belongs to the application, never to a ROM or controller profile.
+        public string DisplayLanguage
+        {
+            get => AetherBoy.Runtime.Localization.UiText.NormalizePreference(Properties.Settings.Default.DisplayLanguage);
+            set => Properties.Settings.Default.DisplayLanguage = AetherBoy.Runtime.Localization.UiText.NormalizePreference(value);
+        }
+
+        // Privacy preferences are global, never inherited from ROM/controller profiles.
+        public bool UpdateCheckOnStartup { get => Properties.Settings.Default.UpdateCheckOnStartup; set => Properties.Settings.Default.UpdateCheckOnStartup = value; }
+        public bool DiscordPresenceEnabled { get => Properties.Settings.Default.DiscordPresenceEnabled; set => Properties.Settings.Default.DiscordPresenceEnabled = value; }
+        public bool DiscordShareGameTitle { get => Properties.Settings.Default.DiscordShareGameTitle; set => Properties.Settings.Default.DiscordShareGameTitle = value; }
+        public string DiscordApplicationId { get => Properties.Settings.Default.DiscordApplicationId; set => Properties.Settings.Default.DiscordApplicationId = value; }
+
         public bool PerformanceOverlay { get => Properties.Settings.Default.PerformanceOverlay; set => Properties.Settings.Default.PerformanceOverlay = value; }
         public int AudioLatencyMs
         {
@@ -17,7 +40,25 @@ namespace nanoboy
         }
         public bool GpuRendering { get => ReadSetting("GpuRendering", Properties.Settings.Default.GpuRendering); set => WriteSetting("GpuRendering", value, next => Properties.Settings.Default.GpuRendering = next); }
         public bool VideoVSync { get => ReadSetting("VideoVSync", Properties.Settings.Default.VideoVSync); set => WriteSetting("VideoVSync", value, next => Properties.Settings.Default.VideoVSync = next); }
-        public bool IntegerScaling { get => ReadSetting("IntegerScaling", Properties.Settings.Default.IntegerScaling); set => WriteSetting("IntegerScaling", value, next => Properties.Settings.Default.IntegerScaling = next); }
+        public bool IntegerScaling
+        {
+            get => VideoScalingMode == 1 || (VideoScalingMode == 0 && DisplayFilterIndex != 1);
+            set => VideoScalingMode = value ? 1 : 2;
+        }
+        public int VideoScalingMode
+        {
+            get
+            {
+                if (GameProfileEnabled && !gameProfile.Overrides.ContainsKey("VideoScalingMode") && gameProfile.Overrides.ContainsKey("IntegerScaling"))
+                    return ReadSetting("IntegerScaling", Properties.Settings.Default.IntegerScaling) ? 1 : 2;
+                int mode = ReadSetting("VideoScalingMode", Properties.Settings.Default.VideoScalingMode);
+                return mode is >= 0 and <= 2 ? mode :
+                    ReadSetting("IntegerScaling", Properties.Settings.Default.IntegerScaling) ? 1 : 2;
+            }
+            set => WriteSetting("VideoScalingMode", Math.Clamp(value, 0, 2), next => Properties.Settings.Default.VideoScalingMode = next);
+        }
+        public bool PauseOnFocusLoss { get => Properties.Settings.Default.PauseOnFocusLoss; set => Properties.Settings.Default.PauseOnFocusLoss = value; }
+        public int UiScalePercent { get => Math.Clamp(Properties.Settings.Default.UiScalePercent, 100, 150); set => Properties.Settings.Default.UiScalePercent = Math.Clamp(value, 100, 150); }
 
         public bool AudioEnable
         {
@@ -195,7 +236,13 @@ namespace nanoboy
             GamepadStart,
             GamepadSelect,
             GamepadQuickLoad,
-            GamepadQuickSave);
+            GamepadQuickSave)
+        {
+            Up = GetControllerDirection("GamepadUpButton", HostGamepadButtons.DPadUp),
+            Down = GetControllerDirection("GamepadDownButton", HostGamepadButtons.DPadDown),
+            Left = GetControllerDirection("GamepadLeftButton", HostGamepadButtons.DPadLeft),
+            Right = GetControllerDirection("GamepadRightButton", HostGamepadButtons.DPadRight)
+        };
 
         public int SampleRate
         {
@@ -227,6 +274,12 @@ namespace nanoboy
             set => WriteSetting("BootRomEnable", value, next => Properties.Settings.Default.BootRomEnable = next);
         }
 
+        public bool RumbleEnabled
+        {
+            get => Properties.Settings.Default.RumbleEnabled;
+            set => Properties.Settings.Default.RumbleEnabled = value;
+        }
+
         public int AudioVolume
         {
             get => Math.Clamp(ReadSetting("AudioVolume", Properties.Settings.Default.AudioVolume), 0, 100);
@@ -242,9 +295,11 @@ namespace nanoboy
 
         private void PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
+            // The privacy choice has its own explicit, synchronous save/confirmation path.
+            if (e.PropertyName == nameof(Properties.Settings.DiagnosticsRecording)) return;
             try
             {
-                nanoboy.Properties.Settings.Default.Save();
+                globalWriter.Enqueue(CaptureGlobalSnapshot());
             }
             catch (Exception exception) when (
                 exception is ConfigurationErrorsException ||
@@ -252,14 +307,51 @@ namespace nanoboy
                 exception is IOException)
             {
                 Debug.WriteLine($"Could not persist UI setting '{e.PropertyName}': {exception}");
+                GlobalSaveFailed?.Invoke(exception);
             }
+        }
+
+        private static IReadOnlyDictionary<string, string?> CaptureGlobalSnapshot()
+        {
+            var source = Properties.Settings.Default;
+            var values = new Dictionary<string, string?>(StringComparer.Ordinal);
+            foreach (SettingsProperty property in source.Properties)
+            {
+                if (property.Name == nameof(Properties.Settings.DiagnosticsRecording)) continue;
+                _ = source[property.Name]; // Populate defaults before reading their serialized representation.
+                values[property.Name] = source.PropertyValues[property.Name]?.SerializedValue?.ToString();
+            }
+            return values;
+        }
+
+        internal bool HasPendingSaves => globalWriter.HasPending ||
+            profileWriters.Values.Any(writer => writer.HasPending) ||
+            controllerWriters.Values.Any(writer => writer.HasPending);
+
+        internal async Task FlushPendingSavesAsync()
+        {
+            // Materialize on the caller thread: a new ROM/controller can register a writer
+            // while an earlier global write is awaiting its completion.
+            var profiles = profileWriters.Values.ToArray();
+            var controllers = controllerWriters.Values.ToArray();
+            await globalWriter.FlushAsync().ConfigureAwait(false);
+            await Task.WhenAll(profiles.Select(writer => writer.FlushAsync())).ConfigureAwait(false);
+            await Task.WhenAll(controllers.Select(writer => writer.FlushAsync())).ConfigureAwait(false);
         }
 
         public NanoboySettings()
         {
+            var provider = Properties.Settings.Default.Providers.Cast<SettingsProvider>()
+                .OfType<WindowsSettingsProvider>().Single();
+            globalWriter = globalWriters.GetOrAdd(provider.FilePath, path =>
+                new OrderedSnapshotWriter<IReadOnlyDictionary<string, string?>>(snapshot =>
+                    new WindowsSettingsProvider(path).WriteSnapshot(snapshot)));
             RecentFiles.AddRange(RecentRomStore.Load());
             nanoboy.Properties.Settings.Default.PropertyChanged += PropertyChanged;
+            globalWriter.SaveFailed += OnGlobalSaveFailed;
         }
+
+        private void OnGlobalSaveFailed(Exception exception) => GlobalSaveFailed?.Invoke(exception);
 
         private static HostGamepadButtons ReadGamepadBinding(
             int storedValue,

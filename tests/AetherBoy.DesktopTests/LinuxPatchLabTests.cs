@@ -182,6 +182,49 @@ public sealed class LinuxPatchLabTests
     }
 
     private const BindingFlags Private = BindingFlags.NonPublic | BindingFlags.Instance;
+
+    [TestMethod]
+    [DataRow(false)][DataRow(true)]
+    public void NativePatchAndPlayStartsOnlyWhileRequestRemainsOnPatchPage(bool leavePage)
+    {
+        if (Environment.GetEnvironmentVariable("AETHERBOY_UI_TESTS") != "1")
+        { Assert.Inconclusive("Set AETHERBOY_UI_TESTS=1 in a native Wayland session."); return; }
+        var (source, patch, _, _) = Files("ips");
+        string settings = Path.Combine(root, "settings.json");
+        LinuxSettingsStore.Save(settings, new LinuxFrontendOptions { AudioEnabled = false });
+        SDL.SetHint("SDL_VIDEO_DRIVER", "wayland");
+        Assert.IsTrue(SDL.Init(SDL.InitFlags.Video | SDL.InitFlags.Events), SDL.GetError());
+        try
+        {
+            using var host = new WaylandEmulatorHost(LinuxDesktopProfile.Detect(), settings, hidden: true);
+            Call(host, "TryLoadRom", source); WaitForSession(host);
+            var previous = Field<EmulationSession>(host, "session");
+            Call(host, "ToggleControlCenter");
+            var pageType = host.GetType().GetField("controlCenterPage", Private)!.FieldType;
+            Call(host, "SelectControlCenterPage", Enum.Parse(pageType, "Library"));
+            Call(host, "OpenPatchLab");
+            host.GetType().GetField("patchFilePath", Private)!.SetValue(host, patch);
+            Call(host, "StartPatchAndPlay");
+            Assert.IsTrue(Field<bool>(host, "pendingPatchLaunch"));
+            if (leavePage)
+            {
+                Call(host, "SelectControlCenterPage", Enum.Parse(pageType, "Overview"));
+                Call(host, "SelectControlCenterPage", Enum.Parse(pageType, "Library")); Call(host, "OpenPatchLab");
+                Assert.IsFalse(Field<bool>(host, "pendingPatchLaunch"));
+            }
+            Assert.IsTrue(SpinWait.SpinUntil(() => { Call(host, "CompletePendingPatch"); return Field<Task?>(host, "pendingPatch") is null; }, TimeSpan.FromSeconds(10)));
+            Assert.IsFalse(Field<bool>(host, "patchFailed"), Field<string>(host, "patchMessage"));
+            var result = Field<LinuxPatchedRom>(host, "patchResult"); Assert.IsTrue(File.Exists(result.Path));
+            if (leavePage) Assert.AreSame(previous, Field<EmulationSession>(host, "session"));
+            else
+            {
+                WaitForSession(host);
+                Assert.AreEqual(result.Path, Field<string>(host, "romPath"));
+                Assert.IsFalse(Field<bool>(host, "controlCenterVisible"));
+            }
+        }
+        finally { SDL.Quit(); }
+    }
     private static T Field<T>(object host, string name) => (T)host.GetType().GetField(name, Private)!.GetValue(host)!;
     private static void Call(object host, string method, params object[] args) => host.GetType().GetMethod(method, Private)!.Invoke(host, args);
     private static void WaitForSession(object host) => Assert.IsTrue(SpinWait.SpinUntil(() =>

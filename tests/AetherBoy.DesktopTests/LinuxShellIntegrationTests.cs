@@ -1,5 +1,6 @@
 using System.Reflection;
 using AetherBoy.Runtime;
+using nanoboy.Core;
 using SDL3;
 
 namespace AetherBoy.Desktop.Tests;
@@ -112,16 +113,24 @@ public sealed class LinuxShellIntegrationTests
             Click(1000, 222);
             Assert.IsTrue(Field<bool>(host, "showAppearance"));
             Capture(host, "appearance");
-            void EnterColor(float y, string value)
+            for (int index = 0; index < UiThemePresets.All.Count; index++)
             {
-                Click(500, y);
+                UiThemePreset preset = UiThemePresets.All[index];
+                Click(430 + index % 3 * 274, 298 + index / 3 * 49);
+                Assert.AreEqual(preset.Id, UiThemePresets.Match(options.UiPrimaryColor,
+                    options.UiSecondaryColor, options.UiBackgroundColor)?.Id);
+                Capture(host, "appearance-" + preset.Id);
+            }
+            void EnterColor(float x, string value)
+            {
+                Click(x, 455);
                 Call(host, "HandleKeyboard", new SDL.KeyboardEvent { Scancode = SDL.Scancode.A, Mod = SDL.Keymod.Ctrl }, true);
                 Call(host, "ReceiveTextInput", value);
             }
-            EnterColor(304, "#FF8800");
-            EnterColor(398, "#0066CC");
-            EnterColor(492, "#EFEFEF");
-            Click(430, 570);
+            EnterColor(450, "#FF8800");
+            EnterColor(724, "#0066CC");
+            EnterColor(998, "#EFEFEF");
+            Click(430, 524);
             Assert.AreEqual("#FF8800", options.UiPrimaryColor);
             Capture(host, "appearance-custom");
             Click(360, 218);

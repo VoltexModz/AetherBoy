@@ -43,6 +43,24 @@ public sealed class WindowsGameDataTests
             Enumerable.Repeat(Color.MediumPurple.ToArgb(), 23040).ToArray(), VideoGeometry.GameBoy), 100));
 
     [TestMethod]
+    public void LibraryTitleIsMetadataAndNeverChangesRomOrSaveIdentity()
+    {
+        string rom = Rom("RENAME");
+        string identity = library.GetIdentity(rom);
+        string savePath = library.GetSavePath(rom);
+        byte[] original = File.ReadAllBytes(rom);
+
+        catalog.Update(rom, old => old with { Title = "Mein Spiel", HasCustomTitle = true });
+        Assert.AreEqual("Mein Spiel", new WindowsGameLibraryStore(paths).Read(rom).Title);
+        Assert.AreEqual(identity, library.GetIdentity(rom));
+        Assert.AreEqual(savePath, library.GetSavePath(rom));
+        CollectionAssert.AreEqual(original, File.ReadAllBytes(rom));
+
+        catalog.Update(rom, old => old with { Title = "RENAME", HasCustomTitle = false });
+        Assert.AreEqual("RENAME", new WindowsGameLibraryStore(paths).Read(rom).Title);
+    }
+
+    [TestMethod]
     public void ManualAndResumeSlotsStaySeparateAndKeepPreviousRawState()
     {
         string rom = Rom("SLOTS");
@@ -111,6 +129,7 @@ public sealed class WindowsGameDataTests
         bool globalGpu = settings.GpuRendering;
         settings.UseGameProfile(first);
         settings.EnableGameProfile(true);
+        settings.FlushPendingSavesAsync().GetAwaiter().GetResult();
         Assert.AreEqual(0, store.Read(first).Overrides.Count);
         settings.AudioVolume = 23; settings.PaletteIndex = 3; settings.GpuRendering = !globalGpu;
         settings.KeyA = Keys.J;
@@ -126,6 +145,7 @@ public sealed class WindowsGameDataTests
         settings.EnableGameProfile(false); Assert.AreEqual(globalVolume, settings.AudioVolume);
         settings.EnableGameProfile(true); Assert.AreEqual(23, settings.AudioVolume);
         settings.ResetGameProfile(); Assert.AreEqual(globalVolume, settings.AudioVolume);
+        settings.FlushPendingSavesAsync().GetAwaiter().GetResult();
         Assert.AreEqual(0, store.Read(first).Overrides.Count);
     }
 
@@ -137,6 +157,7 @@ public sealed class WindowsGameDataTests
         using var settings = new NanoboySettings(store);
         settings.UseGameProfile(rom); settings.EnableGameProfile(true);
         settings.AudioVolume = settings.AudioVolume; settings.PaletteIndex = settings.PaletteIndex;
+        settings.FlushPendingSavesAsync().GetAwaiter().GetResult();
         Assert.AreEqual(0, store.Read(rom).Overrides.Count);
         store.Write(rom, new GameSettingsProfile { Enabled = true,
             Overrides = new() { ["AudioVolume"] = "bad", ["SaveSlot"] = "5", ["Frameskip"] = "999" } });
@@ -147,20 +168,25 @@ public sealed class WindowsGameDataTests
     }
 
     [TestMethod]
-    public void ProfileWriteFailureReportsErrorAndPreservesEffectiveAndGlobalValues()
+    public void ProfileWriteFailureReportsErrorAndKeepsPendingValueForRetry()
     {
         string rom = Rom("PROFILE IO");
         var store = new WindowsGameProfileStore(paths);
         using var settings = new NanoboySettings(store);
         settings.UseGameProfile(rom); settings.EnableGameProfile(true); settings.AudioVolume = 19;
+        settings.FlushPendingSavesAsync().GetAwaiter().GetResult();
         int global = nanoboy.Properties.Settings.Default.AudioVolume;
         string file = Path.Combine(paths.Settings, "Profiles", library.GetIdentity(rom) + ".json");
         File.Delete(file); Directory.CreateDirectory(file);
         Exception? failure = null; settings.ProfileSaveFailed += ex => failure = ex;
         settings.AudioVolume = 71;
+        Assert.ThrowsExactly<InvalidOperationException>(() => settings.FlushPendingSavesAsync().GetAwaiter().GetResult());
         Assert.IsNotNull(failure);
-        Assert.AreEqual(19, settings.AudioVolume);
+        Assert.AreEqual(71, settings.AudioVolume);
         Assert.AreEqual(global, nanoboy.Properties.Settings.Default.AudioVolume);
+        Directory.Delete(file);
+        settings.FlushPendingSavesAsync().GetAwaiter().GetResult();
+        Assert.AreEqual(71, store.Read(rom).Overrides["AudioVolume"] is string value ? int.Parse(value) : -1);
     }
 
     [TestMethod]
@@ -181,9 +207,12 @@ public sealed class WindowsGameDataTests
         string imported = WindowsRomLibrary.Default.Import(original);
         bool audio = nanoboy.Properties.Settings.Default.AudioEnable;
         bool boot = nanoboy.Properties.Settings.Default.BootRomEnable;
+        bool gpu = nanoboy.Properties.Settings.Default.GpuRendering;
         try
         {
-            nanoboy.Properties.Settings.Default.AudioEnable = false; nanoboy.Properties.Settings.Default.BootRomEnable = false;
+            nanoboy.Properties.Settings.Default.AudioEnable = false;
+            nanoboy.Properties.Settings.Default.BootRomEnable = false;
+            nanoboy.Properties.Settings.Default.GpuRendering = false; // GPU coverage has a separate hardware opt-in.
             using var main = new frmNano(); main.Show(); main.LoadRomFile(imported);
             var session = Field<EmulationSession>(main, "session");
             PumpUntil(() => session.LatestSnapshot.EmulatedFrameCount >= 3);
@@ -227,7 +256,9 @@ public sealed class WindowsGameDataTests
         }
         finally
         {
-            nanoboy.Properties.Settings.Default.AudioEnable = audio; nanoboy.Properties.Settings.Default.BootRomEnable = boot;
+            nanoboy.Properties.Settings.Default.AudioEnable = audio;
+            nanoboy.Properties.Settings.Default.BootRomEnable = boot;
+            nanoboy.Properties.Settings.Default.GpuRendering = gpu;
             RemoveTestImport(imported);
         }
     }
@@ -243,15 +274,15 @@ public sealed class WindowsGameDataTests
             WindowsGameLibraryStore.Default.Update(imported, entry => entry with { Title = "VAULT TEST", PlayedSeconds = 3720,
                 PreviewPng = Checkpoint(1).Preview.Png, LastPlayedUtc = DateTimeOffset.UtcNow });
             using var vault = new frmRomLibrary(new[] { imported }); vault.Show(); Application.DoEvents();
-            var list = Field<ListView>(vault, "romList");
-            ((TextBox)vault.Controls.Find("romLibrarySearch", true).Single()).Text = "VAULT TEST";
+            var list = Field<nanoboy.Controls.AetherList>(vault, "romList");
+            ((nanoboy.Controls.AetherTextBox)vault.Controls.Find("romLibrarySearch", true).Single()).Text = "VAULT TEST";
             Assert.AreEqual(1, list.Items.Count);
             list.Items[0].Selected = true; Application.DoEvents();
             ((AetherButton)vault.Controls.Find("romLibraryFavoriteButton", true).Single()).PerformClick();
             Assert.IsTrue(WindowsGameLibraryStore.Default.Read(imported).Favorite);
-            ((ComboBox)vault.Controls.Find("romLibrarySystemFilter", true).Single()).SelectedItem = "GBA";
+            ((AetherSelect)vault.Controls.Find("romLibrarySystemFilter", true).Single()).SelectedItem = "GBA";
             Assert.AreEqual(0, list.Items.Count);
-            ((ComboBox)vault.Controls.Find("romLibrarySystemFilter", true).Single()).SelectedItem = "GB";
+            ((AetherSelect)vault.Controls.Find("romLibrarySystemFilter", true).Single()).SelectedItem = "GB";
             Assert.AreEqual(1, list.Items.Count);
             Application.DoEvents();
             using (var tile = new Bitmap(list.Width, list.Height))

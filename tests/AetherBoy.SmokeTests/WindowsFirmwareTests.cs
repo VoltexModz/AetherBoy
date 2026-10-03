@@ -190,7 +190,7 @@ public sealed class WindowsFirmwareTests
             {
                 var button = (AetherButton)form.Controls.Find("firmwareImport" + kind, true).Single();
                 Assert.IsTrue(button.Visible && button.Enabled && button.TabStop);
-                Assert.IsTrue(form.Controls.Find("firmwareStatus" + kind, true).Single().Text.Contains("NICHT VORHANDEN"));
+            Assert.AreEqual(AetherBoy.Runtime.Localization.UiText.Get("NICHT VORHANDEN · Eingebauter Startpfad"), form.Controls.Find("firmwareStatus" + kind, true).Single().Text);
             }
             var policy = form.Controls.Find("firmwarePolicy", true).Single();
             policy.Focus();

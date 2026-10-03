@@ -28,20 +28,20 @@ namespace nanoboy
         private void InitializeComponent()
         {
             this.label1 = new System.Windows.Forms.Label();
-            this.txtKeyA = new System.Windows.Forms.TextBox();
-            this.txtKeyB = new System.Windows.Forms.TextBox();
+            this.txtKeyA = new nanoboy.Controls.AetherTextBox();
+            this.txtKeyB = new nanoboy.Controls.AetherTextBox();
             this.label2 = new System.Windows.Forms.Label();
-            this.txtKeySelect = new System.Windows.Forms.TextBox();
+            this.txtKeySelect = new nanoboy.Controls.AetherTextBox();
             this.label3 = new System.Windows.Forms.Label();
-            this.txtKeyStart = new System.Windows.Forms.TextBox();
+            this.txtKeyStart = new nanoboy.Controls.AetherTextBox();
             this.label4 = new System.Windows.Forms.Label();
-            this.txtKeyDown = new System.Windows.Forms.TextBox();
+            this.txtKeyDown = new nanoboy.Controls.AetherTextBox();
             this.label5 = new System.Windows.Forms.Label();
-            this.txtKeyUp = new System.Windows.Forms.TextBox();
+            this.txtKeyUp = new nanoboy.Controls.AetherTextBox();
             this.label6 = new System.Windows.Forms.Label();
-            this.txtKeyRight = new System.Windows.Forms.TextBox();
+            this.txtKeyRight = new nanoboy.Controls.AetherTextBox();
             this.label7 = new System.Windows.Forms.Label();
-            this.txtKeyLeft = new System.Windows.Forms.TextBox();
+            this.txtKeyLeft = new nanoboy.Controls.AetherTextBox();
             this.label8 = new System.Windows.Forms.Label();
             this.button1 = new nanoboy.Controls.AetherButton();
             this.SuspendLayout();
@@ -57,7 +57,6 @@ namespace nanoboy
             //
             // txtKeyA
             //
-            this.txtKeyA.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.txtKeyA.Location = new System.Drawing.Point(49, 16);
             this.txtKeyA.Name = "txtKeyA";
             this.txtKeyA.ReadOnly = true;
@@ -67,7 +66,6 @@ namespace nanoboy
             //
             // txtKeyB
             //
-            this.txtKeyB.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.txtKeyB.Location = new System.Drawing.Point(157, 16);
             this.txtKeyB.Name = "txtKeyB";
             this.txtKeyB.ReadOnly = true;
@@ -86,7 +84,6 @@ namespace nanoboy
             //
             // txtKeySelect
             //
-            this.txtKeySelect.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.txtKeySelect.Location = new System.Drawing.Point(157, 42);
             this.txtKeySelect.Name = "txtKeySelect";
             this.txtKeySelect.ReadOnly = true;
@@ -105,7 +102,6 @@ namespace nanoboy
             //
             // txtKeyStart
             //
-            this.txtKeyStart.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.txtKeyStart.Location = new System.Drawing.Point(49, 42);
             this.txtKeyStart.Name = "txtKeyStart";
             this.txtKeyStart.ReadOnly = true;
@@ -124,7 +120,6 @@ namespace nanoboy
             //
             // txtKeyDown
             //
-            this.txtKeyDown.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.txtKeyDown.Location = new System.Drawing.Point(157, 69);
             this.txtKeyDown.Name = "txtKeyDown";
             this.txtKeyDown.ReadOnly = true;
@@ -139,11 +134,10 @@ namespace nanoboy
             this.label5.Name = "label5";
             this.label5.Size = new System.Drawing.Size(42, 13);
             this.label5.TabIndex = 10;
-            this.label5.Text = "Runter:";
+            this.label5.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Runter:");
             //
             // txtKeyUp
             //
-            this.txtKeyUp.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.txtKeyUp.Location = new System.Drawing.Point(49, 69);
             this.txtKeyUp.Name = "txtKeyUp";
             this.txtKeyUp.ReadOnly = true;
@@ -158,11 +152,10 @@ namespace nanoboy
             this.label6.Name = "label6";
             this.label6.Size = new System.Drawing.Size(36, 13);
             this.label6.TabIndex = 8;
-            this.label6.Text = "Hoch:";
+            this.label6.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Hoch:");
             //
             // txtKeyRight
             //
-            this.txtKeyRight.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.txtKeyRight.Location = new System.Drawing.Point(157, 94);
             this.txtKeyRight.Name = "txtKeyRight";
             this.txtKeyRight.ReadOnly = true;
@@ -177,11 +170,10 @@ namespace nanoboy
             this.label7.Name = "label7";
             this.label7.Size = new System.Drawing.Size(44, 13);
             this.label7.TabIndex = 14;
-            this.label7.Text = "Rechts:";
+            this.label7.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Rechts:");
             //
             // txtKeyLeft
             //
-            this.txtKeyLeft.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.txtKeyLeft.Location = new System.Drawing.Point(49, 94);
             this.txtKeyLeft.Name = "txtKeyLeft";
             this.txtKeyLeft.ReadOnly = true;
@@ -196,7 +188,7 @@ namespace nanoboy
             this.label8.Name = "label8";
             this.label8.Size = new System.Drawing.Size(35, 13);
             this.label8.TabIndex = 12;
-            this.label8.Text = "Links:";
+            this.label8.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Links:");
             //
             // button1
             //
@@ -230,9 +222,9 @@ namespace nanoboy
             this.Controls.Add(this.label2);
             this.Controls.Add(this.txtKeyA);
             this.Controls.Add(this.label1);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow;
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
             this.Name = "frmControls";
-            this.Text = "AetherBoy - Steuerung";
+            this.Text = global::AetherBoy.Runtime.Localization.UiText.Get("AetherBoy - Steuerung");
             this.Load += new System.EventHandler(this.frmControls_Load);
             this.ResumeLayout(false);
             this.PerformLayout();
@@ -242,20 +234,20 @@ namespace nanoboy
         #endregion
 
         private System.Windows.Forms.Label label1;
-        private System.Windows.Forms.TextBox txtKeyA;
-        private System.Windows.Forms.TextBox txtKeyB;
+        private nanoboy.Controls.AetherTextBox txtKeyA;
+        private nanoboy.Controls.AetherTextBox txtKeyB;
         private System.Windows.Forms.Label label2;
-        private System.Windows.Forms.TextBox txtKeySelect;
+        private nanoboy.Controls.AetherTextBox txtKeySelect;
         private System.Windows.Forms.Label label3;
-        private System.Windows.Forms.TextBox txtKeyStart;
+        private nanoboy.Controls.AetherTextBox txtKeyStart;
         private System.Windows.Forms.Label label4;
-        private System.Windows.Forms.TextBox txtKeyDown;
+        private nanoboy.Controls.AetherTextBox txtKeyDown;
         private System.Windows.Forms.Label label5;
-        private System.Windows.Forms.TextBox txtKeyUp;
+        private nanoboy.Controls.AetherTextBox txtKeyUp;
         private System.Windows.Forms.Label label6;
-        private System.Windows.Forms.TextBox txtKeyRight;
+        private nanoboy.Controls.AetherTextBox txtKeyRight;
         private System.Windows.Forms.Label label7;
-        private System.Windows.Forms.TextBox txtKeyLeft;
+        private nanoboy.Controls.AetherTextBox txtKeyLeft;
         private System.Windows.Forms.Label label8;
         private System.Windows.Forms.Button button1;
     }

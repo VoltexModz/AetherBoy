@@ -29,6 +29,7 @@ namespace AetherBoy.Runtime
         CheatSnapshot AddCheat(string name, string code);
         bool RemoveCheat(Guid id);
         bool ToggleCheat(Guid id);
+        void SetCheatButton(bool pressed) => throw new NotSupportedException("This core has no cheat-device button.");
         bool TryCopyVideoFrame(int[] destination, ref long sequence);
         EmulationSnapshot CaptureSnapshot(
             SessionState state,

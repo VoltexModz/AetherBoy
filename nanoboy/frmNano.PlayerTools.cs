@@ -20,9 +20,17 @@ public partial class frmNano
 
     private void InitializePlayerTools()
     {
+        var sofa = new nanoboy.Controls.AetherCommand(global::AetherBoy.Runtime.Localization.UiText.Get("Sofa-Modus öffnen"), null, (_, _) => _ = OpenSofaLibraryAsync()) { Name = "menuSofaMode" };
+        menuFile.DropDownItems.Add(sofa);
+        sofaGameMenu = new AetherButton { Text = global::AetherBoy.Runtime.Localization.UiText.Get("Spielmenü"), Name = "sofaGameMenu", Size = new Size(158, 42),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right, Visible = false };
+        gameView.Controls.Add(sofaGameMenu);
+        void PositionSofaMenu() => sofaGameMenu.Location = new Point(Math.Max(0, gameView.Width - sofaGameMenu.Width - 16), 16);
+        gameView.Resize += (_, _) => PositionSofaMenu(); PositionSofaMenu();
+        sofaGameMenu.Click += (_, _) => _ = OpenQuickMenuAsync();
         GamepadNavigation.Attach(this, () => session == null && aetherCommandMenu is null);
         performanceOverlay = new Label { Name = "gamePerformanceOverlay", AutoSize = false, TabStop = false,
-            Text = "PERFORMANCE · noch kein Bild", Bounds = new(10, 10, 390, 84),
+            Text = global::AetherBoy.Runtime.Localization.UiText.Get("PERFORMANCE · noch kein Bild"), Bounds = new(10, 10, 390, 84),
             BackColor = Color.FromArgb(14, 17, 30), ForeColor = AetherColors.Cyan,
             Font = new Font("Consolas", 9f), Padding = new Padding(8), Visible = settings.PerformanceOverlay };
         gameView.Controls.Add(performanceOverlay); performanceOverlay.BringToFront();
@@ -43,11 +51,11 @@ public partial class frmNano
         var metrics = gameView.FrameTimings.Read(Stopwatch.GetTimestamp() * 1000d / Stopwatch.Frequency);
         if (snapshot?.State != SessionState.Running) metrics = default;
         var audio = Volatile.Read(ref audioOutput)?.Snapshot;
-        string state = snapshot?.State.ToString().ToUpperInvariant() ?? "KEIN SPIEL";
-        performanceOverlay.Text = $"{state} · Ausgabe {metrics.FramesPerSecond:F1} FPS\r\n" +
-            $"Bildabstand Ø {metrics.AverageMs:F1} · P95 {metrics.P95Ms:F1} ms\r\n" +
-            (audio == null ? "Audio aus" : $"Audio {audio.Channels} ch · {audio.BufferedMs:F1}/{audio.TargetLatencyMs} ms · XRUN {audio.Underruns}") +
-            $"\r\n{gameView.RendererStatus} · F9 aus/an";
+        string state = snapshot is null ? global::AetherBoy.Runtime.Localization.UiText.Get("KEIN SPIEL") : global::AetherBoy.Runtime.Localization.UiLabels.Session(snapshot.State);
+        performanceOverlay.Text = global::AetherBoy.Runtime.Localization.UiText.Format("{0} · Ausgabe {1:F1} FPS\r\n", state, metrics.FramesPerSecond) +
+            global::AetherBoy.Runtime.Localization.UiText.Format("Bildabstand Ø {0:F1} · P95 {1:F1} ms\r\n", metrics.AverageMs, metrics.P95Ms) +
+            (audio == null ? global::AetherBoy.Runtime.Localization.UiText.Get("Audio aus") : global::AetherBoy.Runtime.Localization.UiText.Format("Audio {0} ch · {1:F1}/{2} ms · XRUN {3}", audio.Channels, audio.BufferedMs, audio.TargetLatencyMs, audio.Underruns)) +
+            global::AetherBoy.Runtime.Localization.UiText.Format("\r\n{0} · F9 aus/an", gameView.RendererStatus);
     }
     private async Task CaptureScreenshotAsync()
     {
@@ -55,25 +63,25 @@ public partial class frmNano
         string rom = currentRomPath;
         VideoGeometry geometry = session.LatestSnapshot.VideoGeometry;
         int[] pixels = new int[geometry.PixelCount]; long sequence = 0;
-        if (!session.TryCopyLatestFrame(pixels, ref sequence)) { SetSaveFeedback("Noch kein Spielbild für einen Screenshot", true); return; }
+        if (!session.TryCopyLatestFrame(pixels, ref sequence)) { SetSaveFeedback(global::AetherBoy.Runtime.Localization.UiText.Get("Noch kein Spielbild für einen Screenshot"), true); return; }
         screenshotInProgress = true;
         try
         {
             string path = await Task.Run(() => new WindowsScreenshotStore(WindowsDataPaths.Default).Write(rom, geometry, pixels));
-            if (!IsDisposed) SetSaveFeedback("Screenshot gespeichert · " + Path.GetFileName(path), false);
+            if (!IsDisposed) SetSaveFeedback(global::AetherBoy.Runtime.Localization.UiText.Get("Screenshot gespeichert · ") + Path.GetFileName(path), false);
             testerSession?.RecordOperation("screenshot", null, true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Runtime.InteropServices.ExternalException)
         {
             testerSession?.RecordException("screenshot.failed", ex);
-            if (!IsDisposed) AetherSignal.Show(this, "Screenshot konnte nicht gespeichert werden.\n\n" + ex.Message,
+            if (!IsDisposed) AetherSignal.Show(this, global::AetherBoy.Runtime.Localization.UiText.Get("Screenshot konnte nicht gespeichert werden.\n\n") + global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(ex.Message),
                 "Screenshot", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         finally { screenshotInProgress = false; }
     }
     private async Task OpenQuickMenuAsync()
     {
-        if (IsOnlineLink) { SetSaveFeedback("Online-Link: TOOLS öffnet Verbindung und Sitzungsspielstände · F12 Screenshot", false); return; }
+        if (IsOnlineLink) { SetSaveFeedback(global::AetherBoy.Runtime.Localization.UiText.Get("Online-Link: TOOLS öffnet Verbindung und Sitzungsspielstände · F12 Screenshot"), false); return; }
         if (quickMenuOpen || stateOperationInProgress || IsDisposed) return;
         if (session == null) { OpenRomFromAetherUi(); return; }
         EmulationSession current = session;
@@ -83,19 +91,31 @@ public partial class frmNano
         ReleaseGamepadInput();
         try
         {
+            if (sofaMode) await current.SetTurboAsync(false);
             await current.SetPausedAsync(true);
             if (IsDisposed || !ReferenceEquals(current, session)) return;
+            if (sofaMode)
+            {
+                using var sofaMenu = new frmSofaQuickMenu(settings, SelectSaveSlot,
+                    () => SaveCheckpointAsync(settings.SaveSlot), () => LoadCheckpointAsync(settings.SaveSlot),
+                    CaptureScreenshotAsync, () => _ = OpenSofaLibraryAsync(), ExitSofaMode, () => saveFeedback);
+                sofaMenu.ShowDialog(this); next = sofaMenu.NextAction;
+                if (sofaMenu.ResumeRequested) pauseAfter = false;
+            }
+            else
+            {
             using var menu = new frmQuickMenu(settings, pauseAfter, SelectSaveSlot,
                 () => SaveCheckpointAsync(settings.SaveSlot), () => LoadCheckpointAsync(settings.SaveSlot),
                 CaptureScreenshotAsync, TogglePerformanceOverlay, ToggleAetherFullscreen,
                 OpenRomFromAetherUi, OpenControlCenter, OpenStateGallery, () => saveFeedback, MarkSessionProblem);
             menu.ShowDialog(this);
             pauseAfter = menu.PauseOnExit; next = menu.NextAction;
+            }
         }
         catch (InvalidOperationException ex)
         {
             testerSession?.RecordException("quick_menu.failed", ex);
-            if (!IsDisposed) SetSaveFeedback("Quick Deck derzeit nicht verfügbar", true);
+            if (!IsDisposed) SetSaveFeedback(global::AetherBoy.Runtime.Localization.UiText.Get("Quick Deck derzeit nicht verfügbar"), true);
         }
         finally
         {

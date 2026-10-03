@@ -208,6 +208,35 @@ public sealed class Phase2CommandCoverageTests
         }
     }
 
+    [TestMethod]
+    public void ProductionMachine_GameGenieOverlaysRomReadsWithoutEditingCartridge()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"AetherBoy-GameGenie-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            string romPath = Path.Combine(root, "generated.gb");
+            byte[] rom = CreateVideoRom();
+            rom[0x44CD] = 0x3A;
+            File.WriteAllBytes(romPath, rom);
+            var configuration = new EmulatorConfiguration(0, false, false, false, false, false, 44_100);
+            using var machine = new ProductionMachine(romPath, Path.Combine(root, "generated.sav"),
+                null, configuration, paletteIndex: 0, initializeRewind: false);
+
+            Assert.AreEqual(0x3A, machine.OnlineMemory.ReadByte(0x44CD));
+            CheatSnapshot cheat = machine.AddCheat("ROM overlay", "AB4-CDB-012\n014200C0");
+            Assert.AreEqual(1, machine.CaptureSnapshot(SessionState.Running, false, false, 0, 0).Cheats.Count);
+            Assert.AreEqual(0xAB, machine.OnlineMemory.ReadByte(0x44CD));
+            Assert.ThrowsExactly<FormatException>(() => machine.AddCheat("invalid set", "AB4-CDB-012 + BAD"));
+            Assert.AreEqual(1, machine.CaptureSnapshot(SessionState.Running, false, false, 0, 0).Cheats.Count);
+            Assert.IsFalse(machine.ToggleCheat(cheat.Id));
+            Assert.AreEqual(0x3A, machine.OnlineMemory.ReadByte(0x44CD));
+            Assert.IsTrue(machine.RemoveCheat(cheat.Id));
+            Assert.AreEqual(0x3A, File.ReadAllBytes(romPath)[0x44CD]);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
     private static byte[] CreateVideoRom()
     {
         var rom = new byte[RomSize];

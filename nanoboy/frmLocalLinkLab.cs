@@ -52,17 +52,17 @@ internal sealed class frmLocalLinkLab : Form
         ClientSize = new Size(1092, 708);
         KeyPreview = true;
         Controls.Add(new Label { Bounds = new(24, 12, 1032, 40),
-            Text = "ZWEI CARTRIDGES // ein PC · zwei eigenständige Spielstände · experimenteller Link\r\n" +
-                "Zwei GB/GBC oder zwei GBA. Kompatibler Kabelmodus im Spiel nötig; kein Wireless, Internet oder Vier-Spieler-Modus." });
+            Text = global::AetherBoy.Runtime.Localization.UiText.Get("ZWEI CARTRIDGES // ein PC · zwei eigenständige Spielstände · experimenteller Link\r\n") +
+                global::AetherBoy.Runtime.Localization.UiText.Get("Zwei GB/GBC oder zwei GBA. Kompatibler Kabelmodus im Spiel nötig; kein Wireless, Internet oder Vier-Spieler-Modus.") });
         for (int index = 0; index < 2; index++)
         {
             int player = index;
             var card = new AetherSurfacePanel { Name = "linkPlayerCard" + index,
                 Bounds = new(24 + index * 532, 62, 512, 438), AccentEdge = true };
             titles[index] = new Label { Name = "linkRomTitle" + index, Bounds = new(16, 12, 480, 30),
-                Text = $"PLAYER {index + 1} · ROM AUSWÄHLEN", Tag = "accent", AutoEllipsis = true };
-            pickButtons[index] = Button(card, "linkPickRom" + index, "ROM WÄHLEN", new(16, 46, 228, 36), () => PickRom(player));
-            playerButtons[index] = Button(card, "linkKeyboardPlayer" + index, $"TASTATUR → P{index + 1}",
+                Text = global::AetherBoy.Runtime.Localization.UiText.Format("PLAYER {0} · ROM AUSWÄHLEN", index + 1), Tag = "accent", AutoEllipsis = true };
+            pickButtons[index] = Button(card, "linkPickRom" + index, global::AetherBoy.Runtime.Localization.UiText.Get("ROM WÄHLEN"), new(16, 46, 228, 36), () => PickRom(player));
+            playerButtons[index] = Button(card, "linkKeyboardPlayer" + index, global::AetherBoy.Runtime.Localization.UiText.Format("TASTATUR → P{0}", index + 1),
                 new(260, 46, 228, 36), () => SelectKeyboardPlayer(player));
             displays[index] = new GameDisplayControl { Name = "linkDisplay" + index,
                 Bounds = new(16, 96, 480, 326), GpuEnabled = settings.GpuRendering,
@@ -73,22 +73,22 @@ internal sealed class frmLocalLinkLab : Form
             card.Controls.Add(titles[index]); card.Controls.Add(displays[index]); Controls.Add(card);
         }
         savePolicy = new Label { Name = "linkSavePolicy", Bounds = new(24, 510, 1032, 42),
-            Text = "Verschiedene ROMs: beide bisherigen AppData-Spielstände. Gleiche ROM: P2 erhält einen getrennten Link-Spielstand." };
+            Text = global::AetherBoy.Runtime.Localization.UiText.Get("Verschiedene ROMs: beide bisherigen AppData-Spielstände. Gleiche ROM: P2 erhält einen getrennten Link-Spielstand.") };
         Controls.Add(savePolicy);
-        startButton = Button(this, "linkStart", "LINK STARTEN", new(24, 562, 190, 42), () => _ = StartAsync());
+        startButton = Button(this, "linkStart", global::AetherBoy.Runtime.Localization.UiText.Get("LINK STARTEN"), new(24, 562, 190, 42), () => _ = StartAsync());
         startButton.Kind = AetherButtonKind.Primary;
-        pauseButton = Button(this, "linkPause", "BEIDE PAUSIEREN", new(226, 562, 198, 42), () => _ = TogglePauseAsync());
-        cableButton = Button(this, "linkCable", "KABEL TRENNEN", new(436, 562, 192, 42), () => _ = ToggleCableAsync());
-        audioButton = Button(this, "linkAudio", "AUDIO AUS", new(640, 562, 166, 42), CycleAudio);
-        stopButton = Button(this, "linkStop", "SITZUNG BEENDEN", new(818, 562, 238, 42), () => _ = StopAsync());
+        pauseButton = Button(this, "linkPause", global::AetherBoy.Runtime.Localization.UiText.Get("BEIDE PAUSIEREN"), new(226, 562, 198, 42), () => _ = TogglePauseAsync());
+        cableButton = Button(this, "linkCable", global::AetherBoy.Runtime.Localization.UiText.Get("KABEL TRENNEN"), new(436, 562, 192, 42), () => _ = ToggleCableAsync());
+        audioButton = Button(this, "linkAudio", global::AetherBoy.Runtime.Localization.UiText.Get("AUDIO AUS"), new(640, 562, 166, 42), CycleAudio);
+        stopButton = Button(this, "linkStop", global::AetherBoy.Runtime.Localization.UiText.Get("SITZUNG BEENDEN"), new(818, 562, 238, 42), () => _ = StopAsync());
         status = new Label { Name = "linkStatus", Bounds = new(24, 616, 1032, 28), Tag = "value", AutoEllipsis = true };
         Controls.Add(status);
         Controls.Add(new Label { Bounds = new(24, 650, 842, 44),
-            Text = "F1/F2 oder Bild anklicken: Tastatur-Spieler wählen. Controller 1/2 → Spieler 1/2. Esc: beide pausieren.\r\n" +
-                "GBA: konfigurierte L/R-Tasten (Standard Q/E). Im Spiel speichern; keine Save States, kein Rewind/Turbo/Einzel-Reset." });
-        var close = Button(this, "linkClose", "ZURÜCK", new(896, 654, 160, 36), Close);
+            Text = global::AetherBoy.Runtime.Localization.UiText.Get("F1/F2 oder Bild anklicken: Tastatur-Spieler wählen. Controller 1/2 → Spieler 1/2. Esc: beide pausieren.\r\n") +
+                global::AetherBoy.Runtime.Localization.UiText.Get("GBA: konfigurierte L/R-Tasten (Standard Q/E). Im Spiel speichern; keine Save States, kein Rewind/Turbo/Einzel-Reset.") });
+        var close = Button(this, "linkClose", global::AetherBoy.Runtime.Localization.UiText.Get("ZURÜCK"), new(896, 654, 160, 36), Close);
         CancelButton = close;
-        AetherDialog.Apply(this, "LOCAL LINK // EXPERIMENTAL", "Gemeinsame Zeitsteuerung · Integrierter Boot · Kein Netzwerk",
+        AetherDialog.Apply(this, global::AetherBoy.Runtime.Localization.UiText.Get("LOCAL LINK // EXPERIMENTAL"), global::AetherBoy.Runtime.Localization.UiText.Get("Gemeinsame Zeitsteuerung · Integrierter Boot · Kein Netzwerk"),
             gamepadNavigationEnabled: () => !GameInputEnabled);
         if (initialRom is not null && IsSupportedPath(initialRom)) SetRom(0, initialRom);
         playerButtons[0].Selected = true;
@@ -115,10 +115,10 @@ internal sealed class frmLocalLinkLab : Form
     internal void SetRom(int player, string path)
     {
         if (player is < 0 or > 1) throw new ArgumentOutOfRangeException(nameof(player));
-        if (session is not null || starting) throw new InvalidOperationException("Die Link-Sitzung zuerst beenden.");
-        if (!IsSupportedPath(path)) throw new InvalidDataException("Local Link unterstützt .gb, .gbc und .gba.");
+        if (session is not null || starting) throw new InvalidOperationException(global::AetherBoy.Runtime.Localization.UiText.Get("Die Link-Sitzung zuerst beenden."));
+        if (!IsSupportedPath(path)) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Local Link unterstützt .gb, .gbc und .gba."));
         selectedRoms[player] = Path.GetFullPath(path);
-        titles[player].Text = $"PLAYER {player + 1} · {Path.GetFileNameWithoutExtension(path)}";
+        titles[player].Text = global::AetherBoy.Runtime.Localization.UiText.Format("PLAYER {0} · {1}", player + 1, Path.GetFileNameWithoutExtension(path));
         actionMessage = null;
         RefreshSession();
     }
@@ -137,25 +137,25 @@ internal sealed class frmLocalLinkLab : Form
     {
         // Selection only: the regular Vault can migrate adjacent saves as part of import.
         // Link storage validates both ROMs first and never imports external save files.
-        using var picker = new OpenFileDialog
+        using var picker = new AetherFileDialog
         {
-            Title = $"Player {player + 1} · GB-/GBC-/GBA-ROM auswählen",
+            Title = global::AetherBoy.Runtime.Localization.UiText.Format("Player {0} · GB-/GBC-/GBA-ROM auswählen", player + 1),
             Filter = "Game Boy / Color / Advance (*.gb;*.gbc;*.gba)|*.gb;*.gbc;*.gba|Game Boy / Color (*.gb;*.gbc)|*.gb;*.gbc|Game Boy Advance (*.gba)|*.gba",
             CheckFileExists = true, Multiselect = false, RestoreDirectory = true
         };
         if (picker.ShowDialog(this) != DialogResult.OK) return;
         try { SetRom(player, picker.FileName); }
-        catch (Exception ex) when (ex is InvalidDataException or ArgumentException) { ShowError("ROM-Auswahl", ex); }
+        catch (Exception ex) when (ex is InvalidDataException or ArgumentException) { ShowError(global::AetherBoy.Runtime.Localization.UiText.Get("ROM-Auswahl"), ex); }
     }
 
     internal async Task StartAsync()
     {
         if (session is not null || starting || !HasCompatibleSelection) return;
-        starting = true; actionMessage = "ROMs werden geprüft …"; RefreshSession();
+        starting = true; actionMessage = global::AetherBoy.Runtime.Localization.UiText.Get("ROMs werden geprüft …"); RefreshSession();
         try
         {
             WindowsLocalLinkPlan plan = storage.CreatePlan(selectedRoms[0]!, selectedRoms[1]!);
-            if (!prepareMainWindow()) throw new InvalidOperationException("Das laufende Spiel konnte nicht sicher beendet werden.");
+            if (!prepareMainWindow()) throw new InvalidOperationException(global::AetherBoy.Runtime.Localization.UiText.Get("Das laufende Spiel konnte nicht sicher beendet werden."));
             // Stopping the main game releases its per-ROM profile; use the same
             // resulting global preferences for both linked displays and machines.
             foreach (var display in displays)
@@ -166,8 +166,8 @@ internal sealed class frmLocalLinkLab : Form
             }
             selectedRoms[0] = plan.FirstRomPath; selectedRoms[1] = plan.SecondRomPath;
             savePolicy.Text = plan.SameRom
-                ? "GLEICHE ROM · P1: bisheriger Spielstand. P2: eigener LinkPlayer2-Spielstand (anfangs leer). Keine Kopie, kein Überschreiben von P1."
-                : "ZWEI ROMs · Jeder Spieler nutzt seinen bisherigen AppData-Spielstand. Beide Dateien bleiben getrennt und exklusiv gesperrt.";
+                ? global::AetherBoy.Runtime.Localization.UiText.Get("GLEICHE ROM · P1: bisheriger Spielstand. P2: eigener LinkPlayer2-Spielstand (anfangs leer). Keine Kopie, kein Überschreiben von P1.")
+                : global::AetherBoy.Runtime.Localization.UiText.Get("ZWEI ROMs · Jeder Spieler nutzt seinen bisherigen AppData-Spielstand. Beide Dateien bleiben getrennt und exklusiv gesperrt.");
             var configuration = new EmulatorConfiguration(settings.Frameskip, settings.AudioEnable,
                 settings.Channel1Enable, settings.Channel2Enable, settings.Channel3Enable, settings.Channel4Enable, 44100);
             // The first link milestone uses the integrated boot path on both machines.
@@ -193,7 +193,7 @@ internal sealed class frmLocalLinkLab : Form
         catch (Exception ex)
         {
             await StopAsync();
-            if (!IsDisposed && !closingRequested) ShowError("Link-Start fehlgeschlagen", ex);
+            if (!IsDisposed && !closingRequested) ShowError(global::AetherBoy.Runtime.Localization.UiText.Get("Link-Start fehlgeschlagen"), ex);
         }
         finally { starting = false; if (!IsDisposed) RefreshSession(); }
     }
@@ -213,17 +213,17 @@ internal sealed class frmLocalLinkLab : Form
         await Task.Yield();
         ClearInput(); Interlocked.Exchange(ref audioOutput, null)?.Dispose();
         active.AudioSamplesAvailable -= OnAudio;
-        actionMessage = "Beide Spiele werden beendet und Spielstände geschrieben …";
+        actionMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Beide Spiele werden beendet und Spielstände geschrieben …");
         try
         {
             await active.ShutdownAsync().WaitAsync(TimeSpan.FromSeconds(5));
             await active.DisposeAsync();
             if (ReferenceEquals(session, active)) session = null;
-            actionMessage = "Beendet · Im Einzelspiel den In-Game-Spielstand laden, keinen älteren Save State fortsetzen.";
+            actionMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Beendet · Im Einzelspiel den In-Game-Spielstand laden, keinen älteren Save State fortsetzen.");
         }
         catch (TimeoutException)
         {
-            actionMessage = "Beenden dauert noch an. Die Dateisperren bleiben zum Schutz der Spielstände aktiv; bitte erneut versuchen.";
+            actionMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Beenden dauert noch an. Die Dateisperren bleiben zum Schutz der Spielstände aktiv; bitte erneut versuchen.");
         }
         catch (Exception ex)
         {
@@ -233,7 +233,7 @@ internal sealed class frmLocalLinkLab : Form
                 // Completion includes owner-thread cleanup; DisposeAsync repeats the same
                 // faulted task, so there is no second disposal operation to await here.
             }
-            actionMessage = "Link mit Fehler beendet: " + ex.GetType().Name + ". Spielstände prüfen.";
+            actionMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Link mit Fehler beendet: ") + ex.GetType().Name + global::AetherBoy.Runtime.Localization.UiText.Get(". Spielstände prüfen.");
         }
         finally
         {
@@ -258,7 +258,7 @@ internal sealed class frmLocalLinkLab : Form
         var active = session; if (active is null) return;
         ClearInput();
         try { await active.SetPausedAsync(!active.LatestSnapshot.IsPaused); if (!IsDisposed) SelectKeyboardPlayer(keyboardPlayer); }
-        catch (InvalidOperationException ex) { if (!IsDisposed) ShowError("Link-Pause", ex); }
+        catch (InvalidOperationException ex) { if (!IsDisposed) ShowError(global::AetherBoy.Runtime.Localization.UiText.Get("Link-Pause"), ex); }
     }
     private async Task PauseForFocusAsync()
     {
@@ -271,7 +271,7 @@ internal sealed class frmLocalLinkLab : Form
         var active = session; if (active is null) return;
         ClearInput();
         try { await active.SetConnectedAsync(!active.LatestSnapshot.Connected); }
-        catch (InvalidOperationException ex) { if (!IsDisposed) ShowError("Link-Verbindung", ex); }
+        catch (InvalidOperationException ex) { if (!IsDisposed) ShowError(global::AetherBoy.Runtime.Localization.UiText.Get("Link-Verbindung"), ex); }
     }
 
     internal void SelectKeyboardPlayer(int player)
@@ -291,17 +291,17 @@ internal sealed class frmLocalLinkLab : Form
         startButton.Enabled = !active && !starting && HasCompatibleSelection;
         foreach (var button in pickButtons) button.Enabled = !active && !starting;
         pauseButton.Enabled = cableButton.Enabled = active && stopping is null && snapshot?.State is SessionState.Running or SessionState.Paused;
-        pauseButton.Text = snapshot?.IsPaused == true ? "BEIDE FORTSETZEN" : "BEIDE PAUSIEREN";
-        cableButton.Text = snapshot?.Connected == true ? "KABEL TRENNEN" : "KABEL VERBINDEN";
+        pauseButton.Text = snapshot?.IsPaused == true ? global::AetherBoy.Runtime.Localization.UiText.Get("BEIDE FORTSETZEN") : global::AetherBoy.Runtime.Localization.UiText.Get("BEIDE PAUSIEREN");
+        cableButton.Text = snapshot?.Connected == true ? global::AetherBoy.Runtime.Localization.UiText.Get("KABEL TRENNEN") : global::AetherBoy.Runtime.Localization.UiText.Get("KABEL VERBINDEN");
         cableButton.Selected = snapshot?.Connected == true;
         stopButton.Enabled = active && stopping is null;
         audioButton.Enabled = active && stopping is null && settings.AudioEnable;
-        audioButton.Text = audioPlayer < 0 ? "AUDIO AUS" : $"AUDIO · PLAYER {audioPlayer + 1}";
+        audioButton.Text = audioPlayer < 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("AUDIO AUS") : global::AetherBoy.Runtime.Localization.UiText.Format("AUDIO · PLAYER {0}", audioPlayer + 1);
         status.Text = actionMessage ?? (snapshot is null ?
             (selectedRoms[0] is not null && selectedRoms[1] is not null && !HasCompatibleSelection
-                ? "NICHT KOMPATIBEL · GB/GBC und GBA können nicht miteinander verkabelt werden."
-                : "BEREIT · Zwei GB-/GBC-ROMs oder zwei GBA-ROMs auswählen.") :
-            $"{snapshot.State} · {(snapshot.Connected ? "KABEL VERBUNDEN" : "KABEL GETRENNT")} · Frame {snapshot.FrameCount:N0} · Link-Zähler {snapshot.ClockEdges:N0} · Tastatur P{keyboardPlayer + 1}");
+                ? global::AetherBoy.Runtime.Localization.UiText.Get("NICHT KOMPATIBEL · GB/GBC und GBA können nicht miteinander verkabelt werden.")
+                : global::AetherBoy.Runtime.Localization.UiText.Get("BEREIT · Zwei GB-/GBC-ROMs oder zwei GBA-ROMs auswählen.")) :
+            global::AetherBoy.Runtime.Localization.UiText.Format("{0} · {1} · Frame {2:N0} · Link-Zähler {3:N0} · Tastatur P{4}", global::AetherBoy.Runtime.Localization.UiLabels.Session(snapshot.State), (snapshot.Connected ? global::AetherBoy.Runtime.Localization.UiText.Get("KABEL VERBUNDEN") : global::AetherBoy.Runtime.Localization.UiText.Get("KABEL GETRENNT")), snapshot.FrameCount, snapshot.ClockEdges, keyboardPlayer + 1));
         var output = Volatile.Read(ref audioOutput);
         output?.SetSuspended(snapshot?.State != SessionState.Running);
         // Control updates and native controller calls can dispatch window messages.
@@ -317,7 +317,7 @@ internal sealed class frmLocalLinkLab : Form
             if (snapshot?.State == SessionState.Faulted && !faultShown)
             {
                 faultShown = true;
-                actionMessage = "Link-Fehler: " + current.Fault?.GetType().Name + ". Sitzung beenden und neu starten.";
+                actionMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Link-Fehler: ") + current.Fault?.GetType().Name + global::AetherBoy.Runtime.Localization.UiText.Get(". Sitzung beenden und neu starten.");
                 ClearInput();
             }
         }
@@ -333,9 +333,11 @@ internal sealed class frmLocalLinkLab : Form
         for (int player = 0; player < 2; player++)
         {
             var pad = player == 0 ? pads.First : pads.Second;
+            settings.UseControllerProfile(pad);
             if (!pad.IsConnected) padArmed[player] = false;
-            else if (!padArmed[player]) padArmed[player] = GamepadNavigationInput.Neutral(pad);
-            GameBoyButtons mapped = padArmed[player] ? GamepadMapper.ToGameBoyButtons(pad, settings.GamepadBindings) : GameBoyButtons.None;
+            else if (!padArmed[player]) padArmed[player] = settings.IsControllerNeutral(pad);
+            GameBoyButtons mapped = padArmed[player] ? GamepadMapper.ToGameBoyButtons(pad, settings.GamepadBindings,
+                settings.ControllerStickEnabled ? settings.ControllerStickThreshold : 1f) : GameBoyButtons.None;
             if (player == keyboardPlayer) mapped |= KeyboardButtons();
             PostButtons(player, mapped);
             GameBoyAdvanceButtons advance = GameBoyAdvanceButtons.None;
@@ -356,6 +358,7 @@ internal sealed class frmLocalLinkLab : Form
     }
 
     private static bool ChangedController(HostGamepadState before, HostGamepadState after) =>
+        before.DeviceId != after.DeviceId ||
         before.IsConnected != after.IsConnected || before.Source != after.Source ||
         before.DeviceName != after.DeviceName || before.VendorId != after.VendorId || before.ProductId != after.ProductId;
 
@@ -459,7 +462,7 @@ internal sealed class frmLocalLinkLab : Form
     private void ShowError(string title, Exception exception)
     {
         actionMessage = title + " · " + exception.GetType().Name;
-        AetherSignal.Show(this, exception.Message, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        AetherSignal.Show(this, global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message), title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
     }
     private static AetherButton Button(Control parent, string name, string text, Rectangle bounds, Action action)
     {

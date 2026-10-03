@@ -19,9 +19,11 @@ namespace nanoboy.Controls
             string section,
             string description,
             bool showMinimize = false,
-            Func<bool>? gamepadNavigationEnabled = null)
+            Func<bool>? gamepadNavigationEnabled = null,
+            int descriptionLines = 1)
         {
             ArgumentNullException.ThrowIfNull(form);
+            int headerHeight = HeaderHeight + (Math.Clamp(descriptionLines, 1, 3) - 1) * 18;
 
             form.SuspendLayout();
             form.AutoScaleMode = AutoScaleMode.Dpi;
@@ -50,7 +52,7 @@ namespace nanoboy.Controls
             form.Padding = new Padding(1);
             form.MinimumSize = Size.Empty;
             form.MaximumSize = Size.Empty;
-            form.ClientSize = new Size(contentSize.Width, contentSize.Height + HeaderHeight);
+            form.ClientSize = new Size(contentSize.Width, contentSize.Height + headerHeight);
 
             if (fixedSize)
             {
@@ -61,28 +63,28 @@ namespace nanoboy.Controls
             {
                 form.MinimumSize = new Size(
                     requestedMinimumSize.Width,
-                    requestedMinimumSize.Height + HeaderHeight);
+                    requestedMinimumSize.Height + headerHeight);
             }
 
             var body = new Panel
             {
                 Name = "aetherDialogBody",
                 BackColor = AetherColors.Void,
-                Bounds = new Rectangle(1, HeaderHeight + 1, contentSize.Width - 2, contentSize.Height - 2),
+                Bounds = new Rectangle(1, headerHeight + 1, contentSize.Width - 2, contentSize.Height - 2),
                 Dock = DockStyle.None,
                 Location = Point.Empty
             };
-            var viewport = new Panel
+            var viewport = new AetherScrollViewport
             {
                 Name = "aetherDialogViewport", Dock = DockStyle.Fill,
-                AutoScroll = true, BackColor = AetherColors.Void
+                BackColor = AetherColors.Void
             };
-            viewport.Controls.Add(body);
+            viewport.SetContent(body, contentSize);
             void FitBody()
             {
                 float factor = form.DeviceDpi / 96f;
-                body.Size = new Size(Math.Max((int)((contentSize.Width - 2) * factor), viewport.ClientSize.Width),
-                    Math.Max((int)((contentSize.Height - 2) * factor), viewport.ClientSize.Height));
+                viewport.SetMinimumContent(new Size((int)((contentSize.Width - 2) * factor),
+                    (int)((contentSize.Height - 2) * factor)));
             }
             viewport.SizeChanged += (_, _) => FitBody();
             void FitDialog()
@@ -91,7 +93,7 @@ namespace nanoboy.Controls
                 form.MinimumSize = Size.Empty;
                 form.MaximumSize = Size.Empty;
                 Size ideal = new Size((int)(contentSize.Width * form.DeviceDpi / 96f),
-                    (int)((contentSize.Height + HeaderHeight) * form.DeviceDpi / 96f));
+                    (int)((contentSize.Height + headerHeight) * form.DeviceDpi / 96f));
                 form.Size = new Size(Math.Min(ideal.Width, work.Width), Math.Min(ideal.Height, work.Height));
                 form.Location = new Point(Math.Clamp(form.Left, work.Left, work.Right - form.Width),
                     Math.Clamp(form.Top, work.Top, work.Bottom - form.Height));
@@ -109,7 +111,7 @@ namespace nanoboy.Controls
             {
                 Name = "aetherDialogHeader",
                 Dock = DockStyle.Top,
-                Height = HeaderHeight,
+                Height = headerHeight,
                 Width = contentSize.Width - 2,
                 Cursor = Cursors.SizeAll
             };
@@ -148,12 +150,13 @@ namespace nanoboy.Controls
 
             var descriptionLabel = new Label
             {
+                Name = "aetherDialogDescription",
                 AutoEllipsis = true,
                 AutoSize = false,
                 ForeColor = AetherColors.Muted,
                 Font = new Font("Segoe UI", 8.25f, FontStyle.Regular, GraphicsUnit.Point),
                 Location = new Point(84, 53),
-                Size = new Size(Math.Max(120, contentSize.Width - 220), 18),
+                Size = new Size(Math.Max(120, contentSize.Width - 220), headerHeight - 64),
                 Text = description
             };
 
@@ -214,6 +217,13 @@ namespace nanoboy.Controls
             form.CancelButton = cancelButton;
             Style(body.Controls);
 
+            float uiScale = Math.Clamp(Properties.Settings.Default.UiScalePercent, 100, 150) / 100f;
+            if (uiScale != 1f)
+            {
+                InterfaceScale.Apply(body, uiScale);
+                contentSize = new Size((int)Math.Ceiling(contentSize.Width * uiScale), (int)Math.Ceiling(contentSize.Height * uiScale));
+            }
+
             form.KeyDown += (_, eventArgs) =>
             {
                 if (eventArgs.KeyCode == Keys.Escape)
@@ -237,43 +247,11 @@ namespace nanoboy.Controls
                         button.UseVisualStyleBackColor = false;
                         break;
 
-                    case Button button:
-                        button.BackColor = AetherColors.SurfaceRaised;
-                        button.ForeColor = AetherColors.Text;
-                        button.FlatStyle = FlatStyle.Flat;
-                        button.FlatAppearance.BorderColor = AetherColors.Violet;
-                        button.FlatAppearance.BorderSize = 1;
-                        button.Font = new Font("Segoe UI", 8.5f, FontStyle.Bold, GraphicsUnit.Point);
-                        button.Cursor = button.Enabled ? Cursors.Hand : Cursors.Default;
-                        button.UseVisualStyleBackColor = false;
-                        break;
+                    case AetherTextBox input:
+                        input.RefreshTheme();
+                        continue; // The encapsulated EDIT backend must never receive generic styling.
 
-                    case TextBox textBox:
-                        textBox.BackColor = AetherColors.SurfaceRaised;
-                        textBox.ForeColor = AetherColors.Text;
-                        textBox.BorderStyle = BorderStyle.FixedSingle;
-                        break;
-
-                    case RichTextBox richTextBox:
-                        richTextBox.BackColor = AetherColors.SurfaceRaised;
-                        richTextBox.ForeColor = AetherColors.Text;
-                        richTextBox.BorderStyle = BorderStyle.FixedSingle;
-                        break;
-
-                    case ListView listView:
-                        StyleListView(listView);
-                        break;
-
-                    case ListBox listBox:
-                        listBox.BackColor = AetherColors.SurfaceRaised;
-                        listBox.ForeColor = AetherColors.Text;
-                        listBox.BorderStyle = BorderStyle.FixedSingle;
-                        break;
-
-                    case ComboBox comboBox:
-                        comboBox.BackColor = AetherColors.SurfaceRaised;
-                        comboBox.ForeColor = AetherColors.Text;
-                        comboBox.FlatStyle = FlatStyle.Flat;
+                    case AetherList:
                         break;
 
                     case AetherGroupBox:
@@ -294,6 +272,10 @@ namespace nanoboy.Controls
                     case Label label:
                         label.BackColor = Color.Transparent;
                         label.ForeColor = ResolveLabelColor(label);
+                        break;
+
+                    case Panel panel when Equals(panel.Tag, "theme-swatch"):
+                        // Preset previews are fixed RGB samples, not dialog surfaces.
                         break;
 
                     case Panel panel when panel is not AetherSurfacePanel:
@@ -331,76 +313,6 @@ namespace nanoboy.Controls
             return AetherColors.Muted;
         }
 
-        private static void StyleListView(ListView listView)
-        {
-            listView.BackColor = AetherColors.SurfaceRaised;
-            listView.ForeColor = AetherColors.Text;
-            listView.BorderStyle = BorderStyle.FixedSingle;
-            listView.Font = new Font("Segoe UI", 9f, FontStyle.Regular, GraphicsUnit.Point);
-            listView.GridLines = false;
-            listView.OwnerDraw = true;
-            listView.DrawColumnHeader += (_, eventArgs) =>
-            {
-                using var fill = new SolidBrush(AetherColors.Chrome);
-                using var edge = new Pen(AetherColors.Hairline);
-                using var headerFont = new Font("Segoe UI", 8f, FontStyle.Bold, GraphicsUnit.Point);
-                eventArgs.Graphics.FillRectangle(fill, eventArgs.Bounds);
-                eventArgs.Graphics.DrawLine(
-                    edge,
-                    eventArgs.Bounds.Left,
-                    eventArgs.Bounds.Bottom - 1,
-                    eventArgs.Bounds.Right,
-                    eventArgs.Bounds.Bottom - 1);
-                TextRenderer.DrawText(
-                    eventArgs.Graphics,
-                    eventArgs.Header?.Text ?? string.Empty,
-                    headerFont,
-                    Rectangle.Inflate(eventArgs.Bounds, -8, 0),
-                    AetherColors.Muted,
-                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
-            };
-            listView.DrawItem += (_, eventArgs) =>
-            {
-                if (listView.View == View.Details) return; // Sub-items paint the details view.
-                if (listView.View != View.LargeIcon) { eventArgs.DrawDefault = true; return; }
-                Rectangle bounds = eventArgs.Bounds;
-                using var fill = new SolidBrush(eventArgs.Item.Selected
-                    ? Color.FromArgb(39, 32, 68) : AetherColors.SurfaceRaised);
-                eventArgs.Graphics.FillRectangle(fill, bounds);
-                ImageList? images = listView.LargeImageList;
-                int imageIndex = eventArgs.Item.ImageIndex;
-                int imageHeight = images?.ImageSize.Height ?? 0;
-                if (images != null && imageIndex >= 0 && imageIndex < images.Images.Count)
-                    images.Draw(eventArgs.Graphics, bounds.Left + (bounds.Width - images.ImageSize.Width) / 2,
-                        bounds.Top + 2, imageIndex);
-                TextRenderer.DrawText(eventArgs.Graphics, eventArgs.Item.Text, listView.Font,
-                    new Rectangle(bounds.Left + 3, bounds.Top + imageHeight + 5,
-                        Math.Max(1, bounds.Width - 6), Math.Max(1, bounds.Height - imageHeight - 5)),
-                    eventArgs.Item.Selected ? AetherColors.Cyan : AetherColors.Text,
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
-                if (eventArgs.Item.Focused) eventArgs.DrawFocusRectangle();
-            };
-            listView.DrawSubItem += (_, eventArgs) =>
-            {
-                bool selected = eventArgs.Item.Selected;
-                Color background = selected ? Color.FromArgb(39, 32, 68) : AetherColors.SurfaceRaised;
-                Color foreground = eventArgs.SubItem.Text switch
-                {
-                    "READY" => AetherColors.Success,
-                    "MISSING" => AetherColors.Danger,
-                    _ => selected ? AetherColors.Cyan : AetherColors.Text
-                };
-                using var fill = new SolidBrush(background);
-                eventArgs.Graphics.FillRectangle(fill, eventArgs.Bounds);
-                TextRenderer.DrawText(
-                    eventArgs.Graphics,
-                    eventArgs.SubItem.Text,
-                    listView.Font,
-                    Rectangle.Inflate(eventArgs.Bounds, -8, 0),
-                    foreground,
-                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
-            };
-        }
 
         [DllImport("user32.dll")]
         private static extern bool ReleaseCapture();

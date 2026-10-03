@@ -17,12 +17,28 @@ namespace nanoboy
         public required Action ApplyAudioSettings { get; init; }
         public Action ApplyVideoSettings { get; init; } = () => { };
         public Action ApplyUiTheme { get; init; } = () => { };
+        public Action ApplyDiscordSettings { get; init; } = () => { };
+        public Func<DiscordPresenceStatus> DiscordStatusProvider { get; init; } = () => DiscordPresenceStatus.Disabled;
+        public Func<DiscordActivityPayload?> DiscordPreviewProvider { get; init; } = () => null;
+        public ReleaseUpdateService? Updates { get; init; }
+        public Func<System.Threading.Tasks.Task>? PreviewBootIntro { get; init; }
+        public Func<bool, System.Threading.Tasks.Task>? SetBarcodeBoyEnabled { get; init; }
+        public Func<string, System.Threading.Tasks.Task>? ScanBarcodeBoy { get; init; }
         public Func<string> AudioOutputProvider { get; init; } = () => "No output";
         public Func<string> VideoOutputProvider { get; init; } = () => "No output";
         public Func<string> SaveFeedbackProvider { get; init; } = () => "Noch keine Save-State-Aktion.";
         public Action OpenStateGallery { get; init; } = () => { };
         public Action OpenQuickMenu { get; init; } = () => { };
+        public Action OpenLibrary { get; init; } = () => { };
+        public Action OpenPatchLab { get; init; } = () => { };
+        public Action OpenCheats { get; init; } = () => { };
+        public Action CreateOnlineRoom { get; init; } = () => { };
+        public Action JoinOnlineRoom { get; init; } = () => { };
+        public Action TestOnlineConnection { get; init; } = () => { };
         public Action CaptureScreenshot { get; init; } = () => { };
+        public Action ToggleGameplayRecording { get; init; } = () => { };
+        public Func<bool> GameplayRecordingActive { get; init; } = () => false;
+        public Func<string> GameplayRecordingStatus { get; init; } = () => "Noch kein Video aufgenommen.";
         public Action TogglePerformanceOverlay { get; init; } = () => { };
         public Action MarkProblem { get; init; } = () => { };
         public Func<string> HealthStatusProvider { get; init; } = () => "Keine Beobachtung aktiv.";

@@ -25,7 +25,7 @@ internal sealed class LinuxRomStorage : IDisposable
     {
         using var input = File.OpenRead(romPath);
         if (input.Length < 0xC0 || input.Length > 32 * 1024 * 1024)
-            throw new InvalidDataException("Unsupported ROM size.");
+            throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Unsupported ROM size."));
         return Convert.ToHexString(Hash(input, cancellationToken));
     }
 
@@ -71,7 +71,7 @@ internal sealed class LinuxRomStorage : IDisposable
         if (Directory.Exists(destination))
         {
             if (files.Any(file => !SameContents(file.Source, Path.Combine(destination, file.Name), cancellationToken)))
-                MigrationNotice = "Central saves kept. Different older files remain beside the original ROM.";
+                MigrationNotice = global::AetherBoy.Runtime.Localization.UiText.Get("Central saves kept. Different older files remain beside the original ROM.");
             return;
         }
 
@@ -86,7 +86,7 @@ internal sealed class LinuxRomStorage : IDisposable
                 using var input = File.OpenRead(file.Source);
                 long maximum = file.Name.StartsWith("game.ss", StringComparison.Ordinal)
                     ? nanoboy.Core.EmulatorStateCodec.MaximumDocumentLength : 4 * 1024 * 1024;
-                if (input.Length > maximum) throw new InvalidDataException("A legacy save file is too large to migrate safely.");
+                if (input.Length > maximum) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("A legacy save file is too large to migrate safely."));
                 using var output = new FileStream(Path.Combine(staging, file.Name), FileMode.CreateNew,
                     FileAccess.Write, FileShare.None);
                 input.CopyToAsync(output, cancellationToken).GetAwaiter().GetResult();
@@ -96,7 +96,7 @@ internal sealed class LinuxRomStorage : IDisposable
             cancellationToken.ThrowIfCancellationRequested();
             Directory.Move(staging, destination);
             if (files.Length > 0 && MigrationNotice is null)
-                MigrationNotice = "Existing saves copied safely. Original files have been kept.";
+                MigrationNotice = global::AetherBoy.Runtime.Localization.UiText.Get("Existing saves copied safely. Original files have been kept.");
         }
         finally { if (Directory.Exists(staging)) Directory.Delete(staging, recursive: true); }
     }

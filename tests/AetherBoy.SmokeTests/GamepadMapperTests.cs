@@ -60,6 +60,18 @@ public sealed class GamepadMapperTests
     }
 
     [TestMethod]
+    public void RemappedDirectionUsesChosenButtonWhileStickRemainsIndependent()
+    {
+        GamepadBindings bindings = GamepadBindings.Default with { Up = HostGamepadButtons.North };
+        Assert.AreEqual(GameBoyButtons.None,
+            GamepadMapper.ToGameBoyButtons(new HostGamepadState(HostGamepadButtons.DPadUp), bindings));
+        Assert.AreEqual(GameBoyButtons.Up,
+            GamepadMapper.ToGameBoyButtons(new HostGamepadState(HostGamepadButtons.North), bindings));
+        Assert.AreEqual(GameBoyButtons.Up,
+            GamepadMapper.ToGameBoyButtons(new HostGamepadState(HostGamepadButtons.None, leftThumbY: .75f), bindings));
+    }
+
+    [TestMethod]
     public void ShoulderShortcut_OnlyFiresOnThePressEdge()
     {
         var pressed = new HostGamepadState(HostGamepadButtons.RightShoulder);

@@ -1,14 +1,22 @@
 # AetherBoy visual identity
 
-## Aether Wave
+## Current logo — approved 2026-10-02
 
-The AetherBoy mark combines an angular `A`, a dissolving signal wave and a
-compact handheld silhouette. The wave communicates translation between real
-Game Boy hardware and the deterministic emulator core without copying the
-outline of a specific Nintendo device.
+`aetherboy-logo-2026-10-02.jpg` is the user's finished artwork, retained as an
+unmodified source file. It combines the interlocking AB monogram, directional
+pad and action buttons with the AetherBoy wordmark and violet/cyan frame.
 
-The detailed master mark is used at 48 px and above. The compact mark reduces
-the particle trail and controls for 16–40 px system surfaces.
+Use this exact composition: no AI regeneration, cropping, recoloring or new
+typography. PNG and ICO exports only resize and encode it. At small system-icon
+sizes the wordmark naturally loses detail; do not silently substitute the old
+mark. The original Aether Wave SVG files remain as historical design sources,
+but no longer generate the active app logo.
+
+Windows and Linux use the same 512 px image in their UI and start animation.
+Windows also embeds the multi-resolution ICO; Linux installation uses the PNG
+icon sizes. The intro does not draw a duplicate wordmark or a visible skip button.
+Existing custom intro images/sounds and all six themes remain independent of
+this bundled logo. The artwork keeps its own colors, including on light themes.
 
 ## Core palette
 
@@ -24,11 +32,12 @@ not be repeated on every UI surface or control.
 
 ## Source and exports
 
-- `aetherboy-mark.svg`: detailed source for large icon and brand use.
-- `aetherboy-mark-small.svg`: optically simplified source for Windows icon sizes.
-- `exports/`: generated PNG previews and individual icon frames.
+- `aetherboy-logo-2026-10-02.jpg`: current, user-supplied master artwork.
+- `aetherboy-mark.svg`, `aetherboy-mark-small.svg`: historical Aether Wave sources.
+- `exports/`: PNG exports at 16–512 px, keeping the complete artwork.
 - `nanoboy/Branding/AetherBoy.ico`: generated multi-resolution Windows icon.
 - `nanoboy/Branding/AetherBoyMark.png`: generated 512 px application artwork.
 
 Run `node tools/branding/render-brand-assets.cjs` with `sharp` available to
-rebuild every raster asset from the SVG sources.
+rebuild every raster asset from the approved JPEG. No remote attachment path is
+needed after cloning the repository.

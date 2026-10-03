@@ -11,6 +11,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="DiscordRichPresence" Version="1.6.1.70" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="SharpCompress" Version="0.50.4" />
     <PackageReference Include="MediaToolkit.WebRtc.Native.win-x64" Version="0.24.5.1" GeneratePathProperty="true" ExcludeAssets="build" />
   </ItemGroup>
 
@@ -20,6 +23,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="../../third_party/online-native-licenses/*" Link="licenses/online-native/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../third_party/mgba-cheats/*" Link="licenses/mgba-cheats/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../third_party/sharpcompress/*" Link="licenses/sharpcompress/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../third_party/discord-rpc/*" Link="licenses/discord-rpc/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(PkgMediaToolkit_WebRtc_Native_win-x64)/native/win-x64/datachannel.dll" Link="datachannel.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../../artifacts/native/$(OnlineNativeRid)/libdatachannel.so" Link="libdatachannel.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('../../artifacts/native/$(OnlineNativeRid)/libdatachannel.so')" />
   </ItemGroup>
@@ -30,6 +36,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Localization\UiText.json" LogicalName="AetherBoy.UiText.json" />
     <EmbeddedResource Include="Netplay\WebRtcBridge.html" LogicalName="AetherBoy.Runtime.Netplay.WebRtcBridge.html" />
     <EmbeddedResource Include="Netplay\WebRtcBridge.js" LogicalName="AetherBoy.Runtime.Netplay.WebRtcBridge.js" />
   </ItemGroup>
@@ -37,6 +44,12 @@
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>AetherBoy.RuntimeTests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>AetherBoy.SmokeTests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>AetherBoy.DesktopTests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
 

@@ -5,7 +5,7 @@ Diese Regeln gelten für alle, die sichtbare Texte im Emulator oder auf der loka
 ## Vor dem Schreiben
 
 1. Kläre für den konkreten Bildschirm: Was will der Spieler gerade tun? Was muss er wissen, bevor er klickt?
-2. Schreibe den Hinweis in der Sprache der jeweiligen Oberfläche. Browserseite und Windows sind Deutsch, Linux ist derzeit Englisch.
+2. Windows, Linux und die lokale Browserbrücke verwenden die gewählte Anzeigesprache Deutsch/Englisch. Neue app-eigene Texte in beiden Sprachen im gemeinsamen `nanoboy/Runtime/Localization/UiText.json` hinterlegen und über `UiText.Get` bzw. `UiText.Format` anbinden. Browserressourcen markieren ihre Texte ausdrücklich mit `{{ui:Quelltext}}` (HTML) bzw. `/*ui*/"Quelltext"` (JavaScript); `BrowserUiText` setzt nur diese Stellen mit passendem HTML-/JSON-Escaping ein.
 3. Prüfe jede technische Aussage im Code oder in der Dokumentation. Online Link ist experimentell; die Verbindung allein bestätigt keinen Tausch. Das Original bleibt erhalten, die Sitzung nutzt eine Kopie des Spielstands.
 4. Lies den Text laut. Wenn er wie ein Statusbericht, eine Werbezeile oder eine interne Entwicklernotiz klingt, schreibe ihn als normalen Satz neu.
 
@@ -31,5 +31,32 @@ Diese Regeln gelten für alle, die sichtbare Texte im Emulator oder auf der loka
 - **Länge:** Schreibe kurz genug für die tatsächliche Breite. Lass Sicherheitsangaben und die nächste Handlung sichtbar; kürze keine entscheidenden Aussagen nur für gleich hohe Felder.
 
 ## Review
+
+Die vertiefte Sprachmigration vom 02.10.2026 umfasst auch Nebenpfade und die
+Browserbrücke; der gemeinsame Katalog enthält derzeit **2376 DE/EN-Einträge**.
+Eine vollständige manuelle Abnahme jedes Fensters und Fehlerfalls bleibt offen.
+Systemauswahl: `de-DE`, `de-AT`, `de-CH` und weitere deutsche UI-Kulturen wählen
+Deutsch; alle anderen Englisch. Sprache wird getrennt von Zahlen-/Datumsformaten
+und Spielprofilen gespeichert. Ein Neustart verhindert gemischte offene Fenster.
+`UiText` ausschließlich mit app-eigenen Texten aufrufen, nicht pauschal mit jedem
+Label: Spieltitel, Pfade, eingegebene Codes und technische Kennungen bleiben Daten.
+Dynamische Werte über Platzhalter einsetzen; keine laufzeitabhängigen Texte als
+Übersetzungsschlüssel bilden. Control-Namen und Beschriftungen müssen getrennt sein.
+Katalogtests prüfen alle Alias-Zuordnungen und Formatplatzhalter. Eine grüne Prüfung
+beweist nicht, dass alle vorhandenen Quelltexte bereits im Katalog stehen.
+
+Stabile Werte wie Genres, Eingabeaktionen, Sitzungs-/Recovery-Zustände und
+Diagnosecodes über `UiLabels` erst an der Präsentationsstelle beschriften.
+Gespeicherte Werte, Enumvergleiche, SDL-Tastennamen, Dateifiltermuster und
+Ordnernamen bleiben unverändert. Fremde bzw. native Fehlermeldungen werden unter
+`UiText.TechnicalDetails` unverändert angezeigt; nur exakt bekannte app-eigene
+Meldungen werden übersetzt. Keine Ersetzung einzelner Wörter in Pfaden/Fehlertexten.
+Lizenztexte, mitgelieferte Originaldokumente, ROM-/Nutzertitel und Gerätenamen sind
+keine UI-Übersetzung. Fach-/Produktnamen wie GameShark oder CodeBreaker bleiben.
+
+Vor einer mechanischen Migration Inventur und Diff prüfen. `--verify` der
+Migrationshilfe prüft angebundene Literalquellen, nicht die semantische Vollständigkeit
+der Oberfläche. Die verbleibende Literalinventur enthält auch technische IDs,
+Dateinamen, Suchstichwörter und Einheiten; deren Anzahl ist keine Übersetzungsschuld.
 
 `python3 scripts/review-ui-copy.py <dateien>` markiert einige typische KI-Muster in Quellzeilen mit UI-Text. Die Treffer sind Prüfpunkte, keine automatische Bewertung. Lies danach alle sichtbaren Strings im geänderten Ablauf und prüfe Dialoge, Statuswechsel, Fehlerfälle und schmale Fensterbreiten. Halte Protokolltexte und technische Kennungen unverändert.

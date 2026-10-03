@@ -39,6 +39,8 @@ namespace nanoboy.Core
     {
         public const int BackupCount = 3;
 
+        public static IReadOnlyList<BatterySaveActivity> GetActiveWrites() => BatterySaveOperation.GetActive();
+
         internal sealed record LoadResult(byte[] Data, BatterySaveLoadStatus Status);
 
         internal static LoadResult Load(string savePath, int expectedLength)
@@ -162,26 +164,57 @@ namespace nanoboy.Core
                 Directory.CreateDirectory(directory);
             }
 
-            RotateValidFiles(savePath, data.Length);
-            WriteAtomic(savePath, data);
+            using var operation = new BatterySaveOperation();
+            try
+            {
+                RotateValidFiles(savePath, data.Length, operation);
+                WriteAtomic(savePath, data, operation, 0);
+            }
+            catch (Exception error)
+            {
+                operation.Annotate(error);
+                throw;
+            }
         }
 
-        private static void RotateValidFiles(string savePath, int expectedLength)
+        private static void RotateValidFiles(string savePath, int expectedLength, BatterySaveOperation operation)
         {
-            var generations = new List<byte[]>(BackupCount);
+            var generations = new List<(string Path, byte[] Data)>(BackupCount);
             for (int generation = 0; generation < BackupCount; generation++)
             {
-                if (TryReadExact(GetPath(savePath, generation), expectedLength, out byte[] data))
+                operation.SetStage("inspect-backup", generation);
+                string path = GetPath(savePath, generation);
+                if (TryReadExact(path, expectedLength, out byte[] data))
                 {
-                    generations.Add(data);
+                    generations.Add((path, data));
                 }
             }
 
             for (int index = generations.Count - 1; index >= 0; index--)
             {
-                WriteAtomic(GetPath(savePath, index + 1), generations[index]);
+                var source = generations[index];
+                string target = GetPath(savePath, index + 1);
+                // Keep the current save in place until its replacement is durable.
+                // Older guarded generations are already durable: rename, don't
+                // rewrite and fsync every byte again on each shutdown.
+                string? guard = GuardMatches(GetGuardPath(source.Path), source.Data) ? GetGuardPath(source.Path)
+                    : GuardMatches(GetNextGuardPath(source.Path), source.Data) ? GetNextGuardPath(source.Path) : null;
+                if (source.Path != savePath && guard is not null)
+                {
+                    if (source.Path == target) continue;
+                    operation.SetStage("rotate-guard", index + 1);
+                    File.Move(guard, GetNextGuardPath(target), overwrite: true);
+                    operation.SetStage("rotate-data", index + 1);
+                    File.Move(source.Path, target, overwrite: true);
+                    operation.SetStage("publish-backup-guard", index + 1);
+                    File.Move(GetNextGuardPath(target), GetGuardPath(target), overwrite: true);
+                    DeleteIfExists(GetGuardPath(source.Path));
+                    DeleteIfExists(GetNextGuardPath(source.Path));
+                }
+                else WriteAtomic(target, source.Data, operation, index + 1);
             }
 
+            operation.SetStage("remove-stale-backups", -1);
             for (int target = generations.Count; target < BackupCount; target++)
             {
                 string stalePath = GetPath(savePath, target + 1);
@@ -194,27 +227,37 @@ namespace nanoboy.Core
             }
         }
 
-        private static void WriteAtomic(string destinationPath, ReadOnlySpan<byte> data)
+        private static void WriteAtomic(string destinationPath, ReadOnlySpan<byte> data, BatterySaveOperation operation, int generation)
         {
             string temporaryPath = destinationPath + ".tmp." + Guid.NewGuid().ToString("N");
             string nextGuardPath = GetNextGuardPath(destinationPath);
             try
             {
+                operation.SetStage("write-data", generation);
                 using (var stream = new FileStream(
                     temporaryPath,
                     FileMode.CreateNew,
                     FileAccess.Write,
                     FileShare.None,
                     64 * 1024,
-                    FileOptions.WriteThrough))
+                    FileOptions.None))
                 {
                     stream.Write(data);
+                    // Commit the complete temporary file once, before publishing it.
+                    // WriteThrough on every write plus Flush(true) made shutdown
+                    // pay for both barriers, multiplied by both linked players
+                    // and their backup generations. The explicit durable flush
+                    // remains mandatory; Dispose/Flush() alone is not sufficient.
+                    operation.SetStage("flush-data", generation);
                     stream.Flush(flushToDisk: true);
+                    operation.SetStage("close-data", generation);
                 }
 
                 byte[] guard = CreateGuard(data);
-                WriteDurableFile(nextGuardPath, guard);
+                WriteDurableFile(nextGuardPath, guard, operation, generation);
+                operation.SetStage("publish-data", generation);
                 File.Move(temporaryPath, destinationPath, overwrite: true);
+                operation.SetStage("publish-guard", generation);
                 File.Move(nextGuardPath, GetGuardPath(destinationPath), overwrite: true);
             }
             finally
@@ -290,23 +333,28 @@ namespace nanoboy.Core
             }
         }
 
-        private static void WriteDurableFile(string destinationPath, ReadOnlySpan<byte> data)
+        private static void WriteDurableFile(string destinationPath, ReadOnlySpan<byte> data, BatterySaveOperation operation, int generation)
         {
             string temporaryPath = destinationPath + ".tmp." + Guid.NewGuid().ToString("N");
             try
             {
+                operation.SetStage("write-guard", generation);
                 using (var stream = new FileStream(
                     temporaryPath,
                     FileMode.CreateNew,
                     FileAccess.Write,
                     FileShare.None,
                     4 * 1024,
-                    FileOptions.WriteThrough))
+                    FileOptions.None))
                 {
                     stream.Write(data);
+                    // The guard must be durable before the data file is replaced.
+                    operation.SetStage("flush-guard", generation);
                     stream.Flush(flushToDisk: true);
+                    operation.SetStage("close-guard", generation);
                 }
 
+                operation.SetStage("stage-guard", generation);
                 File.Move(temporaryPath, destinationPath, overwrite: true);
             }
             finally

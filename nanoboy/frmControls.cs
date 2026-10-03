@@ -23,8 +23,8 @@ namespace nanoboy
         private GamepadBindingSlot? capturedGamepadBinding;
         internal bool IsCapturingGamepad => capturedGamepadBinding != null;
         private HostGamepadState lastCapturedGamepadState;
-        private TextBox txtKeyL = null!;
-        private TextBox txtKeyR = null!;
+        private nanoboy.Controls.AetherTextBox txtKeyL = null!;
+        private nanoboy.Controls.AetherTextBox txtKeyR = null!;
 
         private enum GamepadBindingSlot
         {
@@ -32,6 +32,10 @@ namespace nanoboy
             B,
             Start,
             Select,
+            Up,
+            Down,
+            Left,
+            Right,
             L,
             R,
             QuickLoad,
@@ -43,9 +47,10 @@ namespace nanoboy
             InitializeComponent();
             Branding.AppBrand.ApplyIcon(this);
             this.settings = settings;
-            Text = $"Steuerung – {ProductInfo.DisplayName}";
+            Text = global::AetherBoy.Runtime.Localization.UiText.Format("Steuerung – {0}", ProductInfo.DisplayName);
             ConfigureAetherLayout();
-            gamepadTimer = new Timer { Interval = 250 };
+            ConfigureInputSections();
+            gamepadTimer = new Timer { Interval = 50 };
             gamepadTimer.Tick += (_, _) => UpdateGamepadStatus();
             Shown += (_, _) =>
             {
@@ -56,8 +61,8 @@ namespace nanoboy
 
             AetherDialog.Apply(
                 this,
-                "INPUT MATRIX // 03",
-                "Feld auswählen und anschließend die gewünschte Taste drücken");
+                global::AetherBoy.Runtime.Localization.UiText.Get("Steuerung"),
+                global::AetherBoy.Runtime.Localization.UiText.Get("Feld auswählen und anschließend die gewünschte Taste drücken"));
         }
 
         private void ConfigureAetherLayout()
@@ -73,33 +78,33 @@ namespace nanoboy
                 Font = new Font("Segoe UI", 9f, FontStyle.Regular, GraphicsUnit.Point),
                 Location = new Point(28, 24),
                 Size = new Size(664, 44),
-                Text = "Jede Belegung wird direkt gespeichert. Doppelte Tasten sind möglich, aber für saubere Eingabe nicht empfohlen."
+                Text = global::AetherBoy.Runtime.Localization.UiText.Get("Jede Belegung wird direkt gespeichert. Doppelte Tasten sind möglich, aber für saubere Eingabe nicht empfohlen.")
             };
             Controls.Add(hint);
 
-            ArrangeBinding(label1, txtKeyA, "A BUTTON", 28, 88);
-            ArrangeBinding(label2, txtKeyB, "B BUTTON", 370, 88);
+            ArrangeBinding(label1, txtKeyA, global::AetherBoy.Runtime.Localization.UiText.Get("A BUTTON"), 28, 88);
+            ArrangeBinding(label2, txtKeyB, global::AetherBoy.Runtime.Localization.UiText.Get("B BUTTON"), 370, 88);
             ArrangeBinding(label4, txtKeyStart, "START", 28, 158);
-            ArrangeBinding(label3, txtKeySelect, "SELECT", 370, 158);
-            ArrangeBinding(label6, txtKeyUp, "DPAD UP", 28, 228);
-            ArrangeBinding(label5, txtKeyDown, "DPAD DOWN", 370, 228);
-            ArrangeBinding(label8, txtKeyLeft, "DPAD LEFT", 28, 298);
-            ArrangeBinding(label7, txtKeyRight, "DPAD RIGHT", 370, 298);
+            ArrangeBinding(label3, txtKeySelect, nameof(GamepadBindingSlot.Select).ToUpperInvariant(), 370, 158);
+            ArrangeBinding(label6, txtKeyUp, global::AetherBoy.Runtime.Localization.UiText.Get("DPAD UP"), 28, 228);
+            ArrangeBinding(label5, txtKeyDown, global::AetherBoy.Runtime.Localization.UiText.Get("DPAD DOWN"), 370, 228);
+            ArrangeBinding(label8, txtKeyLeft, global::AetherBoy.Runtime.Localization.UiText.Get("DPAD LEFT"), 28, 298);
+            ArrangeBinding(label7, txtKeyRight, global::AetherBoy.Runtime.Localization.UiText.Get("DPAD RIGHT"), 370, 298);
 
             txtKeyL = CreateKeyboardBindingBox((_, e) =>
             {
                 settings.KeyL = e.KeyCode;
-                txtKeyL.Text = e.KeyCode.ToString();
+                txtKeyL.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(e.KeyCode.ToString());
             });
             txtKeyR = CreateKeyboardBindingBox((_, e) =>
             {
                 settings.KeyR = e.KeyCode;
-                txtKeyR.Text = e.KeyCode.ToString();
+                txtKeyR.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(e.KeyCode.ToString());
             });
             var labelL = new Label();
             var labelR = new Label();
-            ArrangeBinding(labelL, txtKeyL, "GBA SHOULDER L", 28, 368);
-            ArrangeBinding(labelR, txtKeyR, "GBA SHOULDER R", 370, 368);
+            ArrangeBinding(labelL, txtKeyL, global::AetherBoy.Runtime.Localization.UiText.Get("GBA SHOULDER L"), 28, 368);
+            ArrangeBinding(labelR, txtKeyR, global::AetherBoy.Runtime.Localization.UiText.Get("GBA SHOULDER R"), 370, 368);
             Controls.Add(labelL);
             Controls.Add(labelR);
             Controls.Add(txtKeyL);
@@ -109,7 +114,7 @@ namespace nanoboy
 
             button1.Location = new Point(564, 712);
             button1.Size = new Size(128, 40);
-            button1.Text = "FERTIG";
+            button1.Text = global::AetherBoy.Runtime.Localization.UiText.Get("FERTIG");
             if (button1 is AetherButton aetherButton)
             {
                 aetherButton.Kind = AetherButtonKind.Primary;
@@ -128,7 +133,7 @@ namespace nanoboy
                 Location = new Point(28, 436),
                 Name = "gamepadCard",
                 Padding = new Padding(18, 14, 18, 12),
-                Size = new Size(664, 256)
+                Size = new Size(664, 450)
             };
 
             var heading = new Label
@@ -137,7 +142,7 @@ namespace nanoboy
                 Font = new Font("Segoe UI", 7.5f, FontStyle.Bold, GraphicsUnit.Point),
                 Location = new Point(18, 12),
                 Size = new Size(250, 20),
-                Text = "GAMEPAD // REMAP"
+                Text = global::AetherBoy.Runtime.Localization.UiText.Get("GAMEPAD // REMAP")
             };
             gamepadStatusDot = new AetherStatusDot { Location = new Point(18, 42) };
             gamepadStatus = new Label
@@ -147,7 +152,7 @@ namespace nanoboy
                 Font = new Font("Segoe UI", 10f, FontStyle.Bold, GraphicsUnit.Point),
                 Location = new Point(42, 36),
                 Size = new Size(588, 26),
-                Text = "SUCHE CONTROLLER"
+                Text = global::AetherBoy.Runtime.Localization.UiText.Get("SUCHE CONTROLLER")
             };
             gamepadIdentity = new Label
             {
@@ -162,6 +167,10 @@ namespace nanoboy
             AddGamepadBindingButton(card, GamepadBindingSlot.B, 222, 94);
             AddGamepadBindingButton(card, GamepadBindingSlot.Start, 426, 94);
             AddGamepadBindingButton(card, GamepadBindingSlot.Select, 18, 138);
+            AddGamepadBindingButton(card, GamepadBindingSlot.Up, 222, 138);
+            AddGamepadBindingButton(card, GamepadBindingSlot.Down, 426, 138);
+            AddGamepadBindingButton(card, GamepadBindingSlot.Left, 18, 182);
+            AddGamepadBindingButton(card, GamepadBindingSlot.Right, 222, 182);
             AddGamepadBindingButton(card, GamepadBindingSlot.L, 222, 138);
             AddGamepadBindingButton(card, GamepadBindingSlot.R, 426, 138);
             AddGamepadBindingButton(card, GamepadBindingSlot.QuickLoad, 18, 182);
@@ -172,9 +181,10 @@ namespace nanoboy
             {
                 AutoSize = false,
                 Font = new Font("Segoe UI", 8f, FontStyle.Regular, GraphicsUnit.Point),
-                Location = new Point(18, 226),
-                Size = new Size(612, 20),
-                Text = "BINDING ANKLICKEN, DANN CONTROLLER-TASTE DRÜCKEN  ·  DPAD UND LINKER STICK BLEIBEN RICHTUNG"
+                Location = new Point(18, 386),
+                Name = "controllerMappingHint",
+                Size = new Size(612, 52),
+                Text = global::AetherBoy.Runtime.Localization.UiText.Get("Wähle eine Belegung und drücke eine Controller-Taste. Der linke Stick bleibt ein zusätzlicher Richtungseingang; der rechte Stick-Klick öffnet die Menüs.")
             };
 
             card.Controls.Add(mapping);
@@ -204,8 +214,9 @@ namespace nanoboy
 
         private void BeginGamepadCapture(GamepadBindingSlot slot)
         {
+            if (!GamepadStateProvider().IsConnected) return;
             capturedGamepadBinding = slot;
-            lastCapturedGamepadState = GamepadInput.GetState();
+            lastCapturedGamepadState = GamepadStateProvider();
             UpdateGamepadBindingButtons();
         }
 
@@ -216,17 +227,19 @@ namespace nanoboy
                 bool isCapturing = capturedGamepadBinding == slot;
                 button.Selected = isCapturing;
                 button.Text = isCapturing
-                    ? $"{GetBindingCaption(slot)} · PRESS BUTTON"
-                    : $"{GetBindingCaption(slot)} · {FormatGamepadBinding(GetGamepadBinding(slot))}";
+                    ? global::AetherBoy.Runtime.Localization.UiText.Format("{0} · Taste drücken …", GetBindingCaption(slot))
+                    : $"{GetBindingCaption(slot)} · {FormatDeviceButton(GetGamepadBinding(slot), lastCapturedGamepadState)}";
             }
         }
 
         private void UpdateGamepadStatus()
         {
-            HostGamepadState state = GamepadInput.GetState();
+            HostGamepadState state = GamepadStateProvider();
+            if (state.DeviceId != lastCapturedGamepadState.DeviceId || !state.IsConnected) capturedGamepadBinding = null;
+            settings.UseControllerProfile(state);
             gamepadStatus.Text = state.IsConnected
-                ? state.DeviceName?.ToUpperInvariant() ?? "GAMEPAD VERBUNDEN"
-                : "KEIN GAMEPAD VERBUNDEN";
+                ? state.DeviceName?.ToUpperInvariant() ?? global::AetherBoy.Runtime.Localization.UiText.Get("GAMEPAD VERBUNDEN")
+                : global::AetherBoy.Runtime.Localization.UiText.Get("KEIN GAMEPAD VERBUNDEN");
             gamepadStatus.ForeColor = state.IsConnected
                 ? AetherColors.Text
                 : AetherColors.Muted;
@@ -252,6 +265,8 @@ namespace nanoboy
 
             CaptureGamepadBinding(state);
             lastCapturedGamepadState = state;
+            RefreshControllerOptions(state);
+            UpdateGamepadBindingButtons();
         }
 
         private void CaptureGamepadBinding(HostGamepadState state)
@@ -267,6 +282,8 @@ namespace nanoboy
             {
                 return;
             }
+            if (button == HostGamepadButtons.RightStick && slot is GamepadBindingSlot.Up or
+                GamepadBindingSlot.Down or GamepadBindingSlot.Left or GamepadBindingSlot.Right) return;
 
             SetGamepadBinding(slot, button);
             capturedGamepadBinding = null;
@@ -279,6 +296,10 @@ namespace nanoboy
             GamepadBindingSlot.B => settings.GamepadB,
             GamepadBindingSlot.Start => settings.GamepadStart,
             GamepadBindingSlot.Select => settings.GamepadSelect,
+            GamepadBindingSlot.Up => settings.GetControllerDirection("GamepadUpButton", HostGamepadButtons.DPadUp),
+            GamepadBindingSlot.Down => settings.GetControllerDirection("GamepadDownButton", HostGamepadButtons.DPadDown),
+            GamepadBindingSlot.Left => settings.GetControllerDirection("GamepadLeftButton", HostGamepadButtons.DPadLeft),
+            GamepadBindingSlot.Right => settings.GetControllerDirection("GamepadRightButton", HostGamepadButtons.DPadRight),
             GamepadBindingSlot.L => settings.GamepadL,
             GamepadBindingSlot.R => settings.GamepadR,
             GamepadBindingSlot.QuickLoad => settings.GamepadQuickLoad,
@@ -301,6 +322,18 @@ namespace nanoboy
                     break;
                 case GamepadBindingSlot.Select:
                     settings.GamepadSelect = button;
+                    break;
+                case GamepadBindingSlot.Up:
+                    settings.SetControllerDirection("GamepadUpButton", button);
+                    break;
+                case GamepadBindingSlot.Down:
+                    settings.SetControllerDirection("GamepadDownButton", button);
+                    break;
+                case GamepadBindingSlot.Left:
+                    settings.SetControllerDirection("GamepadLeftButton", button);
+                    break;
+                case GamepadBindingSlot.Right:
+                    settings.SetControllerDirection("GamepadRightButton", button);
                     break;
                 case GamepadBindingSlot.L:
                     settings.GamepadL = button;
@@ -335,8 +368,12 @@ namespace nanoboy
 
         private static string GetBindingCaption(GamepadBindingSlot slot) => slot switch
         {
-            GamepadBindingSlot.QuickLoad => "LOAD",
-            GamepadBindingSlot.QuickSave => "SAVE",
+            GamepadBindingSlot.Up => global::AetherBoy.Runtime.Localization.UiText.Get("OBEN"),
+            GamepadBindingSlot.Down => global::AetherBoy.Runtime.Localization.UiText.Get("UNTEN"),
+            GamepadBindingSlot.Left => global::AetherBoy.Runtime.Localization.UiText.Get("LINKS"),
+            GamepadBindingSlot.Right => global::AetherBoy.Runtime.Localization.UiText.Get("RECHTS"),
+            GamepadBindingSlot.QuickLoad => global::AetherBoy.Runtime.Localization.UiText.Get("LOAD"),
+            GamepadBindingSlot.QuickSave => global::AetherBoy.Runtime.Localization.UiText.Get("SAVE"),
             _ => slot.ToString().ToUpperInvariant()
         };
 
@@ -344,32 +381,32 @@ namespace nanoboy
         {
             if (buttons == (HostGamepadButtons.East | HostGamepadButtons.West))
             {
-                return "EAST / WEST";
+                return global::AetherBoy.Runtime.Localization.UiText.Get("EAST / WEST");
             }
 
             return buttons switch
             {
-                HostGamepadButtons.South => "SOUTH / CROSS / A",
-                HostGamepadButtons.East => "EAST / CIRCLE / B",
-                HostGamepadButtons.West => "WEST / SQUARE / X",
-                HostGamepadButtons.North => "NORTH / TRIANGLE / Y",
-                HostGamepadButtons.Start => "MENU / OPTIONS",
-                HostGamepadButtons.Select => "VIEW / SHARE",
+                HostGamepadButtons.South => global::AetherBoy.Runtime.Localization.UiText.Get("SOUTH / CROSS / A"),
+                HostGamepadButtons.East => global::AetherBoy.Runtime.Localization.UiText.Get("EAST / CIRCLE / B"),
+                HostGamepadButtons.West => global::AetherBoy.Runtime.Localization.UiText.Get("WEST / SQUARE / X"),
+                HostGamepadButtons.North => global::AetherBoy.Runtime.Localization.UiText.Get("NORTH / TRIANGLE / Y"),
+                HostGamepadButtons.Start => global::AetherBoy.Runtime.Localization.UiText.Get("MENU / OPTIONS"),
+                HostGamepadButtons.Select => global::AetherBoy.Runtime.Localization.UiText.Get("VIEW / SHARE"),
                 HostGamepadButtons.LeftShoulder => "L1 / LB",
                 HostGamepadButtons.RightShoulder => "R1 / RB",
                 HostGamepadButtons.LeftStick => "L3",
                 HostGamepadButtons.RightStick => "R3",
-                HostGamepadButtons.DPadUp => "DPAD UP",
-                HostGamepadButtons.DPadDown => "DPAD DOWN",
-                HostGamepadButtons.DPadLeft => "DPAD LEFT",
-                HostGamepadButtons.DPadRight => "DPAD RIGHT",
-                _ => "UNASSIGNED"
+                HostGamepadButtons.DPadUp => global::AetherBoy.Runtime.Localization.UiText.Get("DPAD UP"),
+                HostGamepadButtons.DPadDown => global::AetherBoy.Runtime.Localization.UiText.Get("DPAD DOWN"),
+                HostGamepadButtons.DPadLeft => global::AetherBoy.Runtime.Localization.UiText.Get("DPAD LEFT"),
+                HostGamepadButtons.DPadRight => global::AetherBoy.Runtime.Localization.UiText.Get("DPAD RIGHT"),
+                _ => global::AetherBoy.Runtime.Localization.UiText.Get("UNASSIGNED")
             };
         }
 
         private static void ArrangeBinding(
             Label label,
-            TextBox input,
+            nanoboy.Controls.AetherTextBox input,
             string caption,
             int x,
             int y)
@@ -387,11 +424,10 @@ namespace nanoboy
             input.Cursor = Cursors.Hand;
         }
 
-        private static TextBox CreateKeyboardBindingBox(KeyEventHandler handler)
+        private static nanoboy.Controls.AetherTextBox CreateKeyboardBindingBox(KeyEventHandler handler)
         {
-            var input = new TextBox
+            var input = new nanoboy.Controls.AetherTextBox
             {
-                BorderStyle = BorderStyle.FixedSingle,
                 ReadOnly = true
             };
             input.KeyUp += handler;
@@ -400,16 +436,16 @@ namespace nanoboy
 
         private void frmControls_Load(object sender, EventArgs e)
         {
-            txtKeyA.Text = settings.KeyA.ToString();
-            txtKeyB.Text = settings.KeyB.ToString();
-            txtKeyStart.Text = settings.KeyStart.ToString();
-            txtKeySelect.Text = settings.KeySelect.ToString();
-            txtKeyUp.Text = settings.KeyUp.ToString();
-            txtKeyDown.Text = settings.KeyDown.ToString();
-            txtKeyLeft.Text = settings.KeyLeft.ToString();
-            txtKeyRight.Text = settings.KeyRight.ToString();
-            txtKeyL.Text = settings.KeyL.ToString();
-            txtKeyR.Text = settings.KeyR.ToString();
+            txtKeyA.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(settings.KeyA.ToString());
+            txtKeyB.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(settings.KeyB.ToString());
+            txtKeyStart.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(settings.KeyStart.ToString());
+            txtKeySelect.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(settings.KeySelect.ToString());
+            txtKeyUp.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(settings.KeyUp.ToString());
+            txtKeyDown.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(settings.KeyDown.ToString());
+            txtKeyLeft.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(settings.KeyLeft.ToString());
+            txtKeyRight.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(settings.KeyRight.ToString());
+            txtKeyL.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(settings.KeyL.ToString());
+            txtKeyR.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(settings.KeyR.ToString());
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -420,49 +456,49 @@ namespace nanoboy
         private void txtKeyA_KeyUp(object sender, KeyEventArgs e)
         {
             settings.KeyA = e.KeyCode;
-            txtKeyA.Text = e.KeyCode.ToString();
+            txtKeyA.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(e.KeyCode.ToString());
         }
 
         private void txtKeyB_KeyUp(object sender, KeyEventArgs e)
         {
             settings.KeyB = e.KeyCode;
-            txtKeyB.Text = e.KeyCode.ToString();
+            txtKeyB.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(e.KeyCode.ToString());
         }
 
         private void txtKeyStart_KeyUp(object sender, KeyEventArgs e)
         {
             settings.KeyStart = e.KeyCode;
-            txtKeyStart.Text = e.KeyCode.ToString();
+            txtKeyStart.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(e.KeyCode.ToString());
         }
 
         private void txtKeySelect_KeyUp(object sender, KeyEventArgs e)
         {
             settings.KeySelect = e.KeyCode;
-            txtKeySelect.Text = e.KeyCode.ToString();
+            txtKeySelect.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(e.KeyCode.ToString());
         }
 
         private void txtKeyUp_KeyUp(object sender, KeyEventArgs e)
         {
             settings.KeyUp = e.KeyCode;
-            txtKeyUp.Text = e.KeyCode.ToString();
+            txtKeyUp.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(e.KeyCode.ToString());
         }
 
         private void txtKeyDown_KeyUp(object sender, KeyEventArgs e)
         {
             settings.KeyDown = e.KeyCode;
-            txtKeyDown.Text = e.KeyCode.ToString();
+            txtKeyDown.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(e.KeyCode.ToString());
         }
 
         private void txtKeyLeft_KeyUp(object sender, KeyEventArgs e)
         {
             settings.KeyLeft = e.KeyCode;
-            txtKeyLeft.Text = e.KeyCode.ToString();
+            txtKeyLeft.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(e.KeyCode.ToString());
         }
 
         private void txtKeyRight_KeyUp(object sender, KeyEventArgs e)
         {
             settings.KeyRight = e.KeyCode;
-            txtKeyRight.Text = e.KeyCode.ToString();
+            txtKeyRight.Text = global::AetherBoy.Runtime.Localization.UiLabels.Key(e.KeyCode.ToString());
         }
     }
 }

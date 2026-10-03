@@ -1,6 +1,28 @@
 # Windows-Entwicklung: Übergabe / Developer handoff
 
-**Lokaler UI-Nachtrag vom 28. September (noch uncommittet):** [Logo-Farben, frei wählbare Akzente und Hintergrund auf Windows/Wayland](UI_THEME_HANDOFF_2026-09-28.md).
+**02.10.2026 – Barcode Boy in Windows und Linux implementiert:**
+[Gemeinsamer Lieferstand, Testnachweise und Battle-Space-Abnahme](WINDOWS_ROADMAP.md#phase-62--barcode-boy-02102026).
+Synthetische CPU-/Protokolltests und beide Scanner-Oberflächen funktionieren.
+Eigene Battle-Space-ROM fehlt noch; kein bestätigter Originalspieltest. Kein
+GBA e-Reader/Bardigun. Das neue Nutzerlogo ist in beiden Frontends eingebunden.
+English: shared Barcode Boy device and both UIs implemented; real-game validation pending.
+
+**01.10.2026 – Phase 3, erster Ausbau auf beiden Plattformen:**
+[AVI-Aufnahme, ZIP/7z-Import, Patch-Persistenz und noch offene Abnahme](WINDOWS_ROADMAP.md#phase-3--erster-gemeinsamer-ausbau-01102026).
+Shared Runtime owns archive staging and bounded AVI writing. Windows uses
+Settings → Overview; Linux uses Tools → Record video. Both now select one ROM
+from multi-ROM archives, bound to the archive SHA-256, and offer explicit
+**Patch and play** alongside save-only import. Windows UI selection, cancellation,
+patch launch intent and preserved originals are covered by regression tests.
+No remembered automatic patch-on-load association or local-link split-view video
+yet. Native Linux UI verification is still required; four additional opt-in cases
+cover archive choice/cancellation/change and patch launch/navigation.
+
+**Einstellungsabgleich vom 28. September (`9f50dfe`):** [Linux-Update übernommen und Windows um Suche, Unterseiten, Skalierung und Controller-Einrichtung erweitert](WINDOWS_SETTINGS_PARITY_2026-09-28.md).
+
+**Windows-Abnahme vom 28. September:** [2a91c9f integriert, CI-Testkorrektur, visuelle Farbprüfung und Slot-Layoutfix](WINDOWS_UI_INTEGRATION_2026-09-28.md).
+
+**UI-Lieferstand vom 28. September (`2a91c9f`):** [Logo-Farben, frei wählbare Akzente und Hintergrund auf Windows/Wayland](UI_THEME_HANDOFF_2026-09-28.md).
 
 Nachtrag 13. September: [Native Raumcodes – Windows-Integration, Build und Abnahme](ONLINE_ROOMS_WINDOWS_HANDOFF.md).
 Enthält auch die Zusammenführung mit Voltex' Diagnose-/Session-Fix `23c6fda`.
@@ -335,6 +357,33 @@ state restore, sound, pause and turbo, then continue separate frontend work.
 Coordinate shared Core/Runtime changes even when Git reports no line conflicts.
 The support URL, friendly save import/export (item 7), Linux comfort-tool integration
 and broader testing remain open. No new console or finished network/link mode is claimed.
+
+## Cheat phase 2 completion — 2026-10-01
+
+Shared decoder/executor, Windows and Linux UI: CodeBreaker encrypted master
+streams, GameShark v1/v2 and Action Replay v3 with reseeding, conditional blocks,
+fills/lists, indirect writes, Thumb hooks, reversible ROM patches and a virtual
+device button. GB/GBC adds CodeBreaker/raw writes beside GameShark `01` and
+Game Genie. See [CHEAT_SUPPORT.md](CHEAT_SUPPORT.md) for accepted syntax and
+explicit exceptions (notably AR-v3 slowdown/disable-all and banked GB GS codes).
+The user selects codes; no game database, cheat persistence or matching promise.
+
+Windows exposes a six-format dropdown and held/released device-button control;
+both enqueue commands on the session owner thread. Reset releases the device
+button. Existing online cheat restrictions remain. The Linux field converts
+pasted newlines to `+` and uses the same format helper/runtime.
+
+Fresh tests on this Windows host: **Core 253 passed; Runtime 473 passed/5 skipped;
+Windows 252 passed/4 skipped; portable Desktop 114 passed/44 skipped. Zero
+failures.** UI screenshot/measurement and device-button click are covered by
+`WindowsCheatToolsTests`. Independent original mGBA C cipher vectors cover
+CodeBreaker, GS and AR3 reseeding; synthetic ARM/Thumb tests cover execution.
+Native Wayland/hardware opt-ins and real game-code effectiveness remain unverified.
+Historical totals above describe earlier packages, not this current run.
+
+MPL-2.0 cipher/table adaptations retain notices. Ship `licenses/mgba-cheats/`
+and make corresponding sources available for the actual release revision.
+No commit or push was performed as part of this implementation request.
 
 Detailed feature guides: [output](WINDOWS_AUDIO_VIDEO_UI.md#english),
 [game comfort](WINDOWS_GAME_COMFORT.md#english),

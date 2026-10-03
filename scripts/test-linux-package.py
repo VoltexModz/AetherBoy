@@ -32,7 +32,9 @@ with tempfile.TemporaryDirectory(prefix='aetherboy package $ check ') as directo
                      'launch-linux.sh', 'LICENSE', 'licenses/DOTNET-LICENSE.TXT',
                      'licenses/DOTNET-THIRD-PARTY-NOTICES.TXT',
                      'licenses/SDL3-CS-LICENSE.txt', 'licenses/SDL3-CS.Linux-LICENSE.txt',
-                     'licenses/GBADotnet-LICENSE.md', 'Assets/Fonts/OFL.txt'):
+                     'licenses/GBADotnet-LICENSE.md', 'Assets/Fonts/OFL.txt',
+                     'licenses/discord-rpc/LICENSE.txt', 'licenses/discord-rpc/Newtonsoft.Json-LICENSE.txt',
+                     'licenses/sharpcompress/LICENSE.txt', 'licenses/mgba-cheats/LICENSE.txt', 'licenses/mgba-cheats/NOTICE.txt'):
         assert (app / required).is_file(), required
     for executable in ('AetherBoy.Desktop', 'libhostfxr.so', 'libcoreclr.so', 'libSDL3.so', 'libdatachannel.so'):
         with (app / executable).open('rb') as stream:

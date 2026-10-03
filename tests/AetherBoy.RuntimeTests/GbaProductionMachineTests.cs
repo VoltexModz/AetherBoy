@@ -50,6 +50,15 @@ public sealed class GbaProductionMachineTests
             Assert.IsTrue(session.LatestSnapshot.Rom?.IsGameBoyAdvance);
             Assert.AreEqual(VideoGeometry.GameBoyAdvance, session.LatestSnapshot.VideoGeometry);
             Assert.IsTrue(session.LatestSnapshot.HasVideoFrame);
+            await session.SetPausedAsync(true).WaitAsync(TimeSpan.FromSeconds(5));
+            CheatSnapshot deviceCode = await session.AddCheatAsync("device", "GSRAW:82100030 00000055");
+            await session.SetCheatButtonAsync(true).WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.IsTrue(session.LatestSnapshot.CheatButtonPressed);
+            Assert.IsTrue(session.LatestSnapshot.WithState(SessionState.Running, true).CheatButtonPressed);
+            Assert.IsTrue(session.LatestSnapshot.WithVideoGeometry(VideoGeometry.GameBoyAdvance).CheatButtonPressed);
+            await session.ResetAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.IsFalse(session.LatestSnapshot.CheatButtonPressed);
+            Assert.IsTrue(session.LatestSnapshot.Cheats.Any(cheat => cheat.Id == deviceCode.Id));
             await session.ShutdownAsync().WaitAsync(TimeSpan.FromSeconds(5));
         }
         finally
@@ -120,6 +129,7 @@ public sealed class GbaProductionMachineTests
             Assert.IsNotNull(snapshot.Rom);
             Assert.IsTrue(snapshot.Rom.IsGameBoyAdvance);
             Assert.AreEqual("AETHER TEST", snapshot.Rom.Title);
+            Assert.AreEqual("AETHER TEST", snapshot.Rom.CartridgeHeaderTitle);
             Assert.AreEqual(240, snapshot.VideoGeometry.Width);
             Assert.AreEqual(160, snapshot.VideoGeometry.Height);
             Assert.IsTrue(snapshot.Supports(EmulationFeature.SaveStates));
@@ -455,6 +465,76 @@ public sealed class GbaProductionMachineTests
     }
 
     [TestMethod]
+    public void GbaActionReplayV3SupportsDirectRawAndEncryptedRamOperations()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"aetherboy-gba-ar3-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        string romPath = Path.Combine(directory, "synthetic.gba");
+        try
+        {
+            File.WriteAllBytes(romPath, CreateMode3Rom());
+            using var machine = new GbaProductionMachine(
+                romPath, Path.Combine(directory, "synthetic.sav"), CreateConfiguration());
+            machine.AddCheat("byte", "AR3RAW:00200008 0000007A");
+            machine.AddCheat("repeat", "AR3RAW:0020000C 00000255");
+            machine.AddCheat("halfword", "AR3RAW:02200010 0000BEEF");
+            machine.AddCheat("word", "AR3RAW:04200014 12345678");
+            (uint encryptedOp1, uint encryptedOp2) = EncryptActionReplay(0x0020_0018, 0x0000_003C);
+            CheatSnapshot encrypted = machine.AddCheat("encrypted", $"AR3:{encryptedOp1:X8} {encryptedOp2:X8}");
+            machine.AddCheat("addition", "AR3RAW:8220001C 00000003");
+
+            Device device = GetDevice(machine);
+            device.PokeHalfWord(0x0200_001C, 0x0005);
+            machine.RunFrame();
+
+            Assert.AreEqual(0x7A, device.InspectByte(0x0200_0008));
+            Assert.AreEqual(0x55, device.InspectByte(0x0200_000C));
+            Assert.AreEqual(0x55, device.InspectByte(0x0200_000D));
+            Assert.AreEqual(0x55, device.InspectByte(0x0200_000E));
+            Assert.AreEqual(0xBEEF, device.InspectHalfWord(0x0200_0010));
+            Assert.AreEqual(0x1234_5678u, device.InspectWord(0x0200_0014));
+            Assert.AreEqual(0x3C, device.InspectByte(0x0200_0018));
+            Assert.AreEqual(8, device.InspectHalfWord(0x0200_001C));
+            Assert.IsTrue(encrypted.Code.StartsWith("AR3:", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void GbaActionReplayV3RejectsUnsupportedCommandsWithoutAddingPartialSet()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"aetherboy-gba-ar3-reject-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        string romPath = Path.Combine(directory, "synthetic.gba");
+        try
+        {
+            File.WriteAllBytes(romPath, CreateMode3Rom());
+            using var machine = new GbaProductionMachine(
+                romPath, Path.Combine(directory, "synthetic.sav"), CreateConfiguration());
+            string[] invalid =
+            [
+                "AR3RAW:08200000 00000001", // Condition missing its body.
+                "AR3RAW:00000000 80000000", // Incomplete fill.
+                "AR3RAW:00000000 08000000", // Device slowdown.
+                "AR3RAW:00200000 FFFFFF11", // Excessive repeat.
+                "AR3RAW:00240000 00000011", // Not EWRAM/IWRAM.
+                "AR3RAW:02200001 00000011", // Unaligned halfword.
+                "AR3RAW:00200000 00000011 + AR3RAW:00000000 80000000"
+            ];
+            foreach (string code in invalid)
+                Assert.ThrowsExactly<FormatException>(() => machine.AddCheat("invalid", code), code);
+            Assert.HasCount(0, machine.CaptureSnapshot(SessionState.Running, false, false, 1, 0).Cheats);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public void EepromSaveExpandsToEightKiBAndReloadsDetectedCapacity()
     {
         string directory = Path.Combine(
@@ -525,10 +605,15 @@ public sealed class GbaProductionMachineTests
             .GetValue(machine)!;
 
     private static (uint Op1, uint Op2) EncryptGameShark(uint op1, uint op2)
+        => EncryptTea(op1, op2, [0x09F4_FBBD, 0x9681_884A, 0x3520_27E9, 0xF3DE_E5A7]);
+
+    private static (uint Op1, uint Op2) EncryptActionReplay(uint op1, uint op2)
+        => EncryptTea(op1, op2, [0x7AA9_648F, 0x7FAE_6994, 0xC0EF_AAD5, 0x4271_2C57]);
+
+    private static (uint Op1, uint Op2) EncryptTea(uint op1, uint op2, ReadOnlySpan<uint> seed)
     {
         uint sum = 0;
         const uint delta = 0x9E37_79B9;
-        ReadOnlySpan<uint> seed = [0x09F4_FBBD, 0x9681_884A, 0x3520_27E9, 0xF3DE_E5A7];
         unchecked
         {
             for (int round = 0; round < 32; round++)

@@ -13,7 +13,7 @@ namespace nanoboy
         {
             InitializeComponent();
             Branding.AppBrand.ApplyIcon(this);
-            Text = $"Link-Kabel (deaktiviert) – {ProductInfo.DisplayName}";
+            Text = global::AetherBoy.Runtime.Localization.UiText.Get("Link-Kabel (deaktiviert)");
             linkCable = cable;
 
             if (linkCable != null)
@@ -26,8 +26,8 @@ namespace nanoboy
             ConfigureAetherLayout();
             AetherDialog.Apply(
                 this,
-                "LINK LAB // 05",
-                "Konzeptoberfläche für eine zukünftige deterministische Verbindung");
+                global::AetherBoy.Runtime.Localization.UiText.Get("LINK LAB // 05"),
+                global::AetherBoy.Runtime.Localization.UiText.Get("Konzeptoberfläche für eine zukünftige deterministische Verbindung"));
         }
 
         private void ConfigureAetherLayout()
@@ -38,7 +38,7 @@ namespace nanoboy
 
             lblStatus.Location = new System.Drawing.Point(26, 24);
             lblStatus.Size = new System.Drawing.Size(648, 24);
-            lblStatus.Text = "OFFLINE  //  LINK-TRANSPORT NICHT FREIGEGEBEN";
+            lblStatus.Text = global::AetherBoy.Runtime.Localization.UiText.Get("OFFLINE  //  LINK-TRANSPORT NICHT FREIGEGEBEN");
             lblStatus.ForeColor = AetherColors.Danger;
             lblStatus.Tag = "danger";
 
@@ -50,35 +50,35 @@ namespace nanoboy
                 ForeColor = AetherColors.Muted,
                 Location = new System.Drawing.Point(26, 58),
                 Size = new System.Drawing.Size(648, 48),
-                Text = "Die Oberfläche bleibt als Zukunftsentwurf sichtbar. Netzwerkaktionen sind gesperrt, bis Serial-Timing, Synchronisation und Fehlerfälle verifiziert sind."
+                Text = global::AetherBoy.Runtime.Localization.UiText.Get("Die Oberfläche bleibt als Zukunftsentwurf sichtbar. Netzwerkaktionen sind gesperrt, bis Serial-Timing, Synchronisation und Fehlerfälle verifiziert sind.")
             };
             Controls.Add(warning);
 
             grpHost.Location = new System.Drawing.Point(24, 126);
             grpHost.Size = new System.Drawing.Size(316, 206);
-            grpHost.Text = "HOST // PORT 8765";
+            grpHost.Text = global::AetherBoy.Runtime.Localization.UiText.Get("HOST // PORT 8765");
             lblHostDesc.AutoSize = false;
             lblHostDesc.Location = new System.Drawing.Point(22, 44);
             lblHostDesc.Size = new System.Drawing.Size(268, 42);
-            lblHostDesc.Text = "Lokale Sitzung öffnen und auf einen zweiten Emulator warten.";
+            lblHostDesc.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Lokale Sitzung öffnen und auf einen zweiten Emulator warten.");
             btnHost.Location = new System.Drawing.Point(22, 132);
             btnHost.Size = new System.Drawing.Size(270, 42);
-            btnHost.Text = "HOST STARTEN";
+            btnHost.Text = global::AetherBoy.Runtime.Localization.UiText.Get("HOST STARTEN");
 
             grpClient.Location = new System.Drawing.Point(360, 126);
             grpClient.Size = new System.Drawing.Size(316, 206);
-            grpClient.Text = "CLIENT // DIRECT IP";
+            grpClient.Text = global::AetherBoy.Runtime.Localization.UiText.Get("CLIENT // DIRECT IP");
             lblIP.Location = new System.Drawing.Point(22, 42);
-            lblIP.Text = "IP-ADRESSE";
+            lblIP.Text = global::AetherBoy.Runtime.Localization.UiText.Get("IP-ADRESSE");
             txtIP.Location = new System.Drawing.Point(22, 66);
             txtIP.Size = new System.Drawing.Size(270, 30);
             btnConnect.Location = new System.Drawing.Point(22, 132);
             btnConnect.Size = new System.Drawing.Size(270, 42);
-            btnConnect.Text = "VERBINDEN";
+            btnConnect.Text = global::AetherBoy.Runtime.Localization.UiText.Get("VERBINDEN");
 
             btnDisconnect.Location = new System.Drawing.Point(502, 356);
             btnDisconnect.Size = new System.Drawing.Size(174, 40);
-            btnDisconnect.Text = "TRENNEN";
+            btnDisconnect.Text = global::AetherBoy.Runtime.Localization.UiText.Get("TRENNEN");
             if (btnDisconnect is AetherButton disconnectButton)
             {
                 disconnectButton.Kind = AetherButtonKind.Danger;
@@ -96,7 +96,7 @@ namespace nanoboy
                 Invoke(new Action(OnConnected));
                 return;
             }
-            lblStatus.Text = "Status: Verbunden! 🌐 (Link-Kabel Aktiv)";
+            lblStatus.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Status: Verbunden! 🌐 (Link-Kabel Aktiv)");
             lblStatus.ForeColor = System.Drawing.Color.LightGreen;
         }
 
@@ -107,7 +107,7 @@ namespace nanoboy
                 Invoke(new Action(OnDisconnected));
                 return;
             }
-            lblStatus.Text = "Status: Nicht verbunden";
+            lblStatus.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Status: Nicht verbunden");
             lblStatus.ForeColor = System.Drawing.Color.Salmon;
         }
 
@@ -127,7 +127,7 @@ namespace nanoboy
         {
             if (linkCable == null) return;
             linkCable.StartServer(8765);
-            lblStatus.Text = "Warte auf Mitspieler (Port 8765)...";
+            lblStatus.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Warte auf Mitspieler (Port 8765)...");
             lblStatus.ForeColor = System.Drawing.Color.LightSkyBlue;
         }
 
@@ -137,10 +137,10 @@ namespace nanoboy
             string ip = txtIP.Text.Trim();
             if (string.IsNullOrEmpty(ip)) ip = "127.0.0.1";
 
-            lblStatus.Text = $"Verbinde mit {ip}...";
+            lblStatus.Text = global::AetherBoy.Runtime.Localization.UiText.Format("Verbinde mit {0}...", ip);
             if (!linkCable.ConnectClient(ip, 8765))
             {
-                AetherSignal.Show(this, "Verbindung fehlgeschlagen. Ist der Host gestartet?", "Link-Kabel", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AetherSignal.Show(this, global::AetherBoy.Runtime.Localization.UiText.Get("Verbindung fehlgeschlagen. Ist der Host gestartet?"), global::AetherBoy.Runtime.Localization.UiText.Get("Link-Kabel"), MessageBoxButtons.OK, MessageBoxIcon.Error);
                 UpdateStatus();
             }
         }

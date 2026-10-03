@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\nanoboy\nanoboy.csproj" />
+    <EmbeddedResource Include="WindowsUiDebt.json" LogicalName="AetherBoy.WindowsUiDebt.json" />
   </ItemGroup>
 
 </Project>

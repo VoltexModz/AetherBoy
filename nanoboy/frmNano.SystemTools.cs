@@ -14,7 +14,7 @@ public partial class frmNano
 
     private void InitializeSystemTools()
     {
-        var firmware = new ToolStripMenuItem("Firmware Station") { Name = "menuFirmwareManager" };
+        var firmware = new nanoboy.Controls.AetherCommand("Firmware Station") { Name = "menuFirmwareManager" };
         firmware.Click += (_, _) => OpenFirmwareManager();
         menuItem21.DropDownItems.Add(firmware);
     }
@@ -33,10 +33,10 @@ public partial class frmNano
             var status = store.GetStatus(kind);
             string state = status.State switch
             {
-                WindowsFirmwareState.Available => "GRÖSSE OK",
-                WindowsFirmwareState.Invalid => "UNGÜLTIG",
-                WindowsFirmwareState.Unreadable => "NICHT LESBAR",
-                _ => "INTEGRIERT"
+                WindowsFirmwareState.Available => global::AetherBoy.Runtime.Localization.UiText.Get("GRÖSSE OK"),
+                WindowsFirmwareState.Invalid => global::AetherBoy.Runtime.Localization.UiText.Get("UNGÜLTIG"),
+                WindowsFirmwareState.Unreadable => global::AetherBoy.Runtime.Localization.UiText.Get("NICHT LESBAR"),
+                _ => global::AetherBoy.Runtime.Localization.UiText.Get("INTEGRIERT")
             };
             return $"{kind.ToString().ToUpperInvariant()} {state}";
         }));
@@ -46,12 +46,12 @@ public partial class frmNano
     {
         var decision = WindowsDiagnosticsPreferences.Default.GetStatus();
         if (decision.PreferenceReadError is not null)
-            return "Einstellung nicht lesbar · Aufzeichnung bleibt aus. Einstellungen prüfen.";
+            return global::AetherBoy.Runtime.Localization.UiText.Get("Einstellung nicht lesbar · Aufzeichnung bleibt aus. Einstellungen prüfen.");
         if (decision.EnvironmentDisabled)
-            return "AETHERBOY_DIAGNOSTICS=0 erzwingt AUS, auch bei gespeicherter Auswahl AN.";
-        string choice = decision.RecordNextSession ? "AN" : "AUS";
-        string source = decision.SavedPreference.HasValue ? "gespeichert" : "Build-Standard";
-        return $"Normaler Neustart: {choice} ({source}). --tester-mode kann einmalig einschalten.";
+            return global::AetherBoy.Runtime.Localization.UiText.Get("AETHERBOY_DIAGNOSTICS=0 erzwingt AUS, auch bei gespeicherter Auswahl AN.");
+        string choice = decision.RecordNextSession ? global::AetherBoy.Runtime.Localization.UiText.Get("AN") : global::AetherBoy.Runtime.Localization.UiText.Get("AUS");
+        string source = decision.SavedPreference.HasValue ? global::AetherBoy.Runtime.Localization.UiText.Get("gespeichert") : global::AetherBoy.Runtime.Localization.UiText.Get("Build-Standard");
+        return global::AetherBoy.Runtime.Localization.UiText.Format("Normaler Neustart: {0} ({1}). --tester-mode kann einmalig einschalten.", choice, source);
     }
 
     private bool SetRecordNextSession(bool enabled)
@@ -59,22 +59,22 @@ public partial class frmNano
         bool saved = WindowsDiagnosticsPreferences.Default.TrySetRecordNextSession(enabled, out string? failure);
         if (!saved)
             AetherSignal.Show(controlCenter is { IsDisposed: false } ? controlCenter : this,
-                "Die Diagnose-Einstellung konnte nicht gespeichert werden. Die bisherige Auswahl bleibt bestehen.\n\n" + failure,
-                "Aufzeichnungswahl nicht gespeichert", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                global::AetherBoy.Runtime.Localization.UiText.Get("Die Diagnose-Einstellung konnte nicht gespeichert werden. Die bisherige Auswahl bleibt bestehen.\n\n") + failure,
+                global::AetherBoy.Runtime.Localization.UiText.Get("Aufzeichnungswahl nicht gespeichert"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
         return saved;
     }
 
     private string DescribeActiveRecording()
     {
-        if (testerExportInProgress) return "Bericht wird im Hintergrund exportiert · bitte kurz warten.";
+        if (testerExportInProgress) return global::AetherBoy.Runtime.Localization.UiText.Get("Bericht wird im Hintergrund exportiert · bitte kurz warten.");
         if (testerSession is null)
             return Program.StartupDiagnosticsDecision?.EnvironmentDisabled == true
-                ? "AETHERBOY_DIAGNOSTICS=0 hat die Aufzeichnung für diesen Start deaktiviert."
-                : "Live-Ansicht und Kopieren verfügbar. Änderungen am Schalter gelten erst ab Neustart.";
+                ? global::AetherBoy.Runtime.Localization.UiText.Get("AETHERBOY_DIAGNOSTICS=0 hat die Aufzeichnung für diesen Start deaktiviert.")
+                : global::AetherBoy.Runtime.Localization.UiText.Get("Live-Ansicht und Kopieren verfügbar. Änderungen am Schalter gelten erst ab Neustart.");
         if (testerSession.ErrorCode is string error)
-            return "Aufzeichnung wegen Schreibfehler gestoppt · " + error;
+            return global::AetherBoy.Runtime.Localization.UiText.Get("Aufzeichnung wegen Schreibfehler gestoppt · ") + error;
         if (testerSession.SizeLimitReached)
-            return "8-MiB-Limit erreicht. Vorhandene Sitzungsdaten bleiben exportierbar.";
-        return $"Puffer {testerSession.PendingEvents}/256 · verworfene Ereignisse {testerSession.DroppedEvents}. Auswahl gilt ab Neustart.";
+            return global::AetherBoy.Runtime.Localization.UiText.Get("8-MiB-Limit erreicht. Vorhandene Sitzungsdaten bleiben exportierbar.");
+        return global::AetherBoy.Runtime.Localization.UiText.Format("Puffer {0}/256 · verworfene Ereignisse {1}. Auswahl gilt ab Neustart.", testerSession.PendingEvents, testerSession.DroppedEvents);
     }
 }

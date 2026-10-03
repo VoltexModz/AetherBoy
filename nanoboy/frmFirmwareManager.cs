@@ -32,8 +32,8 @@ internal sealed class frmFirmwareManager : Form
         Controls.Add(new Label
         {
             Bounds = new Rectangle(24, 17, 742, 43),
-            Text = "Optional: eigene Boot-ROMs / BIOS-Dateien lokal verwalten. Ohne externe Firmware nutzt AetherBoy " +
-                "seinen eingebauten Startpfad. Es werden keine Firmware-Dateien mitgeliefert oder heruntergeladen."
+            Text = global::AetherBoy.Runtime.Localization.UiText.Get("Optional: eigene Boot-ROMs / BIOS-Dateien lokal verwalten. Ohne externe Firmware nutzt AetherBoy ") +
+                global::AetherBoy.Runtime.Localization.UiText.Get("seinen eingebauten Startpfad. Es werden keine Firmware-Dateien mitgeliefert oder heruntergeladen.")
         });
         int row = 0;
         foreach (WindowsFirmwareKind kind in Enum.GetValues<WindowsFirmwareKind>())
@@ -64,7 +64,7 @@ internal sealed class frmFirmwareManager : Form
             var import = new AetherButton
             {
                 Name = "firmwareImport" + kind, Bounds = new Rectangle(550, 23, 176, 40),
-                Text = "DATEI IMPORTIEREN", Kind = AetherButtonKind.Secondary, TabIndex = 0
+                Text = global::AetherBoy.Runtime.Localization.UiText.Get("DATEI IMPORTIEREN"), Kind = AetherButtonKind.Secondary, TabIndex = 0
             };
             import.Click += (_, _) => PickFirmware(kind);
             card.Controls.Add(import);
@@ -79,20 +79,20 @@ internal sealed class frmFirmwareManager : Form
         {
             settings.BootRomEnable = !settings.BootRomEnable;
             RefreshStatus();
-            feedback.Text = "Boot-Auswahl geändert. Wirksam, wenn du die ROM erneut öffnest; ein Reset liest die Datei nicht neu ein.";
+            feedback.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Boot-Auswahl geändert. Wirksam, wenn du die ROM erneut öffnest; ein Reset liest die Datei nicht neu ein.");
         };
         Controls.Add(policyButton);
         var folder = new AetherButton
         {
             Name = "firmwareOpenFolder", Bounds = new Rectangle(352, 365, 246, 40), TabIndex = 4,
-            Text = "FIRMWARE-ORDNER ÖFFNEN", Kind = AetherButtonKind.Ghost
+            Text = global::AetherBoy.Runtime.Localization.UiText.Get("FIRMWARE-ORDNER ÖFFNEN"), Kind = AetherButtonKind.Ghost
         };
         folder.Click += (_, _) => WindowsDataPaths.OpenFolder(this, store.DirectoryPath);
         Controls.Add(folder);
         var close = new AetherButton
         {
             Name = "firmwareClose", Bounds = new Rectangle(608, 365, 158, 40), TabIndex = 5,
-            Text = "ZURÜCK", DialogResult = DialogResult.Cancel, Kind = AetherButtonKind.Ghost
+            Text = global::AetherBoy.Runtime.Localization.UiText.Get("ZURÜCK"), DialogResult = DialogResult.Cancel, Kind = AetherButtonKind.Ghost
         };
         close.Click += (_, _) => Close();
         Controls.Add(close);
@@ -100,11 +100,11 @@ internal sealed class frmFirmwareManager : Form
         feedback = new Label
         {
             Name = "firmwareFeedback", Bounds = new Rectangle(24, 418, 742, 63),
-            Text = "Geprüft wird nur die Dateigröße, nicht Echtheit oder Funktionsfähigkeit. " +
-                "Importierte Dateien werden beim erneuten Öffnen einer ROM geladen, nicht mitten im Spiel oder durch Reset."
+            Text = global::AetherBoy.Runtime.Localization.UiText.Get("Geprüft wird nur die Dateigröße, nicht Echtheit oder Funktionsfähigkeit. ") +
+                global::AetherBoy.Runtime.Localization.UiText.Get("Importierte Dateien werden beim erneuten Öffnen einer ROM geladen, nicht mitten im Spiel oder durch Reset.")
         };
         Controls.Add(feedback);
-        AetherDialog.Apply(this, "SYSTEM // FIRMWARE", "Eigene Firmware · Lokal gespeichert · Kein Download");
+        AetherDialog.Apply(this, global::AetherBoy.Runtime.Localization.UiText.Get("SYSTEM // FIRMWARE"), global::AetherBoy.Runtime.Localization.UiText.Get("Eigene Firmware · Lokal gespeichert · Kein Download"));
         RefreshStatus();
         Shown += (_, _) => Controls.Find("firmwareImportDmg", true)[0].Focus();
         Activated += (_, _) => RefreshStatus();
@@ -113,16 +113,16 @@ internal sealed class frmFirmwareManager : Form
     private void RefreshStatus()
     {
         policyButton.Selected = settings.BootRomEnable;
-        policyButton.Text = settings.BootRomEnable ? "EXTERNE FIRMWARE · AUTOMATISCH" : "EXTERNE FIRMWARE · BYPASS";
+        policyButton.Text = settings.BootRomEnable ? global::AetherBoy.Runtime.Localization.UiText.Get("EXTERNE FIRMWARE · AUTOMATISCH") : global::AetherBoy.Runtime.Localization.UiText.Get("EXTERNE FIRMWARE · BYPASS");
         foreach (var entry in statusLabels)
         {
             WindowsFirmwareStatus status = store.GetStatus(entry.Key);
             entry.Value.Text = status.State switch
             {
-                WindowsFirmwareState.Available => $"GRÖSSE GEPRÜFT · {status.SourceLabel}" +
-                    (settings.BootRomEnable ? " · Nächster ROM-Start" : " · Bypass aktiv"),
-                WindowsFirmwareState.Missing => "NICHT VORHANDEN · Eingebauter Startpfad",
-                _ => $"NICHT VERWENDBAR · {status.SourceLabel} · {status.Problem}"
+                WindowsFirmwareState.Available => global::AetherBoy.Runtime.Localization.UiText.Format("GRÖSSE GEPRÜFT · {0}", status.SourceLabel) +
+                    (settings.BootRomEnable ? global::AetherBoy.Runtime.Localization.UiText.Get(" · Nächster ROM-Start") : global::AetherBoy.Runtime.Localization.UiText.Get(" · Bypass aktiv")),
+                WindowsFirmwareState.Missing => global::AetherBoy.Runtime.Localization.UiText.Get("NICHT VORHANDEN · Eingebauter Startpfad"),
+                _ => global::AetherBoy.Runtime.Localization.UiText.Format("NICHT VERWENDBAR · {0} · {1}", status.SourceLabel, status.Problem)
             };
             entry.Value.ForeColor = status.State switch
             {
@@ -135,9 +135,9 @@ internal sealed class frmFirmwareManager : Form
 
     private void PickFirmware(WindowsFirmwareKind kind)
     {
-        using var picker = new OpenFileDialog
+        using var picker = new AetherFileDialog
         {
-            Title = WindowsFirmwareStore.ModelName(kind) + " · Eigene Firmware importieren",
+            Title = WindowsFirmwareStore.ModelName(kind) + global::AetherBoy.Runtime.Localization.UiText.Get(" · Eigene Firmware importieren"),
             Filter = "Firmware (*.bin;*.rom;*.bios)|*.bin;*.rom;*.bios|Alle Dateien (*.*)|*.*",
             CheckFileExists = true, Multiselect = false, RestoreDirectory = true
         };
@@ -145,15 +145,15 @@ internal sealed class frmFirmwareManager : Form
         try
         {
             ImportFirmware(picker.FileName, kind, () => AetherSignal.Show(this,
-                $"Die verwaltete Datei {WindowsFirmwareStore.FileName(kind)} ist bereits vorhanden.\n\n" +
-                "Soll sie durch die ausgewählte Datei ersetzt werden? Bei Abbrechen bleibt sie unverändert.",
-                "Firmware ersetzen?", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes);
+                global::AetherBoy.Runtime.Localization.UiText.Format("Die verwaltete Datei {0} ist bereits vorhanden.\n\n", WindowsFirmwareStore.FileName(kind)) +
+                global::AetherBoy.Runtime.Localization.UiText.Get("Soll sie durch die ausgewählte Datei ersetzt werden? Bei Abbrechen bleibt sie unverändert."),
+                global::AetherBoy.Runtime.Localization.UiText.Get("Firmware ersetzen?"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes);
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
         {
             RefreshStatus();
-            AetherSignal.Show(this, "Die Firmware wurde nicht importiert. Vorhandene Dateien bleiben erhalten.\n\n" +
-                exception.Message, "Firmware-Import fehlgeschlagen", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            AetherSignal.Show(this, global::AetherBoy.Runtime.Localization.UiText.Get("Die Firmware wurde nicht importiert. Vorhandene Dateien bleiben erhalten.\n\n") +
+                global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message), global::AetherBoy.Runtime.Localization.UiText.Get("Firmware-Import fehlgeschlagen"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 
@@ -167,8 +167,8 @@ internal sealed class frmFirmwareManager : Form
         // Match Linux's import behavior without changing the current machine or its attached firmware.
         settings.BootRomEnable = true;
         RefreshStatus();
-        feedback.Text = WindowsFirmwareStore.ModelName(kind) + " importiert; automatische Firmware-Auswahl aktiviert. " +
-            "Öffne die ROM erneut, um sie zu verwenden. Ein Reset allein genügt nicht.";
+        feedback.Text = WindowsFirmwareStore.ModelName(kind) + global::AetherBoy.Runtime.Localization.UiText.Get(" importiert; automatische Firmware-Auswahl aktiviert. ") +
+            global::AetherBoy.Runtime.Localization.UiText.Get("Öffne die ROM erneut, um sie zu verwenden. Ein Reset allein genügt nicht.");
         return true;
     }
 }

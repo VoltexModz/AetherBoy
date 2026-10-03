@@ -32,7 +32,7 @@ internal sealed class WindowsSaveStateStore
     internal void Write(string rom, int slot, SavedCheckpoint checkpoint)
     {
         if (checkpoint.State.Length is 0 or > EmulatorStateCodec.MaximumDocumentLength)
-            throw new InvalidDataException("Ungültige Save-State-Größe.");
+            throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Ungültige Save-State-Größe."));
         string path = PathFor(rom, slot);
         StatePreview preview = checkpoint.Preview with { StateSha256 = Convert.ToHexString(SHA256.HashData(checkpoint.State)) };
         // Publish the optional metadata first. A crash between files leaves the old raw state intact;
@@ -45,7 +45,7 @@ internal sealed class WindowsSaveStateStore
     {
         using var stream = File.OpenRead(PathFor(rom, slot));
         if (stream.Length is 0 or > EmulatorStateCodec.MaximumDocumentLength)
-            throw new InvalidDataException("Ungültige Save-State-Größe.");
+            throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Ungültige Save-State-Größe."));
         byte[] result = new byte[(int)stream.Length];
         stream.ReadExactly(result);
         return result;
@@ -59,14 +59,14 @@ internal sealed class WindowsSaveStateStore
         try
         {
             StatePreview? preview = LocalJson.Read<StatePreview>(path + ".preview.json");
-            if (preview is null) return new(slot, path, true, file.LastWriteTimeUtc, null, "Älterer State ohne Vorschau");
+            if (preview is null) return new(slot, path, true, file.LastWriteTimeUtc, null, global::AetherBoy.Runtime.Localization.UiText.Get("Älterer State ohne Vorschau"));
             byte[] state = Read(rom, slot);
             if (!string.Equals(preview.StateSha256, Convert.ToHexString(SHA256.HashData(state)), StringComparison.Ordinal))
-                return new(slot, path, true, file.LastWriteTimeUtc, null, "Vorschau gehört nicht zu dieser Datei");
+                return new(slot, path, true, file.LastWriteTimeUtc, null, global::AetherBoy.Runtime.Localization.UiText.Get("Vorschau gehört nicht zu dieser Datei"));
             return new(slot, path, true, file.LastWriteTimeUtc, preview, null);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { return new(slot, path, true, file.LastWriteTimeUtc, null, "Vorschau/Datei nicht lesbar"); }
+        { return new(slot, path, true, file.LastWriteTimeUtc, null, global::AetherBoy.Runtime.Localization.UiText.Get("Vorschau/Datei nicht lesbar")); }
     }
 
     internal static async Task<SavedCheckpoint> CaptureAsync(EmulationSession session, CancellationToken cancellationToken = default)

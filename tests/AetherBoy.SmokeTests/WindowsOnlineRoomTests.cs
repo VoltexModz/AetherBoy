@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.Reflection;
+using nanoboy.Controls;
 using System.Windows.Forms;
 using AetherBoy.Runtime.Netplay;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -26,10 +27,10 @@ public sealed class WindowsOnlineRoomTests
         {
             Form dialog = Open(main, host);
             Assert.AreEqual(FormBorderStyle.None, dialog.FormBorderStyle);
-            Assert.IsTrue(dialog.Controls.Find("aetherDialogViewport", true).Single() is Panel { AutoScroll: true });
-            var url = TextBox(dialog, "Raumserver HTTPS-Adresse");
-            var key = TextBox(dialog, "Server-Zugangsschlüssel");
-            var code = TextBox(dialog, "Raumcode");
+            Assert.IsTrue(dialog.Controls.Find("aetherDialogViewport", true).Single() is AetherScrollViewport { AutoScroll: false });
+            var url = FindTextBox(dialog, "Raumserver HTTPS-Adresse");
+            var key = FindTextBox(dialog, "Server-Zugangsschlüssel");
+            var code = FindTextBox(dialog, "Raumcode");
             Assert.IsTrue(url.Visible);
             Assert.IsTrue(key.UseSystemPasswordChar);
             Assert.IsFalse(code.Visible);
@@ -58,12 +59,12 @@ public sealed class WindowsOnlineRoomTests
 
             using var reopened = Open(main, host);
             Button(reopened, "Server einstellen").PerformClick();
-            PumpUntil(() => TextBox(reopened, "Server-Zugangsschlüssel").Visible);
-            Assert.IsFalse(TextBox(reopened, "Raumcode").Visible, "The server page must hide room controls immediately, without waiting for the status timer.");
+            PumpUntil(() => FindTextBox(reopened, "Server-Zugangsschlüssel").Visible);
+            Assert.IsFalse(FindTextBox(reopened, "Raumcode").Visible, "The server page must hide room controls immediately, without waiting for the status timer.");
             Assert.IsFalse(Button(reopened, "Raum erstellen").Visible);
-            Assert.AreEqual("https://rooms.example.com", TextBox(reopened, "Raumserver HTTPS-Adresse").Text);
-            Assert.AreEqual(new string('b', 64), TextBox(reopened, "Server-Zugangsschlüssel").Text);
-            Assert.IsTrue(TextBox(reopened, "Server-Zugangsschlüssel").UseSystemPasswordChar);
+            Assert.AreEqual("https://rooms.example.com", FindTextBox(reopened, "Raumserver HTTPS-Adresse").Text);
+            Assert.AreEqual(new string('b', 64), FindTextBox(reopened, "Server-Zugangsschlüssel").Text);
+            Assert.IsTrue(FindTextBox(reopened, "Server-Zugangsschlüssel").UseSystemPasswordChar);
             Capture(reopened, "online-rooms-server-settings.png");
             reopened.Close();
         }
@@ -82,11 +83,11 @@ public sealed class WindowsOnlineRoomTests
         {
             using var dialog = Open(main, true);
             Button(dialog, "Server einstellen").PerformClick();
-            PumpUntil(() => TextBox(dialog, "Raumserver HTTPS-Adresse").Visible);
-            TextBox(dialog, "Raumserver HTTPS-Adresse").Text = "http://example.com";
+            PumpUntil(() => FindTextBox(dialog, "Raumserver HTTPS-Adresse").Visible);
+            FindTextBox(dialog, "Raumserver HTTPS-Adresse").Text = "http://example.com";
             Button(dialog, "Server speichern").PerformClick();
             Assert.AreEqual(expected, OnlineRoomSettings.Load(settings.Path));
-            Assert.IsTrue(TextBox(dialog, "Server-Zugangsschlüssel").Visible);
+            Assert.IsTrue(FindTextBox(dialog, "Server-Zugangsschlüssel").Visible);
             Assert.IsTrue(Descendants(dialog).OfType<Label>().Any(label => label.Visible && label.Text.Contains("HTTPS", StringComparison.Ordinal)));
             Assert.IsNull(Field(main, "onlineRoomTransport"));
             dialog.Close();
@@ -105,8 +106,8 @@ public sealed class WindowsOnlineRoomTests
         .GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(main);
     private static IEnumerable<Control> Descendants(Control parent) => parent.Controls.Cast<Control>()
         .SelectMany(control => new[] { control }.Concat(Descendants(control)));
-    private static TextBox TextBox(Control parent, string accessibleName) => Descendants(parent)
-        .OfType<TextBox>().Single(control => control.AccessibleName == accessibleName);
+    private static nanoboy.Controls.AetherTextBox FindTextBox(Control parent, string accessibleName) => Descendants(parent)
+        .OfType<nanoboy.Controls.AetherTextBox>().Single(control => control.AccessibleName == accessibleName);
     private static Button Button(Control parent, string text) => Descendants(parent)
         .OfType<Button>().Single(control => control.Text == text);
     private static void PumpUntil(Func<bool> condition)

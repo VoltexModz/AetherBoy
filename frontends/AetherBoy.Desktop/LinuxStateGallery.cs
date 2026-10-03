@@ -10,6 +10,7 @@ internal sealed record LinuxDiskSnapshot(string BasePath, IReadOnlyList<LinuxSta
 internal static class LinuxStateGallery
 {
     public static string PathFor(string basePath, int slot) => slot == 0 ? Path.ChangeExtension(basePath, "resume") : LinuxSaveStateStore.GetPath(basePath, slot);
+    internal static LinuxStateCard ReadPreview(string basePath) => ReadCard(basePath, 0);
     public static void Write(string basePath, int slot, byte[] state, int width, int height, int[] pixels)
     {
         string file = PathFor(basePath, slot);
@@ -35,7 +36,7 @@ internal static class LinuxStateGallery
             return new(basePath, cards, savePath is not null && batteryLength > 0 ? BatterySaveStore.Inspect(savePath, batteryLength) : [], null);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
-        { return new(basePath, cards, [], "Backups could not be inspected: " + ex.Message); }
+        { return new(basePath, cards, [], global::AetherBoy.Runtime.Localization.UiText.Get("Backups could not be inspected: ") + ex.Message); }
     }
     private static LinuxStateCard ReadCard(string basePath, int slot)
     {

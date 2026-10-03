@@ -32,25 +32,28 @@ internal sealed class LinuxSdlTextClipboard : ILinuxTextClipboard
 
 internal sealed partial class WaylandEmulatorHost
 {
-    private enum TextField { None, Title, Search, SettingsSearch, Cheat, RoomCode, RoomServer, RoomAccessKey, ThemePrimary, ThemeSecondary, ThemeBackground }
+    private enum TextField { None, Title, Tags, Search, SettingsSearch, Cheat, RoomCode, RoomServer, RoomAccessKey, ThemePrimary, ThemeSecondary, ThemeBackground, DiscordApplicationId, Barcode }
 
     private TextField onlineEditingField;
     private TextField appearanceEditingField;
     private readonly LinuxTextEditor textEditor = new(80);
     private ILinuxTextClipboard textClipboard = new LinuxSdlTextClipboard();
     private TextField editorField;
+    private TextField libraryEditingField = TextField.Title;
     private bool editorHasFocus = true;
     private bool draggingTextSelection;
     private readonly Dictionary<TextField, SDL.FRect> textEntryBounds = new();
-    private TextField ActiveTextField => editingTitleIdentity is not null ? TextField.Title
+    private TextField ActiveTextField => editingTitleIdentity is not null ? libraryEditingField
         : editingSettingsSearch ? TextField.SettingsSearch : editingSearch ? TextField.Search : editingCheat ? TextField.Cheat
         : controlCenterVisible && controlCenterPage == ControlCenterPage.System && showAppearance ? appearanceEditingField
+        : controlCenterVisible && controlCenterPage == ControlCenterPage.System && systemSection == SystemSection.Discord && editingDiscordId ? TextField.DiscordApplicationId
+        : controlCenterVisible && controlCenterPage == ControlCenterPage.Tools && showBarcodeBoy && editingBarcode ? TextField.Barcode
         : controlCenterVisible && showOnlineLinkPage && !showLegacyOnlineLink ? onlineEditingField : TextField.None;
     private string? ActiveTextEntryName => ActiveTextField switch
-    { TextField.Title => "Cartridge title", TextField.Search => "Search cartridges", TextField.SettingsSearch => "Search settings", TextField.Cheat => "Cheat code", TextField.RoomCode => "Room code", TextField.RoomServer => "Room server address", TextField.RoomAccessKey => "Server access key",
-      TextField.ThemePrimary => "Primary UI color", TextField.ThemeSecondary => "Secondary UI color", TextField.ThemeBackground => "UI background color", _ => null };
+    { TextField.Title => global::AetherBoy.Runtime.Localization.UiText.Get("Cartridge title"), TextField.Tags => global::AetherBoy.Runtime.Localization.UiText.Get("Cartridge tags"), TextField.Search => global::AetherBoy.Runtime.Localization.UiText.Get("Search cartridges"), TextField.SettingsSearch => global::AetherBoy.Runtime.Localization.UiText.Get("Search settings"), TextField.Cheat => global::AetherBoy.Runtime.Localization.UiText.Get("Cheat code"), TextField.RoomCode => global::AetherBoy.Runtime.Localization.UiText.Get("Room code"), TextField.RoomServer => global::AetherBoy.Runtime.Localization.UiText.Get("Room server address"), TextField.RoomAccessKey => global::AetherBoy.Runtime.Localization.UiText.Get("Server access key"),
+      TextField.ThemePrimary => global::AetherBoy.Runtime.Localization.UiText.Get("Primary UI color"), TextField.ThemeSecondary => global::AetherBoy.Runtime.Localization.UiText.Get("Secondary UI color"), TextField.ThemeBackground => global::AetherBoy.Runtime.Localization.UiText.Get("UI background color"), TextField.DiscordApplicationId => global::AetherBoy.Runtime.Localization.UiText.Get("Discord application ID"), TextField.Barcode => global::AetherBoy.Runtime.Localization.UiText.Get("Barcode Boy card code"), _ => null };
     private string? ActiveTextName => ActiveTextEntryName;
-    private bool ActiveTextReadOnly => ActiveTextField == TextField.Title && libraryMutation is not null;
+    private bool ActiveTextReadOnly => ActiveTextField is TextField.Title or TextField.Tags && libraryMutation is not null;
     private string ActiveTextValue
     {
         get { EnsureTextEditor(); return ActiveTextField == TextField.None ? "" : ActiveTextField == TextField.RoomAccessKey ? new string('*', textEditor.Text.Length) : textEditor.Text; }
@@ -62,16 +65,19 @@ internal sealed partial class WaylandEmulatorHost
     }
 
     private string TextFieldValue(TextField field) => field switch
-    { TextField.Title => titleInput, TextField.Search => librarySearch, TextField.SettingsSearch => settingsSearch, TextField.Cheat => cheatCode,
+    { TextField.Title => titleInput, TextField.Tags => tagsInput, TextField.Search => librarySearch, TextField.SettingsSearch => settingsSearch, TextField.Cheat => cheatCode,
       TextField.RoomCode => roomCodeInput, TextField.RoomServer => roomServerInput, TextField.RoomAccessKey => roomAccessKeyInput,
-      TextField.ThemePrimary => primaryColorInput, TextField.ThemeSecondary => secondaryColorInput, TextField.ThemeBackground => backgroundColorInput, _ => "" };
+      TextField.ThemePrimary => primaryColorInput, TextField.ThemeSecondary => secondaryColorInput, TextField.ThemeBackground => backgroundColorInput, TextField.DiscordApplicationId => discordApplicationIdInput, TextField.Barcode => barcodeInput, _ => "" };
 
     private void EnsureTextEditor()
     {
         var field = ActiveTextField;
+        textEditor.LineBreakReplacement = field == TextField.Cheat ? " + " : "";
         textEditor.MaximumLength = field is TextField.RoomServer or TextField.RoomAccessKey ? 256
+            : field == TextField.Tags ? 240
+            : field == TextField.Cheat ? 32768
             : field is TextField.ThemePrimary or TextField.ThemeSecondary or TextField.ThemeBackground ? 7
-            : field == TextField.RoomCode ? 14 : 80;
+            : field == TextField.DiscordApplicationId ? 20 : field == TextField.RoomCode ? 14 : 80;
         string value = TextFieldValue(field);
         if (editorField != field || textEditor.Text != value)
         { textEditor.SetText(value); editorField = field; editorHasFocus = true; }
@@ -83,6 +89,7 @@ internal sealed partial class WaylandEmulatorHost
         switch (ActiveTextField)
         {
             case TextField.Title: titleInput = textEditor.Text; titleSelectedAll = textEditor.AllSelected; break;
+            case TextField.Tags: tagsInput = textEditor.Text; break;
             case TextField.SettingsSearch: settingsSearch = textEditor.Text; settingsSearchPage = 0; focusedControl = -1; break;
             case TextField.Search: librarySearch = textEditor.Text; libraryPage = 0; break;
             case TextField.Cheat: cheatCode = textEditor.Text; break;
@@ -92,6 +99,8 @@ internal sealed partial class WaylandEmulatorHost
             case TextField.ThemePrimary: primaryColorInput = textEditor.Text; break;
             case TextField.ThemeSecondary: secondaryColorInput = textEditor.Text; break;
             case TextField.ThemeBackground: backgroundColorInput = textEditor.Text; break;
+            case TextField.DiscordApplicationId: discordApplicationIdInput = textEditor.Text; break;
+            case TextField.Barcode: barcodeInput = textEditor.Text; break;
         }
     }
 
@@ -101,9 +110,12 @@ internal sealed partial class WaylandEmulatorHost
         if (textEditor.IsComposing) SDL.ClearComposition(window);
         onlineEditingField = field is TextField.RoomCode or TextField.RoomServer or TextField.RoomAccessKey ? field : TextField.None;
         appearanceEditingField = field is TextField.ThemePrimary or TextField.ThemeSecondary or TextField.ThemeBackground ? field : TextField.None;
+        if (field is TextField.Title or TextField.Tags) libraryEditingField = field;
         editingSettingsSearch = field == TextField.SettingsSearch;
         editingSearch = field == TextField.Search;
         editingCheat = field == TextField.Cheat;
+        editingDiscordId = field == TextField.DiscordApplicationId;
+        editingBarcode = field == TextField.Barcode;
         editorField = TextField.None;
         EnsureTextEditor(); editorHasFocus = true; focusedControl = -1;
         pressedKeys.Clear();
@@ -139,9 +151,12 @@ internal sealed partial class WaylandEmulatorHost
         EnsureTextEditor();
         if (textEditor.IsComposing) return;
         SyncTextEditor();
-        if (ActiveTextField == TextField.Title) { EndTitleEdit(true); return; }
+        showOnScreenKeyboard = false;
+        if (ActiveTextField is TextField.Title or TextField.Tags) { EndTitleEdit(true); return; }
         editingSettingsSearch = false;
         editingSearch = editingCheat = false;
+        editingDiscordId = false;
+        editingBarcode = false;
         onlineEditingField = TextField.None;
         appearanceEditingField = TextField.None;
         editorField = TextField.None; SDL.StopTextInput(window);
@@ -152,8 +167,9 @@ internal sealed partial class WaylandEmulatorHost
         if (ActiveTextReadOnly) return;
         EnsureTextEditor();
         if (textEditor.IsComposing) { CancelTextComposition(); return; }
+        showOnScreenKeyboard = false;
         if (ActiveTextField == TextField.SettingsSearch) { ClearSettingsSearch(); return; }
-        if (ActiveTextField == TextField.Title) { EndTitleEdit(false); return; }
+        if (ActiveTextField is TextField.Title or TextField.Tags) { EndTitleEdit(false); return; }
         CommitActiveText(); // Search/cheat drafts survive leaving the field.
     }
 
@@ -166,7 +182,7 @@ internal sealed partial class WaylandEmulatorHost
         if (key.Scancode is SDL.Scancode.Tab or SDL.Scancode.F6)
         {
             if (textEditor.IsComposing) return true;
-            if (ActiveTextField != TextField.Title) CommitActiveText();
+            if (ActiveTextField is not (TextField.Title or TextField.Tags)) CommitActiveText();
             else SDL.StopTextInput(window);
             editorHasFocus = false;
             return false;
@@ -197,7 +213,7 @@ internal sealed partial class WaylandEmulatorHost
         if (command is { } action)
         {
             try { textEditor.Key(action, (key.Mod & SDL.Keymod.Shift) != 0, textClipboard); SyncTextEditor(); }
-            catch (Exception ex) { statusMessage = "Clipboard action failed: " + ex.Message; }
+            catch (Exception ex) { statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Clipboard action failed: ") + global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(ex.Message); }
         }
         return true;
     }

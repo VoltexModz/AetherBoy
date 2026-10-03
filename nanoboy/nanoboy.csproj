@@ -24,10 +24,12 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <AetherBoyChannel Condition="'$(AetherBoyChannel)' == ''">development</AetherBoyChannel>
+    <AetherBoyBuildId Condition="'$(AetherBoyBuildId)' == ''"></AetherBoyBuildId>
   </PropertyGroup>
 
   <ItemGroup>
     <AssemblyMetadata Include="AetherBoyChannel" Value="$(AetherBoyChannel)" />
+    <AssemblyMetadata Include="AetherBoyBuildId" Value="$(AetherBoyBuildId)" />
     <PackageReference Include="NAudio.WinMM" Version="2.3.0" />
     <PackageReference Include="NAudio.Wasapi" Version="2.3.0" />
     <PackageReference Include="Vortice.Direct2D1" Version="3.8.3" />

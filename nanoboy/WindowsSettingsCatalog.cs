@@ -1,0 +1,51 @@
+using System;
+using System.Linq;
+
+namespace nanoboy;
+
+internal sealed record WindowsSettingEntry(string Page, string Title, string Description, string Location, string Keywords);
+
+internal static class WindowsSettingsCatalog
+{
+    internal static WindowsSettingEntry[] Entries =>
+    [
+        new("language", global::AetherBoy.Runtime.Localization.UiText.Get("Anzeigesprache"), "Deutsch / English", global::AetherBoy.Runtime.Localization.UiText.Get("App und System"), "language sprache deutsch english englisch system österreich schweiz"),
+        new("barcode", "Barcode Boy", global::AetherBoy.Runtime.Localization.UiText.Get("Scanner anschließen und Kartencodes eingeben oder aus einer Textdatei laden."), global::AetherBoy.Runtime.Localization.UiText.Get("Werkzeuge · Barcode Boy"), "barcode boy scanner namcot battle space berserker valkyrie zubehör kartencode"),
+        new("intro", global::AetherBoy.Runtime.Localization.UiText.Get("Startanimation"), global::AetherBoy.Runtime.Localization.UiText.Get("Logo und Klang vor dem Spiel anpassen oder abschalten."), global::AetherBoy.Runtime.Localization.UiText.Get("App und System · Bedienung · Startanimation"), "boot intro startup start logo sound ton bild png wav"),
+        new("updates", "Updates", global::AetherBoy.Runtime.Localization.UiText.Get("Release-Pakete prüfen und herunterladen."), global::AetherBoy.Runtime.Localization.UiText.Get("App und System · Bedienung · Updates"), "version aktualisierung update download upgrade"),
+        new("discord", global::AetherBoy.Runtime.Localization.UiText.Get("Discord-Spielstatus"), global::AetherBoy.Runtime.Localization.UiText.Get("Aktivität und Spieltitel getrennt freigeben."), global::AetherBoy.Runtime.Localization.UiText.Get("App und System · Bedienung · Discord"), "rich presence activity privacy datenschutz spielstatus application id"),
+        new("display", global::AetherBoy.Runtime.Localization.UiText.Get("Bildfilter"), global::AetherBoy.Runtime.Localization.UiText.Get("Scharfe Pixel, weiche Kanten oder ein LCD-Raster auswählen."), global::AetherBoy.Runtime.Localization.UiText.Get("Grafik · Bild"), "picture video graphics grafik bild filter display shader"),
+        new("display", global::AetherBoy.Runtime.Localization.UiText.Get("Bildskalierung"), global::AetherBoy.Runtime.Localization.UiText.Get("Automatisch, mit ganzen Pixeln oder passend zum Fenster anzeigen."), global::AetherBoy.Runtime.Localization.UiText.Get("Grafik · Bild"), "scale scaling integer aspect ratio zoom auflösung skalierung bildgröße pixel"),
+        new("display", global::AetherBoy.Runtime.Localization.UiText.Get("Vollbild"), global::AetherBoy.Runtime.Localization.UiText.Get("Fenstergröße ändern oder mit F11 ins Vollbild wechseln."), global::AetherBoy.Runtime.Localization.UiText.Get("Grafik · Bild"), "fullscreen window monitor fenster"),
+        new("palette", global::AetherBoy.Runtime.Localization.UiText.Get("Game-Boy-Farben"), global::AetherBoy.Runtime.Localization.UiText.Get("Die vier Farben der ursprünglichen Game-Boy-Spiele ändern."), global::AetherBoy.Runtime.Localization.UiText.Get("Grafik · GB-Farben"), "dmg palette color colour farbe farben"),
+        new("performance", global::AetherBoy.Runtime.Localization.UiText.Get("Leistung und Bildausgabe"), global::AetherBoy.Runtime.Localization.UiText.Get("GPU, VSync, ausgelassene Bilder und Leistungsanzeige einstellen."), global::AetherBoy.Runtime.Localization.UiText.Get("Grafik · Leistung"), "performance frameskip speed fps latency langsam"),
+        new("input", global::AetherBoy.Runtime.Localization.UiText.Get("Tastaturbelegung"), global::AetherBoy.Runtime.Localization.UiText.Get("Spieltasten ändern oder ihre Standardbelegung wiederherstellen."), global::AetherBoy.Runtime.Localization.UiText.Get("Steuerung · Tastatur"), "keyboard input bind mapping tastatur tastenbelegung turbo pause"),
+        new("controller", global::AetherBoy.Runtime.Localization.UiText.Get("Controller einrichten"), global::AetherBoy.Runtime.Localization.UiText.Get("Gerät auswählen und Tasten neu zuweisen."), global::AetherBoy.Runtime.Localization.UiText.Get("Steuerung · Controller"), "gamepad joystick input bind mapping xbox playstation tasten belegung"),
+        new("stick", global::AetherBoy.Runtime.Localization.UiText.Get("Stick-Totzone"), global::AetherBoy.Runtime.Localization.UiText.Get("Empfindlichkeit anpassen und Stickbewegungen live prüfen."), global::AetherBoy.Runtime.Localization.UiText.Get("Steuerung · Stick"), "analog joystick drift sensitivity stick deadzone totzone empfindlichkeit"),
+        new("shortcuts", global::AetherBoy.Runtime.Localization.UiText.Get("Tastenkürzel"), global::AetherBoy.Runtime.Localization.UiText.Get("Tasten für Speichern, Screenshots und Vollbild nachschlagen."), global::AetherBoy.Runtime.Localization.UiText.Get("Steuerung · Tastenkürzel"), "hotkey shortcut keys kürzel f5 f7 f8 f9 f10 f11 f12"),
+        new("audio", global::AetherBoy.Runtime.Localization.UiText.Get("Lautstärke und Ton"), global::AetherBoy.Runtime.Localization.UiText.Get("Ton stummschalten, Kanäle und Ausgabepuffer einstellen."), "Audio", "sound volume mute channels kanal kanäle latency"),
+        new("appearance", global::AetherBoy.Runtime.Localization.UiText.Get("App-Farben"), global::AetherBoy.Runtime.Localization.UiText.Get("Akzentfarben und Hintergrund der Oberfläche auswählen."), global::AetherBoy.Runtime.Localization.UiText.Get("Aussehen"), "theme appearance hintergrund design farbe farben"),
+        new("desktop", global::AetherBoy.Runtime.Localization.UiText.Get("Oberflächengröße"), global::AetherBoy.Runtime.Localization.UiText.Get("Text und Bedienelemente gemeinsam vergrößern."), global::AetherBoy.Runtime.Localization.UiText.Get("App und System · Bedienung"), "text font size accessibility schrift schriftgröße lesbarkeit"),
+        new("desktop", global::AetherBoy.Runtime.Localization.UiText.Get("Bei Fokusverlust pausieren"), global::AetherBoy.Runtime.Localization.UiText.Get("Ein Einzelspiel beim Wechsel zu einer anderen Anwendung anhalten."), global::AetherBoy.Runtime.Localization.UiText.Get("App und System · Bedienung"), "focus background automatic pause hintergrund fokus"),
+        new("profiles", global::AetherBoy.Runtime.Localization.UiText.Get("Spielprofile"), global::AetherBoy.Runtime.Localization.UiText.Get("Grafik, Audio und Tastatur für das aktuelle Spiel einstellen."), global::AetherBoy.Runtime.Localization.UiText.Get("App und System · Spielprofile"), "global profile defaults spielprofil profil standard"),
+        new("firmware", global::AetherBoy.Runtime.Localization.UiText.Get("Boot-ROM und BIOS"), global::AetherBoy.Runtime.Localization.UiText.Get("Eigene Firmware importieren und ihren Einsatz beim Spielstart wählen."), global::AetherBoy.Runtime.Localization.UiText.Get("App und System · Firmware"), "firmware boot startup start"),
+        new("storage", global::AetherBoy.Runtime.Localization.UiText.Get("Lokale Dateien"), global::AetherBoy.Runtime.Localization.UiText.Get("ROMs, Spielstände, Screenshots und Einstellungen finden."), global::AetherBoy.Runtime.Localization.UiText.Get("Ordner"), "file path folder storage ordner dateien speicherort"),
+        new("saves", global::AetherBoy.Runtime.Localization.UiText.Get("Spielstände und Sicherungen"), global::AetherBoy.Runtime.Localization.UiText.Get("Speichern, fortsetzen, Batterie-Spielstände importieren oder wiederherstellen."), global::AetherBoy.Runtime.Localization.UiText.Get("Spielstände"), "save load resume rewind backup recovery import export sicherung zurückspulen gallery preview slot vorschau"),
+        new("diagnostics", global::AetherBoy.Runtime.Localization.UiText.Get("Diagnose und Berichte"), global::AetherBoy.Runtime.Localization.UiText.Get("Sitzungsinformationen prüfen und einen lokalen Bericht exportieren."), global::AetherBoy.Runtime.Localization.UiText.Get("Diagnose"), "error debug log report fehler bericht"),
+        new("tools", global::AetherBoy.Runtime.Localization.UiText.Get("Spielebibliothek"), global::AetherBoy.Runtime.Localization.UiText.Get("Letzte Spiele und Favoriten öffnen."), global::AetherBoy.Runtime.Localization.UiText.Get("Werkzeuge"), "rom game open recent favorite library bibliothek spiel öffnen"),
+        new("tools", "ROM-Patcher", global::AetherBoy.Runtime.Localization.UiText.Get("IPS-, BPS- oder UPS-Patches auf einer Kopie anwenden."), global::AetherBoy.Runtime.Localization.UiText.Get("Werkzeuge"), "patch patcher ips bps ups hack"),
+        new("tools", global::AetherBoy.Runtime.Localization.UiText.Get("Audioaufnahme und Cheats"), global::AetherBoy.Runtime.Localization.UiText.Get("Audio prüfen, als WAV aufnehmen oder Cheat-Codes verwalten."), global::AetherBoy.Runtime.Localization.UiText.Get("Werkzeuge"), "wav recording capture cheat aufnahme gameshark"),
+        new("overview", global::AetherBoy.Runtime.Localization.UiText.Get("Gameplay-Video aufnehmen"), global::AetherBoy.Runtime.Localization.UiText.Get("Bild und Spielton als AVI aufnehmen oder den Aufnahmeordner öffnen."), global::AetherBoy.Runtime.Localization.UiText.Get("Übersicht"), "video recording gameplay capture avi film aufnahme"),
+        new("tools", "Online Link", global::AetherBoy.Runtime.Localization.UiText.Get("Raum erstellen, beitreten oder die Verbindung ohne ROM testen."), global::AetherBoy.Runtime.Localization.UiText.Get("Werkzeuge"), "online link room multiplayer raum verbindung test"),
+        new("diagnostics", "Screenshot", global::AetherBoy.Runtime.Localization.UiText.Get("Ein unverändertes Spielbild aufnehmen."), global::AetherBoy.Runtime.Localization.UiText.Get("Diagnose"), "screenshot capture bildschirmfoto")
+    ];
+
+    internal static WindowsSettingEntry[] Search(string query)
+    {
+        string[] words = query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return Entries.Where(entry => words.All(word =>
+                $"{entry.Title} {entry.Description} {entry.Location} {entry.Keywords}".Contains(word, StringComparison.OrdinalIgnoreCase)))
+            .OrderByDescending(entry => words.Count(word => entry.Title.Contains(word, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+    }
+}

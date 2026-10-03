@@ -30,7 +30,7 @@ namespace nanoboy
         {
             this.button1 = new nanoboy.Controls.AetherButton();
             this.pictureBox1 = new System.Windows.Forms.PictureBox();
-            this.textBox1 = new System.Windows.Forms.TextBox();
+            this.textBox1 = new nanoboy.Controls.AetherTextBox();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
             this.SuspendLayout();
             //
@@ -72,10 +72,10 @@ namespace nanoboy
             this.Controls.Add(this.textBox1);
             this.Controls.Add(this.pictureBox1);
             this.Controls.Add(this.button1);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedToolWindow;
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
             this.Name = "frmAbout";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Über AetherBoy GBC Emulator";
+            this.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Über AetherBoy GBC Emulator");
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
@@ -86,6 +86,6 @@ namespace nanoboy
 
         private System.Windows.Forms.Button button1;
         private System.Windows.Forms.PictureBox pictureBox1;
-        private System.Windows.Forms.TextBox textBox1;
+        private nanoboy.Controls.AetherTextBox textBox1;
     }
 }

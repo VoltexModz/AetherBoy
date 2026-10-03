@@ -17,7 +17,7 @@ namespace nanoboy
 
         private void InitializeComponent()
         {
-            this.txtChangelog = new System.Windows.Forms.TextBox();
+            this.txtChangelog = new nanoboy.Controls.AetherTextBox();
             this.btnClose = new nanoboy.Controls.AetherButton();
             this.SuspendLayout();
             //
@@ -42,7 +42,7 @@ namespace nanoboy
             this.btnClose.Name = "btnClose";
             this.btnClose.Size = new System.Drawing.Size(90, 28);
             this.btnClose.TabIndex = 1;
-            this.btnClose.Text = "Schließen";
+            this.btnClose.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Schließen");
             this.btnClose.UseVisualStyleBackColor = true;
             this.btnClose.Click += new System.EventHandler(this.btnClose_Click);
             //
@@ -53,10 +53,10 @@ namespace nanoboy
             this.ClientSize = new System.Drawing.Size(584, 450);
             this.Controls.Add(this.btnClose);
             this.Controls.Add(this.txtChangelog);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
             this.Name = "frmChangelog";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Projektgeschichte, Changelog & Roadmap - AetherBoy";
+            this.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Projektgeschichte, Changelog & Roadmap - AetherBoy");
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -64,7 +64,7 @@ namespace nanoboy
 
         #endregion
 
-        private System.Windows.Forms.TextBox txtChangelog;
+        private nanoboy.Controls.AetherTextBox txtChangelog;
         private System.Windows.Forms.Button btnClose;
     }
 }

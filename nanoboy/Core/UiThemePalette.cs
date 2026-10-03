@@ -65,6 +65,9 @@ public sealed class UiThemePalette
     public UiRgb OnSecondary { get; }
     public UiRgb SuccessText { get; }
     public UiRgb DangerText { get; }
+    public UiButtonGradient Button { get; }
+    public UiButtonGradient ButtonHover { get; }
+    public UiButtonGradient ButtonPressed { get; }
 
     public UiThemePalette(string? primary, string? secondary, string? background)
     {
@@ -74,33 +77,51 @@ public sealed class UiThemePalette
         Primary = UiRgb.TryParse(primary, out UiRgb p) ? p : defaultPrimary;
         Secondary = UiRgb.TryParse(secondary, out UiRgb s) ? s : defaultSecondary;
         Background = UiRgb.TryParse(background, out UiRgb b) ? b : defaultBackground;
-        Text = Background.Contrast(new(255, 255, 255)) >= Background.Contrast(new(0, 0, 0))
+        bool original = Primary == defaultPrimary && Secondary == defaultSecondary && Background == defaultBackground;
+        Text = original ? new(241, 244, 255) : Background.Contrast(new(255, 255, 255)) >= Background.Contrast(new(0, 0, 0))
             ? new(255, 255, 255) : new(0, 0, 0);
-        UiRgb opposite = Text.R == 255 ? new(0, 0, 0) : new(255, 255, 255);
+        bool dark = Text.Luminance > .5;
+        UiRgb opposite = dark ? new(0, 0, 0) : new(255, 255, 255);
         UiRgb SurfaceAt(double amount)
         {
-            UiRgb candidate = UiRgb.Mix(Background, Text, amount);
+            // Keep dark themes close to their background instead of washing out
+            // the shell. Custom colors remain untouched in settings and swatches.
+            UiRgb tint = UiRgb.Mix(Primary, Secondary, .22);
+            UiRgb candidate = UiRgb.Mix(UiRgb.Mix(Background, Text, amount), tint, dark ? .035 : .02);
             return Text.Contrast(candidate) >= 4.5 ? candidate : UiRgb.Mix(Background, opposite, amount);
         }
-        Chrome = SurfaceAt(.055);
-        Surface = SurfaceAt(.105);
-        Raised = SurfaceAt(.16);
-        Border = SurfaceAt(.25);
-        Muted = EnsureContrast(UiRgb.Mix(Background, Text, .62), Raised, Text);
-        PrimaryText = EnsureContrast(Primary, Surface, Text);
-        SecondaryText = EnsureContrast(Secondary, Surface, Text);
+        // These are the actual Aether Wave surface colors, not just the three
+        // logo colors. Other presets and custom palettes use the same hierarchy.
+        Chrome = original ? new(8, 11, 24) : SurfaceAt(.012);
+        Surface = original ? new(12, 16, 31) : SurfaceAt(.03);
+        Raised = original ? new(17, 22, 41) : SurfaceAt(.055);
+        Border = original ? new(47, 55, 83) : SurfaceAt(.20);
+        UiRgb ReadableOnSurfaces(UiRgb color)
+        {
+            UiRgb[] surfaces = [Background, Chrome, Surface, Raised];
+            foreach (UiRgb surface in surfaces) color = EnsureContrast(color, surface, Text);
+            foreach (UiRgb surface in surfaces)
+                if (color.Contrast(surface) < 4.5) return Text;
+            return color;
+        }
+        Muted = ReadableOnSurfaces(original ? new(139, 148, 177) : UiRgb.Mix(Background, Text, .62));
+        PrimaryText = ReadableOnSurfaces(Primary);
+        SecondaryText = ReadableOnSurfaces(Secondary);
         OnPrimary = Primary.Contrast(new(255, 255, 255)) >= Primary.Contrast(new(0, 0, 0))
             ? new(255, 255, 255) : new(0, 0, 0);
         OnSecondary = Secondary.Contrast(new(255, 255, 255)) >= Secondary.Contrast(new(0, 0, 0))
             ? new(255, 255, 255) : new(0, 0, 0);
-        SuccessText = EnsureContrast(Text.R == 255 ? new(109, 221, 166) : new(0, 112, 69), Raised, Text);
-        DangerText = EnsureContrast(Text.R == 255 ? new(255, 118, 136) : new(176, 27, 45), Raised, Text);
+        SuccessText = ReadableOnSurfaces(dark ? new(84, 237, 176) : new(0, 112, 69));
+        DangerText = ReadableOnSurfaces(dark ? new(255, 92, 132) : new(176, 27, 45));
+        Button = UiButtonGradient.Create(Primary, Secondary);
+        ButtonHover = UiButtonGradient.Create(UiRgb.Mix(Primary, new(255, 255, 255), .13), UiRgb.Mix(Secondary, new(255, 255, 255), .13));
+        ButtonPressed = UiButtonGradient.Create(UiRgb.Mix(Primary, new(0, 0, 0), .16), UiRgb.Mix(Secondary, new(0, 0, 0), .16));
     }
 
     private static UiRgb EnsureContrast(UiRgb color, UiRgb background, UiRgb toward)
     {
-        for (int step = 0; step <= 20 && color.Contrast(background) < 4.5; step++)
-            color = UiRgb.Mix(color, toward, .1);
-        return color;
+        for (int step = 0; step < 32 && color.Contrast(background) < 4.5; step++)
+            color = UiRgb.Mix(color, toward, .25);
+        return color.Contrast(background) >= 4.5 ? color : toward;
     }
 }

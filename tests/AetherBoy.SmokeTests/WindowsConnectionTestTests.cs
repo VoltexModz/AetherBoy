@@ -18,12 +18,12 @@ public sealed class WindowsConnectionTestTests
         main.OnlineLinkBrowserLauncher = _ => Assert.Fail("No browser should open.");
         main.OnlineProbeSessionFactory = (_, _, _, _) => throw new AssertFailedException("Opening the dialog must not start the network.");
         main.Show();
-        var tools = (ToolStripMenuItem)typeof(frmNano).GetField("menuItem21", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(main)!;
+        var tools = (nanoboy.Controls.AetherCommand)typeof(frmNano).GetField("menuItem21", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(main)!;
         var entry = tools.DropDownItems.Find("menuOnlineProbe", true).Single();
         entry.PerformClick(); Application.DoEvents();
         var dialog = main.OwnedForms.OfType<frmOnlineConnectionTest>().Single();
         Assert.AreEqual(FormBorderStyle.None, dialog.FormBorderStyle);
-        Assert.IsTrue(Find<TextBox>(dialog, "probeServerKey").UseSystemPasswordChar);
+        Assert.IsTrue(Find<nanoboy.Controls.AetherTextBox>(dialog, "probeServerKey").UseSystemPasswordChar);
         Assert.IsTrue(Find<Button>(dialog, "probeCreate").Enabled);
         Assert.IsNull(typeof(frmNano).GetField("session", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(main));
         entry.PerformClick(); Assert.AreEqual(1, main.OwnedForms.OfType<frmOnlineConnectionTest>().Count());
@@ -46,8 +46,8 @@ public sealed class WindowsConnectionTestTests
         showRoom.Invoke(main, new object[] { false }); Application.DoEvents(); Assert.IsTrue(probe.IsDisposed);
         showProbe.Invoke(main, null); Application.DoEvents();
         probe = main.OwnedForms.OfType<frmOnlineConnectionTest>().Single();
-        Find<TextBox>(probe, "probeServerUrl").Text = "https://rooms.example.com";
-        Find<TextBox>(probe, "probeServerKey").Text = new string('b', 64);
+        Find<nanoboy.Controls.AetherTextBox>(probe, "probeServerUrl").Text = "https://rooms.example.com";
+        Find<nanoboy.Controls.AetherTextBox>(probe, "probeServerKey").Text = new string('b', 64);
         Click(probe, "probeCreate"); Assert.IsTrue(probe.IsTestActive);
         Assert.IsFalse(main.StartOnlineLink(false, confirm: false));
         showRoom.Invoke(main, new object[] { true }); Application.DoEvents();
@@ -64,15 +64,15 @@ public sealed class WindowsConnectionTestTests
             (_, _, code, reports) => { starts++; requestedCode = code; Assert.IsNull(reports); return fake; });
         dialog.Show();
         Click(dialog, "probeCreate"); Assert.AreEqual(0, starts);
-        Find<TextBox>(dialog, "probeServerUrl").Text = "https://rooms.example.com";
-        Find<TextBox>(dialog, "probeServerKey").Text = new string('b', 64);
+        Find<nanoboy.Controls.AetherTextBox>(dialog, "probeServerUrl").Text = "https://rooms.example.com";
+        Find<nanoboy.Controls.AetherTextBox>(dialog, "probeServerKey").Text = new string('b', 64);
         Click(dialog, "probeSaveServer");
         Assert.AreEqual(new OnlineRoomSettings("https://rooms.example.com", new string('b', 64)), OnlineRoomSettings.Load(scope.SettingsPath));
-        Find<TextBox>(dialog, "probeRoomCode").Text = "bad";
+        Find<nanoboy.Controls.AetherTextBox>(dialog, "probeRoomCode").Text = "bad";
         Click(dialog, "probeJoin"); Assert.AreEqual(0, starts);
-        Find<TextBox>(dialog, "probeRoomCode").Text = "abcde-fghjk";
+        Find<nanoboy.Controls.AetherTextBox>(dialog, "probeRoomCode").Text = "abcde-fghjk";
         Click(dialog, "probeJoin"); Assert.AreEqual(1, starts); Assert.AreEqual("ABCDEFGHJK", requestedCode);
-        Assert.IsTrue(Find<TextBox>(dialog, "probeServerKey").ReadOnly);
+        Assert.IsTrue(Find<nanoboy.Controls.AetherTextBox>(dialog, "probeServerKey").ReadOnly);
         Assert.IsFalse(Find<Button>(dialog, "probeCreate").Enabled);
         Assert.IsTrue(Find<Button>(dialog, "probeStop").Enabled);
         string? copied = null; dialog.CopyText = value => copied = value;
@@ -83,14 +83,14 @@ public sealed class WindowsConnectionTestTests
         fake.Pass(); dialog.RefreshStatus();
         Assert.IsTrue(Find<Label>(dialog, "probeStatus").Text.Contains("BEIDE"));
         Assert.IsFalse(Find<Button>(dialog, "probeCreate").Enabled, "Local PASS must retain the connection for the peer.");
-        Assert.IsTrue(Find<TextBox>(dialog, "probeResults").Text.Contains("4096"));
+        Assert.IsTrue(Find<nanoboy.Controls.AetherTextBox>(dialog, "probeResults").Text.Contains("4096"));
         Capture(dialog, scope, "connection-test-passed.png");
         Click(dialog, "probeCopyReport"); Assert.AreEqual(fake.GetDiagnosticReport(), copied);
         Assert.IsFalse(copied!.Contains(new string('b', 64)));
         Click(dialog, "probeStop"); Until(() => Find<Button>(dialog, "probeJoin").Enabled);
         Assert.AreEqual(1, fake.Stops);
-        Find<TextBox>(dialog, "probeRoomCode").Text = "KLMNP-QRSTU";
-        dialog.RefreshStatus(); Assert.AreEqual("KLMNP-QRSTU", Find<TextBox>(dialog, "probeRoomCode").Text);
+        Find<nanoboy.Controls.AetherTextBox>(dialog, "probeRoomCode").Text = "KLMNP-QRSTU";
+        dialog.RefreshStatus(); Assert.AreEqual("KLMNP-QRSTU", Find<nanoboy.Controls.AetherTextBox>(dialog, "probeRoomCode").Text);
         fake = new Probe(); Click(dialog, "probeJoin"); Assert.AreEqual(2, starts); Assert.AreEqual("KLMNPQRSTU", requestedCode);
         dialog.Close(); Until(() => dialog.IsDisposed);
     }
@@ -135,7 +135,7 @@ public sealed class WindowsConnectionTestTests
         Click(dialog, "probeCreate"); Assert.AreEqual(scope.Reports, requestedReports);
         fake.State = fake.State with { ReportWriteFailed = true };
         dialog.RefreshStatus();
-        Assert.IsTrue(Find<TextBox>(dialog, "probeResults").Text.Contains("nicht gespeichert"));
+        Assert.IsTrue(Find<nanoboy.Controls.AetherTextBox>(dialog, "probeResults").Text.Contains("nicht gespeichert"));
         Assert.IsTrue(Find<Button>(dialog, "probeCopyReport").Enabled);
         dialog.Close(); Until(() => dialog.IsDisposed);
     }

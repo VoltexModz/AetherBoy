@@ -25,7 +25,10 @@ namespace AetherBoy.Runtime
             ReadOnlySpan<CheatSnapshot> cheats,
             VideoGeometry? videoGeometry = null,
             EmulationFeature features = EmulationFeature.None,
-            ReadOnlySpan<GbaDiagnosticEventSnapshot> diagnosticEvents = default)
+            ReadOnlySpan<GbaDiagnosticEventSnapshot> diagnosticEvents = default,
+            bool rumbleActive = false,
+            bool cheatButtonPressed = false,
+            BarcodeBoySnapshot? barcodeBoy = null)
         {
             State = state;
             IsPaused = isPaused;
@@ -36,6 +39,9 @@ namespace AetherBoy.Runtime
             Audio = audio;
             VideoGeometry = videoGeometry ?? VideoGeometry.GameBoy;
             Features = features;
+            RumbleActive = rumbleActive;
+            CheatButtonPressed = cheatButtonPressed;
+            BarcodeBoy = barcodeBoy;
             this.cheats = cheats.ToArray();
             readOnlyCheats = Array.AsReadOnly(this.cheats);
             this.diagnosticEvents = diagnosticEvents.ToArray();
@@ -51,6 +57,9 @@ namespace AetherBoy.Runtime
         public AudioSnapshot? Audio { get; }
         public VideoGeometry VideoGeometry { get; }
         public EmulationFeature Features { get; }
+        public bool RumbleActive { get; }
+        public bool CheatButtonPressed { get; }
+        public BarcodeBoySnapshot? BarcodeBoy { get; }
         public IReadOnlyList<CheatSnapshot> Cheats => readOnlyCheats;
         public IReadOnlyList<GbaDiagnosticEventSnapshot> DiagnosticEvents => readOnlyDiagnosticEvents;
         public bool HasVideoFrame => VideoFrameSequence != 0;
@@ -68,7 +77,8 @@ namespace AetherBoy.Runtime
                 cheats,
                 VideoGeometry,
                 Features,
-                diagnosticEvents);
+                diagnosticEvents,
+                RumbleActive, CheatButtonPressed, BarcodeBoy);
         }
 
         internal EmulationSnapshot WithVideoGeometry(VideoGeometry geometry)
@@ -78,7 +88,7 @@ namespace AetherBoy.Runtime
 
             return new EmulationSnapshot(
                 State, IsPaused, IsTurboEnabled, EmulatedFrameCount, VideoFrameSequence,
-                Rom, Audio, cheats, geometry, Features, diagnosticEvents);
+                Rom, Audio, cheats, geometry, Features, diagnosticEvents, RumbleActive, CheatButtonPressed, BarcodeBoy);
         }
 
         public bool Supports(EmulationFeature feature) =>

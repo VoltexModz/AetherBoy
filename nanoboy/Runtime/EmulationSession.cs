@@ -45,6 +45,29 @@ namespace AetherBoy.Runtime
         private long audioGeneration = 1;
         private bool acceptingCommands = true;
         private bool shutdownRequested;
+        private GameplayRecorder? gameplayRecording;
+        private int[]? recordingPixels;
+        private long recordingFrameSequence;
+
+        public GameplayRecorder? GameplayRecording => Volatile.Read(ref gameplayRecording);
+
+        public Task<GameplayRecorder> StartGameplayRecordingAsync(string path) =>
+            EnqueueAsync(new StartGameplayRecordingCommand(this, path), CancellationToken.None);
+
+        private sealed class StartGameplayRecordingCommand(EmulationSession session, string path) : EmulationCommand<GameplayRecorder>
+        {
+            public override void Apply(SessionOwnerContext context)
+            {
+                if (context.IsTurboEnabled) throw new InvalidOperationException("Release Turbo before recording.");
+                if (session.GameplayRecording is { Completion.IsCompleted: false })
+                    throw new InvalidOperationException("Wait for the previous recording to finish.");
+                var recorder = new GameplayRecorder(path, context.Machine.VideoGeometry, session.LatestSnapshot.Audio?.SampleRate ?? 44100);
+                session.recordingPixels = new int[context.Machine.VideoGeometry.PixelCount];
+                session.recordingFrameSequence = long.MinValue;
+                Volatile.Write(ref session.gameplayRecording, recorder);
+                SetResult(recorder);
+            }
+        }
 
         public EmulationSession(
             string romPath,
@@ -229,6 +252,15 @@ namespace AetherBoy.Runtime
             return EnqueueAsync(new ToggleCheatCommand(id), cancellationToken);
         }
 
+        public Task SetCheatButtonAsync(bool pressed, CancellationToken cancellationToken = default) =>
+            EnqueueAsync(new SetCheatButtonCommand(pressed), cancellationToken);
+
+        public Task SetBarcodeBoyEnabledAsync(bool enabled, CancellationToken cancellationToken = default) =>
+            EnqueueAsync(new SetBarcodeBoyCommand(enabled), cancellationToken);
+
+        public Task ScanBarcodeBoyAsync(string code, CancellationToken cancellationToken = default) =>
+            EnqueueAsync(new ScanBarcodeBoyCommand(BarcodeBoyInput.Normalize(code)), cancellationToken);
+
         public Task ShutdownAsync(CancellationToken cancellationToken = default)
         {
             lock (lifecycleGate)
@@ -393,6 +425,9 @@ namespace AetherBoy.Runtime
                     List<EmulationCommand> appliedCommands = DrainCommands(context);
                     bool timelineChanged = context.TimelineChanged;
                     context.TimelineChanged = false;
+                    if (timelineChanged) GameplayRecording?.Stop(GameplayRecordingStop.TimelineChanged);
+                    if (context.IsTurboEnabled) GameplayRecording?.Stop(GameplayRecordingStop.Turbo);
+                    if (previousPausedState != context.IsPaused) GameplayRecording?.ClearAudio();
                     if (previousPausedState != context.IsPaused ||
                         previousTurboState != context.IsTurboEnabled ||
                         timelineChanged)
@@ -466,6 +501,12 @@ namespace AetherBoy.Runtime
                     else machine.RunFrame();
                     emulatedFrameCount++;
                     PublishStateAndSnapshot(context, SessionState.Running, emulatedFrameCount);
+                    if (GameplayRecording is { IsRecording: true } recording && recordingPixels is not null)
+                    {
+                        // A skipped display frame repeats the last image; it must not shorten the clip.
+                        frameExchange.TryCopyLatestFrame(recordingPixels, ref recordingFrameSequence);
+                        recording.SubmitFrame(recordingPixels);
+                    }
 
                     if (context.IsTurboEnabled)
                     {
@@ -487,6 +528,12 @@ namespace AetherBoy.Runtime
                 // Disposal may include durable battery/RTC writes. Keep the owner and its write
                 // leases alive, but do not advertise a runnable session while finalization blocks.
                 PublishTerminalState(SessionState.Stopping);
+                if (GameplayRecording is { } recording)
+                {
+                    recording.Stop(GameplayRecordingStop.SessionEnded);
+                    // Capture owns no machine state; finish its bounded queue before application exit.
+                    recording.Completion.GetAwaiter().GetResult();
+                }
                 audioDispatcher.StopWithoutWaiting();
                 if (machine is not null)
                 {
@@ -587,6 +634,11 @@ namespace AetherBoy.Runtime
                 context.IsTurboEnabled,
                 emulatedFrameCount,
                 frameExchange.PublishedSequence).WithVideoGeometry(frameExchange.Geometry);
+            if (snapshot.Audio is { } currentAudio && LatestSnapshot.Audio is { } previousAudio)
+            {
+                if (currentAudio.SampleRate != previousAudio.SampleRate) GameplayRecording?.Stop(GameplayRecordingStop.AudioChanged);
+                if (currentAudio.Enabled != previousAudio.Enabled) GameplayRecording?.ClearAudio();
+            }
             Volatile.Write(ref latestSnapshot, snapshot);
             Volatile.Write(ref state, (int)nextState);
         }
@@ -614,6 +666,7 @@ namespace AetherBoy.Runtime
 
         private void ForwardAudioSamples(object? sender, AudioSamplesAvailableEventArgs eventArgs)
         {
+            GameplayRecording?.SubmitAudio(eventArgs);
             audioDispatcher.TryPost(eventArgs.WithPlaybackGeneration(audioGeneration, audioSession));
         }
 

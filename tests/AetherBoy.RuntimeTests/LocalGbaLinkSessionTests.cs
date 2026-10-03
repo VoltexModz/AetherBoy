@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Text;
 using System.Reflection;
+using System.Diagnostics;
 using AetherBoy.Runtime;
 using AetherBoy.Runtime.Storage;
 using GameboyAdvanced.Core;
@@ -14,6 +15,7 @@ public sealed class LocalGbaLinkSessionTests
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
     private static readonly EmulatorConfiguration Configuration = new(0, true, true, true, true, true, 44_100);
     private string directory = null!;
+    public TestContext TestContext { get; set; } = null!;
 
     [TestInitialize]
     public void CreateDirectory() => directory = Directory.CreateTempSubdirectory("aether-gba-link-tests-").FullName;
@@ -39,7 +41,7 @@ public sealed class LocalGbaLinkSessionTests
         Assert.IsTrue(session.LatestSnapshot.First!.IsGameBoyAdvance);
         Assert.IsTrue(session.LatestSnapshot.Second!.IsGameBoyAdvance);
         Assert.IsGreaterThan(0L, session.LatestSnapshot.ClockEdges);
-        await session.ShutdownAsync().WaitAsync(Timeout);
+        await ObservedShutdown(session);
 
         byte[] firstSave = File.ReadAllBytes(first.SavePath);
         byte[] secondSave = File.ReadAllBytes(second.SavePath);
@@ -179,6 +181,134 @@ public sealed class LocalGbaLinkSessionTests
         string romPath = Path.Combine(directory, name + ".gba");
         File.WriteAllBytes(romPath, rom);
         return new(romPath, Path.Combine(directory, name + ".sav"), null, Configuration);
+    }
+
+    [TestMethod]
+    [DataRow(0)]
+    [DataRow(1)]
+    [DataRow(2)]
+    [DataRow(3)]
+    public async Task RepeatedConcurrentShutdownFlushesBothSavesAndReleasesLeases(int baud)
+    {
+        int rounds = Environment.GetEnvironmentVariable("AETHERBOY_SHUTDOWN_STRESS") == "1" ? 40 : 2;
+        for (int round = 0; round < rounds; round++)
+        {
+            ushort firstWord = (ushort)(0x1200 + round), secondWord = (ushort)(0xAB00 + round);
+            var first = MakePlayer("stress-a", CreateRom(true, firstWord, baud));
+            var second = MakePlayer("stress-b", CreateRom(false, secondWord, baud));
+            using var pacer = new ManualFramePacer();
+            await using var session = new LocalLinkSession(first, second, pacer);
+            await session.Ready.WaitAsync(Timeout);
+            pacer.WaitForWaitCount(1, Timeout);
+            // Simultaneous close callers must all observe the same durable completion.
+            Task observed = ObservedShutdown(session);
+            await Task.WhenAll(observed, Task.Run(() => session.ShutdownAsync()),
+                Task.Run(() => session.ShutdownAsync())).WaitAsync(Timeout);
+            Assert.AreEqual(SessionState.Stopped, session.State);
+            Assert.IsNull(session.Fault);
+            foreach (var player in new[] { first, second })
+            {
+                byte[] save = File.ReadAllBytes(player.SavePath);
+                Assert.AreEqual(firstWord, BinaryPrimitives.ReadUInt16LittleEndian(save));
+                Assert.AreEqual(secondWord, BinaryPrimitives.ReadUInt16LittleEndian(save.AsSpan(2)));
+                Assert.AreEqual((byte)0x42, save[10]);
+                using var released = RomWriteLease.Acquire(player.SavePath + ".lock");
+            }
+        }
+    }
+
+    [TestMethod]
+    public async Task SlowSaveReportsStoppingAndRetainsLeaseUntilDurableCompletion()
+    {
+        var first = MakePlayer("slow-a", CreateRom(true, 0x1234));
+        var second = MakePlayer("slow-b", CreateRom(false, 0xABCD));
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        using var pacer = new ManualFramePacer();
+        await using var session = new LocalLinkSession(first, second, pacer, side =>
+        {
+            if (side != 0) return;
+            entered.Set();
+            if (!release.Wait(Timeout)) throw new TimeoutException("Slow-save test was not released.");
+        });
+        try
+        {
+            await session.Ready.WaitAsync(Timeout);
+            pacer.WaitForWaitCount(1, Timeout);
+            Task shutdown = session.ShutdownAsync();
+            Assert.IsTrue(entered.Wait(Timeout));
+            Assert.AreEqual(SessionState.Stopping, session.State);
+            Assert.AreEqual("saving-player-1", session.OwnerPhase);
+            Assert.IsFalse(shutdown.IsCompleted);
+            Assert.ThrowsExactly<IOException>(() => RomWriteLease.Acquire(first.SavePath + ".lock"));
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+            await Assert.ThrowsAsync<OperationCanceledException>(() => session.ShutdownAsync(cancellation.Token));
+            Assert.IsFalse(shutdown.IsCompleted, "Cancelling a caller must not abort or pretend to finish the save.");
+        }
+        finally
+        {
+            release.Set();
+            await session.ShutdownAsync().WaitAsync(Timeout);
+        }
+        Assert.AreEqual(SessionState.Stopped, session.State);
+        foreach (var player in new[] { first, second })
+        {
+            Assert.AreEqual((ushort)0x1234, BinaryPrimitives.ReadUInt16LittleEndian(File.ReadAllBytes(player.SavePath)));
+            using var lease = RomWriteLease.Acquire(player.SavePath + ".lock");
+        }
+    }
+
+    private async Task ObservedShutdown(LocalLinkSession session)
+    {
+        var timer = Stopwatch.StartNew();
+        Task shutdown = session.ShutdownAsync();
+        using var stopObserver = new CancellationTokenSource();
+        // Dedicated observer: a starved thread pool must not hide the owner's phase.
+        var observer = new Thread(() =>
+        {
+            string? previous = null;
+            while (!stopObserver.IsCancellationRequested)
+            {
+                string phase = session.OwnerPhase;
+                if (phase != previous)
+                {
+                    TestContext.WriteLine($"shutdown pid={Environment.ProcessId} thread={session.OwnerThreadId} elapsed_ms={timer.ElapsedMilliseconds} phase={phase}");
+                    previous = phase;
+                }
+                if (timer.Elapsed > TimeSpan.FromSeconds(2) &&
+                    Environment.GetEnvironmentVariable("AETHERBOY_SHUTDOWN_STACK_TOOL") is { Length: > 0 } tool)
+                {
+                    try
+                    {
+                        var start = new ProcessStartInfo(tool) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
+                        start.ArgumentList.Add("report"); start.ArgumentList.Add("--process-id"); start.ArgumentList.Add(Environment.ProcessId.ToString());
+                        using var capture = Process.Start(start)!;
+                        Task<string> output = capture.StandardOutput.ReadToEndAsync();
+                        Task<string> error = capture.StandardError.ReadToEndAsync();
+                        if (capture.WaitForExit(5000)) TestContext.WriteLine(output.GetAwaiter().GetResult() + error.GetAwaiter().GetResult());
+                        else capture.Kill();
+                    }
+                    catch (Exception error)
+                    {
+                        // Optional diagnostics must not kill the test process or
+                        // conceal the actual shutdown result.
+                        TestContext.WriteLine($"stack capture unavailable: {error.GetType().Name}");
+                    }
+                    break;
+                }
+                stopObserver.Token.WaitHandle.WaitOne(5);
+            }
+        }) { IsBackground = true, Name = "AetherBoy shutdown test observer" };
+        observer.Start();
+        try { await shutdown.WaitAsync(Timeout); }
+        finally
+        {
+            long completionMilliseconds = timer.ElapsedMilliseconds;
+            stopObserver.Cancel();
+            observer.Join(TimeSpan.FromSeconds(6));
+            TestContext.WriteLine($"shutdown final elapsed_ms={completionMilliseconds} phase={session.OwnerPhase} state={session.State} completed={shutdown.IsCompleted}");
+        }
     }
 
     private static byte[] CreateRom(bool master, ushort outgoing, int baud = 3, ushort color = 0x001F)

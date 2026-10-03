@@ -2,8 +2,10 @@ namespace AetherBoy.Desktop;
 
 internal sealed record LinuxDataPaths(string Data, string Config, string State, string Cache)
 {
-    public static LinuxDataPaths Default => FromEnvironment(Environment.GetEnvironmentVariable,
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+    public static LinuxDataPaths Default => AetherBoy.Runtime.PortableStorage.IsEnabled
+        ? Isolated(AetherBoy.Runtime.PortableStorage.Root)
+        : FromEnvironment(Environment.GetEnvironmentVariable,
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
 
     internal static LinuxDataPaths FromEnvironment(Func<string, string?> read, string home)
     {

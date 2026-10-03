@@ -49,7 +49,8 @@ public sealed class LinuxAccessibilityBusTests
             string stdout = output.GetAwaiter().GetResult(), stderr = errors.GetAwaiter().GetResult();
             Assert.AreEqual(0, client.ExitCode, stderr + "\n" + stdout);
             using var result = JsonDocument.Parse(stdout.Trim());
-            Assert.AreEqual("push button", result.RootElement.GetProperty("actionRole").GetString());
+            Assert.IsTrue(result.RootElement.GetProperty("actionIsButton").GetBoolean(),
+                "Check the stable AT-SPI role, not a version-dependent or translated display name.");
             Assert.IsTrue(result.RootElement.GetProperty("checked").GetBoolean());
             Assert.IsFalse(result.RootElement.GetProperty("disabledEnabled").GetBoolean());
             Assert.IsTrue(activated, "The separate AT-SPI client must activate a real application request.");
@@ -97,7 +98,7 @@ disabled.get_action_iface().do_action(0)
 assert not disabled.get_state_set().contains(Atspi.StateType.ENABLED)
 assert entry.get_editable_text_iface().set_text_contents('Pokémon 日本 🎮')
 assert Atspi.Text.get_text(entry, 0, -1) == 'Pokémon 日本 🎮'
-print(json.dumps({'actionRole': action.get_role_name(), 'checked': True, 'disabledEnabled': False}))
+print(json.dumps({'actionIsButton': action.get_role() == Atspi.Role.PUSH_BUTTON, 'checked': True, 'disabledEnabled': False}))
 """;
     [DllImport("libgtk-3.so.0")] private static extern void gtk_window_set_title(IntPtr window, string title);
 }

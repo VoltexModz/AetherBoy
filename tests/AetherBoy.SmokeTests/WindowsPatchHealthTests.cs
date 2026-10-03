@@ -119,11 +119,13 @@ public sealed class WindowsPatchHealthTests
         report.RecordHealthHint(new("video.uniform_suspected", 20_000, true), Sample(20));
         using (var monitor = new WindowsSessionHealthMonitor(report))
         { Assert.IsTrue(monitor.MarkProblem()); Assert.IsFalse(monitor.MarkProblem()); }
-        using var reader = new StreamReader(new FileStream(report.LogFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite));
+        // Export waits for every accepted event, including the marker. Reading the
+        // live log immediately races the asynchronous diagnostic writer.
+        using var bundle = ZipFile.OpenRead(report.CreateBundle(Path.Combine(root, "report.zip")));
+        using var reader = new StreamReader(bundle.GetEntry("session.jsonl")!.Open());
         string log = reader.ReadToEnd();
         StringAssert.Contains(log, "session.health_hint"); StringAssert.Contains(log, "session.problem_marked");
         Assert.IsFalse(log.Contains("uniform_rgb")); Assert.IsFalse(log.Contains(root));
-        using var bundle = ZipFile.OpenRead(report.CreateBundle(Path.Combine(root, "report.zip")));
         CollectionAssert.AreEquivalent(new[] { "README.txt", "session.jsonl" }, bundle.Entries.Select(e => e.Name).ToArray());
     }
 
@@ -131,8 +133,8 @@ public sealed class WindowsPatchHealthTests
     public void PatchLabImportsFromUiWithoutLaunchingAGame()
     {
         using var form = new frmRomPatcher(Rom()); form.Show(); Application.DoEvents();
-        ((TextBox)form.Controls.Find("patchFile", true).Single()).Text = Patch();
-        ((TextBox)form.Controls.Find("patchTitle", true).Single()).Text = "UI PATCH TEST";
+        ((nanoboy.Controls.AetherTextBox)form.Controls.Find("patchFile", true).Single()).Text = Patch();
+        ((nanoboy.Controls.AetherTextBox)form.Controls.Find("patchTitle", true).Single()).Text = "UI PATCH TEST";
         ((AetherButton)form.Controls.Find("patchApply", true).Single()).PerformClick();
         PumpUntil(() => form.ImportedRomPath != null && form.Controls.Find("patchDone", true).Single().Enabled);
         Assert.IsTrue(File.Exists(form.ImportedRomPath));

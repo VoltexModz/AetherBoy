@@ -77,7 +77,8 @@ public sealed class WindowsSystemToolsTests
             Assert.AreEqual("True", settings.DiagnosticsRecording);
             var saved = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(WindowsDataPaths.Default.SettingsFile))!;
             Assert.AreEqual("True", saved["DiagnosticsRecording"]);
-            StringAssert.Contains(Find<Label>(center, "controlCenterRecordingStatus").Text, "KEINE SITZUNGSAUFZEICHNUNG");
+            StringAssert.Contains(Find<Label>(center, "controlCenterRecordingStatus").Text,
+                AetherBoy.Runtime.Localization.UiText.Get("AKTUELL · KEINE SITZUNGSAUFZEICHNUNG\r\n"));
             Assert.IsFalse(Find<AetherButton>(center, "controlCenterExportTesterReportButton").Enabled);
             Capture(center, "windows-diagnostics.png");
             center.Close();
@@ -91,9 +92,10 @@ public sealed class WindowsSystemToolsTests
     {
         using var main = new frmNano();
         main.Show();
-        var tools = Field<ToolStripMenuItem>(main, "menuItem21");
+        var tools = Field<nanoboy.Controls.AetherCommand>(main, "menuItem21");
         Assert.IsTrue(tools.DropDownItems.ContainsKey("menuFirmwareManager"));
         var center = OpenCenter(main, "System");
+        Find<AetherButton>(center, "settingsTab_system_firmware").PerformClick();
         bool seen = false;
         Exception? failure = null;
         using var driver = new System.Windows.Forms.Timer { Interval = 20 };
@@ -155,25 +157,25 @@ public sealed class WindowsSystemToolsTests
         new byte[] { 0xFE, 0xFF, 0xFF, 0xEA }.CopyTo(bytes, 0);
         File.WriteAllBytes(rom, bytes);
         var defaults = nanoboy.Properties.Settings.Default;
-        bool audio = defaults.AudioEnable, boot = defaults.BootRomEnable;
+        bool audio = defaults.AudioEnable, boot = defaults.BootRomEnable, gpu = defaults.GpuRendering;
         try
         {
-            defaults.AudioEnable = defaults.BootRomEnable = false;
+            defaults.AudioEnable = defaults.BootRomEnable = defaults.GpuRendering = false;
             using var main = new frmNano();
             main.Show(); main.LoadRomFile(rom);
             var session = Field<EmulationSession>(main, "session");
             PumpUntil(() => session.LatestSnapshot.Rom is not null);
             Call(main, "SetSaveFeedback", "PRIVATE_FEEDBACK_693 " + rom, false);
             var center = OpenCenter(main, "Diagnostics");
-            string text = Find<RichTextBox>(center, "controlCenterDiagnosticsText").Text;
+            string text = Find<nanoboy.Controls.AetherTextBox>(center, "controlCenterDiagnosticsText").Text;
             StringAssert.Contains(text, "ROM SHA-256");
             Assert.IsFalse(text.Contains("PRIVATE_FILENAME_9241", StringComparison.Ordinal));
             Assert.IsFalse(text.Contains("PRIVATE_FEEDBACK_693", StringComparison.Ordinal));
             Assert.IsFalse(text.Contains(root, StringComparison.OrdinalIgnoreCase));
             Assert.IsFalse(text.Contains("ROM PATH", StringComparison.Ordinal));
-            var preview = Find<RichTextBox>(center, "controlCenterDiagnosticsText");
+            var preview = Find<nanoboy.Controls.AetherTextBox>(center, "controlCenterDiagnosticsText");
             Assert.AreEqual(BorderStyle.None, preview.BorderStyle);
-            Assert.AreEqual(RichTextBoxScrollBars.None, preview.ScrollBars);
+            Assert.AreEqual(ScrollBars.None, preview.ScrollBars);
             Call(center, "ScrollDiagnostics", 8);
             int line = preview.GetLineFromCharIndex(preview.GetCharIndexFromPosition(Point.Empty));
             Assert.IsTrue(line > 0, "Custom scroll actions must expose the remaining report.");
@@ -182,7 +184,7 @@ public sealed class WindowsSystemToolsTests
                 "Live refresh must not jump away from the section being read.");
             center.Close(); main.Close();
         }
-        finally { defaults.AudioEnable = audio; defaults.BootRomEnable = boot; }
+        finally { defaults.AudioEnable = audio; defaults.BootRomEnable = boot; defaults.GpuRendering = gpu; }
     }
 
     private static frmControlCenter OpenCenter(frmNano main, string page)

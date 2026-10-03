@@ -99,6 +99,17 @@ namespace nanoboy.Input
             }
         }
 
+        internal static bool SetVibration(uint playerIndex, ushort strength)
+        {
+            if (!OperatingSystem.IsWindows() || playerIndex >= MaximumControllerCount) return false;
+            var vibration = new NativeVibration { LeftMotorSpeed = strength, RightMotorSpeed = strength };
+            try { return XInputSetState(playerIndex, ref vibration) == ErrorSuccess; }
+            catch (DllNotFoundException) { }
+            catch (EntryPointNotFoundException) { }
+            catch (BadImageFormatException) { }
+            return false;
+        }
+
         [DllImport(
             "xinput9_1_0.dll",
             EntryPoint = "XInputGetState",
@@ -106,6 +117,18 @@ namespace nanoboy.Input
             CallingConvention = CallingConvention.Winapi)]
         [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
         private static extern uint XInputGetState(uint playerIndex, out NativeState state);
+
+        [DllImport("xinput9_1_0.dll", EntryPoint = "XInputSetState", ExactSpelling = true,
+            CallingConvention = CallingConvention.Winapi)]
+        [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
+        private static extern uint XInputSetState(uint playerIndex, ref NativeVibration vibration);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeVibration
+    {
+        public ushort LeftMotorSpeed;
+        public ushort RightMotorSpeed;
     }
 
     [StructLayout(LayoutKind.Sequential)]

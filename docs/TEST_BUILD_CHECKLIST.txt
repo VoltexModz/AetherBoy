@@ -1,0 +1,40 @@
+AetherBoy development build — gemeinsamer Kurztest / shared smoke test
+
+DE
+1. Das Archiv in einen neuen Ordner entpacken. Buildkennung aus package-info.json
+   vergleichen: Windows und Linux müssen denselben buildId haben. Das sind
+   Entwicklungsstände, keine bestätigten Releases.
+2. Eigene GB-, GBC- und GBA-Spiele nacheinander öffnen. Bild, Eingabe und Ton prüfen.
+   Turbo halten und loslassen: danach muss normaler Ton ohne Dauerton zurückkehren.
+3. Mit einem entbehrlichen Testspielstand im Spiel speichern; App beenden und neu
+   öffnen. Zusätzlich Schnellspeichern, Laden, Rückgängig und Fortsetzen prüfen.
+   Bestehende wichtige Spielstände vorher separat sichern.
+4. Kurze Aufnahme und Screenshot erstellen; Aufnahme beenden und Datei außerhalb
+   des Emulators ansehen/anhören. Während laufender Aufnahme Spielwechsel und
+   Beenden prüfen: keine beschädigte Aufnahme, kein endlos hängendes Fenster.
+5. Controller verbinden, trennen, neu verbinden; Tastatur als Rückfall testen.
+   Alle sechs Themes und eigene Farben öffnen, speichern und nach Neustart prüfen.
+6. Bei einem Fehler Uhrzeit, Buildkennung, Spiel und letzte Aktion notieren.
+   Keine ROMs, Spielstände oder Zugangsdaten in öffentliche Fehlerberichte laden.
+
+Noch NICHT durch diese Kurzprüfung bestätigt: vollständige Spielekompatibilität,
+echte Pokémon-Tausche über Internet, Barcode Boy mit Battle Space, sämtliche
+Controller, DPI-/IME-/Screenreader-Fälle und Linux-Desktop-/Treiberkombinationen.
+
+EN
+1. Extract into a new directory. Compare buildId in package-info.json on both
+   platforms. These are development builds, not verified releases.
+2. Open your own GB, GBC and GBA games in turn. Check picture, input and sound.
+   Hold and release turbo; normal sound must return without a stuck tone.
+3. Use a disposable test save. Save in-game, close and reopen the app. Also check
+   quick save/load, undo and resume. Back up important existing saves first.
+4. Create a short recording and screenshot, stop recording, then play the output
+   outside the emulator. Check switching games and exiting during recording.
+5. Connect, disconnect and reconnect a controller; check keyboard fallback.
+   Try all six themes and custom colors, save them and restart.
+6. For a failure, note time, build ID, game and last action. Do not publish ROMs,
+   saves or credentials in issue reports.
+
+This checklist does NOT establish general game compatibility, real WAN Pokémon
+trades, Barcode Boy/Battle Space compatibility, every controller, all DPI/IME/
+screenreader paths or all Linux desktop/driver combinations.

@@ -24,9 +24,9 @@ public sealed class LinuxRomPathTests
     }
 
     [TestMethod]
-    public void RejectsArchivesAndRemoteFileUris()
+    public void RejectsUnsupportedArchivesAndRemoteFileUris()
     {
-        Assert.ThrowsExactly<NotSupportedException>(() => LinuxRomPath.Resolve("game.zip"));
+        Assert.ThrowsExactly<NotSupportedException>(() => LinuxRomPath.Resolve("game.rar"));
         Assert.ThrowsExactly<NotSupportedException>(() => LinuxRomPath.Resolve("file://server/game.gba"));
     }
 }

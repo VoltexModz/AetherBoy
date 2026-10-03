@@ -16,6 +16,8 @@ internal sealed class LinuxFrontendOptions
 {
     public const int SampleRate = 44_100;
 
+    public string DisplayLanguage { get; set; } = AetherBoy.Runtime.Localization.UiText.SystemLanguage;
+
     public LinuxVideoFilter VideoFilter { get; set; } = LinuxVideoFilter.Sharp;
     public LinuxVideoScaling VideoScaling { get; set; }
     public bool AudioEnabled { get; set; } = true;
@@ -30,7 +32,12 @@ internal sealed class LinuxFrontendOptions
     public Dictionary<string, LinuxGamepadProfile> Gamepads { get; set; } = new();
     public bool RecordDiagnostics { get; set; } = LinuxBuildInfo.RecordByDefault;
     public bool UseFirmware { get; set; } = true;
+    public bool RumbleEnabled { get; set; } = true;
     public bool PauseOnFocusLoss { get; set; } = true;
+    public bool DiscordPresenceEnabled { get; set; } = true;
+    public bool UpdateCheckOnStartup { get; set; }
+    public bool DiscordShareGameTitle { get; set; }
+    public string DiscordApplicationId { get; set; } = AetherBoy.Runtime.DiscordPresenceOptions.DefaultApplicationId;
     public int TextSize { get; set; } = 14;
     public int SaveSlot { get; set; } = 1;
     public bool PerformanceOverlay { get; set; }

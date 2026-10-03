@@ -86,7 +86,7 @@ jobs:
         # Run 34755810398 was still completing UI tests when the old 2m suite limit expired.
         # Keep both deadlines and the full test-count gate; do not skip or retry failures.
         timeout-minutes: 5
-        run: dotnet test --project .\tests\AetherBoy.SmokeTests\AetherBoy.SmokeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 210 --timeout 4m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Smoke" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Smoke"
+        run: dotnet test --project .\tests\AetherBoy.SmokeTests\AetherBoy.SmokeTests.csproj --configuration Release --no-build --no-restore --minimum-expected-tests 232 --timeout 4m --output Detailed --report-trx --results-directory "${{ github.workspace }}/artifacts/test-results/Smoke" --diagnostic --diagnostic-synchronous-write --diagnostic-output-directory "${{ github.workspace }}/artifacts/test-results/Smoke"
 
       - name: Retain Windows test diagnostics
         if: ${{ !cancelled() }}
@@ -219,3 +219,21 @@ jobs:
           bash -n scripts/build-linux.sh scripts/run-linux.sh scripts/install-linux-user.sh scripts/launch-linux.sh scripts/uninstall-linux-user.sh scripts/package-linux.sh scripts/test-linux-headless.sh
           bash scripts/build-linux.sh
           python3 scripts/test-linux-install.py
+
+      - name: Build and smoke-test self-contained Linux package
+        shell: bash
+        run: |
+          case "$(uname -m)" in
+            x86_64) rid=linux-x64 ;;
+            aarch64|arm64) rid=linux-arm64 ;;
+            *) echo "Unsupported package architecture" >&2; exit 2 ;;
+          esac
+          bash scripts/package-linux.sh --runtime "$rid" --output "$RUNNER_TEMP/aetherboy-packages"
+
+      - name: Retain Linux package for architecture testing
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-package-${{ matrix.runner }}
+          path: ${{ runner.temp }}/aetherboy-packages/
+          if-no-files-found: error
+          retention-days: 7

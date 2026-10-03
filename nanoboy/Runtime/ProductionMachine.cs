@@ -37,7 +37,7 @@ namespace AetherBoy.Runtime
     {
         private const int PersistentFlushIntervalFrames = 1_800;
 
-        private sealed record ManagedCheat(Guid Id, CheatItem Item);
+        private sealed record ManagedCheat(Guid Id, string Name, string Code, CheatItem[] Items);
 
         private readonly Nanoboy emulator;
         private readonly CheatEngine cheatEngine = new();
@@ -93,7 +93,8 @@ namespace AetherBoy.Runtime
                     batterySave.IsEnabled,
                     batterySave.ExpectedLength,
                     (int)batterySave.LoadedFrom,
-                    batterySave.InvalidPrimaryDetected));
+                    batterySave.InvalidPrimaryDetected))
+            { CartridgeHeaderTitle = (rom.Title ?? string.Empty).TrimEnd('\0', ' ') };
             if (initializeRewind) rewindManager.Initialize(emulator);
         }
 
@@ -111,7 +112,21 @@ namespace AetherBoy.Runtime
 
         public event EventHandler<AudioSamplesAvailableEventArgs>? AudioSamplesAvailable;
 
-        public EmulationFeature Features => EmulationFeature.GameBoyStandard;
+        public EmulationFeature Features => EmulationFeature.GameBoyStandard | EmulationFeature.BarcodeBoy;
+
+        public void SetBarcodeBoyEnabled(bool enabled)
+        {
+            ThrowIfDisposed();
+            emulator.Memory.SetBarcodeBoyEnabled(enabled);
+            rewindManager.Initialize(emulator);
+        }
+
+        public void ScanBarcodeBoy(string code)
+        {
+            ThrowIfDisposed();
+            var scanner = emulator.Memory.BarcodeScanner ?? throw new InvalidOperationException("Connect Barcode Boy before scanning.");
+            scanner.QueueScan(code);
+        }
 
         public void RunFrame()
         {
@@ -175,14 +190,22 @@ namespace AetherBoy.Runtime
         public CheatSnapshot AddCheat(string name, string code)
         {
             ThrowIfDisposed();
-            int previousCount = cheatEngine.Cheats.Count;
-            if (!cheatEngine.AddCheat(name, code) || cheatEngine.Cheats.Count != previousCount + 1)
+            ArgumentException.ThrowIfNullOrWhiteSpace(code);
+            string[] lines = code.Replace("\r", "", StringComparison.Ordinal)
+                .Split(['\n', ';', '+'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (lines.Length is < 1 or > 32)
+                throw new FormatException("A GB/GBC cheat set needs between one and 32 code lines.");
+            var pending = new CheatEngine();
+            foreach (string line in lines)
             {
-                throw new FormatException("The cheat code is not a supported GameShark or Game Genie code.");
+                if (!pending.AddCheat(name, line))
+                    throw new FormatException("The cheat set contains an unsupported GB/GBC code. Use GameShark, Game Genie, CodeBreaker or address:value.");
             }
 
-            CheatItem item = cheatEngine.Cheats[previousCount];
-            ManagedCheat managedCheat = new(Guid.NewGuid(), item);
+            CheatItem[] items = pending.Cheats.ToArray();
+            cheatEngine.Cheats.AddRange(items);
+            RefreshRomCheatBinding();
+            ManagedCheat managedCheat = new(Guid.NewGuid(), name, string.Join(" + ", lines), items);
             cheats.Add(managedCheat);
             return ToSnapshot(managedCheat);
         }
@@ -198,7 +221,9 @@ namespace AetherBoy.Runtime
 
             ManagedCheat managedCheat = cheats[index];
             cheats.RemoveAt(index);
-            cheatEngine.Cheats.Remove(managedCheat.Item);
+            foreach (CheatItem item in managedCheat.Items)
+                cheatEngine.Cheats.Remove(item);
+            RefreshRomCheatBinding();
             return true;
         }
 
@@ -211,8 +236,11 @@ namespace AetherBoy.Runtime
                 return false;
             }
 
-            managedCheat.Item.Enabled = !managedCheat.Item.Enabled;
-            return managedCheat.Item.Enabled;
+            bool enabled = !managedCheat.Items[0].Enabled;
+            foreach (CheatItem item in managedCheat.Items)
+                item.Enabled = enabled;
+            RefreshRomCheatBinding();
+            return enabled;
         }
 
         public bool TryCopyVideoFrame(int[] destination, ref long sequence)
@@ -244,7 +272,10 @@ namespace AetherBoy.Runtime
                 romSnapshot,
                 CaptureAudioSnapshot(),
                 cheatSnapshots,
-                features: Features);
+                features: Features,
+                rumbleActive: emulator.Memory.ROM.MBC is Mbc5 { RumbleEnabled: true },
+                barcodeBoy: emulator.Memory.BarcodeScanner is { } scanner
+                    ? new BarcodeBoySnapshot(scanner.Ready, scanner.HasPendingScan, scanner.BytesSent, scanner.CompletedScans) : null);
         }
 
         public void Dispose()
@@ -319,10 +350,14 @@ namespace AetherBoy.Runtime
         {
             return new CheatSnapshot(
                 cheat.Id,
-                cheat.Item.Name ?? string.Empty,
-                cheat.Item.Code ?? string.Empty,
-                cheat.Item.Enabled);
+                cheat.Name,
+                cheat.Code,
+                cheat.Items[0].Enabled);
         }
+
+        private void RefreshRomCheatBinding() =>
+            emulator.Memory.RomCheats = cheatEngine.Cheats.Exists(item => item.Enabled && item.IsGameGenie)
+                ? cheatEngine : null;
 
         private void OnCoreAudioAvailable(object? sender, nanoboy.Core.Audio.AudioAvailableEventArgs eventArgs)
         {

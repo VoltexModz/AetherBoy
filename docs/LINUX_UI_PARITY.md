@@ -1,5 +1,8 @@
 # Windows → Linux: Aether shell
 
+Windows follow-up for `9f50dfe`: [searchable Windows settings, picture scaling,
+controller setup and validation](WINDOWS_SETTINGS_PARITY_2026-09-28.md).
+
 The Windows screenshots correspond to hand-drawn WinForms controls, rather than
 a web page or a set of full-window image assets. The Linux frontend renders the
 same visual language using SDL3, sharing the existing Core and Runtime projects.
@@ -8,7 +11,7 @@ No Wine, WinForms emulation, or new emulator implementation is involved.
 | Responsibility | Windows source | Linux source |
 | --- | --- | --- |
 | Main shell, display, session rail, command deck | `nanoboy/frmNano.AetherUi.cs` | `frontends/AetherBoy.Desktop/WaylandEmulatorHost.AetherUi.cs` |
-| Control Center navigation/cards | `nanoboy/frmControlCenter.cs` | `WaylandEmulatorHost.AetherUi.cs` plus existing settings pages in `WaylandEmulatorHost.cs` |
+| Control Center navigation/cards/search | `nanoboy/frmControlCenter.cs`, `frmControlCenter.Navigation.cs`, `WindowsSettingsCatalog.cs` | `WaylandEmulatorHost.AetherUi.cs`, `WaylandEmulatorHost.SettingsNavigation.cs`, `LinuxSettingsCatalog.cs` |
 | Colors, six-point buttons, gradients | `nanoboy/Controls/AetherUiControls.cs` | `WaylandEmulatorHost.AetherUi.cs` (same RGB values and geometry) |
 | Window icon / empty-state logo | `nanoboy/Branding/AppBrand.cs`, `branding/exports/` | `Assets/aetherboy-mark.png`, linked from the original 256px export |
 | Text | Windows Segoe UI | Bundled Noto Sans Regular/Bold; optional SDL3_ttf and bundled atlas fallback |
@@ -18,6 +21,23 @@ The Linux Control Center is a page in the main SDL window, rather than a separat
 WinForms dialog. Opening it pauses a running game; closing it restores the prior
 pause state. The shell keeps native Wayland window management and retains Linux
 keyboard defaults. Header navigation opens System, Display, Saves and Diagnostics.
+
+## Theme parity in the current Linux working tree
+
+Windows now offers six selectable themes from the shared
+`nanoboy/Core/UiThemePresets.cs` catalog. The original violet/cyan appearance is
+`aether-original`; the other IDs are `neko-sakura`, `deep-ocean`,
+`emerald-circuit`, `amber-arcade` and `pocket-light`. Their RGB values are defined
+in that Core file, not in the Windows controls. Shared `UiThemePalette` surfaces
+now take a subtle tint from the selected accents rather than neutral gray.
+
+The Linux appearance page now offers the same six preset IDs and RGB values,
+custom colors and an explicit reset to Aether Original. Existing saved colors
+remain unchanged until the user chooses or applies a new theme. Cross-platform
+persistence tests pass. Contrast and all Control Center pages still need a visual
+check under native Wayland and Hyprland; implementation alone is not that check.
+The step-by-step acceptance criteria are in
+[L5 of the platform implementation plan](WINDOWS_LINUX_IMPLEMENTATION_PLAN_2026-09-30.md#l5-audio-inspector-und-bibliothek-aufholen).
 
 ## Assets are part of the project
 

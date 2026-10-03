@@ -7,13 +7,16 @@ using System.Linq;
 using System.Text.Json;
 using System.Xml;
 using System.Xml.Linq;
+using AetherBoy.Runtime;
 
 namespace nanoboy.Storage;
 
 public sealed class WindowsSettingsProvider : SettingsProvider, IApplicationSettingsProvider
 {
+    private static readonly object fileSync = new();
     private readonly string file;
     private readonly string? legacyRoot;
+    internal string FilePath => file;
     public WindowsSettingsProvider() : this(WindowsDataPaths.Default.SettingsFile, WindowsDataPaths.Default.LegacySettingsRoot) { }
     internal WindowsSettingsProvider(string file, string? legacyRoot = null)
     {
@@ -26,12 +29,31 @@ public sealed class WindowsSettingsProvider : SettingsProvider, IApplicationSett
 
     public override SettingsPropertyValueCollection GetPropertyValues(SettingsContext context, SettingsPropertyCollection properties)
     {
-        Dictionary<string, string?>? values = Read(file) ?? Read(file + ".bak");
+        // Keep primary/backup selection and first-run migration in the same
+        // transaction boundary as saves. A reload must not observe the brief
+        // rename window in File.Replace and mistake it for missing settings.
+        lock (fileSync) return ReadPropertyValues(context, properties);
+    }
+
+    private SettingsPropertyValueCollection ReadPropertyValues(SettingsContext context, SettingsPropertyCollection properties)
+    {
+        Dictionary<string, string?>? values = Read(file);
+        if (values is null && Read(file + ".bak") is { } recovered)
+        {
+            // An older backup must not re-enable publicly shared activity after opt-out.
+            recovered["DiscordPresenceEnabled"] = "False";
+            recovered["DiscordShareGameTitle"] = "False";
+            recovered["UpdateCheckOnStartup"] = "False";
+            values = recovered;
+        }
+        if (values is null && (File.Exists(file) || File.Exists(file + ".bak")))
+            values = new() { ["DiscordPresenceEnabled"] = "False", ["DiscordShareGameTitle"] = "False" };
         if (values == null && !File.Exists(file) && !File.Exists(file + ".bak"))
         {
-            values = ReadLegacy(properties);
+            // A portable launch must not silently import settings from the machine's profile.
+            values = PortableStorage.IsEnabled ? null : ReadLegacy(properties);
             if (values != null) Write(values);
-            else
+            else if (!PortableStorage.IsEnabled)
             {
                 // Also support the framework's current location if no prior AetherBoy build is found.
                 var legacy = new LocalFileSettingsProvider();
@@ -55,22 +77,35 @@ public sealed class WindowsSettingsProvider : SettingsProvider, IApplicationSett
 
     public override void SetPropertyValues(SettingsContext context, SettingsPropertyValueCollection properties)
     {
-        var values = Read(file) ?? Read(file + ".bak") ?? new Dictionary<string, string?>();
+        var changed = new Dictionary<string, string?>(StringComparer.Ordinal);
         foreach (SettingsPropertyValue value in properties)
-            values[value.Name] = value.SerializedValue?.ToString();
-        Write(values);
+            changed[value.Name] = value.SerializedValue?.ToString();
+        WriteSnapshot(changed);
+    }
+
+    internal void WriteSnapshot(IReadOnlyDictionary<string, string?> snapshot)
+    {
+        lock (fileSync)
+        {
+            var values = Read(file) ?? Read(file + ".bak") ?? new Dictionary<string, string?>();
+            foreach (var entry in snapshot) values[entry.Key] = entry.Value;
+            Write(values);
+        }
     }
 
     public void Reset(SettingsContext context)
     {
         // Resetting emulator preferences must not silently revoke a diagnostic privacy choice.
-        Dictionary<string, string?>? current = Read(file) ?? Read(file + ".bak");
-        var reset = new Dictionary<string, string?>();
-        if (current != null && current.TryGetValue("DiagnosticsRecording", out string? recording))
-            reset["DiagnosticsRecording"] = recording;
-        else if (current == null && (File.Exists(file) || File.Exists(file + ".bak")))
-            reset["DiagnosticsRecording"] = "False"; // Unknown prior choice: keep recording off.
-        Write(reset);
+        lock (fileSync)
+        {
+            Dictionary<string, string?>? current = Read(file) ?? Read(file + ".bak");
+            var reset = new Dictionary<string, string?>();
+            if (current != null && current.TryGetValue("DiagnosticsRecording", out string? recording))
+                reset["DiagnosticsRecording"] = recording;
+            else if (current == null && (File.Exists(file) || File.Exists(file + ".bak")))
+                reset["DiagnosticsRecording"] = "False"; // Unknown prior choice: keep recording off.
+            Write(reset);
+        }
     }
     public void Upgrade(SettingsContext context, SettingsPropertyCollection properties) { }
     public SettingsPropertyValue GetPreviousVersion(SettingsContext context, SettingsProperty property) =>
@@ -79,7 +114,15 @@ public sealed class WindowsSettingsProvider : SettingsProvider, IApplicationSett
     private static Dictionary<string, string?>? Read(string path)
     {
         if (!File.Exists(path)) return null;
-        try { return JsonSerializer.Deserialize<Dictionary<string, string?>>(File.ReadAllText(path)); }
+        try
+        {
+            // Saves publish a complete snapshot via File.Replace. Readers must allow
+            // that rename: a reload racing a background save must not block it and
+            // open a modal "settings not saved" dialog. The open handle continues
+            // reading the old, complete snapshot until this read finishes.
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+            return JsonSerializer.Deserialize<Dictionary<string, string?>>(stream);
+        }
         catch (JsonException) { return null; }
     }
 

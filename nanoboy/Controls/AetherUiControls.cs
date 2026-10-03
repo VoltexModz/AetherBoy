@@ -23,7 +23,10 @@ namespace nanoboy.Controls
         public static Color Pulse => Violet;
         public static Color Cyan => From(palette.SecondaryText);
         public static Color Primary => From(palette.Primary);
+        public static Color Secondary => From(palette.Secondary);
         public static Color OnPrimary => From(palette.OnPrimary);
+        public static nanoboy.Core.UiButtonGradient ButtonGradient(bool hovered, bool pressed) =>
+            pressed ? palette.ButtonPressed : hovered ? palette.ButtonHover : palette.Button;
         public static Color Success => From(palette.SuccessText);
         public static Color Danger => From(palette.DangerText);
 
@@ -38,6 +41,7 @@ namespace nanoboy.Controls
 
         private static void Recolor(Control control, Color[] before, Color[] after)
         {
+            if (Equals(control.Tag, "theme-swatch")) return;
             for (int i = 0; i < before.Length; i++)
             {
                 if (control.BackColor == before[i]) { control.BackColor = after[i]; break; }
@@ -167,12 +171,15 @@ namespace nanoboy.Controls
             graphics.SmoothingMode = SmoothingMode.AntiAlias;
             graphics.Clear(Parent?.BackColor ?? AetherColors.Void);
 
+            // Dock/scroll layouts can temporarily give a button a zero-sized row during scaling.
+            if (Width < 3 || Height < 3) return;
+
             Rectangle bounds = new Rectangle(0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1));
-            using GraphicsPath path = CreateRoundedPath(bounds, Math.Min(8, Height / 3));
+            using GraphicsPath path = CreateChamferedPath(bounds, Math.Min(8, Height / 3));
 
             Color foreground = Enabled ? AetherColors.Text : AetherColors.Muted;
             Color border = Focused ? AetherColors.Cyan : AetherColors.Hairline;
-            Color surface = hovered ? AetherColors.SurfaceRaised : AetherColors.Surface;
+            Color surface = AetherColors.SurfaceRaised;
 
             if (kind == AetherButtonKind.Danger)
             {
@@ -185,25 +192,35 @@ namespace nanoboy.Controls
 
             if (kind == AetherButtonKind.Primary && Enabled)
             {
-                using var fill = new SolidBrush(pressed ? Color.FromArgb(190, AetherColors.Primary) : AetherColors.Primary);
+                var ramp = AetherColors.ButtonGradient(hovered, pressed);
+                using var fill = new LinearGradientBrush(bounds,
+                    Color.FromArgb(ramp.Start.R, ramp.Start.G, ramp.Start.B),
+                    Color.FromArgb(ramp.End.R, ramp.End.G, ramp.End.B), 0f);
                 graphics.FillPath(fill, path);
-                foreground = AetherColors.OnPrimary;
-                border = AetherColors.Primary;
+                foreground = Color.FromArgb(ramp.Text.R, ramp.Text.G, ramp.Text.B);
+                border = Focused ? AetherColors.Cyan : AetherColors.Primary;
             }
             else
             {
-                if (pressed)
+                if (pressed && Enabled)
                 {
                     surface = AetherColors.Chrome;
                 }
-                else if (selected)
+                else if (selected && Enabled)
                 {
                     surface = AetherColors.SurfaceRaised;
-                    border = AetherColors.Primary;
+                    border = AetherColors.Cyan;
                 }
+                else if (hovered && Enabled && kind != AetherButtonKind.Danger)
+                    border = Focused ? AetherColors.Cyan : AetherColors.Violet;
 
                 using var fill = new SolidBrush(surface);
                 graphics.FillPath(fill, path);
+                if (Enabled && (selected || hovered) && Width > 12 && Height > 12)
+                {
+                    using var signal = new Pen(selected ? AetherColors.Cyan : AetherColors.Violet, 2f);
+                    graphics.DrawLine(signal, 4, 5, 4, Height - 9);
+                }
             }
 
             using (var outline = new Pen(border, selected ? 1.6f : 1f))
@@ -222,21 +239,22 @@ namespace nanoboy.Controls
                 TextFormatFlags.EndEllipsis |
                 TextFormatFlags.NoPadding);
 
-            if (Focused)
+            if (Focused && Width > 12 && Height > 12)
             {
                 Rectangle focusBounds = Rectangle.Inflate(bounds, -5, -5);
-                ControlPaint.DrawFocusRectangle(graphics, focusBounds, foreground, Color.Transparent);
+                AetherWidgetPaint.Focus(graphics, focusBounds, foreground);
             }
         }
 
-        private static GraphicsPath CreateRoundedPath(Rectangle bounds, int radius)
+        private static GraphicsPath CreateChamferedPath(Rectangle bounds, int cut)
         {
             var path = new GraphicsPath();
-            int diameter = radius * 2;
-            path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
-            path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
-            path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
-            path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+            Span<nanoboy.Core.UiPoint> vertices = stackalloc nanoboy.Core.UiPoint[nanoboy.Core.UiChamfer.VertexCount];
+            nanoboy.Core.UiChamfer.Write(vertices, bounds.X, bounds.Y, bounds.Width, bounds.Height, cut);
+            var points = new PointF[vertices.Length];
+            for (int index = 0; index < points.Length; index++)
+                points[index] = new PointF(vertices[index].X, vertices[index].Y);
+            path.AddPolygon(points);
             path.CloseFigure();
             return path;
         }
@@ -257,19 +275,16 @@ namespace nanoboy.Controls
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            e.Graphics.Clear(Parent?.BackColor ?? AetherColors.Void);
+            if (Width < 2 || Height < 2) return;
+            e.Graphics.Clear(BackColor);
             Rectangle border = new Rectangle(0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1));
-            using var shape = new GraphicsPath();
-            shape.AddArc(border.Left, border.Top, 20, 20, 180, 90);
-            shape.AddArc(border.Right - 20, border.Top, 20, 20, 270, 90);
-            shape.AddArc(border.Right - 20, border.Bottom - 20, 20, 20, 0, 90);
-            shape.AddArc(border.Left, border.Bottom - 20, 20, 20, 90, 90);
-            shape.CloseFigure();
-            using var fill = new SolidBrush(BackColor);
-            e.Graphics.FillPath(fill, shape);
             using var borderPen = new Pen(AetherColors.Hairline);
-            e.Graphics.DrawPath(borderPen, shape);
+            e.Graphics.DrawRectangle(borderPen, border);
+            if (AccentEdge)
+            {
+                using var accent = new LinearGradientBrush(ClientRectangle, AetherColors.Primary, AetherColors.Secondary, 90f);
+                e.Graphics.FillRectangle(accent, 0, 1, Math.Min(2, Width), Height - 2);
+            }
         }
     }
 
@@ -290,8 +305,8 @@ namespace nanoboy.Controls
                 return;
             }
 
-            using var line = new SolidBrush(AetherColors.Hairline);
-            e.Graphics.FillRectangle(line, 0, Height - 1, Width, 1);
+            using var line = new LinearGradientBrush(ClientRectangle, AetherColors.Primary, AetherColors.Secondary, 0f);
+            e.Graphics.FillRectangle(line, 0, Math.Max(0, Height - 2), Width, Math.Min(2, Height));
         }
     }
 
@@ -311,12 +326,16 @@ namespace nanoboy.Controls
             base.OnPaint(e);
             TextRenderer.DrawText(
                 e.Graphics,
-                "GAME SCREEN",
+                global::AetherBoy.Runtime.Localization.UiText.Get("GAME SCREEN"),
                 labelFont,
                 new Rectangle(18, 12, Math.Max(1, Width - 36), 20),
                 AetherColors.Muted,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-
+            if (Width > 120 && Height > 24)
+            {
+                using var signal = new Pen(AetherColors.Cyan, 2f);
+                e.Graphics.DrawLine(signal, Width - 58, 22, Width - 20, 22);
+            }
         }
 
         protected override void Dispose(bool disposing)

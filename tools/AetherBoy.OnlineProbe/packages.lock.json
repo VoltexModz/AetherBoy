@@ -2,10 +2,28 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
+      "DiscordRichPresence": {
+        "type": "Transitive",
+        "resolved": "1.6.1.70",
+        "contentHash": "yho1fdhbsedICHdfHe/Tu3IX6a5oj4fiPFL0keZStlsh7T/FrdjcwZZ7C1uC2HUvcXbFh+VEJvcbo1W66QtkUg==",
+        "dependencies": {
+          "Newtonsoft.Json": "13.0.1"
+        }
+      },
       "MediaToolkit.WebRtc.Native.win-x64": {
         "type": "Transitive",
         "resolved": "0.24.5.1",
         "contentHash": "H46CLQXAhdYXy6uZnzYpkUqDPDjdzDP5OjdfiFxWZxtPk6b5XERIRTcztHRm92TZKGl2BlNXSw1804+ARrkPtA=="
+      },
+      "Newtonsoft.Json": {
+        "type": "Transitive",
+        "resolved": "13.0.4",
+        "contentHash": "pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A=="
+      },
+      "SharpCompress": {
+        "type": "Transitive",
+        "resolved": "0.50.4",
+        "contentHash": "/hxjUR7DEX6mky8/LQXyrnrKioOL6D6veAID1EZpro+q4s02x5dHEYBV3qjEN6lDYYilDoQQ76BcmQj+lRx51w=="
       },
       "aetherboy.core": {
         "type": "Project"
@@ -15,7 +33,10 @@
         "dependencies": {
           "AetherBoy.Core": "[4.8.0-alpha.1, )",
           "AetherBoy.Vendored.GBADotnet.Core": "[4.8.0-alpha.1, )",
-          "MediaToolkit.WebRtc.Native.win-x64": "[0.24.5.1, )"
+          "DiscordRichPresence": "[1.6.1.70, )",
+          "MediaToolkit.WebRtc.Native.win-x64": "[0.24.5.1, )",
+          "Newtonsoft.Json": "[13.0.4, )",
+          "SharpCompress": "[0.50.4, )"
         }
       },
       "aetherboy.vendored.gbadotnet.core": {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Threading;
 
 namespace nanoboy.Storage;
 
@@ -14,27 +15,38 @@ internal sealed class WindowsRomLibrary
 
     internal WindowsRomLibrary(WindowsDataPaths paths) => this.paths = paths;
 
-    internal string Import(string sourcePath)
+    internal string Import(string sourcePath, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         string source = Path.GetFullPath(sourcePath);
         if (!RomFiles.IsSupportedPath(source))
-            throw new InvalidDataException("Unterstützt werden .gb, .gbc und .gba.");
+            throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Unterstützt werden .gb, .gbc und .gba."));
 
         using var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read);
         bool gba = Path.GetExtension(source).Equals(".gba", StringComparison.OrdinalIgnoreCase);
         if (input.Length < (gba ? 0xC0 : 0x150) || input.Length > 32 * 1024 * 1024)
-            throw new InvalidDataException("Die Datei besitzt keine unterstützte ROM-Größe.");
+            throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Die Datei besitzt keine unterstützte ROM-Größe."));
 
-        string identity = Convert.ToHexString(SHA256.HashData(input));
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        byte[] buffer = new byte[64 * 1024];
+        int count;
+        while ((count = input.Read(buffer)) != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            hash.AppendData(buffer, 0, count);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        string identity = Convert.ToHexString(hash.GetHashAndReset());
         string directory = Path.Combine(paths.Roms, identity);
         Directory.CreateDirectory(directory);
         string? existing = Directory.EnumerateFiles(directory).FirstOrDefault(RomFiles.IsSupportedPath);
         string destination = existing ?? Path.Combine(directory, SafeName(source));
         if (existing != null)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             using var stored = File.OpenRead(existing);
             if (!SHA256.HashData(stored).AsSpan().SequenceEqual(Convert.FromHexString(identity)))
-                throw new InvalidDataException("Die lokale ROM-Kopie wurde verändert. Bitte prüfe den ROM-Ordner.");
+                throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Die lokale ROM-Kopie wurde verändert. Bitte prüfe den ROM-Ordner."));
         }
         else
         {
@@ -45,9 +57,15 @@ internal sealed class WindowsRomLibrary
                 using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write,
                     FileShare.None, 64 * 1024, FileOptions.WriteThrough))
                 {
-                    input.CopyTo(output);
+                    while ((count = input.Read(buffer)) != 0)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        output.Write(buffer, 0, count);
+                    }
+                    cancellationToken.ThrowIfCancellationRequested();
                     output.Flush(flushToDisk: true);
                 }
+                cancellationToken.ThrowIfCancellationRequested();
                 File.Move(temporary, destination);
             }
             finally
@@ -57,6 +75,7 @@ internal sealed class WindowsRomLibrary
         }
 
         // Copy each complete legacy family once. A central family always takes precedence.
+        cancellationToken.ThrowIfCancellationRequested();
         MigrateFamily(Path.Combine(paths.Saves, identity), BuildBatteryFiles(source));
         MigrateFamily(Path.Combine(paths.States, identity), Enumerable.Range(1, 5)
             .Select(slot => (Path.ChangeExtension(source, $"ss{slot}"), $"game.ss{slot}")));
@@ -88,7 +107,7 @@ internal sealed class WindowsRomLibrary
         string identity = Path.GetFileName(directory)!;
         if (!IsIdentity(identity) || !string.Equals(Path.GetDirectoryName(directory), paths.Roms,
             StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Die ROM wurde noch nicht in die lokale Bibliothek importiert.");
+            throw new InvalidOperationException(global::AetherBoy.Runtime.Localization.UiText.Get("Die ROM wurde noch nicht in die lokale Bibliothek importiert."));
         return identity;
     }
 

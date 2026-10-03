@@ -4,13 +4,15 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows.Forms;
 using nanoboy.Controls;
+using AetherBoy.Runtime;
 
 namespace nanoboy.Storage;
 
 internal sealed class WindowsDataPaths
 {
-    internal static WindowsDataPaths Default { get; set; } = new(Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ProductInfo.Name));
+    internal static WindowsDataPaths Default { get; set; } = new(PortableStorage.IsEnabled
+        ? PortableStorage.Root
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ProductInfo.Name));
 
     internal WindowsDataPaths(string root) => Root = Path.GetFullPath(root);
 
@@ -22,6 +24,8 @@ internal sealed class WindowsDataPaths
     internal string Firmware => Path.Combine(Root, "Firmware");
     internal string Recordings => Path.Combine(Root, "Recordings");
     internal string Screenshots => Path.Combine(Root, "Screenshots");
+    internal string Exports => Path.Combine(Root, "Exports");
+    internal string Updates => Path.Combine(Root, "Updates");
     internal string Development => Path.Combine(Root, "development");
     internal string Sessions => Path.Combine(Development, "Sessions");
     internal string CrashLogs => Path.Combine(ProductInfo.IsDevelopmentBuild ? Development : Root, "Crashes");
@@ -38,8 +42,8 @@ internal sealed class WindowsDataPaths
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or Win32Exception)
         {
-            AetherSignal.Show(owner, $"Der Ordner konnte nicht geöffnet werden.\n\n{exception.Message}",
-                "Ordner nicht verfügbar", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            AetherSignal.Show(owner, global::AetherBoy.Runtime.Localization.UiText.Get("Ordner konnte nicht geöffnet werden. ") + "\n\n" + global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message),
+                global::AetherBoy.Runtime.Localization.UiText.Get("Ordner nicht verfügbar"), MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 }

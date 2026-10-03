@@ -61,7 +61,8 @@ public sealed class WindowsTesterSessionTests
                 session.RecordException(
                     "test.failure",
                     new InvalidOperationException(
-                        @"Do not capture C:\Users\PrivateName\Games\Pokemon Rocket Secret.gba"));
+                        @"Do not capture C:\Users\PrivateName\Games\Pokemon Rocket Secret.gba",
+                        new UnauthorizedAccessException("PrivateName secret-token")));
 
                 File.WriteAllText(Path.Combine(session.SessionDirectory, "private-notes.txt"), "Do not export");
                 Assert.AreEqual(Path.GetFullPath(reportPath), session.CreateBundle(reportPath));
@@ -100,6 +101,9 @@ public sealed class WindowsTesterSessionTests
             Assert.IsFalse(log.Contains("PrivateName", StringComparison.Ordinal));
             Assert.IsFalse(log.Contains("Pokemon Rocket Secret.gba", StringComparison.Ordinal));
             Assert.IsFalse(log.Contains("Do not capture", StringComparison.Ordinal));
+            Assert.IsFalse(log.Contains("secret-token", StringComparison.Ordinal));
+            StringAssert.Contains(log, "UnauthorizedAccessException");
+            StringAssert.Contains(log, "causes");
 
             int gamepadEvents = lines.Count(line => line.Contains(
                 "input.gamepad_changed",
@@ -206,9 +210,9 @@ public sealed class WindowsTesterSessionTests
                         .Find("controlCenterOpenTesterFolderButton", true)
                         .Single() as Button
                         ?? throw new AssertFailedException("Tester folder action is missing.");
-                    RichTextBox diagnostics = center.Controls
+                    nanoboy.Controls.AetherTextBox diagnostics = center.Controls
                         .Find("controlCenterDiagnosticsText", true)
-                        .Single() as RichTextBox
+                        .Single() as nanoboy.Controls.AetherTextBox
                         ?? throw new AssertFailedException("Diagnostics text is missing.");
 
                     Assert.IsTrue(export.Enabled);

@@ -66,7 +66,7 @@ internal sealed partial class WaylandEmulatorHost
             {
                 settingsDirty = false;
                 if (loadError == settingsWriteError) loadError = null;
-                if (settingsWriteError is not null) statusMessage = "Preferences saved.";
+                if (settingsWriteError is not null) statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Preferences saved.");
                 settingsWriteError = null;
             }
             return false;
@@ -78,9 +78,9 @@ internal sealed partial class WaylandEmulatorHost
     {
         settingsDirty = true;
         settingsChangedAt = Environment.TickCount64 + 1700;
-        var failure = new IOException("Preferences could not be saved: " + exception.Message, exception);
+        var failure = new IOException(global::AetherBoy.Runtime.Localization.UiText.Get("Preferences could not be saved: ") + exception.Message, exception);
         ReportError(failure);
         settingsWriteError = loadError;
-        statusMessage = "Preferences are still unsaved. Retrying shortly; you can keep editing.";
+        statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Preferences are still unsaved. Retrying shortly; you can keep editing.");
     }
 }

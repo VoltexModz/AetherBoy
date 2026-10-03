@@ -18,25 +18,24 @@ namespace nanoboy
             pictureBox1.Image = mark;
             previousImage?.Dispose();
             Disposed += (_, _) => mark.Dispose();
-            Text = $"Über {ProductInfo.Name}";
+            Text = global::AetherBoy.Runtime.Localization.UiText.Format("Über {0}", ProductInfo.Name);
             textBox1.Text =
                 $"{ProductInfo.DisplayName}\r\n\r\n" +
-                "Game Boy, Game Boy Color und experimentell Game Boy Advance.\r\n\r\n" +
-                $"Entwickelt und weitergeführt von {ProductInfo.TeamName}.\r\n" +
-                "Ein gemeinsames Projekt für Windows und Linux / Wayland.\r\n\r\n" +
-                "Herkunft: nanoboy von Frédéric Meyer (2014), später ChiiBoy Color.\r\n" +
-                "GBA-Basis: GBADotnet von David Tyler, als gepflegter Fork integriert.\r\n" +
-                "Lizenz: GPL-3.0-only; Drittanbieter mit eigenen Lizenzhinweisen.\r\n\r\n" +
-                "Alpha-Software: GBA-Spielkompatibilität wird weiter erprobt.\r\n" +
-                "Nintendo und Game Boy sind Marken ihrer jeweiligen Rechteinhaber. " +
-                "AetherBoy ist nicht mit Nintendo verbunden.";
+                global::AetherBoy.Runtime.Localization.UiText.Get("Game Boy, Game Boy Color und experimentell Game Boy Advance.\r\n\r\n") +
+                global::AetherBoy.Runtime.Localization.UiText.Format("Entwickelt und weitergeführt von {0}.\r\n", ProductInfo.TeamName) +
+                global::AetherBoy.Runtime.Localization.UiText.Get("Ein gemeinsames Projekt für Windows und Linux / Wayland.\r\n\r\n") +
+                global::AetherBoy.Runtime.Localization.UiText.Get("Herkunft: nanoboy von Frédéric Meyer (2014), später ChiiBoy Color.\r\n") +
+                global::AetherBoy.Runtime.Localization.UiText.Get("GBA-Basis: GBADotnet von David Tyler, als gepflegter Fork integriert.\r\n") +
+                global::AetherBoy.Runtime.Localization.UiText.Get("Lizenz: GPL-3.0-only; Drittanbieter mit eigenen Lizenzhinweisen.\r\n\r\n") +
+                global::AetherBoy.Runtime.Localization.UiText.Get("Alpha-Software: GBA-Spielkompatibilität wird weiter erprobt.\r\n") +
+                global::AetherBoy.Runtime.Localization.UiText.Get("Nintendo und Game Boy sind Marken ihrer jeweiligen Rechteinhaber. ") +
+                global::AetherBoy.Runtime.Localization.UiText.Get("AetherBoy ist nicht mit Nintendo verbunden.");
 
             ConfigureAetherLayout();
             AetherDialog.Apply(
                 this,
-                "IDENTITY // 01",
-                $"{ProductInfo.TeamName} · Projekt, Mitwirkende und Herkunft");
-            textBox1.BorderStyle = BorderStyle.None;
+                global::AetherBoy.Runtime.Localization.UiText.Get("IDENTITY // 01"),
+                global::AetherBoy.Runtime.Localization.UiText.Format("{0} · Projekt, Mitwirkende und Herkunft", ProductInfo.TeamName));
             textBox1.BackColor = AetherColors.Void;
             button1.Focus();
         }
@@ -66,7 +65,7 @@ namespace nanoboy
             {
                 Name = "aboutTeamCaption",
                 AutoSize = false,
-                Text = "Das Team hinter AetherBoy",
+                Text = global::AetherBoy.Runtime.Localization.UiText.Get("Das Team hinter AetherBoy"),
                 TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = AetherColors.Muted,
                 Location = new Point(20, 328),
@@ -95,7 +94,7 @@ namespace nanoboy
             var repositoryButton = new AetherButton
             {
                 Name = "aboutRepositoryButton",
-                Text = "PROJEKT AUF GITHUB",
+                Text = global::AetherBoy.Runtime.Localization.UiText.Get("PROJEKT AUF GITHUB"),
                 Location = new Point(28, 418),
                 Size = new Size(238, 40)
             };
@@ -105,20 +104,20 @@ namespace nanoboy
             var coffeeButton = new AetherButton
             {
                 Name = "aboutCoffeeButton",
-                Text = "BUY US A COFFEE",
+                Text = global::AetherBoy.Runtime.Localization.UiText.Get("Spendiert uns einen Kaffee"),
                 Kind = AetherButtonKind.Primary,
                 Location = new Point(304, 418),
                 Size = new Size(238, 40),
                 AccessibleDescription = ProductInfo.SupportUri is null
-                    ? "Kommt bald. Der Support-Link ist noch nicht hinterlegt."
-                    : $"Unterstütze {ProductInfo.TeamName}."
+                    ? global::AetherBoy.Runtime.Localization.UiText.Get("Kommt bald. Der Support-Link ist noch nicht hinterlegt.")
+                    : global::AetherBoy.Runtime.Localization.UiText.Format("Unterstütze {0}.", ProductInfo.TeamName)
             };
             coffeeButton.Click += (_, _) => ShowCoffeeSupport();
             Controls.Add(coffeeButton);
             Controls.Add(new Label
             {
                 Name = "aboutCoffeeStatus",
-                Text = "KOMMT BALD · Support-Link folgt",
+                Text = global::AetherBoy.Runtime.Localization.UiText.Get("KOMMT BALD · Support-Link folgt"),
                 Visible = ProductInfo.SupportUri is null,
                 AutoEllipsis = true,
                 Font = new Font("Segoe UI", 8f, FontStyle.Regular, GraphicsUnit.Point),
@@ -129,7 +128,7 @@ namespace nanoboy
 
             button1.Location = new Point(644, 418);
             button1.Size = new Size(128, 40);
-            button1.Text = "VERSTANDEN";
+            button1.Text = global::AetherBoy.Runtime.Localization.UiText.Get("VERSTANDEN");
             if (button1 is AetherButton aetherButton)
             {
                 aetherButton.Kind = AetherButtonKind.Primary;
@@ -148,10 +147,10 @@ namespace nanoboy
             }
 
             AetherSignal.Show(this,
-                $"Danke, dass du {ProductInfo.TeamName} unterstützen möchtest!\n\n" +
-                "Der Coffee-Link ist in dieser Entwicklungsversion noch nicht hinterlegt. " +
-                "Er wird mit einem späteren Update ergänzt.",
-                "Coffee kommt bald", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                global::AetherBoy.Runtime.Localization.UiText.Format("Danke, dass du {0} unterstützen möchtest!\n\n", ProductInfo.TeamName) +
+                global::AetherBoy.Runtime.Localization.UiText.Get("Der Coffee-Link ist in dieser Entwicklungsversion noch nicht hinterlegt. ") +
+                global::AetherBoy.Runtime.Localization.UiText.Get("Er wird mit einem späteren Update ergänzt."),
+                global::AetherBoy.Runtime.Localization.UiText.Get("Coffee kommt bald"), MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void OpenExternalLink(Uri uri)
@@ -162,8 +161,8 @@ namespace nanoboy
             }
             catch (Exception exception) when (exception is Win32Exception or InvalidOperationException)
             {
-                AetherSignal.Show(this, $"Der Browser konnte nicht geöffnet werden.\n\n{uri.AbsoluteUri}",
-                    "Link öffnen", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                AetherSignal.Show(this, global::AetherBoy.Runtime.Localization.UiText.Format("Der Browser konnte nicht geöffnet werden.\n\n{0}", uri.AbsoluteUri),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Link öffnen"), MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 

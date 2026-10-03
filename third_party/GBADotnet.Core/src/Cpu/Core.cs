@@ -68,6 +68,9 @@ public unsafe class Core
     internal readonly GbaDiagnosticLog Diagnostics;
     private readonly InterruptRegisters _interruptRegisters;
     public long Cycles;
+    // Owner-thread instrumentation: called once per instruction after IRQ dispatch.
+    // It is deliberately not serialized as emulated CPU state.
+    public Action<uint, bool>? InstructionStarting { get; set; }
     internal readonly MemoryBus Bus;
     internal bool UseHleBios { get; private set; }
     public CPSR Cpsr;
@@ -336,6 +339,7 @@ public unsafe class Core
                 break;
         }
 
+        core.InstructionStarting?.Invoke(core.Pipeline.CurrentInstructionAddress.Value, core.Cpsr.ThumbMode);
         var instruction = core.Pipeline.CurrentInstruction.Value;
 
         if (core.Cpsr.ThumbMode)

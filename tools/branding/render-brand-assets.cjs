@@ -6,8 +6,8 @@ const repositoryRoot = path.resolve(__dirname, '..', '..');
 const brandingRoot = path.join(repositoryRoot, 'branding');
 const exportRoot = path.join(brandingRoot, 'exports');
 const applicationBrandingRoot = path.join(repositoryRoot, 'nanoboy', 'Branding');
-const detailedSource = path.join(brandingRoot, 'aetherboy-mark.svg');
-const compactSource = path.join(brandingRoot, 'aetherboy-mark-small.svg');
+// User-approved artwork. Only resize/encode; do not redraw, crop or recolor it.
+const masterSource = path.join(brandingRoot, 'aetherboy-logo-2026-10-02.jpg');
 const iconSizes = [16, 20, 24, 32, 40, 48, 64, 128, 256];
 
 function createIco(frames) {
@@ -50,13 +50,12 @@ async function main() {
 
   const frames = [];
   for (const size of iconSizes) {
-    const sourcePath = size <= 40 ? compactSource : detailedSource;
-    const data = await renderPng(sourcePath, size);
+    const data = await renderPng(masterSource, size);
     fs.writeFileSync(path.join(exportRoot, `aetherboy-mark-${size}.png`), data);
     frames.push({ size, data });
   }
 
-  const applicationArtwork = await renderPng(detailedSource, 512);
+  const applicationArtwork = await renderPng(masterSource, 512);
   fs.writeFileSync(path.join(exportRoot, 'aetherboy-mark-512.png'), applicationArtwork);
   fs.writeFileSync(path.join(applicationBrandingRoot, 'AetherBoyMark.png'), applicationArtwork);
   fs.writeFileSync(

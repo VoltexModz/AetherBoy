@@ -7,26 +7,27 @@ using nanoboy.Input;
 
 namespace nanoboy.Controls;
 
-/// <summary>In-window command navigation. ToolStrip items are only the existing command model.</summary>
+/// <summary>In-window command navigation over a data-only command tree.</summary>
 internal sealed class AetherCommandMenu : AetherSurfacePanel, IMessageFilter
 {
     private readonly Form owner;
     private readonly Control anchor;
-    private readonly ToolStripMenuItem root;
+    private readonly nanoboy.Controls.AetherCommand root;
     private readonly string section;
     private readonly Action closed;
-    private readonly Stack<ToolStripMenuItem> history = new();
+    private readonly Stack<nanoboy.Controls.AetherCommand> history = new();
     private readonly List<AetherButton> rows = new();
     private readonly FlowLayoutPanel body;
+    private readonly AetherScrollViewport viewport;
     private readonly Label heading;
     private readonly Label hint;
     private readonly AetherButton back;
-    private ToolStripMenuItem current;
+    private nanoboy.Controls.AetherCommand current;
     private bool dismissed;
     private readonly GamepadNavigationInput pad = new();
     private int maximumHeight;
 
-    public AetherCommandMenu(Form owner, Control host, Control anchor, ToolStripMenuItem root,
+    public AetherCommandMenu(Form owner, Control host, Control anchor, nanoboy.Controls.AetherCommand root,
         string section, Action closed)
     {
         this.owner = owner;
@@ -35,7 +36,7 @@ internal sealed class AetherCommandMenu : AetherSurfacePanel, IMessageFilter
         this.section = section;
         this.closed = closed;
         Name = "aetherCommandMenu";
-        AccessibleName = section + " Menü";
+        AccessibleName = section + global::AetherBoy.Runtime.Localization.UiText.Get(" Menü");
         AccentEdge = true;
         Padding = new Padding(14);
         Font = new Font("Segoe UI", 10f);
@@ -46,17 +47,18 @@ internal sealed class AetherCommandMenu : AetherSurfacePanel, IMessageFilter
             ForeColor = AetherColors.Cyan, Font = new Font("Segoe UI", 10f, FontStyle.Bold),
             Location = new Point(18, 17), Size = new Size(Width - 76, 25) };
         var close = new AetherButton { Text = "×", Kind = AetherButtonKind.Ghost,
-            AccessibleName = "Menü schließen", Bounds = new Rectangle(Width - 50, 12, 32, 30) };
+            AccessibleName = global::AetherBoy.Runtime.Localization.UiText.Get("Menü schließen"), Bounds = new Rectangle(Width - 50, 12, 32, 30) };
         close.Click += (_, _) => Dismiss();
         hint = new Label { ForeColor = AetherColors.Muted, AutoSize = false,
-            Bounds = new Rectangle(18, 47, Width - 36, 28), Text = "Pfeile navigieren · Enter wählen · Esc schließen" };
-        back = new AetherButton { Text = "‹  ZURÜCK", Kind = AetherButtonKind.Ghost,
+            Bounds = new Rectangle(18, 47, Width - 36, 28), Text = global::AetherBoy.Runtime.Localization.UiText.Get("Pfeile navigieren · Enter wählen · Esc schließen") };
+        back = new AetherButton { Text = global::AetherBoy.Runtime.Localization.UiText.Get("‹  ZURÜCK"), Kind = AetherButtonKind.Ghost,
             Bounds = new Rectangle(18, 80, Width - 36, 32) };
         back.Click += (_, _) => GoBack();
         body = new FlowLayoutPanel { Name = "commandMenuRows", BackColor = AetherColors.Surface,
-            FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true,
-            Bounds = new Rectangle(14, 122, Width - 28, Height - 136) };
-        Controls.AddRange(new Control[] { heading, close, hint, back, body });
+            FlowDirection = FlowDirection.TopDown, WrapContents = false, Size = new Size(Width - 28, Height - 136) };
+        viewport = new AetherScrollViewport { Name = "commandMenuViewport", Bounds = new Rectangle(14, 122, Width - 28, Height - 136) };
+        viewport.SetContent(body, Size.Empty, measureChildren: true);
+        Controls.AddRange(new Control[] { heading, close, hint, back, viewport });
         host.Controls.Add(this);
         BringToFront();
         owner.Deactivate += OwnerChanged;
@@ -77,27 +79,27 @@ internal sealed class AetherCommandMenu : AetherSurfacePanel, IMessageFilter
 
     private void ShowPage()
     {
-        heading.Text = current == root ? section + " // COMMANDS" : section + " / " + current.Text.Replace("&", "");
+        heading.Text = current == root ? section + global::AetherBoy.Runtime.Localization.UiText.Get(" // COMMANDS") : section + " / " + current.Text.Replace("&", "");
         back.Enabled = history.Count != 0;
         body.SuspendLayout();
         foreach (Control child in body.Controls.Cast<Control>().ToArray()) child.Dispose();
         rows.Clear();
-        foreach (ToolStripItem item in current.DropDownItems)
+        foreach (nanoboy.Controls.AetherCommandItem item in current.DropDownItems)
         {
-            // Visible also reflects the hidden legacy MenuStrip; Available is the item's own visibility.
+            // Availability includes the parent command; there is no hidden native menu.
             if (!item.Available) continue;
-            if (item is ToolStripSeparator)
+            if (item is nanoboy.Controls.AetherCommandSeparator)
             {
                 body.Controls.Add(new Panel { Height = 1, Width = body.Width - 24,
                     BackColor = AetherColors.Hairline, Margin = new Padding(4, 8, 4, 8) });
                 continue;
             }
-            if (item is not ToolStripMenuItem command) continue;
+            if (item is not nanoboy.Controls.AetherCommand command) continue;
             bool branch = command.HasDropDownItems;
             var row = new AetherButton
             {
                 Name = "command_" + command.Name, Text = command.Text.Replace("&", "") + (branch ? "   ›" : ""),
-                AccessibleName = command.Text.Replace("&", ""), AccessibleDescription = command.Checked ? "Aktiv" : null,
+                AccessibleName = command.Text.Replace("&", ""), AccessibleDescription = command.Checked ? global::AetherBoy.Runtime.Localization.UiText.Get("Aktiv") : null,
                 Enabled = command.Enabled, Selected = command.Checked,
                 Kind = AetherButtonKind.Secondary, Size = new Size(body.Width - 24, 42),
                 Margin = new Padding(2, 3, 2, 3), Font = Font
@@ -114,9 +116,10 @@ internal sealed class AetherCommandMenu : AetherSurfacePanel, IMessageFilter
         body.ResumeLayout(true);
         int contentHeight = body.Controls.Cast<Control>().Sum(control => control.Height + control.Margin.Vertical);
         Height = Math.Min(maximumHeight, 140 + Math.Max(48, contentHeight));
-        body.Height = Height - 136;
-        hint.Text = rows.Count == 0 ? "Hier sind gerade keine Aktionen verfügbar." :
-            "Pfeile navigieren · Enter wählen · Esc schließen";
+        viewport.Height = Height - 136;
+        viewport.ScrollTo(0, 0);
+        hint.Text = rows.Count == 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("Hier sind gerade keine Aktionen verfügbar.") :
+            global::AetherBoy.Runtime.Localization.UiText.Get("Pfeile navigieren · Enter wählen · Esc schließen");
         rows.FirstOrDefault(row => row.Enabled)?.Focus();
     }
 
@@ -165,7 +168,7 @@ internal sealed class AetherCommandMenu : AetherSurfacePanel, IMessageFilter
             Keys.End => enabled.Length - 1,
             _ => -1
         };
-        if (next >= 0) { enabled[next].Focus(); body.ScrollControlIntoView(enabled[next]); }
+        if (next >= 0) { enabled[next].Focus(); viewport.Reveal(enabled[next]); }
         return true;
     }
 

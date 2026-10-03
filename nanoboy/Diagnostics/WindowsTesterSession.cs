@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
@@ -249,8 +251,30 @@ namespace nanoboy.Diagnostics
                     hresult = $"0x{exception.HResult:X8}",
                     target = exception.TargetSite is null
                         ? null
-                        : $"{exception.TargetSite.DeclaringType?.FullName}.{exception.TargetSite.Name}"
+                        : $"{exception.TargetSite.DeclaringType?.FullName}.{exception.TargetSite.Name}",
+                    causes = ExceptionCauses(exception),
+                    active_battery_writes = nanoboy.Core.BatterySaveStore.GetActiveWrites()
                 });
+        }
+
+        internal void RecordSlowBatteryWrites() => Record("storage.slow_finalization", nanoboy.Core.BatterySaveStore.GetActiveWrites());
+
+        private static object[] ExceptionCauses(Exception exception)
+        {
+            var causes = new List<object>();
+            for (Exception? cause = exception; cause is not null && causes.Count < 8; cause = cause.InnerException)
+            {
+                // No Message/ToString/file names: these commonly contain private paths and tokens.
+                causes.Add(new { exception_type = cause.GetType().FullName, hresult = $"0x{cause.HResult:X8}",
+                    methods = new StackTrace(cause, fNeedFileInfo: false).GetFrames()?.Take(16)
+                        .Select(frame => frame.GetMethod())
+                        .Select(method => method is null ? null : $"{method.DeclaringType?.FullName}.{method.Name}").ToArray(),
+                    save_stage = cause.Data["battery_save_stage"] is string stage &&
+                        stage.Length <= 40 && stage.All(c => c is >= 'a' and <= 'z' or '-') ? stage : null,
+                    save_generation = cause.Data["battery_save_generation"] as int?,
+                    save_elapsed_ms = cause.Data["battery_save_elapsed_ms"] as long? });
+            }
+            return causes.ToArray();
         }
 
         internal void RecordHeartbeat(EmulationSnapshot snapshot, NanoboySettings settings,

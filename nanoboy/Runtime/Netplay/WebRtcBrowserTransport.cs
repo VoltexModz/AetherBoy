@@ -56,8 +56,9 @@ public sealed class WebRtcBrowserTransport : IOnlineLinkTransport
 
     public WebRtcBrowserTransport()
     {
-        page = ReadResource("AetherBoy.Runtime.Netplay.WebRtcBridge.html");
-        script = ReadResource("AetherBoy.Runtime.Netplay.WebRtcBridge.js");
+        string language = Localization.UiText.Language;
+        page = Localization.BrowserUiText.Render(ReadResource("AetherBoy.Runtime.Netplay.WebRtcBridge.html"), language, script: false);
+        script = Localization.BrowserUiText.Render(ReadResource("AetherBoy.Runtime.Netplay.WebRtcBridge.js"), language, script: true);
         listener = StartLoopbackListener(out int port);
         authority = "127.0.0.1:" + port;
         origin = "http://" + authority;

@@ -29,26 +29,26 @@ internal sealed class LinuxAccessibleControls : IDisposable
     public static bool TryCreate(out LinuxAccessibleControls? controls, out string? error)
     {
         controls = null; error = null;
-        if (!OperatingSystem.IsLinux()) { error = "Native accessible controls require Linux and GTK 3."; return false; }
+        if (!OperatingSystem.IsLinux()) { error = global::AetherBoy.Runtime.Localization.UiText.Get("Native accessible controls require Linux and GTK 3."); return false; }
         try
         {
             gdk_set_allowed_backends("wayland");
             if (gtk_init_check(IntPtr.Zero, IntPtr.Zero) == 0)
-            { error = "GTK could not connect to Wayland. The regular controls remain available."; return false; }
+            { error = global::AetherBoy.Runtime.Localization.UiText.Get("GTK could not connect to Wayland. The regular controls remain available."); return false; }
             controls = new LinuxAccessibleControls(); return true;
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
-        { error = "Native accessible controls need GTK 3 and ATK from your distribution. " + ex.Message; return false; }
+        { error = global::AetherBoy.Runtime.Localization.UiText.Get("Native accessible controls need GTK 3 and ATK from your distribution. ") + global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(ex.Message); return false; }
     }
 
     private LinuxAccessibleControls()
     {
         window = gtk_window_new(0);
-        gtk_window_set_title(window, "AetherBoy — Accessible controls");
+        gtk_window_set_title(window, global::AetherBoy.Runtime.Localization.UiText.Get("AetherBoy — Accessible controls"));
         gtk_window_set_default_size(window, 820, 680);
         gtk_container_set_border_width(window, 16);
         var outer = gtk_box_new(1, 12); gtk_container_add(window, outer);
-        heading = Label("AetherBoy controls"); Pack(outer, heading);
+        heading = Label(global::AetherBoy.Runtime.Localization.UiText.Get("AetherBoy controls")); Pack(outer, heading);
         var columns = gtk_box_new(0, 16); gtk_box_pack_start(outer, columns, 1, 1, 0);
         navigation = gtk_box_new(1, 6); gtk_widget_set_size_request(navigation, 190, -1);
         var navScroll = Scroll(navigation); gtk_box_pack_start(columns, navScroll, 0, 1, 0);
@@ -59,7 +59,7 @@ internal sealed class LinuxAccessibleControls : IDisposable
         entry = gtk_entry_new(); gtk_entry_set_max_length(entry, 160); Pack(entryBox, entry);
         actions = gtk_box_new(1, 6); Pack(body, actions);
         status = Label(""); Pack(outer, status);
-        atk_object_set_name(gtk_widget_get_accessible(status), "Session status");
+        atk_object_set_name(gtk_widget_get_accessible(status), global::AetherBoy.Runtime.Localization.UiText.Get("Session status"));
         changedHandler = (_, _) =>
         {
             if (!updating && textKey is { } key)

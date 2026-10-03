@@ -6,23 +6,48 @@
 
 <p align="center"><strong>by NekoZDevTeam</strong></p>
 
+## Entwicklungsstand — 3. Oktober 2026
+
+Beide Oberflächen bieten inzwischen Deutsch/Englisch als Anzeigesprache, sechs
+Themes mit eigenen Farben, den controllerorientierten Sofa-Modus, AVI-Aufnahmen,
+ZIP-/7z-Import und erweiterte Sitzungs-Cheats. Windows verwendet die gemeinsamen
+eigenen Aether-Bedienelemente; Linux behält seine native Wayland-Oberfläche.
+Implementierung ist keine pauschale Hardware- oder Spielkompatibilitätsfreigabe.
+
+Die jüngste Stabilisierung reduziert unnötiges Neuschreiben älterer Save-Backups,
+ergänzt datensparsame Speicherphasen-Diagnose und ersetzt blockierende Windows-
+Hintergrundfehlerdialoge durch einen dauerhaften Hinweis mit Wiederholfunktion.
+Acht vollständige Runtime-Lastläufe bestanden ohne erneuten GBA-Shutdown-Timeout.
+Reale Hardware- und Langzeitabnahmen bleiben offen.
+[Änderungen, genaue Testergebnisse und Grenzen (DE/EN)](docs/STABILIZATION_2026-10-02.md).
+
+In den Einstellungen nach **Sprache** suchen: Deutsch, Englisch oder Systemsprache,
+wirksam nach Neustart. Deutsche Systemsprachen einschließlich Deutschland,
+Österreich und Schweiz wählen automatisch Deutsch; sonst Englisch. Die Sprache
+der Spiele wird dadurch nicht verändert.
+
+Aktuelle Pläne: [Windows](docs/WINDOWS_ROADMAP.md) · [Linux](docs/LINUX_ROADMAP.md).
+
+### Gemeinsame Funktionen und Entwicklungsdokumentation
+
 Windows ↔ Linux: gemeinsame Turbo-Audio-/Screenshot-/Performance-Grundlage und
 eigene Windows-Menüs. [Umgesetzt, geprüft und noch offen: Funktionsabgleich (DE/EN)](docs/PLATFORM_PARITY.md).
-Vollständige 1:1-Funktionsgleichheit ist noch in Arbeit.
+Die Plattformpläne unterscheiden implementierte Werkzeuge von offenen Hardware- und Spieltests.
 
 Neu unter Windows: Firmware Station für eigene Boot-ROMs/BIOS und steuerbare,
 begrenzte lokale Diagnose. [Bedienung, Datenschutz und Übergabe (DE/EN)](docs/WINDOWS_FIRMWARE_DIAGNOSTICS.md).
 
-Experimentelles Local Link Lab unter Windows: zwei GB-/GBC- oder zwei GBA-Spielinstanzen in einer
+Experimentelles Local Link Lab unter Windows und Linux: zwei GB-/GBC- oder zwei GBA-Spielinstanzen in einer
 gemeinsamen lokalen Sitzung, mit getrennten Spielständen. Dieses Lab bleibt lokal;
-echte Spiele und die Linux-Local-Link-Oberfläche müssen noch qualifiziert beziehungsweise angebunden werden.
+echte Spiele müssen noch qualifiziert werden. Die native Linux-Zwei-Spieler-Oberfläche ist implementiert.
 [Anleitung, Grenzen und Linux-Übergabe (DE/EN)](docs/LOCAL_LINK_LAB.md).
 [GBA-Kabel-/CPU-Ausbau](docs/GBA_LOCAL_LINK_HANDOFF.md) ·
 [Neuester Linux-Beitrag und Integrationsprüfung](docs/LINUX_UPSTREAM_INTEGRATION_REVIEW.md).
 
 Neu als separater **GB/GBC-Online-Link-Prototyp** für Windows und Linux: ein eigenes
-Spiel je Rechner, private Sitzungsspielstände und verschlüsseltes WebRTC über einen
-lokalen Browserhelfer. Noch kein bestätigter Pokémon-Tausch;
+Spiel je Rechner und private Sitzungsspielstände. Native Raumcodes nutzen einen
+eingerichteten privaten Raumdienst; manuelle WebRTC-Browserkopplung bleibt verfügbar.
+Noch kein bestätigter Pokémon-Tausch;
 Internet-Verbindungen können STUN/TURN-Konfiguration benötigen.
 [Anleitung, Schutzmaßnahmen und Grenzen (DE/EN)](docs/ONLINE_LINK_HANDOFF.md).
 [Erster Windows↔Linux-Test über zwei Internetanschlüsse](docs/ONLINE_PLAYTEST_DE.md).
@@ -75,14 +100,14 @@ GTK-Zugänglichkeit und abbrechbares Laden ergänzen den nativen Client.
 
 ## Ein Blick auf AetherBoy
 
-Die Desktop-Oberfläche stellt das Spiel in den Mittelpunkt: **Open game** startet direkt, daneben stehen Pause, Speichern, Laden und Zurückspulen als vertraute Aktionen bereit. Die Seitenleiste zeigt nur das aktuelle Spiel und wichtige Angaben; weitere Optionen liegen unter Settings. Windows und Linux nutzen ruhige dunkle Flächen und eine klare Akzentfarbe für die nächste Aktion.
+Die Desktop-Oberfläche stellt das Spiel in den Mittelpunkt: **Spiel öffnen**, Pause, Speichern, Laden und Zurückspulen sind direkt erreichbar. Das gemeinsame Aether-Design nutzt schräg abgeschnittene Bedienelemente und Violett/Cyan als Standard-Akzente, mit dunklen und hellen Themes. Weitere Optionen liegen in den Einstellungen.
 
-Die Violett- und Cyan-Töne des Logos sind die Standard-Akzente. Unter Windows lassen sich in **Settings → Appearance**, unter Linux in **Settings → System → Appearance colors** beide Akzente und der Hintergrund frei wählen. Diese globalen UI-Farben bleiben von den Farbpaletten der Spiele getrennt.
+Unter Darstellung stehen sechs Theme-Vorgaben sowie frei wählbare Akzent- und Hintergrundfarben bereit. Diese globalen UI-Farben bleiben von den Farbpaletten der Spiele getrennt.
 
 <p align="center">
   <img src="docs/images/aetherboy-linux.png" alt="AetherBoy unter Linux: Hauptfenster mit ROM-Auswahl, Sessionleiste, fünf Save-Slots und direkten Spielaktionen" width="1000">
   <br>
-  <sub>Echte Aufnahme des nativen Linux-Frontends, ohne geladene ROM.</sub>
+  <sub>Frühere native Linux-Ansicht ohne geladene ROM. Aktuelle Builds enthalten zusätzlich das erneuerte Aether-Design und die Sprachauswahl.</sub>
 </p>
 
 <details>
@@ -115,10 +140,17 @@ Neun Bereiche bündeln Übersicht, Video, Audio, Steuerung, Spielstände, System
 | **Speichern und Zurückspulen** | Batterie-Spielstände, fünf Save-State-Slots und Rewind für GB, GBC und GBA. |
 | **Save-Schutz** | Atomare `.sav`-Schreibvorgänge, Integritätsprüfung und drei rotierende Backups. |
 | **Lokale Einstellungen** | Persistente Display-, Audio- und Eingabeoptionen im Control Center. |
+| **Bibliothek und Sofa-Modus** | Favoriten, Tags, Bewertungen, Spielzeit und controllerorientierte Vollbildnavigation. |
+| **Aufnahmen und Archive** | Screenshots, WAV-Audio, Einzelspiel-AVI mit Ton sowie ZIP-/7z-ROM-Import mit Spielauswahl. |
+| **Patches** | IPS/BPS/UPS mit ausdrücklichem Patchen und Starten; Ergebnisse bleiben separat gespeicherte ROMs. Keine automatische Anwendung benachbarter Patches. |
+| **Sitzungs-Cheats** | Gemeinsame GB-/GBC-/GBA-Decoder; [Formate und Grenzen](docs/CHEAT_SUPPORT.md). |
+| **Anpassung** | Deutsch/Englisch, sechs Themes, eigene Farben, einstellbares Spielstart-Intro und optionale Discord-Aktivität. |
+| **Portabler Speicher** | `--portable` oder `aetherboy.portable` speichert beim Programm; keine automatische Profilübernahme. |
+| **Barcode Boy** | Gemeinsame Zubehör-Implementierung und manuelle Barcode-Eingabe; Prüfung mit unterstütztem Spiel noch offen. |
 
 ### Windows und Linux im Vergleich
 
-Beide Frontends verwenden denselben plattformneutralen Core und dieselbe Runtime. Die verfügbaren Desktop-Werkzeuge unterscheiden sich noch:
+Beide Frontends verwenden denselben plattformneutralen Core und dieselbe Runtime. Entsprechende Werkzeuge sind implementiert; Plattformintegration und Abnahme auf echten Geräten bleiben getrennt:
 
 | | Windows | Linux |
 | --- | --- | --- |
@@ -131,10 +163,11 @@ Beide Frontends verwenden denselben plattformneutralen Core und dieselbe Runtime
 | **WAV-Aufnahme und Boot-ROM-Auswahl** | Vorhanden | Unter Tools / System vorhanden |
 | **State-Galerie/Fortsetzen und Spielprofile** | Vorhanden | Jetzt vorhanden, einschließlich Lade-Undo und globaler Profilvererbung |
 | **Native Screenshots / Performance** | Gemeinsame Runtime-Dienste | F12 / F9 und Tools; native Bedienprobe für den vereinten Stand noch offen |
-| **Quick Deck / Audio Inspector** | Vorhanden | Noch kein vollständiges Gegenstück |
+| **Schnellmenü / Audio Inspector** | Vorhanden | In der nativen Oberfläche vorhanden |
 | **IPS-/BPS-/UPS-Patch Lab** | Integriert; UPS-Rückpatchen ausdrücklich wählbar | Unter Library → Patch Lab; ausdrückliches UPS-Rückpatchen |
 | **Stereo-Ausgabe** | GB/GBC/GBA durchgängig | GB/GBC/GBA durchgängig |
-| **Lokales GB/GBC/GBA-Link-Kabel** | Experimentelles Zwei-Spieler-Lab, keine kommerzielle Spielabnahme | Gemeinsame Core/Runtime verfügbar, native Link-Oberfläche fehlt |
+| **Lokales GB/GBC/GBA-Link-Kabel** | Experimentelles Zwei-Spieler-Lab | Native Zwei-Spieler-Oberfläche; dieselbe Runtime und Hardwarefamilien-Grenzen |
+| **Sprache / Themes / Sofa / AVI / Archive** | Implementiert | Implementiert; weitere native Desktop-Abnahme erforderlich |
 
 Die genaue Zuordnung steht in [Windows → Linux: UI-Stand](docs/LINUX_UI_PARITY.md).
 
@@ -162,7 +195,7 @@ bash scripts/build-linux.sh
 bash scripts/run-linux.sh
 ```
 
-Danach eine `.gb`-, `.gbc`- oder `.gba`-Datei über **OPEN ROM**, die Taste **O** oder Drag-and-drop öffnen. Archive vorher entpacken. Eine ROM lässt sich auch direkt übergeben:
+Danach eine `.gb`-, `.gbc`- oder `.gba`-Datei über **Spiel öffnen**, die Taste **O** oder Drag-and-drop öffnen. ZIP-/7z-Archive werden unterstützt; bei mehreren Spielen erscheint eine Auswahl. Importierte Spiele bleiben als separate ROMs gespeichert. Eine ROM lässt sich auch direkt übergeben:
 
 ```bash
 bash scripts/run-linux.sh "/pfad/zu/deinem-spiel.gba"
@@ -217,7 +250,7 @@ Falls unter Hyprland kein Dateidialog erscheint, die [Portal-Konfiguration](docs
 
 ## Windows-Build
 
-Benötigt werden Windows und dasselbe **.NET SDK 10.0.302** beziehungsweise ein neuerer Patch der `10.0.3xx`-Feature-Band. Für Audio muss ein funktionierendes Windows-WinMM-Gerät verfügbar sein.
+Benötigt werden Windows und dasselbe **.NET SDK 10.0.302** beziehungsweise ein neuerer Patch der `10.0.3xx`-Feature-Band. Audio benötigt ein funktionierendes Windows-Ausgabegerät; WASAPI und WinMM stehen zur Verfügung.
 
 Im Repository-Verzeichnis mit PowerShell ausführen:
 
@@ -248,7 +281,7 @@ Alle verwalteten Windows-Daten liegen unter `%LOCALAPPDATA%\AetherBoy`:
 | `Library/` | Titel, Favoriten, Spielzeit und Vorschaumetadaten je ROM |
 | `Screenshots/<SHA-256>/` | Manuell aufgenommene Spielbild-PNGs in nativer Auflösung |
 | `Firmware/` | Optional selbst bereitgestellte Boot-ROMs/BIOS |
-| `Recordings/` | Standardziel für manuell gespeicherte WAV-Aufnahmen |
+| `Recordings/` | Audio- und Gameplay-Aufnahmen |
 | `development/Sessions/` | Diagnoseberichte pro Programmstart |
 | `development/Crashes/` | Crashlogs der Development-Builds |
 
@@ -274,7 +307,9 @@ beweist noch keine korrekte Spielgrafik und ersetzt keinen Spieltest.
 
 Für die Weitergabe per USB den vollständigen Publish-Ordner kopieren. Die EXE
 und ihre Abhängigkeiten gehören zusammen; persönliche Spieldaten bleiben auf
-dem jeweiligen Rechner. Der weitere Ausbau steht im [Windows-Plan](docs/WINDOWS_ROADMAP.md).
+dem jeweiligen Rechner. [`--portable` oder die Markerdatei](docs/PORTABLE_MODE.md)
+speichert neue Daten stattdessen beim Programm; vorhandene Profile werden nicht
+automatisch übernommen. Der weitere Ausbau steht im [Windows-Plan](docs/WINDOWS_ROADMAP.md).
 
 Die historischen Datei- und Ordnernamen `nanoboy` bleiben im Quellbaum erhalten; das Produkt heißt **AetherBoy**.
 
@@ -320,7 +355,9 @@ bleiben in diesem Update unverändert. [Kompatibilitätsdetails](docs/WINDOWS_DE
 
 **GBA:** Ein vendorter, MIT-lizenzierter [GBADotnet-Kern](third_party/GBADotnet.Core/README.md) ist an Bild, Eingabe, Audio, SRAM/Flash/EEPROM/RTC, Save States und Rewind angebunden. Vollständig zyklusgenaues Timing, weitere Renderer-Grenzfälle und breitere Praxistests stehen noch aus.
 
-**Weitere Grenzen:** Game Genie ist deaktiviert. Cheats sind nur teilweise unterstützt; Action Replay/PAR v3 fehlt. Das experimentelle [Local Link Lab für GB/GBC/GBA](docs/LOCAL_LINK_LAB.md) unter Windows ist noch nicht mit kommerziellen Spielen validiert. Separate [GB/GBC-Online-Link](docs/ONLINE_LINK_HANDOFF.md)- und [GBA-Pokémon-Gen3-Onlineprofile](docs/GBA_ONLINE_HANDOFF.md) sind Entwicklungstests, kein bestätigter Pokémon-Tauschrelease. Universelles GBA-Netzwerk, GBA-Wireless, Joybus und Vier-Spieler-Link fehlen; GBA lässt sich nicht mit GB/GBC koppeln. Der Debugger bleibt experimentell.
+**Sitzungs-Cheats:** Die [Support-Matrix](docs/CHEAT_SUPPORT.md) beschreibt GB-/GBC-GameShark-`01`-Schreibcodes, CodeBreaker, Rohadressen und Game Genie mit sechs/neun Zeichen. GBA unterstützt CodeBreaker-Masterstreams, GameShark v1/v2 und Action Replay v3 samt Bedingungen, Füllbefehlen, Hooks, indirekten Schreibzugriffen und reversiblen ROM-Änderungen im Speicher. Beide Oberflächen verwenden dieselben Decoder, Formatwahl und virtuelle Gerätetaste. Sets werden nicht dauerhaft gespeichert; passende Spielversion und erforderliche Mastercodes liegen beim Nutzer. Einzelne Spezialbefehle und GB-Bankwechselvarianten fehlen weiterhin. Erfolgreiches Einlesen beweist keine korrekte Wirkung im Spiel.
+
+**Weitere Grenzen:** Das experimentelle [Local Link Lab für GB/GBC/GBA](docs/LOCAL_LINK_LAB.md) unter Windows/Linux ist noch nicht mit kommerziellen Spielen validiert. Separate [GB/GBC-Online-Link](docs/ONLINE_LINK_HANDOFF.md)- und [GBA-Pokémon-Gen3-Onlineprofile](docs/GBA_ONLINE_HANDOFF.md) sind Entwicklungstests, kein bestätigter Pokémon-Tauschrelease. Universelles GBA-Netzwerk, GBA-Wireless, Joybus und Vier-Spieler-Link fehlen; GBA lässt sich nicht mit GB/GBC koppeln. Der Debugger bleibt experimentell.
 
 Details und reproduzierbare Ergebnisse: [Kompatibilitätsmatrix](COMPATIBILITY.md) · [GBA-Status](GBA.md) · [Projektstatus](docs/PROJECT_STATUS_DE.md).
 
@@ -376,6 +413,7 @@ Dieser Lern- und Regressionpfad schreibt `artifacts/gba-prototype.bmp`. Er ist v
 
 | Thema | Einstieg |
 | --- | --- |
+| Neueste Stabilisierung und Prüfgrenzen | [Speicherabschluss, Fehlerbehandlung und Sprache (DE/EN)](docs/STABILIZATION_2026-10-02.md) |
 | Aktuelles Windows-Entwicklungspaket | [DE/EN-Übergabe, gemeinsame Schnittstellen, Tests und nächste Schritte](docs/WINDOWS_DEVELOPMENT_HANDOFF.md) |
 | Projektstand und nächste Schritte | [Deutsch](docs/PROJECT_STATUS_DE.md) · [English](docs/PROJECT_STATUS_EN.md) |
 | Linux einrichten und bedienen | [Wayland / Hyprland (DE)](docs/LINUX_WAYLAND.md) · [User Guide (EN)](docs/LINUX_USER_GUIDE.md) |

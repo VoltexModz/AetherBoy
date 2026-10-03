@@ -23,6 +23,10 @@ public sealed class WindowsStorageTests
     {
         // UI smoke tests must never change a real player's settings, ROMs or history.
         WindowsDataPaths.Default = new WindowsDataPaths(Path.Combine(TestRoot, "ui"));
+        // Existing copy assertions have a deterministic baseline on English CI
+        // hosts too. Dedicated language tests cover both overrides and OS cultures.
+        AetherBoy.Runtime.Localization.UiText.Initialize("de");
+        IsolatedDiscordClient.Install(); // UI tests must never publish synthetic game activity.
     }
 
     [AssemblyCleanup]
@@ -189,6 +193,7 @@ public sealed class WindowsStorageTests
         {
             settings.AudioVolume = 37;
             settings.KeyL = Keys.F2;
+            settings.FlushPendingSavesAsync().GetAwaiter().GetResult();
             Assert.IsTrue(File.Exists(WindowsDataPaths.Default.SettingsFile));
             nanoboy.Properties.Settings.Default.Reload();
             Assert.AreEqual(37, settings.AudioVolume);
@@ -198,6 +203,7 @@ public sealed class WindowsStorageTests
         {
             settings.AudioVolume = originalVolume;
             settings.KeyL = originalKey;
+            settings.Dispose();
         }
     }
 

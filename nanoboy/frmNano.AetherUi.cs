@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using AetherBoy.Runtime;
@@ -25,6 +26,7 @@ namespace nanoboy
 
         private bool aetherShellInitialized;
         private Panel aetherRoot = null!;
+        private AetherSaveNotice settingsSaveNotice = null!;
         private AetherChromePanel aetherTitleBar = null!;
         private AetherStagePanel aetherStage = null!;
         private Panel aetherEmptyState = null!;
@@ -61,8 +63,6 @@ namespace nanoboy
         {
             SuspendLayout();
 
-            menuStrip.Visible = false;
-            menuStrip.Dock = DockStyle.None;
             FormBorderStyle = FormBorderStyle.None;
             KeyPreview = true;
             AllowDrop = true;
@@ -84,6 +84,9 @@ namespace nanoboy
 
             aetherRoot.Controls.Add(content);
             aetherRoot.Controls.Add(commandDeck);
+            settingsSaveNotice = new AetherSaveNotice(() => settings.FlushPendingSavesAsync(),
+                error => testerSession?.RecordException("settings.retry_save_failed", error)) { Dock = DockStyle.Top };
+            aetherRoot.Controls.Add(settingsSaveNotice);
             aetherRoot.Controls.Add(aetherTitleBar);
             Controls.Add(aetherRoot);
             aetherRoot.BringToFront();
@@ -92,6 +95,8 @@ namespace nanoboy
             DragDrop += frmNano_DragDrop;
             Resize += frmNano_AetherResize;
 
+            aetherUiScale = settings.UiScalePercent / 100f;
+            InterfaceScale.Apply(aetherRoot, aetherUiScale);
             aetherShellInitialized = true;
             ClientSize = GetAetherClientSize(settings.VideoScaleFactor);
             UpdateAetherSessionUi(null);
@@ -104,6 +109,7 @@ namespace nanoboy
             {
                 Dock = DockStyle.Top,
                 Height = 64,
+                Padding = new Padding(0, 0, 0, 2), // Keep the accent line below docked title-bar children.
                 Name = "aetherTitleBar"
             };
 
@@ -175,10 +181,11 @@ namespace nanoboy
                 WrapContents = false,
                 Width = 330
             };
-            navigation.Controls.Add(CreateNavButton("GAME", menuFile, "SYSTEM"));
-            navigation.Controls.Add(CreateNavButton("VIDEO", menuItem1, "TUNE"));
-            navigation.Controls.Add(CreateNavButton("TOOLS", menuItem21, "TOOLS"));
-            navigation.Controls.Add(CreateNavButton("HELP", menuItem4, "INFO"));
+            navigation.Controls.Add(CreateNavButton(global::AetherBoy.Runtime.Localization.UiText.Get("GAME"), menuFile, "SYSTEM"));
+            navigation.Controls.Add(CreateNavButton(global::AetherBoy.Runtime.Localization.UiText.Get("VIDEO"), menuItem1, "TUNE"));
+            navigation.Controls.Add(CreateNavButton(global::AetherBoy.Runtime.Localization.UiText.Get("TOOLS"), menuItem21, "TOOLS"));
+            navigation.Controls.Add(CreateNavButton(global::AetherBoy.Runtime.Localization.UiText.Get("HELP"), menuItem4, "INFO"));
+            navigation.Width = navigation.Padding.Horizontal + navigation.Controls.Cast<Control>().Sum(button => button.Width + button.Margin.Horizontal);
 
             titleBar.Controls.Add(navigation);
             titleBar.Controls.Add(windowControls);
@@ -226,8 +233,15 @@ namespace nanoboy
             aetherEmptyState.BringToFront();
 
             aetherSessionRail = BuildSessionRail();
+            aetherSessionRail.Dock = DockStyle.None;
+            var railViewport = new AetherScrollViewport { Dock = DockStyle.Fill, Margin = Padding.Empty,
+                Name = "aetherSessionRailViewport" };
+            railViewport.SetContent(aetherSessionRail, new Size(0, 438));
+            void FitRail() => railViewport.SetMinimumContent(new Size(0,
+                (int)Math.Ceiling(438 * aetherUiScale * DeviceDpi / 96f)));
+            railViewport.SizeChanged += (_, _) => FitRail();
             layout.Controls.Add(aetherStage, 0, 0);
-            layout.Controls.Add(aetherSessionRail, 1, 0);
+            layout.Controls.Add(railViewport, 1, 0);
             contentHost.Controls.Add(layout);
             return contentHost;
         }
@@ -265,7 +279,7 @@ namespace nanoboy
             };
             mark.Disposed += (_, _) => mark.Image?.Dispose();
             var headline = CreateUiLabel(
-                "Ready for your next game?",
+                global::AetherBoy.Runtime.Localization.UiText.Get("Ready for your next game?"),
                 15f,
                 FontStyle.Bold,
                 AetherColors.Text,
@@ -273,18 +287,18 @@ namespace nanoboy
                 34,
                 ContentAlignment.MiddleCenter);
             var copy = CreateUiLabel(
-                "Open a game or drop a .gb, .gbc or .gba file here.",
+                global::AetherBoy.Runtime.Localization.UiText.Get("Open a game or drop a .gb, .gbc or .gba file here."),
                 9f,
                 FontStyle.Regular,
                 AetherColors.Muted,
                 DockStyle.Fill,
                 48,
                 ContentAlignment.TopCenter);
-            aetherOpenButton = CreateActionButton("Open game", AetherButtonKind.Primary, 158);
+            aetherOpenButton = CreateActionButton(global::AetherBoy.Runtime.Localization.UiText.Get("Spiel öffnen"), AetherButtonKind.Primary, 158);
             aetherOpenButton.Anchor = AnchorStyles.None;
             aetherOpenButton.Click += (_, _) => OpenRomFromAetherUi();
             var hint = CreateUiLabel(
-                "SHORTCUT: CTRL+O",
+                global::AetherBoy.Runtime.Localization.UiText.Get("SHORTCUT: CTRL+O"),
                 8.5f,
                 FontStyle.Bold,
                 AetherColors.Muted,
@@ -321,6 +335,7 @@ namespace nanoboy
                 Dock = DockStyle.Fill,
                 RowCount = 13
             };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
@@ -335,32 +350,35 @@ namespace nanoboy
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36f));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36f));
 
-            layout.Controls.Add(CreateUiLabel("NOW PLAYING", 8.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 24), 0, 0);
-            aetherRomTitle = CreateUiLabel("No game open", 12f, FontStyle.Bold, AetherColors.Text, DockStyle.Fill, 58);
+            layout.Controls.Add(CreateUiLabel(global::AetherBoy.Runtime.Localization.UiText.Get("NOW PLAYING"), 8.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 24), 0, 0);
+            aetherRomTitle = CreateUiLabel(global::AetherBoy.Runtime.Localization.UiText.Get("No game open"), 12f, FontStyle.Bold, AetherColors.Text, DockStyle.Fill, 58);
             aetherRomTitle.AutoEllipsis = true;
             layout.Controls.Add(aetherRomTitle, 0, 1);
 
             var stateRow = new Panel { BackColor = AetherColors.Surface, Dock = DockStyle.Fill };
             aetherStatusDot = new AetherStatusDot { Location = new Point(0, 8) };
-            aetherStateValue = CreateUiLabel("Ready", 8.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 30);
+            aetherStateValue = CreateUiLabel(global::AetherBoy.Runtime.Localization.UiText.Get("Ready"), 8.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 30);
             aetherStateValue.Padding = new Padding(22, 0, 0, 0);
             stateRow.Controls.Add(aetherStateValue);
             stateRow.Controls.Add(aetherStatusDot);
             layout.Controls.Add(stateRow, 0, 2);
 
             layout.Controls.Add(CreateDivider(), 0, 3);
-            layout.Controls.Add(CreateMetricRow("System", out aetherModelValue), 0, 4);
+            layout.Controls.Add(CreateMetricRow(global::AetherBoy.Runtime.Localization.UiText.Get("System"), out aetherModelValue), 0, 4);
             layout.Controls.Add(CreateMetricRow("Audio", out aetherAudioValue), 0, 5);
-            layout.Controls.Add(CreateMetricRow("Video", out aetherFilterValue), 0, 6);
-            layout.Controls.Add(CreateMetricRow("Controls", out aetherInputValue), 0, 7);
+            layout.Controls.Add(CreateMetricRow(global::AetherBoy.Runtime.Localization.UiText.Get("Video"), out aetherFilterValue), 0, 6);
+            layout.Controls.Add(CreateMetricRow(global::AetherBoy.Runtime.Localization.UiText.Get("Controls"), out aetherInputValue), 0, 7);
             aetherInputValue.AutoEllipsis = true;
             layout.Controls.Add(CreateMetricRow("Slot", out aetherSlotValue), 0, 8);
-            layout.Controls.Add(CreateUiLabel("SAVE SLOT", 8.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 30), 0, 9);
+            layout.Controls.Add(CreateUiLabel(global::AetherBoy.Runtime.Localization.UiText.Get("SAVE SLOT"), 8.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 30), 0, 9);
 
             var slots = new FlowLayoutPanel
             {
                 BackColor = AetherColors.Surface,
                 Dock = DockStyle.Fill,
+                // The 36px row includes 5px top padding and 30px buttons.
+                // Default 3px table-cell margins would clip their lower edge.
+                Margin = Padding.Empty,
                 FlowDirection = FlowDirection.LeftToRight,
                 Padding = new Padding(0, 5, 0, 0),
                 WrapContents = false
@@ -384,16 +402,17 @@ namespace nanoboy
             layout.Controls.Add(slots, 0, 11);
 
             aetherSaveSafetyButton = CreateActionButton(
-                "Manage saves",
+                global::AetherBoy.Runtime.Localization.UiText.Get("Manage saves"),
                 AetherButtonKind.Ghost,
                 190);
             aetherSaveSafetyButton.Dock = DockStyle.Bottom;
+            aetherSaveSafetyButton.MinimumSize = new Size(0, 38);
             aetherSaveSafetyButton.Margin = Padding.Empty;
             aetherSaveSafetyButton.Click += (_, args) => menuBatterySaveSafety_Click(aetherSaveSafetyButton, args);
             layout.Controls.Add(aetherSaveSafetyButton, 0, 10);
 
             var hint = CreateUiLabel(
-                "F5 save · F8 load\r\nF10 quick menu",
+                global::AetherBoy.Runtime.Localization.UiText.Get("F5 save · F8 load\r\nF10 quick menu"),
                 8.5f,
                 FontStyle.Bold,
                 AetherColors.Muted,
@@ -423,32 +442,30 @@ namespace nanoboy
                 Margin = Padding.Empty,
                 Padding = Padding.Empty
             };
-            foreach (float width in new[] { 17f, 14f, 10f, 12f, 12f, 10f, 10f, 15f })
-                commands.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, width));
             commands.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
-            aetherDeckOpenButton = CreateActionButton("Open game", AetherButtonKind.Primary, 126);
+            aetherDeckOpenButton = CreateActionButton(global::AetherBoy.Runtime.Localization.UiText.Get("Spiel öffnen"), AetherButtonKind.Primary, 126);
             aetherDeckOpenButton.Click += (_, _) => OpenRomFromAetherUi();
-            aetherControlCenterButton = CreateActionButton("Settings", AetherButtonKind.Secondary, 94);
+            aetherControlCenterButton = CreateActionButton(global::AetherBoy.Runtime.Localization.UiText.Get("Settings"), AetherButtonKind.Secondary, 94);
             aetherControlCenterButton.Click += (_, _) => OpenControlCenter();
-            AetherButton quick = CreateActionButton("Quick", AetherButtonKind.Secondary, 82);
+            AetherButton quick = CreateActionButton(global::AetherBoy.Runtime.Localization.UiText.Get("Quick"), AetherButtonKind.Secondary, 82);
             quick.Name = "aetherQuickMenuButton";
             quick.Click += (_, _) => _ = OpenQuickMenuAsync();
             aetherPauseButton = CreateActionButton("Pause", AetherButtonKind.Secondary, 92);
             aetherPauseButton.Click += aetherPauseButton_Click;
-            aetherRewindButton = CreateActionButton("Rewind", AetherButtonKind.Secondary, 94);
+            aetherRewindButton = CreateActionButton(global::AetherBoy.Runtime.Localization.UiText.Get("Rewind"), AetherButtonKind.Secondary, 94);
             aetherRewindButton.Click += (_, args) =>
             {
                 menuRewind_Click(aetherRewindButton, args);
                 gameView.Focus();
             };
-            aetherSaveButton = CreateActionButton("Save", AetherButtonKind.Secondary, 82);
+            aetherSaveButton = CreateActionButton(global::AetherBoy.Runtime.Localization.UiText.Get("Save"), AetherButtonKind.Secondary, 82);
             aetherSaveButton.Click += (_, _) =>
             {
                 QuickSave();
                 gameView.Focus();
             };
-            aetherLoadButton = CreateActionButton("Load", AetherButtonKind.Secondary, 82);
+            aetherLoadButton = CreateActionButton(global::AetherBoy.Runtime.Localization.UiText.Get("Load"), AetherButtonKind.Secondary, 82);
             aetherLoadButton.Click += (_, _) =>
             {
                 QuickLoad();
@@ -466,6 +483,35 @@ namespace nanoboy
                 commands.Controls.Add(actions[index], index, 0);
             }
             deck.Controls.Add(commands);
+            bool arranging = false;
+            void ArrangeCommands()
+            {
+                if (arranging || commands.ClientSize.Width == 0) return;
+                arranging = true;
+                try
+                {
+                    int[] widths = actions.Select(button => TextRenderer.MeasureText(button.Text, button.Font,
+                        Size.Empty, TextFormatFlags.NoPadding).Width + (int)Math.Ceiling(button.Font.Height * 1.8) + button.Margin.Horizontal).ToArray();
+                    int columns = widths.Sum() <= commands.ClientSize.Width ? 8 : 4;
+                    commands.SuspendLayout();
+                    commands.ColumnCount = columns;
+                    commands.RowCount = 8 / columns;
+                    commands.ColumnStyles.Clear();
+                    commands.RowStyles.Clear();
+                    for (int column = 0; column < columns; column++)
+                        commands.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,
+                            columns == 8 ? widths[column] : Math.Max(widths[column], widths[column + 4])));
+                    for (int row = 0; row < commands.RowCount; row++)
+                        commands.RowStyles.Add(new RowStyle(SizeType.Percent, 1));
+                    for (int index = 0; index < actions.Length; index++)
+                        commands.SetCellPosition(actions[index], new TableLayoutPanelCellPosition(index % columns, index / columns));
+                    deck.Height = deck.Padding.Vertical + commands.RowCount * (actions[0].Font.Height + 26);
+                    commands.ResumeLayout(true);
+                }
+                finally { arranging = false; }
+            }
+            commands.SizeChanged += (_, _) => ArrangeCommands();
+            foreach (AetherButton action in actions) action.FontChanged += (_, _) => ArrangeCommands();
             return deck;
         }
 
@@ -482,9 +528,10 @@ namespace nanoboy
             return button;
         }
 
-        private AetherButton CreateNavButton(string text, ToolStripMenuItem menu, string identity)
+        private AetherButton CreateNavButton(string text, nanoboy.Controls.AetherCommand menu, string identity)
         {
             AetherButton button = CreateActionButton(text, AetherButtonKind.Ghost, 72);
+            button.Width = Math.Max(72, TextRenderer.MeasureText(text, button.Font, Size.Empty, TextFormatFlags.NoPadding).Width + 24);
             button.Height = 34;
             button.Margin = new Padding(2, 0, 2, 0);
             button.Name = "aetherNav" + identity;
@@ -578,17 +625,23 @@ namespace nanoboy
                 return;
             }
 
-            aetherInputValue.Text = state.IsConnected ? "Gamepad" : "Keyboard";
+            aetherInputValue.Text = state.IsConnected ? global::AetherBoy.Runtime.Localization.UiText.Get("Gamepad") : global::AetherBoy.Runtime.Localization.UiText.Get("Keyboard");
         }
 
         private void OpenRomFromAetherUi()
         {
+            if (romPreparation != null)
+            {
+                CancelRomPreparation();
+                return;
+            }
             menuOpen_Click(this, EventArgs.Empty);
             gameView.Focus();
         }
 
         private void aetherPauseButton_Click(object? sender, EventArgs e)
         {
+            focusPausedSession = null; // An explicit user decision takes over from automatic focus pause.
             if (stateOperationInProgress) return;
             EmulationSession? currentSession = session;
             if (currentSession == null)
@@ -633,34 +686,36 @@ namespace nanoboy
 
             aetherRomTitle.Text = snapshot?.Rom?.Title?.Trim() is { Length: > 0 } title
                 ? title
-                : hasSession ? "Loading game" : "No game open";
+                : hasSession ? global::AetherBoy.Runtime.Localization.UiText.Get("Loading game") : global::AetherBoy.Runtime.Localization.UiText.Get("No game open");
             aetherModelValue.Text = snapshot?.Rom == null
                 ? "—"
                 : snapshot.Rom.IsGameBoyAdvance
                     ? "GBA"
                     : snapshot.Rom.HasColorFeatures ? "CGB" : "DMG";
-            aetherAudioValue.Text = settings.AudioEnable ? "On" : "Muted";
+            aetherAudioValue.Text = settings.AudioEnable ? global::AetherBoy.Runtime.Localization.UiText.Get("On") : global::AetherBoy.Runtime.Localization.UiText.Get("Muted");
             aetherFilterValue.Text = gameView.Filter switch
             {
-                GameDisplayFilter.Smooth => "Smooth",
-                GameDisplayFilter.LcdGrid => "LCD grid",
-                _ => "Sharp"
+                GameDisplayFilter.Smooth => global::AetherBoy.Runtime.Localization.UiText.Get("Smooth"),
+                GameDisplayFilter.LcdGrid => global::AetherBoy.Runtime.Localization.UiText.Get("LCD grid"),
+                _ => global::AetherBoy.Runtime.Localization.UiText.Get("Sharp")
             };
             aetherSlotValue.Text = settings.SaveSlot.ToString();
 
             SessionState? state = snapshot?.State;
             string stateText = state switch
             {
-                SessionState.Starting => "Loading",
+                SessionState.Starting => global::AetherBoy.Runtime.Localization.UiText.Get("Lädt"),
                 SessionState.Running when snapshot?.IsTurboEnabled == true => "Turbo",
-                SessionState.Running => "Playing",
-                SessionState.Paused => "Paused",
-                SessionState.Stopping => "Stopping",
-                SessionState.Stopped => "Stopped",
-                SessionState.Faulted => "Error",
-                _ => "Ready"
+                SessionState.Running => global::AetherBoy.Runtime.Localization.UiText.Get("Spielt"),
+                SessionState.Paused => global::AetherBoy.Runtime.Localization.UiText.Get("Pausiert"),
+                SessionState.Stopping => global::AetherBoy.Runtime.Localization.UiText.Get("Beendet…"),
+                SessionState.Stopped => global::AetherBoy.Runtime.Localization.UiText.Get("Beendet"),
+                SessionState.Faulted => global::AetherBoy.Runtime.Localization.UiText.Get("Fehler"),
+                _ => global::AetherBoy.Runtime.Localization.UiText.Get("Bereit")
             };
-            aetherStateValue.Text = stateText;
+            aetherStateValue.Text = hasRom && !IsOnlineLink
+                ? stateText + " · " + frmRomLibrary.FormatTime(sessionPlaySeconds)
+                : stateText;
             aetherStatusDot.SignalColor = state switch
             {
                 SessionState.Running => snapshot?.IsTurboEnabled == true ? AetherColors.Cyan : AetherColors.Success,
@@ -700,7 +755,7 @@ namespace nanoboy
             menuAudioInspector.Enabled = (features & EmulationFeature.AudioInspector) != 0;
             aetherDeckOpenButton.Kind = hasRom ? AetherButtonKind.Secondary : AetherButtonKind.Primary;
             aetherPauseButton.Kind = hasRom ? AetherButtonKind.Primary : AetherButtonKind.Secondary;
-            aetherPauseButton.Text = snapshot?.IsPaused == true ? "Resume" : "Pause";
+            aetherPauseButton.Text = snapshot?.IsPaused == true ? global::AetherBoy.Runtime.Localization.UiText.Get("Resume") : "Pause";
             aetherPauseButton.Selected = snapshot?.IsPaused == true;
             aetherTurboButton.Selected = snapshot?.IsTurboEnabled == true;
             UpdateAetherSlotButtons();
@@ -728,7 +783,7 @@ namespace nanoboy
         {
             if (TryGetDroppedRom(e.Data, out string? path))
             {
-                LoadRomFile(path);
+                _ = PrepareRomLoadAsync(path);
                 gameView.Focus();
             }
         }
@@ -793,22 +848,32 @@ namespace nanoboy
             Size logicalSize = new Size(
                 Math.Max(860, displayWidth + 330),
                 Math.Max(646, displayHeight + 228));
-            double dpiScale = IsHandleCreated ? DeviceDpi / 96d : 1d;
+            double dpiScale = (IsHandleCreated ? DeviceDpi / 96d : 1d) * aetherUiScale;
             return new Size((int)Math.Round(logicalSize.Width * dpiScale),
                 (int)Math.Round(logicalSize.Height * dpiScale));
         }
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            if (bootIntro is not null && keyData != (Keys.Alt | Keys.F4))
+            {
+                if (keyData is Keys.Escape or Keys.Enter or Keys.Space) bootIntro.Skip();
+                return true;
+            }
             FinishStoppedOnlineLink();
+            if (keyData == (Keys.Control | Keys.Shift | Keys.F11) && sofaMode) { ExitSofaMode(); return true; }
+            if (sofaMode && keyData == Keys.Escape) { _ = OpenQuickMenuAsync(); return true; }
             if (keyData == (Keys.Control | Keys.F10)) { ShowOnlineRoomDialog(true); return true; }
             if (keyData == (Keys.Control | Keys.Shift | Keys.F10)) { ShowOnlineRoomDialog(false); return true; }
             if (aetherCommandMenu is not null) return aetherCommandMenu.HandleNavigation(keyData);
             if (keyData == Keys.F10) { _ = OpenQuickMenuAsync(); return true; }
             if (keyData == Keys.F12) { _ = CaptureScreenshotAsync(); return true; }
             if (keyData == Keys.F9) { TogglePerformanceOverlay(); return true; }
+            if (keyData == Keys.F7) { menuRewind_Click(this, EventArgs.Empty); return true; }
+            if (keyData == (Keys.Control | Keys.K)) { OpenControlCenter(); controlCenter.FocusSettingsSearch(); return true; }
             if (keyData == Keys.F11 || keyData == (Keys.Alt | Keys.Enter))
             {
+                if (sofaMode) { ExitSofaMode(); return true; }
                 ToggleAetherFullscreen();
                 return true;
             }

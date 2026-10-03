@@ -19,6 +19,7 @@ public sealed class GbaOnlineTests
     private static readonly TimeSpan Deadline = TimeSpan.FromSeconds(12);
     private string directory = null!;
     private readonly List<EmulationSession> ownedSessions = [];
+    public TestContext TestContext { get; set; } = null!;
     [TestInitialize] public void Initialize() => directory = Directory.CreateTempSubdirectory("aether-gba-online-").FullName;
     [TestCleanup]
     public void Cleanup()
@@ -401,17 +402,45 @@ public sealed class GbaOnlineTests
             await Task.Delay(5);
         }
     }
-    private static async Task Stop(EmulationSession session)
+    private async Task Stop(EmulationSession session)
     {
-        try { await session.ShutdownAsync().WaitAsync(Deadline); }
+        Task shutdown = session.ShutdownAsync();
+        using var stopObserver = new CancellationTokenSource();
+        Thread? observer = null;
+        if (Environment.GetEnvironmentVariable("AETHERBOY_SHUTDOWN_STACK_TOOL") is { Length: > 0 } tool)
+        {
+            // A dedicated observer still runs if the test thread pool is starved.
+            // Capture before the deadline; a green rerun is not evidence of a fix.
+            observer = new Thread(() =>
+            {
+                if (stopObserver.Token.WaitHandle.WaitOne(2000) || shutdown.IsCompleted) return;
+                TestContext.WriteLine($"Slow GBA shutdown: pid={Environment.ProcessId}, owner={session.OwnerThreadId}, state={session.State}, online={session.OnlineLink?.Phase}, storage={string.Join("; ", nanoboy.Core.BatterySaveStore.GetActiveWrites())}");
+                try
+                {
+                    var start = new ProcessStartInfo(tool) { UseShellExecute = false, CreateNoWindow = true,
+                        RedirectStandardOutput = true, RedirectStandardError = true };
+                    start.ArgumentList.Add("report"); start.ArgumentList.Add("--process-id");
+                    start.ArgumentList.Add(Environment.ProcessId.ToString());
+                    using var capture = Process.Start(start)!;
+                    Task<string> output = capture.StandardOutput.ReadToEndAsync();
+                    Task<string> error = capture.StandardError.ReadToEndAsync();
+                    if (capture.WaitForExit(5000)) TestContext.WriteLine(output.GetAwaiter().GetResult() + error.GetAwaiter().GetResult());
+                    else { capture.Kill(); capture.WaitForExit(); }
+                }
+                catch (Exception error) { TestContext.WriteLine("Optional shutdown stack unavailable: " + error.GetType().Name); }
+            }) { IsBackground = true, Name = "AetherBoy GBA online shutdown observer" };
+            observer.Start();
+        }
+        try { await shutdown.WaitAsync(Deadline); }
         catch (TimeoutException error)
         {
             throw new TimeoutException($"GBA shutdown timed out: owner={session.OwnerThreadId}, state={session.State}, " +
                 $"online={session.OnlineLink?.Phase}, transfers={session.OnlineLink?.TransfersCompleted}, " +
                 $"sent={session.OnlineLink?.CommandsSent}, received={session.OnlineLink?.CommandsReceived}, " +
-                $"delivered={session.OnlineLink?.CommandsDelivered}, fault={session.Fault?.GetType().Name ?? "none"}.", error);
+                $"delivered={session.OnlineLink?.CommandsDelivered}, fault={session.Fault?.GetType().Name ?? "none"}, storage={string.Join("; ", nanoboy.Core.BatterySaveStore.GetActiveWrites())}.", error);
         }
         catch (Exception) when (session.State == SessionState.Faulted) { _ = session.Completion.Exception; }
+        finally { stopObserver.Cancel(); observer?.Join(TimeSpan.FromSeconds(6)); }
     }
 
     private sealed class DelayedTransport(int delay, bool jitter = false) : IOnlineLinkTransport

@@ -29,7 +29,7 @@ internal sealed class LinuxWavRecorder : IDisposable
     public void Submit(float[] samples, int sampleRate, int channelCount)
     {
         if (sampleRate != rate || channelCount != channels)
-        { Error = "Audio format changed; recording finished."; queue.Writer.TryComplete(); return; }
+        { Error = global::AetherBoy.Runtime.Localization.UiText.Get("Audio format changed; recording finished."); queue.Writer.TryComplete(); return; }
         if (!queue.Writer.TryWrite(samples)) Interlocked.Increment(ref dropped);
     }
 
@@ -45,7 +45,7 @@ internal sealed class LinuxWavRecorder : IDisposable
                 await foreach (float[] block in queue.Reader.ReadAllAsync())
                 {
                     if (bytes + block.Length * 2L > 128 * 1024 * 1024)
-                    { Error = "Recording reached its 128 MiB limit."; break; }
+                    { Error = global::AetherBoy.Runtime.Localization.UiText.Get("Recording reached its 128 MiB limit."); break; }
                     foreach (float sample in block) binary.Write((short)Math.Clamp((int)(sample * 32767), -32768, 32767));
                     bytes += (uint)block.Length * 2;
                 }

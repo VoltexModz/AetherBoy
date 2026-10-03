@@ -1,0 +1,19 @@
+AetherBoy includes adapted mGBA cheat decoding algorithms and reseed tables.
+Copyright (c) 2013-2016 Jeffrey Pfau
+License: Mozilla Public License 2.0 (see LICENSE.txt in this directory).
+
+Original project: https://github.com/mgba-emu/mgba
+Original files: src/gba/cheats/gameshark.c, parv3.c, codebreaker.c
+Reference: user-supplied mgba-master.zip reviewed on 2026-10-01.
+Archive SHA-256 is recorded in docs/MGBA_REVIEW.md in the source repository.
+
+Modified C# source (MPL-2.0):
+  nanoboy/Runtime/GbaCheatCipher.cs
+  nanoboy/Runtime/GbaCheatTables.cs
+Changes: managed arrays and spans, cloned per-set cipher state, bounded input
+and integration with AetherBoy's independently implemented cheat interpreter.
+
+Corresponding source is available in the AetherBoy repository:
+https://github.com/VoltexModz/AetherBoy
+Distributors must make the source of these covered files, including their
+modifications, available under MPL-2.0 alongside or with their release.

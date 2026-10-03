@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="{{language}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -18,32 +18,32 @@
 </head>
 <body>
 <main>
-  <header><div class="eyebrow">AetherBoy · Online Link</div><h1>Mitspieler verbinden</h1><p>Auf dieser Seite tauscht ihr die Verbindungsdaten aus. Danach spielt ihr im Emulator weiter.</p></header>
-  <div id="status" class="status" role="status" aria-live="polite">Lokale Verbindung wird vorbereitet …</div>
-  <p class="warning">Online Link ist noch in Entwicklung. Ein Pokémon-Tausch über das Internet ist nicht bestätigt. Nutzt Testspielstände. Für GBA lassen sich nur freigegebene Gen3-Spiele starten; Funkadapter werden nicht unterstützt. ROMs und vollständige Spielstände werden nicht übertragen.</p>
+  <header><div class="eyebrow">AetherBoy · Online Link</div><h1>{{ui:Mitspieler verbinden}}</h1><p>{{ui:Auf dieser Seite tauscht ihr die Verbindungsdaten aus. Danach spielt ihr im Emulator weiter.}}</p></header>
+  <div id="status" class="status" role="status" aria-live="polite">{{ui:Lokale Verbindung wird vorbereitet …}}</div>
+  <p class="warning">{{ui:Online Link ist noch in Entwicklung. Ein Pokémon-Tausch über das Internet ist nicht bestätigt. Nutzt Testspielstände. Für GBA lassen sich nur freigegebene Gen3-Spiele starten; Funkadapter werden nicht unterstützt. ROMs und vollständige Spielstände werden nicht übertragen.}}</p>
   <details>
-    <summary>Erweiterte Verbindungseinstellungen</summary>
-    <p>Ohne STUN oder TURN kommt die Verbindung nicht durch jeden Router. Wenn es nicht klappt, kannst du hier eigene Server eintragen. Ohne Eintrag wird kein öffentlicher Server kontaktiert.</p>
-    <div class="row"><div><label for="stun">STUN-Adresse (optional)</label><input id="stun" maxlength="512" placeholder="stun:dein-server:3478" autocomplete="off" spellcheck="false"></div><div><label for="turn">TURN-Adresse (optional)</label><input id="turn" maxlength="512" placeholder="turn:dein-server:3478" autocomplete="off" spellcheck="false"></div></div>
-    <div class="row"><div><label for="turnUser">TURN-Benutzername</label><input id="turnUser" maxlength="128" autocomplete="off" spellcheck="false"></div><div><label for="turnPassword">TURN-Passwort</label><input id="turnPassword" type="password" maxlength="256" autocomplete="off"></div></div>
-    <label><input id="serverConsent" type="checkbox">Diese Server kontaktieren. Der Anbieter kann meine IP-Adresse sehen; ein TURN-Server leitet verschlüsselte Daten weiter.</label>
-    <label><input id="relayOnly" type="checkbox">Nur über meinen TURN-Server verbinden.</label>
-    <p class="note">Einladung und Antwort können IP-Adressen enthalten. Teile sie nur mit deinem Mitspieler. Server-Zugangsdaten werden nicht in Einladung oder Antwort kopiert. Verbindungsdaten werden nicht automatisch gespeichert.</p>
+    <summary>{{ui:Erweiterte Verbindungseinstellungen}}</summary>
+    <p>{{ui:Ohne STUN oder TURN kommt die Verbindung nicht durch jeden Router. Wenn es nicht klappt, kannst du hier eigene Server eintragen. Ohne Eintrag wird kein öffentlicher Server kontaktiert.}}</p>
+    <div class="row"><div><label for="stun">{{ui:STUN-Adresse (optional)}}</label><input id="stun" maxlength="512" placeholder="{{ui:stun:dein-server:3478}}" autocomplete="off" spellcheck="false"></div><div><label for="turn">{{ui:TURN-Adresse (optional)}}</label><input id="turn" maxlength="512" placeholder="{{ui:turn:dein-server:3478}}" autocomplete="off" spellcheck="false"></div></div>
+    <div class="row"><div><label for="turnUser">{{ui:TURN-Benutzername}}</label><input id="turnUser" maxlength="128" autocomplete="off" spellcheck="false"></div><div><label for="turnPassword">{{ui:TURN-Passwort}}</label><input id="turnPassword" type="password" maxlength="256" autocomplete="off"></div></div>
+    <label><input id="serverConsent" type="checkbox">{{ui:Diese Server kontaktieren. Der Anbieter kann meine IP-Adresse sehen; ein TURN-Server leitet verschlüsselte Daten weiter.}}</label>
+    <label><input id="relayOnly" type="checkbox">{{ui:Nur über meinen TURN-Server verbinden.}}</label>
+    <p class="note">{{ui:Einladung und Antwort können IP-Adressen enthalten. Teile sie nur mit deinem Mitspieler. Server-Zugangsdaten werden nicht in Einladung oder Antwort kopiert. Verbindungsdaten werden nicht automatisch gespeichert.}}</p>
   </details>
   <div class="grid">
-    <section><h2>1 · Einladung austauschen</h2><p>Wenn du einlädst, erstelle eine Einladung. Wenn du beitrittst, füge die Einladung unten ein und erstelle eine Antwort. Wenn du eingeladen hast, füge die Antwort hier ein.</p>
-      <button id="offer" class="primary" disabled>Einladung erstellen</button>
-      <label for="remote">Einladung oder Antwort des Mitspielers</label><textarea id="remote" maxlength="131072" placeholder="Verbindungsdaten hier einfügen" autocomplete="off" spellcheck="false"></textarea>
-      <button id="answer" disabled>Aus Einladung eine Antwort erstellen</button><button id="accept" disabled>Antwort übernehmen</button>
+    <section><h2>{{ui:1 · Einladung austauschen}}</h2><p>{{ui:Wenn du einlädst, erstelle eine Einladung. Wenn du beitrittst, füge die Einladung unten ein und erstelle eine Antwort. Wenn du eingeladen hast, füge die Antwort hier ein.}}</p>
+      <button id="offer" class="primary" disabled>{{ui:Einladung erstellen}}</button>
+      <label for="remote">{{ui:Einladung oder Antwort des Mitspielers}}</label><textarea id="remote" maxlength="131072" placeholder="{{ui:Verbindungsdaten hier einfügen}}" autocomplete="off" spellcheck="false"></textarea>
+      <button id="answer" disabled>{{ui:Aus Einladung eine Antwort erstellen}}</button><button id="accept" disabled>{{ui:Antwort übernehmen}}</button>
     </section>
-    <section><h2>2 · Text an Mitspieler schicken</h2><p id="localHint">Deine Einladung oder Antwort erscheint hier, sobald sie fertig ist. Kopiere den Text und schick ihn deinem Mitspieler.</p>
-      <label for="local">Deine Verbindungsdaten</label><textarea id="local" readonly spellcheck="false" aria-describedby="localHint"></textarea><button id="copy" disabled>Verbindungsdaten kopieren</button>
-      <p class="note">Teile den kopierten Text, nicht die Adresse dieser Seite. Lass die Seite während des Spiels offen.</p>
+    <section><h2>{{ui:2 · Text an Mitspieler schicken}}</h2><p id="localHint">{{ui:Deine Einladung oder Antwort erscheint hier, sobald sie fertig ist. Kopiere den Text und schick ihn deinem Mitspieler.}}</p>
+      <label for="local">{{ui:Deine Verbindungsdaten}}</label><textarea id="local" readonly spellcheck="false" aria-describedby="localHint"></textarea><button id="copy" disabled>{{ui:Verbindungsdaten kopieren}}</button>
+      <p class="note">{{ui:Teile den kopierten Text, nicht die Adresse dieser Seite. Lass die Seite während des Spiels offen.}}</p>
     </section>
   </div>
-  <button id="disconnect" class="danger">Verbindung beenden</button>
-  <p class="note">Sobald hier „Verbunden“ steht, spiel im Emulator weiter. Beende die Sitzung zuerst dort. Wenn du diese Seite schließt, bricht die Verbindung sofort ab und das Tauschergebnis kann ungeklärt sein. Für einen neuen Versuch starte im Emulator eine neue Sitzung.</p>
-  <footer>Diese Seite läuft auf deinem Rechner. Es werden keine externen Skripte geladen.</footer>
+  <button id="disconnect" class="danger">{{ui:Verbindung beenden}}</button>
+  <p class="note">{{ui:Sobald hier „Verbunden“ steht, spiel im Emulator weiter. Beende die Sitzung zuerst dort. Wenn du diese Seite schließt, bricht die Verbindung sofort ab und das Tauschergebnis kann ungeklärt sein. Für einen neuen Versuch starte im Emulator eine neue Sitzung.}}</p>
+  <footer>{{ui:Diese Seite läuft auf deinem Rechner. Es werden keine externen Skripte geladen.}}</footer>
 </main>
 <script src="/bridge.js" defer></script>
 </body>

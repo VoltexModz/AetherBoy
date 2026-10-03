@@ -10,6 +10,7 @@ internal static class LinuxSettingsStore
     private sealed class Settings
     {
         public int Version { get; set; } = 1;
+        public string? DisplayLanguage { get; set; }
         public int AudioVolume { get; set; } = 75;
         public bool AudioEnabled { get; set; } = true;
         public Dictionary<LinuxInputAction, SDL.Scancode>? Keys { get; set; }
@@ -20,7 +21,12 @@ internal static class LinuxSettingsStore
         public Dictionary<string, LinuxGamepadProfile>? Gamepads { get; set; }
         public bool? RecordDiagnostics { get; set; }
         public bool UseFirmware { get; set; } = true;
+        public bool RumbleEnabled { get; set; } = true;
         public bool PauseOnFocusLoss { get; set; } = true;
+        public bool DiscordPresenceEnabled { get; set; } = true;
+        public bool UpdateCheckOnStartup { get; set; }
+        public bool DiscordShareGameTitle { get; set; }
+        public string? DiscordApplicationId { get; set; } = AetherBoy.Runtime.DiscordPresenceOptions.DefaultApplicationId;
         public int TextSize { get; set; } = 14;
         public int SaveSlot { get; set; } = 1;
         public bool PerformanceOverlay { get; set; }
@@ -42,13 +48,7 @@ internal static class LinuxSettingsStore
 
     public static string DefaultPath
     {
-        get
-        {
-            string? directory = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
-            if (string.IsNullOrWhiteSpace(directory) || !Path.IsPathFullyQualified(directory))
-                directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
-            return Path.Combine(directory, "aetherboy", "settings.json");
-        }
+        get => Path.Combine(LinuxDataPaths.Default.Config, "settings.json");
     }
 
     public static LinuxFrontendOptions Load(string path, out string? error)
@@ -59,7 +59,11 @@ internal static class LinuxSettingsStore
             var backup = LoadSingle(path + ".bak", out string? backupError);
             if (backupError is null)
             {
-                error = "Preferences recovered from the last readable backup.";
+                // Recovery must not resurrect a superseded opt-in to public activity sharing.
+                backup.DiscordPresenceEnabled = false;
+                backup.DiscordShareGameTitle = false;
+                backup.UpdateCheckOnStartup = false;
+                error = global::AetherBoy.Runtime.Localization.UiText.Get("Preferences recovered from the last readable backup.");
                 return backup;
             }
         }
@@ -73,13 +77,14 @@ internal static class LinuxSettingsStore
         try
         {
             using var stream = File.OpenRead(path);
-            if (stream.Length > 64 * 1024) throw new InvalidDataException("Settings file is too large.");
+            if (stream.Length > 64 * 1024) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Settings file is too large."));
             Settings saved = JsonSerializer.Deserialize<Settings>(stream, JsonOptions)
-                ?? throw new InvalidDataException("Settings file is empty.");
-            if (saved.Version != 1) throw new InvalidDataException("Unsupported settings version.");
+                ?? throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Settings file is empty."));
+            if (saved.Version != 1) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Unsupported settings version."));
             UiThemePalette theme = new(saved.UiPrimaryColor, saved.UiSecondaryColor, saved.UiBackgroundColor);
             var options = new LinuxFrontendOptions
             {
+                DisplayLanguage = AetherBoy.Runtime.Localization.UiText.NormalizePreference(saved.DisplayLanguage),
                 AudioEnabled = saved.AudioEnabled,
                 VideoFilter = Enum.IsDefined(saved.VideoFilter) ? saved.VideoFilter : LinuxVideoFilter.Sharp,
                 VideoScaling = Enum.IsDefined(saved.VideoScaling) ? saved.VideoScaling : LinuxVideoScaling.Automatic,
@@ -89,7 +94,12 @@ internal static class LinuxSettingsStore
                     .ToDictionary(pair => pair.Key, pair => (pair.Value ?? new LinuxGamepadProfile()).Validated()) ?? new(),
                 RecordDiagnostics = saved.RecordDiagnostics ?? LinuxBuildInfo.RecordByDefault,
                 UseFirmware = saved.UseFirmware,
+                RumbleEnabled = saved.RumbleEnabled,
                 PauseOnFocusLoss = saved.PauseOnFocusLoss,
+                DiscordPresenceEnabled = saved.DiscordPresenceEnabled,
+                UpdateCheckOnStartup = saved.UpdateCheckOnStartup,
+                DiscordShareGameTitle = saved.DiscordShareGameTitle,
+                DiscordApplicationId = AetherBoy.Runtime.DiscordPresenceOptions.IsValidApplicationId(saved.DiscordApplicationId) ? saved.DiscordApplicationId! : "",
                 SaveSlot = Math.Clamp(saved.SaveSlot, 1, 5),
                 TextSize = Math.Clamp(saved.TextSize, 14, 18),
                 PerformanceOverlay = saved.PerformanceOverlay,
@@ -107,8 +117,8 @@ internal static class LinuxSettingsStore
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException or JsonException)
         {
-            error = "Could not load preferences. Using defaults: " + exception.Message;
-            return new LinuxFrontendOptions();
+            error = global::AetherBoy.Runtime.Localization.UiText.Get("Could not load preferences. Using defaults: ") + global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(exception.Message);
+            return new LinuxFrontendOptions { DiscordPresenceEnabled = false, DiscordShareGameTitle = false };
         }
     }
 
@@ -117,6 +127,7 @@ internal static class LinuxSettingsStore
         UiThemePalette theme = new(options.UiPrimaryColor, options.UiSecondaryColor, options.UiBackgroundColor);
         return JsonSerializer.SerializeToUtf8Bytes(new Settings
         {
+            DisplayLanguage = AetherBoy.Runtime.Localization.UiText.NormalizePreference(options.DisplayLanguage),
             UiPrimaryColor = theme.Primary.Hex,
             UiSecondaryColor = theme.Secondary.Hex,
             UiBackgroundColor = theme.Background.Hex,
@@ -128,7 +139,12 @@ internal static class LinuxSettingsStore
             Gamepads = options.Gamepads,
             RecordDiagnostics = options.RecordDiagnostics,
             UseFirmware = options.UseFirmware,
+            RumbleEnabled = options.RumbleEnabled,
             PauseOnFocusLoss = options.PauseOnFocusLoss,
+            DiscordPresenceEnabled = options.DiscordPresenceEnabled,
+            UpdateCheckOnStartup = options.UpdateCheckOnStartup,
+            DiscordShareGameTitle = options.DiscordShareGameTitle,
+            DiscordApplicationId = options.DiscordApplicationId,
             SaveSlot = options.SaveSlot,
             TextSize = options.TextSize,
             PerformanceOverlay = options.PerformanceOverlay,

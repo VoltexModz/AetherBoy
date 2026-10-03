@@ -14,8 +14,8 @@ internal static class LinuxRomPath
         }
         string path = Path.GetFullPath(candidate);
         string extension = Path.GetExtension(path);
-        if (!new[] { ".gb", ".gbc", ".gba" }.Contains(extension, StringComparer.OrdinalIgnoreCase))
-            throw new NotSupportedException("Choose a .gb, .gbc or .gba file. Extract ZIP archives first.");
+        if (!new[] { ".gb", ".gbc", ".gba", ".zip", ".7z" }.Contains(extension, StringComparer.OrdinalIgnoreCase))
+            throw new NotSupportedException("Choose a GB, GBC, GBA, ZIP or 7z file.");
         if (!File.Exists(path))
             throw new FileNotFoundException("The ROM file could not be found. Choose it again.", path);
         return path;

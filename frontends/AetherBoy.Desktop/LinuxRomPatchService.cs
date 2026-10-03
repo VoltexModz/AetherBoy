@@ -15,17 +15,17 @@ internal sealed class LinuxRomPatchService(LinuxDataPaths paths)
 
     public LinuxPatchedRom ApplyAndImport(string sourcePath, string patchPath, bool reverseUps = false)
     {
-        if (!IsRomPath(sourcePath)) throw new InvalidDataException("Choose a .gb, .gbc or .gba source ROM.");
-        if (!IsPatchPath(patchPath)) throw new InvalidDataException("Choose an .ips, .bps or .ups patch; extract ZIP files first.");
+        if (!IsRomPath(sourcePath)) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Choose a .gb, .gbc or .gba source ROM."));
+        if (!IsPatchPath(patchPath)) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Choose an .ips, .bps or .ups patch; extract ZIP files first."));
         byte[] source = ReadBounded(sourcePath, RomPatcher.MaximumRomSize);
         string extension = Path.GetExtension(sourcePath).ToLowerInvariant();
         int minimum = extension == ".gba" ? 0xC0 : 0x150;
-        if (source.Length < minimum) throw new InvalidDataException("The source is too small for the selected cartridge format.");
+        if (source.Length < minimum) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("The source is too small for the selected cartridge format."));
         byte[] patch = ReadBounded(patchPath, RomPatcher.MaximumPatchSize);
         RomPatchResult result = RomPatcher.Apply(source, patch, reverseUps);
-        if (result.Image.Length < minimum) throw new InvalidDataException("The patch result is too small for this cartridge format.");
+        if (result.Image.Length < minimum) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("The patch result is too small for this cartridge format."));
         string sourceHash = Hash(source), targetHash = Hash(result.Image), patchHash = Hash(patch);
-        if (sourceHash == targetHash) throw new InvalidDataException("This patch makes no change. No duplicate was imported.");
+        if (sourceHash == targetHash) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("This patch makes no change. No duplicate was imported."));
 
         var library = new LinuxLibrary(paths);
         // An explicit UPS undo may return to an existing original. Preserve its path and metadata.
@@ -62,18 +62,18 @@ internal sealed class LinuxRomPatchService(LinuxDataPaths paths)
         }
         // Validate an existing result rather than overwriting it, including after concurrent imports.
         output = Directory.EnumerateFiles(destination).FirstOrDefault(file => IsRomPath(file) && Matches(file, targetHash))
-            ?? throw new InvalidDataException("The existing result folder contains no matching ROM. Its files were kept unchanged.");
+            ?? throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("The existing result folder contains no matching ROM. Its files were kept unchanged."));
         string? warning = null;
         try { library.Remember(targetHash, output); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        { warning = "Result saved, but the library could not be updated. Use OPEN RESULT or OPEN FOLDER."; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        { warning = global::AetherBoy.Runtime.Localization.UiText.Get("Result saved, but the library could not be updated. Use OPEN RESULT or OPEN FOLDER."); }
         return new(output, result.Format, result.ChecksumsVerified, result.Reversed, reused, warning);
     }
 
     private static byte[] ReadBounded(string path, int maximum)
     {
         using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (input.Length <= 0 || input.Length > maximum) throw new InvalidDataException($"File must contain between 1 byte and {maximum / 1024 / 1024} MiB of data.");
+        if (input.Length <= 0 || input.Length > maximum) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Format("File must contain between 1 byte and {0} MiB of data.", maximum / 1024 / 1024));
         byte[] bytes = new byte[(int)input.Length]; input.ReadExactly(bytes); return bytes;
     }
 

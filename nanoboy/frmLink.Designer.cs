@@ -22,7 +22,7 @@ namespace nanoboy
             this.btnHost = new nanoboy.Controls.AetherButton();
             this.lblHostDesc = new System.Windows.Forms.Label();
             this.grpClient = new nanoboy.Controls.AetherGroupBox();
-            this.txtIP = new System.Windows.Forms.TextBox();
+            this.txtIP = new nanoboy.Controls.AetherTextBox();
             this.lblIP = new System.Windows.Forms.Label();
             this.btnConnect = new nanoboy.Controls.AetherButton();
             this.btnDisconnect = new nanoboy.Controls.AetherButton();
@@ -38,7 +38,7 @@ namespace nanoboy
             this.lblStatus.Name = "lblStatus";
             this.lblStatus.Size = new System.Drawing.Size(155, 17);
             this.lblStatus.TabIndex = 0;
-            this.lblStatus.Text = "Status: Nicht verbunden";
+            this.lblStatus.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Status: Nicht verbunden");
             //
             // grpHost
             //
@@ -49,7 +49,7 @@ namespace nanoboy
             this.grpHost.Size = new System.Drawing.Size(360, 75);
             this.grpHost.TabIndex = 1;
             this.grpHost.TabStop = false;
-            this.grpHost.Text = "Option 1: Als Host (Server) starten";
+            this.grpHost.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Option 1: Als Host (Server) starten");
             //
             // btnHost
             //
@@ -57,7 +57,7 @@ namespace nanoboy
             this.btnHost.Name = "btnHost";
             this.btnHost.Size = new System.Drawing.Size(110, 25);
             this.btnHost.TabIndex = 1;
-            this.btnHost.Text = "Host Starten";
+            this.btnHost.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Host Starten");
             this.btnHost.UseVisualStyleBackColor = true;
             this.btnHost.Click += new System.EventHandler(this.btnHost_Click);
             //
@@ -68,7 +68,7 @@ namespace nanoboy
             this.lblHostDesc.Name = "lblHostDesc";
             this.lblHostDesc.Size = new System.Drawing.Size(188, 15);
             this.lblHostDesc.TabIndex = 0;
-            this.lblHostDesc.Text = "Öffnet Server auf Port 8765 für LAN";
+            this.lblHostDesc.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Öffnet Server auf Port 8765 für LAN");
             //
             // grpClient
             //
@@ -80,7 +80,7 @@ namespace nanoboy
             this.grpClient.Size = new System.Drawing.Size(360, 80);
             this.grpClient.TabIndex = 2;
             this.grpClient.TabStop = false;
-            this.grpClient.Text = "Option 2: Mit Mitspieler verbinden (Client)";
+            this.grpClient.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Option 2: Mit Mitspieler verbinden (Client)");
             //
             // txtIP
             //
@@ -97,7 +97,7 @@ namespace nanoboy
             this.lblIP.Name = "lblIP";
             this.lblIP.Size = new System.Drawing.Size(65, 15);
             this.lblIP.TabIndex = 1;
-            this.lblIP.Text = "IP-Adresse:";
+            this.lblIP.Text = global::AetherBoy.Runtime.Localization.UiText.Get("IP-Adresse:");
             //
             // btnConnect
             //
@@ -105,7 +105,7 @@ namespace nanoboy
             this.btnConnect.Name = "btnConnect";
             this.btnConnect.Size = new System.Drawing.Size(110, 25);
             this.btnConnect.TabIndex = 0;
-            this.btnConnect.Text = "Verbinden";
+            this.btnConnect.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Verbinden");
             this.btnConnect.UseVisualStyleBackColor = true;
             this.btnConnect.Click += new System.EventHandler(this.btnConnect_Click);
             //
@@ -115,7 +115,7 @@ namespace nanoboy
             this.btnDisconnect.Name = "btnDisconnect";
             this.btnDisconnect.Size = new System.Drawing.Size(120, 25);
             this.btnDisconnect.TabIndex = 3;
-            this.btnDisconnect.Text = "Trennen";
+            this.btnDisconnect.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Trennen");
             this.btnDisconnect.UseVisualStyleBackColor = true;
             this.btnDisconnect.Click += new System.EventHandler(this.btnDisconnect_Click);
             //
@@ -128,11 +128,11 @@ namespace nanoboy
             this.Controls.Add(this.grpClient);
             this.Controls.Add(this.grpHost);
             this.Controls.Add(this.lblStatus);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
             this.MaximizeBox = false;
             this.Name = "frmLink";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Link-Kabel (experimentell/deaktiviert) - AetherBoy";
+            this.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Link-Kabel (experimentell/deaktiviert) - AetherBoy");
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.frmLink_FormClosing);
             this.grpHost.ResumeLayout(false);
             this.grpHost.PerformLayout();
@@ -150,7 +150,7 @@ namespace nanoboy
         private System.Windows.Forms.Button btnHost;
         private System.Windows.Forms.Label lblHostDesc;
         private System.Windows.Forms.GroupBox grpClient;
-        private System.Windows.Forms.TextBox txtIP;
+        private nanoboy.Controls.AetherTextBox txtIP;
         private System.Windows.Forms.Label lblIP;
         private System.Windows.Forms.Button btnConnect;
         private System.Windows.Forms.Button btnDisconnect;

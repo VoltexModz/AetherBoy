@@ -15,6 +15,7 @@ namespace AetherBoy.Runtime
         AudioInspector = 1 << 5,
         Frameskip = 1 << 6,
         ShoulderButtons = 1 << 7,
+        BarcodeBoy = 1 << 8,
 
         GameBoyStandard = SaveStates | Rewind | Cheats | MonochromePalettes |
             AudioChannelControls | AudioInspector | Frameskip,
@@ -42,6 +43,8 @@ namespace AetherBoy.Runtime
         string RomSha256,
         BatterySaveSnapshot BatterySave)
     {
+        // Unlike Title, this never falls back to a filename. Safe source for opt-in social display.
+        public string CartridgeHeaderTitle { get; init; } = "";
         public bool IsGameBoyAdvance =>
             CartridgeType.StartsWith("GBA", StringComparison.OrdinalIgnoreCase);
     }

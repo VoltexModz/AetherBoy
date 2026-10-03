@@ -3,14 +3,18 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text.Json;
+using AetherBoy.Runtime;
 
 namespace nanoboy.Storage;
 
 internal static class LocalJson
 {
     private const int MaximumLength = 2 * 1024 * 1024;
-    internal static T? Read<T>(string path) where T : class
+    internal static T? Read<T>(string path, Action<T>? validate = null) where T : class => Read(path, out _, validate);
+
+    internal static T? Read<T>(string path, out bool recovered, Action<T>? validate = null) where T : class
     {
+        recovered = false;
         bool existed = false;
         foreach (string candidate in new[] { path, path + ".bak" })
         {
@@ -21,23 +25,38 @@ internal static class LocalJson
                 using var stream = File.OpenRead(candidate);
                 if (stream.Length > MaximumLength) continue;
                 T? value = JsonSerializer.Deserialize<T>(stream);
-                if (value != null) return value;
+                if (value != null)
+                {
+                    validate?.Invoke(value);
+                    recovered = candidate != path;
+                    return value;
+                }
             }
-            catch (JsonException) { }
+            catch (Exception ex) when (ex is JsonException or InvalidDataException or IOException or UnauthorizedAccessException) { }
         }
-        if (existed) throw new InvalidDataException("Lokale Metadaten und Sicherung sind nicht lesbar: " + Path.GetFileName(path));
+        if (existed) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Lokale Metadaten und Sicherung sind nicht lesbar: ") + Path.GetFileName(path));
         return null;
     }
 
-    internal static void Write<T>(string path, T value)
+    internal static void Write<T>(string path, T value, Action<T>? validate = null)
     {
+        validate?.Invoke(value);
         bool keepPrevious = true;
         if (File.Exists(path))
         {
             // Do not replace the last readable backup with a corrupt main file during recovery.
             using var stream = File.OpenRead(path);
-            try { keepPrevious = stream.Length <= MaximumLength && JsonSerializer.Deserialize<T>(stream) is not null; }
-            catch (JsonException) { keepPrevious = false; }
+            try
+            {
+                keepPrevious = stream.Length <= MaximumLength;
+                if (keepPrevious)
+                {
+                    T? previous = JsonSerializer.Deserialize<T>(stream);
+                    keepPrevious = previous is not null;
+                    if (previous is not null) validate?.Invoke(previous);
+                }
+            }
+            catch (Exception ex) when (ex is JsonException or InvalidDataException) { keepPrevious = false; }
         }
         WriteBytes(path, JsonSerializer.SerializeToUtf8Bytes(value), keepPrevious);
     }
@@ -63,6 +82,10 @@ internal sealed record GameLibraryEntry
     public bool HasCustomTitle { get; init; }
     public string System { get; init; } = "";
     public bool Favorite { get; init; }
+    public bool SofaSelected { get; init; }
+    public string Genre { get; init; } = "";
+    public int Rating { get; init; }
+    public string[] Tags { get; init; } = [];
     public double PlayedSeconds { get; init; }
     public DateTimeOffset? LastPlayedUtc { get; init; }
     public string? PreviewPng { get; init; }
@@ -73,24 +96,33 @@ internal sealed class WindowsGameLibraryStore
     internal static WindowsGameLibraryStore Default { get; } = new(WindowsDataPaths.Default);
     private readonly WindowsDataPaths paths;
     private readonly WindowsRomLibrary library;
-    private readonly object sync = new();
+    private static readonly object sync = new();
     internal WindowsGameLibraryStore(WindowsDataPaths paths) { this.paths = paths; library = new(paths); }
     private string PathFor(string rom) => Path.Combine(paths.Root, "Library", library.GetIdentity(rom) + ".json");
-    internal GameLibraryEntry Read(string rom)
+    internal GameLibraryEntry Read(string rom) => Read(rom, out _);
+    internal GameLibraryEntry Read(string rom, out bool recovered)
     {
-        lock (sync) return LocalJson.Read<GameLibraryEntry>(PathFor(rom)) ?? new GameLibraryEntry
-        { Title = Path.GetFileNameWithoutExtension(rom).Replace("ROM - ", ""), System = DetectSystem(rom) };
+        lock (sync)
+        {
+            GameLibraryEntry entry = LocalJson.Read<GameLibraryEntry>(PathFor(rom), out recovered, Validate) ?? new GameLibraryEntry
+            { Title = LibraryMetadata.DefaultTitle(rom), System = DetectSystem(rom) };
+            return entry;
+        }
     }
     internal GameLibraryEntry Update(string rom, Func<GameLibraryEntry, GameLibraryEntry> change)
     {
         lock (sync)
         {
             GameLibraryEntry next = change(Read(rom));
-            if (!double.IsFinite(next.PlayedSeconds) || next.PlayedSeconds < 0)
-                throw new InvalidDataException("Ungültige Spielzeit.");
-            LocalJson.Write(PathFor(rom), next);
+            LocalJson.Write(PathFor(rom), next, Validate);
             return next;
         }
+    }
+    private static void Validate(GameLibraryEntry entry)
+    {
+        LibraryMetadata.ValidateEntry(entry.Title, entry.System, entry.PlayedSeconds);
+        LibraryMetadata.Validate(entry.Genre, entry.Rating, entry.Tags);
+        if (entry.PreviewPng is { Length: > 1048576 }) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Library preview is too large."));
     }
     internal static string DetectSystem(string rom)
     {
@@ -116,7 +148,7 @@ internal sealed class WindowsGameProfileStore
     internal GameSettingsProfile Read(string rom)
     {
         GameSettingsProfile result = LocalJson.Read<GameSettingsProfile>(PathFor(rom)) ?? new();
-        if (result.Overrides is null) throw new InvalidDataException("Spielprofil enthält keine gültigen Einstellungen.");
+        if (result.Overrides is null) throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Spielprofil enthält keine gültigen Einstellungen."));
         return result;
     }
     internal void Write(string rom, GameSettingsProfile profile) => LocalJson.Write(PathFor(rom), profile);
