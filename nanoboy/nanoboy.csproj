@@ -38,6 +38,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Branding\AetherBoy.ico" LogicalName="AetherBoy.Branding.AppIcon.ico" />
     <EmbeddedResource Include="Branding\AetherBoyMark.png" LogicalName="AetherBoy.Branding.Mark.png" />
+    <EmbeddedResource Include="..\branding\exports\themes\*.png" LogicalName="AetherBoy.Branding.Themes.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

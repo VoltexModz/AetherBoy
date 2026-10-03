@@ -6,17 +6,24 @@
 unmodified source file. It combines the interlocking AB monogram, directional
 pad and action buttons with the AetherBoy wordmark and violet/cyan frame.
 
-Use this exact composition: no AI regeneration, cropping, recoloring or new
-typography. PNG and ICO exports only resize and encode it. At small system-icon
+The user's 2026-10-03 request authorizes transparent, recolored theme derivatives.
+Keep the original JPEG unchanged. Retain the AB/D-pad/buttons, custom wordmark
+and rounded frame; do not substitute a different logo. At small system-icon
 sizes the wordmark naturally loses detail; do not silently substitute the old
 mark. The original Aether Wave SVG files remain as historical design sources,
 but no longer generate the active app logo.
 
-Windows and Linux use the same 512 px image in their UI and start animation.
-Windows also embeds the multi-resolution ICO; Linux installation uses the PNG
-icon sizes. The intro does not draw a duplicate wordmark or a visible skip button.
-Existing custom intro images/sounds and all six themes remain independent of
-this bundled logo. The artwork keeps its own colors, including on light themes.
+Windows and Linux use the same six transparent 512 px PNG exports in the UI and
+standard start animation. Their accents select Aether Original, Neko Sakura,
+Deep Ocean, Emerald Circuit, Amber Arcade or Pocket Light. Pocket Light uses
+dark green/bronze for the light surface. Theme changes refresh live logos without
+restarting. The settings card specifically previewing Aether Original stays original.
+
+Custom accent pairs use the transparent Aether Original fallback; changing only
+the background retains the matching accent variant. No user color is overwritten.
+Custom intro images/sounds remain independent and are not recolored. Windows ICO,
+Linux launcher PNGs and window icons keep the original JPEG-derived identity.
+The intro still has no duplicate wordmark or visible skip button.
 
 ## Core palette
 
@@ -37,7 +44,19 @@ not be repeated on every UI surface or control.
 - `exports/`: PNG exports at 16–512 px, keeping the complete artwork.
 - `nanoboy/Branding/AetherBoy.ico`: generated multi-resolution Windows icon.
 - `nanoboy/Branding/AetherBoyMark.png`: generated 512 px application artwork.
+- `themes/*.png`: six transparent theme masters, edited with the built-in image
+  tool from the supplied logo. These derivatives are not pixel-identical copies
+  of the JPEG. No image generation occurs during builds.
+- `themes/generation.json`: exact edit prompts, palette targets and provenance.
+- `exports/themes/*.png`: the same 512 px RGBA files for both frontends.
+- `exports/themes/64/` and `exports/themes/128/`: prefiltered Linux header sizes;
+  SDL selects a texture by the actual display size, including render scaling.
 
 Run `node tools/branding/render-brand-assets.cjs` with `sharp` available to
-rebuild every raster asset from the approved JPEG. No remote attachment path is
-needed after cloning the repository.
+rebuild the original system icons from the JPEG and resize the checked-in theme
+PNGs without recoloring, flattening or removing alpha. No remote attachment path
+or image-generation access is needed after cloning the repository.
+
+`node tools/branding/render-theme-preview.cjs` renders the labeled contact sheet
+`exports/theme-overview.png` on theme surfaces for review. That sheet is not a
+transparent application asset; use the individual PNGs when embedding a logo.

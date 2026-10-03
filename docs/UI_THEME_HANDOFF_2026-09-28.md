@@ -1,5 +1,48 @@
 # UI-Farben und Logo-Abgleich — lokaler Arbeitsstand vom 28. September 2026
 
+## Transparente Logos für alle sechs Themes — 03.10.2026
+
+**Für Windows und Linux umgesetzt; mit diesem Änderungspaket versioniert.** Nutzerauftrag:
+das eigene AB-Logo farblich an jedes Theme anpassen und den Hintergrund freistellen.
+Dieser Nachtrag ersetzt die älteren Aussagen weiter unten, nach denen das Logo
+immer undurchsichtig und unabhängig vom Theme bleibt. Der ursprüngliche JPEG-Master
+wird weiterhin unverändert aufbewahrt.
+
+- Sechs mit dem Bildwerkzeug bearbeitete transparente PNG-Master in
+  `branding/themes/`, genaue Bearbeitungsprompts in `generation.json`.
+  Sie sind farbliche/freigestellte Ableitungen, keine pixelidentischen Kopien.
+  Pocket Light verwendet dunkles Grün/Bronze auf der hellen Oberfläche.
+- Windows und Linux verwenden dieselben 512-px-RGBA-Exporte aus
+  `branding/exports/themes/`. Der Export baut nur Größen, keine neuen Bilder.
+  `branding/exports/theme-overview.png` zeigt alle sechs auf ihren UI-Flächen;
+  nur diese Übersicht hat bewusst einen Hintergrund, die einzelnen PNGs nicht.
+- Logo-Auswahl gemeinsam über `UiThemePresets.ResolveBrandVariant` aus den beiden
+  Akzenten. Ein eigener Hintergrund behält die passende Akzentvariante.
+  Freie, nicht zu einem Preset gehörende Akzentpaare verwenden transparentes
+  Aether Original; gespeicherte Farben bleiben exakt erhalten.
+- Windows aktualisiert bestehende gebundene Bildfelder im zentralen Theme-Lauf.
+  Alte Bitmaps werden freigegeben; keine statischen Control-Event-Abonnements.
+  Hauptfenster, leere Spielansicht, Über-Fenster und Sofa-Bibliothek folgen mit.
+  Die ausdrücklich als Aether Original beschriftete Wiederherstellungsvorschau
+  zeigt weiterhin das Original. Das Standard-Intro lädt das aktuelle Theme;
+  eigene Intro-Bilder und Sounds bleiben unangetastet.
+- Linux tauscht die gemeinsame SDL-Logo-Textur beim Theme-Wechsel, erst nach
+  erfolgreichem Laden der Ersatztextur. Standard-Intro und alle `Mark`-Zeichenstellen
+  verwenden diese Textur. Alte Texturen werden freigegeben. Zusätzliche vorglättete
+  64-/128-px-Exporte verhindern ausgefranste Rahmen in kleinen Linux-Logos;
+  die Texturauswahl berücksichtigt die tatsächliche Rendergröße inklusive DPI.
+- Windows-EXE/ICO, Linux-Launcher und Betriebssystem-Fenstericons bleiben bewusst
+  die ursprüngliche Markenkennung. Kein Umbau von Speicherständen, Core oder Link.
+
+**Prüfung:** Windows- und Linux-Release-Build jeweils ohne Warnungen/Fehler.
+22 gezielte Windows-Tests bestanden (Logos, Alpha, Live-Umschaltung, Bitmap-Lebensdauer,
+Themes, Intro und UI-Policy); 8 gezielte Linux-Tests bestanden, ohne Skips,
+einschließlich nativer Wayland-Shell, sechs Theme-Wechseln und Intro. Zusätzlich
+8 Windows-Theme-Renderfälle bestanden. Bilder in
+`artifacts/theme-logos-20261003/`; Original und Pocket Light im Frontend sowie alle
+sechs Logo-Varianten visuell geprüft. Das ist eine gezielte Logo-Abnahme,
+kein neuer vollständiger Anwendungstest.
+
 ## Verbliebene Windows-Bauteile ersetzt — 02.10.2026
 
 **Lokal implementiert, nicht committed/gepusht.** Die Fundliste bleibt darunter

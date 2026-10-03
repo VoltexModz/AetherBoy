@@ -6,6 +6,26 @@ namespace AetherBoy.Desktop.Tests;
 public sealed class LinuxThemeTests
 {
     [TestMethod]
+    public void EveryThemeShipsTheSharedTransparentPng()
+    {
+        foreach (UiThemePreset preset in UiThemePresets.All)
+        {
+            string variant = UiThemePresets.ResolveBrandVariant(preset.Primary, preset.Secondary);
+            Assert.AreEqual(preset.Id, variant);
+            byte[] png = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Assets", "Themes", variant + ".png"));
+            Assert.IsTrue(png.Length > 1000);
+            CollectionAssert.AreEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, png[..8]);
+            Assert.AreEqual(6, (int)png[25], "Export must retain RGBA, not an opaque RGB background.");
+            foreach (int size in new[] { 64, 128 })
+            {
+                byte[] small = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Assets", "Themes", size.ToString(), variant + ".png"));
+                Assert.AreEqual(size, System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(small.AsSpan(16, 4)));
+                Assert.AreEqual(6, (int)small[25]);
+            }
+        }
+    }
+
+    [TestMethod]
     public void SixSharedThemesPersistWithoutChangingGamePalette()
     {
         string root = Path.Combine(Path.GetTempPath(), "aetherboy-linux-themes-" + Guid.NewGuid().ToString("N"));

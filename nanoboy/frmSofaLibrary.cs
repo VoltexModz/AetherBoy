@@ -40,8 +40,8 @@ internal sealed class frmSofaLibrary : Form
         foreach (float height in new[] { 86f, 64f, 0f, 64f, 64f, 58f })
             layout.RowStyles.Add(new RowStyle(height == 0 ? SizeType.Percent : SizeType.Absolute, height == 0 ? 100 : height));
         var header = new Panel { Dock = DockStyle.Fill };
-        var logo = new PictureBox { Image = Branding.AppBrand.CreateMarkBitmap(), Bounds = new Rectangle(0, 0, 76, 76), SizeMode = PictureBoxSizeMode.Zoom };
-        logo.Disposed += (_, _) => logo.Image?.Dispose();
+        var logo = new PictureBox { Bounds = new Rectangle(0, 0, 76, 76), SizeMode = PictureBoxSizeMode.Zoom };
+        Branding.AppBrand.BindMark(logo);
         header.Controls.Add(logo);
         header.Controls.Add(new Label { Text = global::AetherBoy.Runtime.Localization.UiText.Get("AetherBoy\nSofa-Modus"), Bounds = new Rectangle(90, 0, 800, 82),
             Font = new Font("Segoe UI", 22, FontStyle.Bold), ForeColor = AetherColors.Cyan });

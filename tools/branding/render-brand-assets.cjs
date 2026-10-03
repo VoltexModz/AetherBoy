@@ -62,8 +62,26 @@ async function main() {
     path.join(applicationBrandingRoot, 'AetherBoy.ico'),
     createIco(frames));
 
+  // Theme edits are checked-in transparent masters. Export only; never
+  // regenerate or recolor them as a side effect of building the application.
+  const themeRoot = path.join(brandingRoot, 'themes');
+  const themeExports = path.join(exportRoot, 'themes');
+  fs.mkdirSync(themeExports, { recursive: true });
+  const { variants } = JSON.parse(fs.readFileSync(path.join(themeRoot, 'generation.json'), 'utf8'));
+  for (const { id } of variants) {
+    if (!/^[a-z]+(?:-[a-z]+)*$/.test(id)) throw new Error('Invalid theme asset ID');
+    const source = path.join(themeRoot, `${id}.png`);
+    if (!(await sharp(source).metadata()).hasAlpha) throw new Error(`Theme ${id} needs alpha`);
+    fs.writeFileSync(path.join(themeExports, `${id}.png`), await renderPng(source, 512));
+    for (const size of [64, 128]) {
+      const sizedRoot = path.join(themeExports, String(size));
+      fs.mkdirSync(sizedRoot, { recursive: true });
+      fs.writeFileSync(path.join(sizedRoot, `${id}.png`), await renderPng(source, size));
+    }
+  }
+
   process.stdout.write(
-    `Rendered ${iconSizes.length} icon frames, application artwork and AetherBoy.ico.\n`);
+    `Rendered ${iconSizes.length} icon frames, application artwork, AetherBoy.ico and ${variants.length} theme logos.\n`);
 }
 
 main().catch((error) => {

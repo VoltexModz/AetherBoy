@@ -13,11 +13,7 @@ namespace nanoboy
         {
             InitializeComponent();
             Branding.AppBrand.ApplyIcon(this);
-            Image? previousImage = pictureBox1.Image;
-            Image mark = Branding.AppBrand.CreateMarkBitmap();
-            pictureBox1.Image = mark;
-            previousImage?.Dispose();
-            Disposed += (_, _) => mark.Dispose();
+            Branding.AppBrand.BindMark(pictureBox1);
             Text = global::AetherBoy.Runtime.Localization.UiText.Format("Über {0}", ProductInfo.Name);
             textBox1.Text =
                 $"{ProductInfo.DisplayName}\r\n\r\n" +

@@ -42,6 +42,7 @@ namespace nanoboy.Controls
         private static void Recolor(Control control, Color[] before, Color[] after)
         {
             if (Equals(control.Tag, "theme-swatch")) return;
+            Branding.AppBrand.RefreshMark(control);
             for (int i = 0; i < before.Length; i++)
             {
                 if (control.BackColor == before[i]) { control.BackColor = after[i]; break; }

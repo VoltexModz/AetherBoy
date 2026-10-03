@@ -31,4 +31,15 @@ public static class UiThemePresets
         }
         return null;
     }
+
+    /// <summary>Choose only a bundled asset ID. A custom background does not change the accent identity.</summary>
+    public static string ResolveBrandVariant(string? primary, string? secondary)
+    {
+        if (UiRgb.TryParse(primary, out UiRgb p) && UiRgb.TryParse(secondary, out UiRgb s))
+            foreach (UiThemePreset preset in All)
+                if (p.Hex.Equals(preset.Primary, StringComparison.OrdinalIgnoreCase) &&
+                    s.Hex.Equals(preset.Secondary, StringComparison.OrdinalIgnoreCase)) return preset.Id;
+        // Free user colors remain untouched; there is no approximate nearest-theme selection.
+        return All[0].Id;
+    }
 }

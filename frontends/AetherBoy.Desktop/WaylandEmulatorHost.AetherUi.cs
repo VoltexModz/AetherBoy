@@ -59,6 +59,8 @@ internal sealed partial class WaylandEmulatorHost
             : focusTargets.FindIndex(target => target.X >= 278 && target.Y >= 180);
     }
     private IntPtr brandTexture;
+    private IntPtr brandTexture64, brandTexture128;
+    private string? brandVariant;
     private bool mouseTurbo;
     private bool showAppearance;
     private string primaryColorInput = "", secondaryColorInput = "", backgroundColorInput = "";
@@ -86,17 +88,55 @@ internal sealed partial class WaylandEmulatorHost
     private void Center(float center, float y, string text, int size, SDL.Color? color = null, bool bold = false) =>
         Ink(center - textRenderer.Measure(text, size, bold) / 2, y, text, size, color, bold);
 
-    private void LoadBrandMark()
+    private void LoadBrandMark(string? primary = null, string? secondary = null)
     {
-        IntPtr surface = SDL.LoadPNG(Path.Combine(AppContext.BaseDirectory, "Assets", "aetherboy-mark.png"));
+        string variant = UiThemePresets.ResolveBrandVariant(primary ?? options.UiPrimaryColor, secondary ?? options.UiSecondaryColor);
+        if (variant == brandVariant && brandTexture != IntPtr.Zero) return;
+        IntPtr replacement = IntPtr.Zero, replacement64 = IntPtr.Zero, replacement128 = IntPtr.Zero;
+        try
+        {
+            replacement = LoadBrandTexture(variant, 512);
+            replacement64 = LoadBrandTexture(variant, 64);
+            replacement128 = LoadBrandTexture(variant, 128);
+            // Launcher/window icons retain the original identity on both platforms.
+            if (brandTexture == IntPtr.Zero)
+            {
+                IntPtr icon = SDL.LoadPNG(Path.Combine(AppContext.BaseDirectory, "Assets", "aetherboy-mark.png"));
+                if (icon != IntPtr.Zero)
+                    try { SDL.SetWindowIcon(window, icon); }
+                    finally { SDL.DestroySurface(icon); }
+            }
+            IntPtr previous = brandTexture, previous64 = brandTexture64, previous128 = brandTexture128;
+            brandTexture = replacement;
+            brandTexture64 = replacement64;
+            brandTexture128 = replacement128;
+            replacement = replacement64 = replacement128 = IntPtr.Zero;
+            brandVariant = variant;
+            if (previous != IntPtr.Zero) SDL.DestroyTexture(previous);
+            if (previous64 != IntPtr.Zero) SDL.DestroyTexture(previous64);
+            if (previous128 != IntPtr.Zero) SDL.DestroyTexture(previous128);
+        }
+        finally
+        {
+            if (replacement != IntPtr.Zero) SDL.DestroyTexture(replacement);
+            if (replacement64 != IntPtr.Zero) SDL.DestroyTexture(replacement64);
+            if (replacement128 != IntPtr.Zero) SDL.DestroyTexture(replacement128);
+        }
+    }
+
+    private IntPtr LoadBrandTexture(string variant, int size)
+    {
+        string directory = Path.Combine(AppContext.BaseDirectory, "Assets", "Themes");
+        if (size != 512) directory = Path.Combine(directory, size.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        IntPtr surface = SDL.LoadPNG(Path.Combine(directory, variant + ".png"));
         if (surface == IntPtr.Zero) throw new IOException(global::AetherBoy.Runtime.Localization.UiText.Get("Cannot load the bundled AetherBoy logo: ") + SDL.GetError());
         try
         {
-            SDL.SetWindowIcon(window, surface);
-            brandTexture = SDL.CreateTextureFromSurface(renderer, surface);
-            if (brandTexture == IntPtr.Zero) throw new IOException(global::AetherBoy.Runtime.Localization.UiText.Get("Cannot create logo texture: ") + SDL.GetError());
-            SDL.SetTextureScaleMode(brandTexture, SDL.ScaleMode.Linear);
-            SDL.SetTextureBlendMode(brandTexture, SDL.BlendMode.Blend);
+            IntPtr texture = SDL.CreateTextureFromSurface(renderer, surface);
+            if (texture == IntPtr.Zero) throw new IOException(global::AetherBoy.Runtime.Localization.UiText.Get("Cannot create logo texture: ") + SDL.GetError());
+            SDL.SetTextureScaleMode(texture, SDL.ScaleMode.Linear);
+            SDL.SetTextureBlendMode(texture, SDL.BlendMode.Blend);
+            return texture;
         }
         finally { SDL.DestroySurface(surface); }
     }
@@ -104,7 +144,13 @@ internal sealed partial class WaylandEmulatorHost
     private void Mark(float x, float y, float size)
     {
         SDL.FRect destination = new() { X = x, Y = y, W = size, H = size };
-        SDL.RenderTexture(renderer, brandTexture, IntPtr.Zero, in destination);
+        // Pre-filtered sizes avoid undersampling thin strokes when SDL reduces
+        // the 512-pixel intro artwork to a tiny title-bar logo. Account for DPI.
+        float pixels = size;
+        if (SDL.GetCurrentRenderOutputSize(renderer, out int outputWidth, out int outputHeight))
+            pixels *= Math.Min(outputWidth / (float)LogicalWidth, outputHeight / (float)LogicalHeight);
+        IntPtr texture = pixels <= 64 ? brandTexture64 : pixels <= 128 ? brandTexture128 : brandTexture;
+        SDL.RenderTexture(renderer, texture, IntPtr.Zero, in destination);
     }
 
     private void RoundedFill(float x, float y, float w, float h, float radius, SDL.Color color)
@@ -456,6 +502,7 @@ internal sealed partial class WaylandEmulatorHost
             !UiRgb.TryParse(secondaryColorInput, out UiRgb secondary) ||
             !UiRgb.TryParse(backgroundColorInput, out UiRgb background))
         { statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Use six hexadecimal digits for each color, for example #8B38FF."); return; }
+        LoadBrandMark(primary.Hex, secondary.Hex);
         options.UiPrimaryColor = primaryColorInput = primary.Hex;
         options.UiSecondaryColor = secondaryColorInput = secondary.Hex;
         options.UiBackgroundColor = backgroundColorInput = background.Hex;

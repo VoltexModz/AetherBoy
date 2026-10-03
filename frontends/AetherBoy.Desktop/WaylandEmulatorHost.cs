@@ -262,6 +262,8 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         }
 
         if (brandTexture != IntPtr.Zero) SDL.DestroyTexture(brandTexture);
+        if (brandTexture64 != IntPtr.Zero) SDL.DestroyTexture(brandTexture64);
+        if (brandTexture128 != IntPtr.Zero) SDL.DestroyTexture(brandTexture128);
         ClearLibraryPreviews();
         ClearPreviewTextures();
         textRenderer.Dispose();

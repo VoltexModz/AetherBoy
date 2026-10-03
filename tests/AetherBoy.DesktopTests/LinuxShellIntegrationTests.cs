@@ -119,6 +119,14 @@ public sealed class LinuxShellIntegrationTests
                 Click(430 + index % 3 * 274, 298 + index / 3 * 49);
                 Assert.AreEqual(preset.Id, UiThemePresets.Match(options.UiPrimaryColor,
                     options.UiSecondaryColor, options.UiBackgroundColor)?.Id);
+                Assert.AreEqual(preset.Id, Field<string>(host, "brandVariant"));
+                Assert.AreNotEqual(IntPtr.Zero, Field<IntPtr>(host, "brandTexture"));
+                foreach (int size in new[] { 64, 128 })
+                {
+                    Assert.IsTrue(SDL.GetTextureSize(Field<IntPtr>(host, "brandTexture" + size), out float width, out float height));
+                    Assert.AreEqual((float)size, width);
+                    Assert.AreEqual(width, height);
+                }
                 Capture(host, "appearance-" + preset.Id);
             }
             void EnterColor(float x, string value)
@@ -132,6 +140,7 @@ public sealed class LinuxShellIntegrationTests
             EnterColor(998, "#EFEFEF");
             Click(430, 524);
             Assert.AreEqual("#FF8800", options.UiPrimaryColor);
+            Assert.AreEqual("aether-original", Field<string>(host, "brandVariant"));
             Capture(host, "appearance-custom");
             Click(360, 218);
             Click(120, 545);

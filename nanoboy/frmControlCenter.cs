@@ -275,11 +275,13 @@ namespace nanoboy
                 () => bridge.Settings.UiBackgroundColor, value => bridge.Settings.UiBackgroundColor = value);
 
             AetherSurfacePanel brand = CreateCard(page, 0, 664, 788, 132, "AETHER ORIGINAL");
-            brand.Controls.Add(new PictureBox
+            var originalMark = new PictureBox
             {
-                Image = Branding.AppBrand.CreateMarkBitmap(), SizeMode = PictureBoxSizeMode.Zoom,
+                SizeMode = PictureBoxSizeMode.Zoom,
                 Location = new Point(18, 36), Size = new Size(82, 82),
-            });
+            };
+            Branding.AppBrand.BindMark(originalMark, followsTheme: false);
+            brand.Controls.Add(originalMark);
             brand.Controls.Add(CreateSmallLabel(global::AetherBoy.Runtime.Localization.UiText.Get("Das Originaldesign nutzt Violett und Cyan. Eigene Farben gelten für alle Spiele."),
                 118, 39, 630, 35));
             AddActionButton(brand, global::AetherBoy.Runtime.Localization.UiText.Get("Originaldesign wiederherstellen"), 118, 79, 300,

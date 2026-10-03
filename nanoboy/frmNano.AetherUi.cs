@@ -123,12 +123,11 @@ namespace nanoboy
             var mark = new PictureBox
             {
                 Dock = DockStyle.Left,
-                Image = Branding.AppBrand.CreateMarkBitmap(),
                 Size = new Size(46, 46),
                 SizeMode = PictureBoxSizeMode.Zoom,
                 TabStop = false
             };
-            mark.Disposed += (_, _) => mark.Image?.Dispose();
+            Branding.AppBrand.BindMark(mark);
 
             var nameStack = new Panel
             {
@@ -272,12 +271,11 @@ namespace nanoboy
             var mark = new PictureBox
             {
                 Anchor = AnchorStyles.None,
-                Image = Branding.AppBrand.CreateMarkBitmap(),
                 Size = new Size(104, 104),
                 SizeMode = PictureBoxSizeMode.Zoom,
                 TabStop = false
             };
-            mark.Disposed += (_, _) => mark.Image?.Dispose();
+            Branding.AppBrand.BindMark(mark);
             var headline = CreateUiLabel(
                 global::AetherBoy.Runtime.Localization.UiText.Get("Ready for your next game?"),
                 15f,

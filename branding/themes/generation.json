@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-03",
+  "method": "Built-in image_gen editing, transparent_background=true",
+  "notes": "Theme derivatives, not pixel-identical masters. Original supplied JPEG is retained unchanged. Export pipeline only resizes these PNGs and preserves alpha.",
+  "variants": [
+    {
+      "id": "aether-original",
+      "source": "../aetherboy-logo-2026-10-02.jpg",
+      "prompt": "Edit the reference logo, do not design a new logo. Produce a CLEAN FLAT transparent PNG cutout.\nPrecisely preserve its AB silhouette, D-pad, two buttons, custom AetherBoy wordmark and thin rounded-square border. Same layout and dimensions. Wordmark must remain exactly AetherBoy with original custom angular A and notched B.\nRemove ALL dark navy background, including the negative spaces inside the letters and AB, with real alpha transparency.\nCRITICAL: NO glow, NO bloom, NO shadow, NO bevel, NO outlines around the monogram or lettering, NO noise, NO sparkles, NO texture, NO 3D, NO translucent haze. Completely clean empty transparent areas between shapes. Solid filled 2D shapes with smooth antialiased edges only.\nColor foreground with clean violet #8B38FF to cyan #29E2ED left-to-right gradient through blue. Thin single rounded-square border in the same gradient. Do not thicken the border.\nThis is a precise background removal and color replacement task, preserving the supplied logo's geometry and lettering. Square canvas, same generous margins. No labels, no new elements, no opaque background or checkerboard."
+    },
+    {
+      "id": "neko-sakura",
+      "name": "Neko Sakura",
+      "primary": "#F05BAF",
+      "secondary": "#6DCCFF",
+      "source": "aether-original.png",
+      "prompt": "Precise palette-only edit of this existing transparent AetherBoy logo PNG. Theme Neko Sakura.\nKeep EXACTLY the supplied image's geometry, margins, proportions, thin rounded-square border, interlocking AB monogram with plus/D-pad and two circle buttons, all negative spaces, exact custom AetherBoy wordmark (including A and B notches). Do not move, resize, thicken, restyle or redesign any part. Do not add text or elements.\nChange ONLY foreground gradient colors: left endpoint #F05BAF, right endpoint #6DCCFF, with smooth interpolation between these two colors. Apply to all colored foreground shapes and border. \nBackground stays REAL ALPHA TRANSPARENT everywhere, inside and outside the border and all holes. Flat clean vector-like gradient fills, crisp smooth antialiasing, no glow, shadow, bevel, texture or extra outlines. Empty transparent areas completely clean. Same square canvas. Exact text AetherBoy."
+    },
+    {
+      "id": "deep-ocean",
+      "name": "Deep Ocean",
+      "primary": "#218FD5",
+      "secondary": "#37D7CE",
+      "source": "aether-original.png",
+      "prompt": "Precise palette-only edit of this existing transparent AetherBoy logo PNG. Theme Deep Ocean.\nKeep EXACTLY the supplied image's geometry, margins, proportions, thin rounded-square border, interlocking AB monogram with plus/D-pad and two circle buttons, all negative spaces, exact custom AetherBoy wordmark (including A and B notches). Do not move, resize, thicken, restyle or redesign any part. Do not add text or elements.\nChange ONLY foreground gradient colors: left endpoint #218FD5, right endpoint #37D7CE, with smooth interpolation between these two colors. Apply to all colored foreground shapes and border. \nBackground stays REAL ALPHA TRANSPARENT everywhere, inside and outside the border and all holes. Flat clean vector-like gradient fills, crisp smooth antialiasing, no glow, shadow, bevel, texture or extra outlines. Empty transparent areas completely clean. Same square canvas. Exact text AetherBoy."
+    },
+    {
+      "id": "emerald-circuit",
+      "name": "Emerald Circuit",
+      "primary": "#36D392",
+      "secondary": "#A2E57B",
+      "source": "aether-original.png",
+      "prompt": "Precise palette-only edit of this existing transparent AetherBoy logo PNG. Theme Emerald Circuit.\nKeep EXACTLY the supplied image's geometry, margins, proportions, thin rounded-square border, interlocking AB monogram with plus/D-pad and two circle buttons, all negative spaces, exact custom AetherBoy wordmark (including A and B notches). Do not move, resize, thicken, restyle or redesign any part. Do not add text or elements.\nChange ONLY foreground gradient colors: left endpoint #36D392, right endpoint #A2E57B, with smooth interpolation between these two colors. Apply to all colored foreground shapes and border. \nBackground stays REAL ALPHA TRANSPARENT everywhere, inside and outside the border and all holes. Flat clean vector-like gradient fills, crisp smooth antialiasing, no glow, shadow, bevel, texture or extra outlines. Empty transparent areas completely clean. Same square canvas. Exact text AetherBoy."
+    },
+    {
+      "id": "amber-arcade",
+      "name": "Amber Arcade",
+      "primary": "#FFAD42",
+      "secondary": "#FF6C65",
+      "source": "aether-original.png",
+      "prompt": "Precise palette-only edit of this existing transparent AetherBoy logo PNG. Theme Amber Arcade.\nKeep EXACTLY the supplied image's geometry, margins, proportions, thin rounded-square border, interlocking AB monogram with plus/D-pad and two circle buttons, all negative spaces, exact custom AetherBoy wordmark (including A and B notches). Do not move, resize, thicken, restyle or redesign any part. Do not add text or elements.\nChange ONLY foreground gradient colors: left endpoint #FFAD42, right endpoint #FF6C65, with smooth interpolation between these two colors. Apply to all colored foreground shapes and border. \nBackground stays REAL ALPHA TRANSPARENT everywhere, inside and outside the border and all holes. Flat clean vector-like gradient fills, crisp smooth antialiasing, no glow, shadow, bevel, texture or extra outlines. Empty transparent areas completely clean. Same square canvas. Exact text AetherBoy."
+    },
+    {
+      "id": "pocket-light",
+      "name": "Pocket Light",
+      "primary": "#386D4A",
+      "secondary": "#B88029",
+      "source": "aether-original.png",
+      "prompt": "Precise palette-only edit of this existing transparent AetherBoy logo PNG. Theme Pocket Light.\nKeep EXACTLY the supplied image's geometry, margins, proportions, thin rounded-square border, interlocking AB monogram with plus/D-pad and two circle buttons, all negative spaces, exact custom AetherBoy wordmark (including A and B notches). Do not move, resize, thicken, restyle or redesign any part. Do not add text or elements.\nChange ONLY foreground gradient colors: left endpoint #386D4A, right endpoint #B88029, with smooth interpolation between these two colors. Apply to all colored foreground shapes and border. These are deliberately DARK forest green and muted bronze for legibility on a light cream UI. Do not lighten them, no neon/glow.\nBackground stays REAL ALPHA TRANSPARENT everywhere, inside and outside the border and all holes. Flat clean vector-like gradient fills, crisp smooth antialiasing, no glow, shadow, bevel, texture or extra outlines. Empty transparent areas completely clean. Same square canvas. Exact text AetherBoy."
+    }
+  ]
+}
