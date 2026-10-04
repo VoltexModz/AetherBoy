@@ -13,11 +13,12 @@ public sealed class DiscordIpcTests
     [TestMethod]
     public void LibraryHandshakePublishesOnlyAllowedFieldsAndClearsOnShutdown()
     {
-        var pipe = new MemoryPipe();
+        var pipe = new MemoryPipe(automaticReady: false);
         using var client = new DiscordIpcClient("123456789012345678", pipe);
+        pipe.ReplyReadyAfterHandshake(1);
         Assert.IsTrue(SpinWait.SpinUntil(() => client.Status == DiscordPresenceStatus.Connected, 3000), "Fake READY not processed.");
         client.SetActivity(new("TEST GAME", "GBC · Paused"));
-        Assert.IsTrue(SpinWait.SpinUntil(() => pipe.Written.Any(HasTestActivity), 3000));
+        pipe.WaitForWritten(frames => frames.Any(HasTestActivity), "Activity not published.");
         var packet = JObject.Parse(pipe.Written.First(HasTestActivity));
         var activity = (JObject)packet["args"]!["activity"]!;
         Assert.AreEqual("GBC · Paused", (string?)activity["state"]);
@@ -25,23 +26,37 @@ public sealed class DiscordIpcTests
         Assert.IsFalse(packet.ToString().Contains("fake-user"));
         int clears = pipe.Written.Count(IsClear);
         client.Dispose();
-        Assert.IsTrue(SpinWait.SpinUntil(() => pipe.Written.Count(IsClear) > clears, 3000), "Shutdown must clear activity: " + string.Join("; ", pipe.Written));
+        pipe.WaitForWritten(frames => frames.Count(IsClear) > clears, "Shutdown must clear activity.");
     }
 
     private static bool HasTestActivity(string json) => JObject.Parse(json)["args"]?["activity"] is JObject activity && (string?)activity["details"] == "TEST GAME";
     [TestMethod]
     public void ReconnectionRepublishesLatestActivityAndExplicitClearIsSent()
     {
-        var pipe = new MemoryPipe(); using var client = new DiscordIpcClient("123456789012345678", pipe);
-        Assert.IsTrue(SpinWait.SpinUntil(() => client.Status == DiscordPresenceStatus.Connected, 3000));
+        var pipe = new MemoryPipe(automaticReady: false); using var client = new DiscordIpcClient("123456789012345678", pipe);
+        pipe.ReplyReadyAfterHandshake(1);
+        Assert.IsTrue(SpinWait.SpinUntil(() => client.Status == DiscordPresenceStatus.Connected, 3000), "First READY not processed.");
         client.SetActivity(new("TEST GAME", "GB · Playing"));
-        Assert.IsTrue(SpinWait.SpinUntil(() => pipe.Written.Any(HasTestActivity), 3000));
-        int sent = pipe.Written.Count(HasTestActivity);
+        pipe.WaitForWritten(frames => frames.Any(HasTestActivity), "Initial activity not published.");
         pipe.Close();
-        Assert.IsTrue(SpinWait.SpinUntil(() => pipe.Written.Count(HasTestActivity) > sent, 6000), "READY after reconnect must replay current activity.");
+        pipe.ReplyReadyAfterHandshake(2);
+        pipe.WaitForWritten(frames => frames.Any(HasTestActivity), "READY after reconnect must replay current activity.", handshake: 2);
         int clears = pipe.Written.Count(IsClear);
         client.SetActivity(null);
-        Assert.IsTrue(SpinWait.SpinUntil(() => pipe.Written.Count(IsClear) > clears, 3000));
+        pipe.WaitForWritten(frames => frames.Count(IsClear) > clears, "Explicit clear not sent.");
+    }
+
+    [TestMethod]
+    public void ImmediateReadyIsProcessedWhenClientsStartTogether()
+    {
+        // Keep the fastest possible server response covered as well as the explicitly stepped
+        // handshakes above. Starting workers together exercises Initialize's IPC-thread race.
+        Parallel.For(0, 32, new ParallelOptions { MaxDegreeOfParallelism = 16 }, _ =>
+        {
+            var pipe = new MemoryPipe();
+            using var client = new DiscordIpcClient("123456789012345678", pipe);
+            Assert.IsTrue(SpinWait.SpinUntil(() => client.Status == DiscordPresenceStatus.Connected, 3000), "Immediate READY not processed.");
+        });
     }
 
     private static bool IsClear(string json)
@@ -66,9 +81,12 @@ public sealed class DiscordIpcTests
         pipe.RequestStop(); Assert.IsFalse(pipe.WriteFrame(stale));
     }
 
-    private sealed class MemoryPipe : INamedPipeClient
+    private sealed class MemoryPipe(bool automaticReady = true) : INamedPipeClient
     {
+        private readonly object framesChanged = new();
         private readonly ConcurrentQueue<PipeFrame> incoming = new();
+        private readonly ConcurrentQueue<(int Handshake, string Message)> writtenByHandshake = new();
+        private int handshakes, readyReplies;
         public readonly ConcurrentQueue<string> Written = new();
         public ILogger Logger { get; set; } = new NullLogger();
         private int connected;
@@ -78,20 +96,63 @@ public sealed class DiscordIpcTests
         public bool ReadFrame(out PipeFrame frame) => incoming.TryDequeue(out frame);
         public bool WriteFrame(PipeFrame frame)
         {
-            if (frame.Opcode == Opcode.Handshake)
+            lock (framesChanged)
             {
-                incoming.Enqueue(new PipeFrame(Opcode.Frame, new
+                if (frame.Opcode == Opcode.Handshake)
                 {
-                    cmd = "DISPATCH", evt = "READY", data = new
+                    handshakes++;
+                    if (automaticReady) EnqueueReady();
+                    else
                     {
-                        v = 1, config = new { cdn_host = "example.invalid", api_endpoint = "//example.invalid", environment = "test" },
-                        user = new { id = "123456789012345678", username = "fake-user", discriminator = "0000", avatar = (string?)null }
+                        // The test acts as the server. Do not let the worker poll an empty pipe
+                        // between sending the handshake and the test supplying its READY reply.
+                        Monitor.PulseAll(framesChanged);
+                        WaitFor(() => readyReplies >= handshakes, "Server did not reply to handshake.");
                     }
-                }));
+                }
+                if (frame.Opcode == Opcode.Frame)
+                {
+                    Written.Enqueue(frame.Message);
+                    writtenByHandshake.Enqueue((handshakes, frame.Message));
+                }
+                Monitor.PulseAll(framesChanged);
             }
-            if (frame.Opcode == Opcode.Frame) Written.Enqueue(frame.Message);
             return true;
         }
+        public void ReplyReadyAfterHandshake(int number)
+        {
+            lock (framesChanged)
+            {
+                WaitFor(() => handshakes >= number, $"Handshake {number} not sent.");
+                Assert.AreEqual(number, handshakes, "Unexpected extra handshake.");
+                EnqueueReady();
+                readyReplies = number;
+                Monitor.PulseAll(framesChanged);
+            }
+        }
+        public void WaitForWritten(Func<IEnumerable<string>, bool> predicate, string failure, int handshake = 0)
+        {
+            lock (framesChanged) WaitFor(() => predicate(handshake == 0 ? Written
+                : writtenByHandshake.Where(frame => frame.Handshake == handshake).Select(frame => frame.Message)), failure);
+        }
+        private void WaitFor(Func<bool> predicate, string failure)
+        {
+            long deadline = Environment.TickCount64 + 3000;
+            while (!predicate())
+            {
+                int remaining = (int)Math.Max(0, deadline - Environment.TickCount64);
+                Assert.IsTrue(remaining > 0, failure + " Frames: " + string.Join("; ", Written));
+                Monitor.Wait(framesChanged, remaining);
+            }
+        }
+        private void EnqueueReady() => incoming.Enqueue(new PipeFrame(Opcode.Frame, new
+        {
+            cmd = "DISPATCH", evt = "READY", data = new
+            {
+                v = 1, config = new { cdn_host = "example.invalid", api_endpoint = "//example.invalid", environment = "test" },
+                user = new { id = "123456789012345678", username = "fake-user", discriminator = "0000", avatar = (string?)null }
+            }
+        }));
         public void Close() => Volatile.Write(ref connected, 0);
         public void Dispose() => Close();
     }

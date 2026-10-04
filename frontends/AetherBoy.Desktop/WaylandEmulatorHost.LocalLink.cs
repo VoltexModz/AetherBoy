@@ -22,6 +22,7 @@ internal sealed partial class WaylandEmulatorHost
     private Task<LinuxLocalLinkPlan>? localLinkPlanTask;
     private Task<LocalLinkSession>? localLinkStartupTask;
     private Task? localLinkStopTask;
+    private Exception? localLinkShutdownError;
     private CancellationTokenSource? localLinkStartCancellation;
     private IntPtr secondGamepad;
     private LinuxGamepadProfile secondGamepadProfile = new();
@@ -74,7 +75,8 @@ internal sealed partial class WaylandEmulatorHost
     {
         if (localLinkStopTask is { IsCompleted: true } stopped)
         {
-            if (stopped.IsFaulted) { _ = stopped.Exception; localLinkMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Local link could not close cleanly. Check the local report."); }
+            try { stopped.GetAwaiter().GetResult(); }
+            catch (Exception error) { RecordLocalLinkShutdownFailure(error); }
             localLinkStopTask = null;
         }
         if (localLinkPlanTask is { IsCompleted: true } planned)
@@ -136,6 +138,7 @@ internal sealed partial class WaylandEmulatorHost
                 if (localLinkStartCancellation?.IsCancellationRequested == true)
                 { localLinkStopTask = ready.ShutdownAsync(); return; }
                 localLinkSession = ready;
+                localLinkShutdownError = null;
                 localLinkFrameSequences[0] = localLinkFrameSequences[1] = 0;
                 localLinkPostedButtons[0] = localLinkPostedButtons[1] = GameBoyButtons.None;
                 localLinkPostedAdvance[0] = localLinkPostedAdvance[1] = GameBoyAdvanceButtons.None;
@@ -204,6 +207,58 @@ internal sealed partial class WaylandEmulatorHost
         showLocalLinkPage = false;
         CloseSecondLocalGamepad();
         focusedControl = -1;
+    }
+
+    private Exception? FinishLocalLinkForDisposal()
+    {
+        StopLocalLink();
+        // Every startup/owner task runs in the background. Returning from Dispose
+        // would let process exit interrupt save finalization, even after a timeout
+        // or a detached continuation. Drain them before releasing diagnostics/SDL.
+        try
+        {
+            try { localLinkPlanTask?.GetAwaiter().GetResult(); }
+            catch (OperationCanceledException error) when (IsExpectedLocalLinkStartCancellation(localLinkPlanTask, error)) { }
+            catch (Exception error) { RecordLocalLinkShutdownFailure(error, "local_link_plan"); }
+
+            LocalLinkSession? unclaimed = null;
+            try
+            {
+                if (localLinkStartupTask is { } startup)
+                    unclaimed = startup.GetAwaiter().GetResult();
+            }
+            // The startup worker awaits its owner's disposal before completing
+            // cancellation, so a cancelled task also guarantees released leases.
+            catch (OperationCanceledException error) when (IsExpectedLocalLinkStartCancellation(localLinkStartupTask, error)) { }
+            catch (Exception error) { RecordLocalLinkShutdownFailure(error); }
+
+            // Cancellation of startup must never hide a failure during saving.
+            try { unclaimed?.ShutdownAsync().GetAwaiter().GetResult(); }
+            catch (Exception error) { RecordLocalLinkShutdownFailure(error); }
+
+            try { localLinkStopTask?.GetAwaiter().GetResult(); }
+            catch (Exception error) { RecordLocalLinkShutdownFailure(error); }
+        }
+        finally
+        {
+            localLinkPlanTask = null;
+            localLinkStartupTask = null;
+            localLinkStopTask = null;
+            localLinkStartCancellation?.Dispose();
+            localLinkStartCancellation = null;
+        }
+        return localLinkShutdownError;
+    }
+
+    private bool IsExpectedLocalLinkStartCancellation(Task? task, OperationCanceledException error) =>
+        task?.IsCanceled == true && localLinkStartCancellation is { IsCancellationRequested: true } cancellation &&
+        error.CancellationToken == cancellation.Token;
+
+    private void RecordLocalLinkShutdownFailure(Exception error, string action = "local_link_shutdown")
+    {
+        localLinkShutdownError ??= error;
+        diagnostics.Failure(action, error);
+        statusMessage = localLinkMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Local link could not close cleanly. Check the local report.");
     }
 
     private void EnsureLocalLinkTextures(VideoGeometry geometry)
