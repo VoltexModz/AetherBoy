@@ -73,7 +73,7 @@ public unsafe class DmaController
 
         var channel = ctrl._dmaDataUnit.Channels[ctrl._currentTimerIx];
 
-        if (channel.ControlReg.Is32Bit)
+        if (channel.TransfersWords)
         {
             ctrl._bus.WriteWord(channel.IntDestinationAddress, channel.IntCachedValue!.Value, channel.IntDestSeqAccess, 0x4000);
         }
@@ -160,7 +160,7 @@ public unsafe class DmaController
                 // instead rely on the dmas internal latch register
                 if (channel.IntSourceAddress >= 0x0200_0000)
                 {
-                    if (channel.ControlReg.Is32Bit)
+                    if (channel.TransfersWords)
                     {
                         channel.InternalLatch = ctrl._bus.ReadWord(
                             channel.IntSourceAddress,

@@ -6,7 +6,28 @@
 
 <p align="center"><strong>by NekoZDevTeam</strong></p>
 
-## Development update — 3 October 2026
+## Development update — 8 October 2026
+
+Windows and Linux now include an **e-Reader card library** under Settings → Tools →
+e-Reader: import and name card sets, add strips, keep separate saves and resume
+with a preview. Your own e-Reader firmware and card files are required; none are
+bundled. This is not a firmware-free replacement or an automatic whole-collection
+importer. [Usage, tests and research plan](docs/WINDOWS_ROADMAP.md#e-reader-kartenbibliothek-und-firmware-forschung--08102026).
+
+The accessory implementation adapts mGBA's scanner/dotcode code under MPL-2.0;
+the library and frontend integration are AetherBoy code. Real NES-e tests exposed
+and helped fix ARM status-register and sound-FIFO DMA defects in the shared GBA
+core. Barcode Boy has additional Battle Space regressions. Pasted cheats now
+receive line-by-line review and improved format detection; ambiguous formats and
+unresolved placeholders require user input. A parsed code is not a guarantee that
+it works in a particular game. [Cheat support and known limits](docs/CHEAT_SUPPORT.md).
+
+The Linux contribution `641cab0` is included: wait for Local Link save finalization,
+retain shutdown failures, fix an early Discord READY race and preserve Linux CI
+diagnostics. Hardware, WAN trading and general game compatibility still require
+separate acceptance. [Source attribution](THIRD_PARTY_NOTICES.md).
+
+### Previous desktop stabilization
 
 Both frontends now provide German/English display-language selection, six themes
 with custom colors, controller-oriented sofa mode, AVI capture, ZIP/7z import and

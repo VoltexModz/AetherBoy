@@ -33,7 +33,8 @@ public enum EventType
     HBlankEnd,
     Generic,
     ApuSample,
-    SerialTransfer
+    SerialTransfer,
+    EReaderIrq
 }
 
 public unsafe partial class Scheduler

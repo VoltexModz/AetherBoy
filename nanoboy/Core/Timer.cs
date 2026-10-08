@@ -12,6 +12,10 @@ namespace nanoboy.Core
         private int reloadDelay;
         private bool reloadedThisCycle;
 
+        // The serial prescaler uses the running system divider, including its
+        // low bits that are not visible through the DIV register.
+        internal ushort DividerCounter => dividerCounter;
+
         public int DIV
         {
             get { return dividerCounter >> 8; }

@@ -1,6 +1,6 @@
 # Phase 2: Cheats auf Windows und Linux / Cheat support
 
-Stand / updated: 2026-10-01. Implementiert, synthetisch getestet; keine pauschale
+Stand / updated: 2026-10-06. Implementiert, synthetisch getestet; keine pauschale
 Garantie für Spielcodes. Diese Matrix ersetzt die frühere Beschränkung auf
 direkte GBA-RAM-Schreibzugriffe.
 
@@ -9,16 +9,28 @@ direkte GBA-RAM-Schreibzugriffe.
 ### Benutzung
 
 1. Spiel öffnen, dann Windows **Cheats** beziehungsweise Linux **Tools** öffnen.
-2. Bei GBA das passende Format auswählen. **Automatisch** ist für eindeutige
-   CodeBreaker- oder einfache GameShark-Zeilen gedacht, nicht zum Erraten einer
-   beliebigen verschlüsselten Liste. Im Zweifel explizit das Geräteformat wählen.
+2. Bei GBA das passende Format auswählen. **Automatisch** erkennt CodeBreaker
+   anhand der Zeilenbreite und prüft für 16-stellige Codegruppen GameShark v1/v2
+   und Action Replay v3 verschlüsselt. RAW-Geräteformate werden nur bei expliziter
+   Auswahl beziehungsweise mit RAW-Präfix verwendet. Nur eine eindeutig
+   kompilierbare vollständige Gruppe wird übernommen; Mehrdeutigkeit verlangt
+   eine manuelle Auswahl. Zwischen vollständigen Befehlen kann Auto die Breite
+   wechseln, etwa bei AR-Master plus CodeBreaker-Geldcodes. Explizit gewählte
+   Formate werden nicht stillschweigend uminterpretiert. Das ist keine Prüfung,
+   ob der Code zum Spiel passt.
+   Bei echter Mehrdeutigkeit bieten beide Oberflächen die tatsächlich passenden
+   Geräteformate an, statt auch unpassende Formate aufzuzählen.
 3. Nur wenn die gewählten Codes einen Mastercode benötigen, diesen und die
    abhängigen Zeilen in ihrer ursprünglichen Reihenfolge als ein Set einfügen.
    Codes ohne Mastercode können direkt eingegeben werden; es gibt keine allgemeine
    Mastercode-Pflicht, keine automatische Beschaffung und keine Ergänzung durch
    AetherBoy. Unter Windows gehen Zeilenumbrüche oder `+`; Linux wandelt
    eingefügte Zeilenumbrüche zu `+` um. Name und Schaltzustand gelten für das Set.
-4. Codes hinzufügen, ein-/ausschalten oder entfernen. Die GBA-**Gerätetaste**
+4. Neue Codes sind sofort aktiv. Windows zeigt eigene Aether-Häkchen je Set;
+   anklicken oder die ausgewählte Zeile mit Leertaste umschalten. Der Zustand
+   wird erst nach Bestätigung durch die Sitzung geändert. Linux verwendet
+   weiterhin seine bisherigen Set-Schaltflächen; die Erkennung ist gemeinsam.
+   Die GBA-**Cheat-Modul-Taste halten** (Linux: Gerätetaste)
    schaltet den Knopf am Cheat-Modul; sie ersetzt nicht A/B/L/R am GBA.
    Erneutes Betätigen lässt sie los; ein Reset lässt sie ebenfalls los.
 5. Die Liste gilt für diese Sitzung, nicht automatisch für den nächsten Start.
@@ -30,6 +42,63 @@ ROM-Kennung. Der Spieler wählt Version, Region, Code und erforderlichen Master.
 Geprüft werden Syntax, implementierter Befehl, Adress-/Breitengrenzen und Aufwand.
 Ein syntaktisch gültiger, aber falscher Code kann ein Spiel oder seinen Save verändern.
 Online Link bleibt ohne Cheats; dafür werden keine Sicherheitsprüfungen gelockert.
+
+### FireRed-Rückmeldung vom 06.10.2026
+
+- Gemeinsame Regressionen für das gemeldete zweizeilige AR-v3-Set „1 Hit Kill“,
+  AR-Master plus CodeBreaker-Geldcode, verschlüsselten CodeBreaker-Master samt
+  Listenschreibzugriffen, falsche Formate, mehrdeutige Gruppen und Begleittext
+  wie `svg`. Kein Entfernen beliebiger Fremdzeichen, das aus beschädigtem Text
+  einen anderen gültigen Code machen könnte.
+- CodeBreaker-Entschlüsselung gegen die originalen mGBA-C-Routinen verglichen:
+  Masterhook `08058E58`; Schreibzugriffe `03007D60`, `03007D62` und drei
+  Halfwords ab `0203F802` stimmen überein. Eine synthetische CPU-Probe prüft
+  Thumb-Hook, ARM-RAM-Routine und Rückkehr unabhängig vom Spiel.
+- Isolierter, rein lesender Test mit einer vorhandenen Rocket-Edition-ROM und
+  einem älteren Spielzustand: ohne Cheat Bewegung/wechselnde Bilder; nur mit
+  diesem CodeBreaker-Set Hänger nach der Bewegung (PC `00000010`, keine neuen
+  Bilder). ROM/Spielzustand unverändert; keine SAV geöffnet oder gespeichert.
+  Das ist eine reproduzierte Fehlwirkung, **kein Nachweis eines reparierten
+  Cheat-Hängers** und kein allgemeiner Kompatibilitätstest.
+- Die vom Nutzer verlinkte [Code-Liste](https://www.pokemoncoders.com/pokemon-fire-red-gameshark-codes/)
+  führt beide gemeldeten Walk-through-walls-Sets (CodeBreaker und AR-v3-v2)
+  unter **FireRed Version 1.1**. Die vorhandenen Test-ROMs melden Revision 0.
+  Keine automatische Umschreibung, Ersatzcodes oder ROM-Sperrliste eingebaut.
+- Der fehlende Spiel-/Introton war im heutigen Windows-Protokoll als
+  `audio_enabled=false` bei 100 % Lautstärke bestätigt. Die gespeicherte
+  Stummschaltung bleibt eine Nutzerentscheidung; Control Center → Audio schaltet
+  sie wieder ein. Keine Audio-Treiberänderung aus diesem Befund abgeleitet.
+- Offen: passender 1.0-/Hack-Code im Spiel, Vergleich mit einem zweiten Emulator,
+  dieselbe Code-/ROM-/Save-Kombination unter Linux; dortige Checkbox-UI-Parität.
+
+### Einfügeprüfung — 06.10.2026
+
+- Windows zeigt Codezeilen und Befunde direkt im Cheat-Fenster. Doppelklick oder
+  Enter auf eine Prüfzeile markiert sie zur Bearbeitung. Vollständige Hinweise
+  stehen im scrollbar lesbaren Aether-Memo, nicht nur im gekürzten Tabellenfeld.
+- Linux führt **Prüfen** zur eigenen SDL-Prüfseite: Vor/Zurück durch Codezeilen,
+  **Zeile bearbeiten**, konkrete Formatwahl und ausdrückliches Hinzufügen.
+- `YYYY`, `ZZZ`, mitkopierte Beschriftungen/Überschriften, `svg` und unsichtbare
+  Zeichen werden mit Codezeile gemeldet. Keine automatische Werteauswahl und
+  kein stilles Entfernen von Fremdtext. Normale Code-Leerzeichen bleiben gültig.
+- `AAAA` als vierstelliger GBA-Wert ist gültiges Hex, kann aber ein Platzhalter
+  sein. Beide UIs verlangen eine ausdrückliche Bestätigung oder eine Korrektur.
+  Eine Änderung der Eingabe oder des Formats hebt die Bestätigung wieder auf.
+- Die gemeinsame Vorschau rekonstruiert vorhandene Mastertexte auf isoliertem
+  Compilerzustand. Nach Entfernen eines separaten Masters kann der bereits
+  kompilierte Sitzungskontext trotzdem weiterbestehen. Ist er aus Textsnapshots
+  nicht rekonstruierbar, erklärt die Vorschau diese Grenze; die unveränderte
+  Owner-Thread-Prüfung beim Hinzufügen entscheidet abschließend. Keine Vorschau
+  schreibt in RAM, ROM oder Spielstände.
+- Erneuter Parserlauf über die Benutzeranlage: **293/328** vollständige Blöcke
+  automatisch erkannt, zuvor **241/328**. Die übrigen **35** bleiben tatsächlich
+  zwischen GS v1/v2 und AR v3 mehrdeutig und werden nicht erraten. Kein Nachweis
+  der korrekten Spielwirkung oder der Behebung des gemeldeten Stillstands.
+- Abschlussprüfung dieses Pakets: **74** gemeinsame Cheat-/Sprachtests, **36**
+  Windows-Bedien-/Theme-/UI-Policy-Tests und **12** Linux-Eingabe-/Prüfseitentests
+  unter WSLg/Wayland bestanden, ohne übersprungene Tests. Deutsches und englisches
+  Rendering geprüft; Windows-Release-Build ohne Warnungen oder Fehler. Die echten
+  Spieltests und manuelle DPI-/Controller-/Screenreader-Abnahme bleiben offen.
 
 ### Gemeinsame Formatmatrix
 
@@ -142,6 +211,18 @@ Implementierung gesondert priorisieren; keine automatische Online-Codedatenbank.
 ## English
 
 Both frontends use the same cheat compiler, ciphers and owner-thread executor.
+Automatic detection validates whole wide-code groups against encrypted GS-v1/v2
+and AR-v3 formats. RAW device formats require explicit selection or a RAW prefix.
+True ambiguity offers the matching device choices instead of guessing.
+Both frontends review pasted input with code-line diagnostics. Windows uses its
+painted table and scrollable memo; Linux uses a separate SDL review page. Labels,
+placeholders, svg suffixes and invisible characters are reported, never silently
+removed. The valid hex value AAAA requires explicit UI confirmation because it
+may be an unresolved website placeholder. Editing input/format resets consent.
+Preview does not change the core; the owner-thread compiler remains authoritative,
+including retained cipher state after removal of a separate master entry.
+New sets start enabled. Windows uses painted Aether row checkboxes, keyboard and
+accessible actions; Linux retains its existing toggle buttons for now.
 Select the GBA device format. Codes that do not require a master can be entered
 directly. Only where required, include the user-supplied master and dependent
 lines in one set; there is no mandatory or automatically fetched master code.

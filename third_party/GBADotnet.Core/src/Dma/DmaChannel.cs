@@ -28,6 +28,11 @@ public class DmaChannel
 
     public DmaControlRegister ControlReg;
 
+    // Sound FIFO requests always transfer four words, regardless of the
+    // software-visible transfer-width and word-count register fields.
+    internal bool IsSoundFifo => Id is 1 or 2 && ControlReg.StartTiming == StartTiming.Special;
+    internal bool TransfersWords => ControlReg.Is32Bit || IsSoundFifo;
+
     public int ClocksToStart;
     public int ClocksToStop;
 
@@ -111,8 +116,8 @@ public class DmaChannel
             IntDestSeqAccess = 0; // 1st read/write pair are non-sequential
 
             // Both source and destination addresses are forcibly aligned to halfword/word boundaries
-            IntSourceAddress = SourceAddress & (ControlReg.Is32Bit ? 0xFFFF_FFFC : 0xFFFF_FFFE);
-            IntDestinationAddress = DestinationAddress & (ControlReg.Is32Bit ? 0xFFFF_FFFC : 0xFFFF_FFFE);
+            IntSourceAddress = SourceAddress & (TransfersWords ? 0xFFFF_FFFC : 0xFFFF_FFFE);
+            IntDestinationAddress = DestinationAddress & (TransfersWords ? 0xFFFF_FFFC : 0xFFFF_FFFE);
             IntCachedValue = null;
             if (Id is 1 or 2 && ControlReg.StartTiming == StartTiming.Special)
             {
@@ -122,7 +127,7 @@ public class DmaChannel
             {
                 IntWordCount = (WordCount == 0) ? MaxWordCounts[Id] : WordCount; // 0 is a special case that means copy MAX bytes
             }
-            IntDestAddressIncrement = (ControlReg.Is32Bit, ControlReg.DestAddressCtrl, ControlReg.StartTiming) switch
+            IntDestAddressIncrement = (TransfersWords, ControlReg.DestAddressCtrl, ControlReg.StartTiming) switch
             {
                 (_, _, StartTiming.Special) => 0,
                 (_, DestAddressCtrl.Fixed, _) => 0,
@@ -134,7 +139,7 @@ public class DmaChannel
                 (false, DestAddressCtrl.Decrement, _) => -2,
                 _ => throw new Exception("Invalid destination address control")
             };
-            IntSrcAddressIncrement = (ControlReg.Is32Bit, ControlReg.SrcAddressCtrl) switch
+            IntSrcAddressIncrement = (TransfersWords, ControlReg.SrcAddressCtrl) switch
             {
                 (_, SrcAddressCtrl.Fixed) => 0,
                 (true, SrcAddressCtrl.Increment) => 4,
@@ -165,7 +170,7 @@ public class DmaChannel
 
             if (ControlReg.DestAddressCtrl == DestAddressCtrl.IncrementReload)
             {
-                IntDestinationAddress = DestinationAddress & (ControlReg.Is32Bit ? 0xFFFF_FFFC : 0xFFFF_FFFE);
+                IntDestinationAddress = DestinationAddress & (TransfersWords ? 0xFFFF_FFFC : 0xFFFF_FFFE);
             }
         }
         else

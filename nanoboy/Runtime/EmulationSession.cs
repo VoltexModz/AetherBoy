@@ -258,6 +258,15 @@ namespace AetherBoy.Runtime
         public Task SetBarcodeBoyEnabledAsync(bool enabled, CancellationToken cancellationToken = default) =>
             EnqueueAsync(new SetBarcodeBoyCommand(enabled), cancellationToken);
 
+        public Task QueueEReaderCardAsync(byte[] card, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(card);
+            return EnqueueAsync(new EReaderCardCommand(card), cancellationToken);
+        }
+
+        public Task ClearEReaderCardsAsync(CancellationToken cancellationToken = default) =>
+            EnqueueAsync(new EReaderCardCommand(null), cancellationToken);
+
         public Task ScanBarcodeBoyAsync(string code, CancellationToken cancellationToken = default) =>
             EnqueueAsync(new ScanBarcodeBoyCommand(BarcodeBoyInput.Normalize(code)), cancellationToken);
 

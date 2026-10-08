@@ -750,6 +750,7 @@ namespace nanoboy
             RefreshDiscord();
             RefreshUpdates();
             RefreshBarcodeBoy();
+            RefreshEReader();
         }
 
         private void RefreshSelectors()

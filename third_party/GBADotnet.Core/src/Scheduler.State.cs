@@ -65,6 +65,7 @@ public unsafe partial class Scheduler
         EventType.HBlankEnd => &Ppu.Ppu.HBlankEndEvent,
         EventType.ApuSample => &Apu.Apu.SampleEvent,
         EventType.SerialTransfer => &SerialController.CompleteTransferEvent,
+        EventType.EReaderIrq => &Rom.EReader.IrqEvent,
         _ => throw new InvalidDataException($"The saved GBA event type {type} is unsupported.")
     };
 }

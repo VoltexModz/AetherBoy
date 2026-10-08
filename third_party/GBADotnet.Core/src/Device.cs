@@ -81,6 +81,7 @@ public unsafe partial class Device
         SerialController = new SerialController(this, debugger, InterruptInterconnect);
         Bus = new MemoryBus(bios, Gamepad, Gamepak, Ppu, Apu, DmaData, TimerController, InterruptRegisters, SerialController, debugger, skipBios, Diagnostics);
         Cpu = new Core(Bus, skipBios, debugger, InterruptRegisters, Diagnostics);
+        Gamepak.EReader?.Attach(this);
         DmaCtrl = new DmaController(Bus, debugger, DmaData, InterruptInterconnect, Cpu);
         Debugger = debugger;
 
@@ -173,6 +174,7 @@ public unsafe partial class Device
         Gamepad.Reset();
         SerialController.Reset();
         Scheduler.Reset();
+        Gamepak.EReader?.Reset();
 
         ScheduleInitialEvents();
     }

@@ -11,6 +11,7 @@ internal sealed class AetherListItem
 {
     internal AetherList? Owner;
     private bool selected;
+    private bool isChecked;
     internal List<Cell> SubItems { get; }
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     internal string Text { get => SubItems[0].Text; set { SubItems[0].Text = value; Owner?.Invalidate(); } }
@@ -22,6 +23,7 @@ internal sealed class AetherListItem
     internal string ToolTipText { get; set; } = "";
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     internal bool Selected { get => selected; set { if (value == selected) return; selected = value; Owner?.SelectionChanged(this); } }
+    internal bool Checked { get => isChecked; set { if (isChecked == value) return; isChecked = value; Owner?.CheckStateChanged(this); } }
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     internal bool Focused { get => Selected; set { if (value) Selected = true; } }
     internal Rectangle Bounds => Owner?.ItemBounds(Owner.Items.IndexOf(this)) ?? Rectangle.Empty;
@@ -47,6 +49,24 @@ internal sealed class AetherList : Control
     internal List<AetherListItem> SelectedItems => Items.Where(item => item.Selected).ToList();
     internal IndexSelection SelectedIndices => new(this);
     internal event EventHandler? SelectedIndexChanged;
+    [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
+    internal bool CheckBoxes { get; set; }
+    internal event Action<AetherListItem>? ItemCheckRequested;
+    internal void RequestItemCheck(AetherListItem item)
+    {
+        if (Enabled && CheckBoxes && item.Owner == this) ItemCheckRequested?.Invoke(item);
+    }
+    internal void CheckStateChanged(AetherListItem item)
+    {
+        Invalidate();
+        AccessibilityNotifyClients(AccessibleEvents.StateChange, Items.IndexOf(item));
+    }
+    internal Rectangle CheckBounds(int index)
+    {
+        Rectangle row = ItemBounds(index);
+        int size = Math.Min(RowHeight - 6, Math.Max(18 * DeviceDpi / 96, Font.Height));
+        return new Rectangle(row.Left + 8, row.Top + (RowHeight - size) / 2, size, size);
+    }
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
     internal View View { get => view; set { if (value is not (View.Details or View.LargeIcon)) throw new ArgumentOutOfRangeException(nameof(value)); view = value; Reflow(); } }
     [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
@@ -129,7 +149,14 @@ internal sealed class AetherList : Control
             if (View == View.Details)
             {
                 int x = bounds.Left;
-                for (int c = 0; c < Columns.Count; c++) { DrawText(e.Graphics, c < item.SubItems.Count ? item.SubItems[c].Text : "", new Rectangle(x + 8, bounds.Top, Math.Max(1, Columns[c].Width - 16), bounds.Height), color); x += Columns[c].Width; }
+                for (int c = 0; c < Columns.Count; c++)
+                {
+                    if (c == 0 && CheckBoxes)
+                        AetherCheckBox.DrawIndicator(e.Graphics, CheckBounds(i), item.Checked ? CheckState.Checked : CheckState.Unchecked,
+                            Enabled, item.Selected && ContainsFocus || i == hovered, DeviceDpi);
+                    else DrawText(e.Graphics, c < item.SubItems.Count ? item.SubItems[c].Text : "", new Rectangle(x + 8, bounds.Top, Math.Max(1, Columns[c].Width - 16), bounds.Height), color);
+                    x += Columns[c].Width;
+                }
             }
             else
             {
@@ -164,7 +191,13 @@ internal sealed class AetherList : Control
             int x = 2 - horizontal.Value;
             for (int i = 0; i < Columns.Count; i++) { x += Columns[i].Width; if (Math.Abs(e.X - x) < 6) { resizingColumn = i; resizeStart = e.X; resizeWidth = Columns[i].Width; Capture = true; return; } }
         }
-        int index = Hit(e.Location); if (index >= 0) Items[index].Selected = true;
+        int index = Hit(e.Location);
+        if (index >= 0)
+        {
+            var item = Items[index]; item.Selected = true;
+            if (e.Button == MouseButtons.Left && e.Clicks == 1 && CheckBoxes && View == View.Details && CheckBounds(index).Contains(e.Location))
+                RequestItemCheck(item);
+        }
         base.OnMouseDown(e);
     }
     protected override void OnMouseMove(MouseEventArgs e)
@@ -180,6 +213,8 @@ internal sealed class AetherList : Control
     protected override bool IsInputKey(Keys keyData) => (keyData & Keys.KeyCode) is Keys.Up or Keys.Down or Keys.Left or Keys.Right or Keys.Home or Keys.End or Keys.PageUp or Keys.PageDown || base.IsInputKey(keyData);
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        if (e.KeyCode == Keys.Space && CheckBoxes && SelectedItems.FirstOrDefault() is { } checkedItem)
+        { RequestItemCheck(checkedItem); e.Handled = e.SuppressKeyPress = true; return; }
         if (e.KeyCode == Keys.Enter) { OnDoubleClick(EventArgs.Empty); e.Handled = e.SuppressKeyPress = true; return; }
         if (e.KeyCode == Keys.F10 && e.Shift) { if (SelectedItems.FirstOrDefault() is { } item) hint = new AetherHint(this, string.Join("\r\n", item.SubItems.Select(cell => cell.Text))); e.Handled = true; return; }
         int current = SelectedIndices.Count > 0 ? SelectedIndices[0] : -1, step = View == View.LargeIcon ? TileColumns : 1;
@@ -213,9 +248,13 @@ internal sealed class AetherList : Control
         public override string? Name { get => string.Join(" · ", item.SubItems.Select(cell => cell.Text)); set { } }
         public override AccessibleRole Role => AccessibleRole.ListItem;
         public override Rectangle Bounds => list.RectangleToScreen(item.Bounds);
-        public override AccessibleStates State => AccessibleStates.Selectable | (item.Selected ? AccessibleStates.Selected : 0);
+        public override AccessibleStates State => AccessibleStates.Selectable | (item.Selected ? AccessibleStates.Selected : 0) |
+            (list.CheckBoxes && item.Checked ? AccessibleStates.Checked : 0) | (!list.Enabled ? AccessibleStates.Unavailable : 0);
+        public override string? DefaultAction => list.CheckBoxes
+            ? global::AetherBoy.Runtime.Localization.UiText.Get(item.Checked ? "Häkchen entfernen" : "Häkchen setzen") : base.DefaultAction;
         public override void Select(AccessibleSelection flags) { item.Selected = true; item.EnsureVisible(); list.Focus(); }
-        public override void DoDefaultAction() { Select(AccessibleSelection.TakeSelection); list.OnDoubleClick(EventArgs.Empty); }
+        public override void DoDefaultAction()
+        { Select(AccessibleSelection.TakeSelection); if (list.CheckBoxes) list.RequestItemCheck(item); else list.OnDoubleClick(EventArgs.Empty); }
     }
     internal sealed class ItemCollection(AetherList owner) : Collection<AetherListItem>
     {

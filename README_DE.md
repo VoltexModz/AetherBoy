@@ -6,7 +6,30 @@
 
 <p align="center"><strong>by NekoZDevTeam</strong></p>
 
-## Entwicklungsstand — 3. Oktober 2026
+## Entwicklungsstand — 8. Oktober 2026
+
+Windows und Linux haben jetzt eine **e-Reader-Kartenbibliothek** unter Einstellungen →
+Werkzeuge → e-Reader: Kartensätze importieren und benennen, Streifen ergänzen,
+getrennte Spielstände und Fortsetzen mit Vorschaubild. Eigene e-Reader-Firmware
+und Kartendateien werden weiterhin benötigt; nichts davon wird mitgeliefert.
+Noch kein Firmware-Ersatz und kein automatischer Import einer ganzen Sammlung.
+[Bedienung, Tests und Forschungsplan](docs/WINDOWS_ROADMAP.md#e-reader-kartenbibliothek-und-firmware-forschung--08102026).
+
+Scanner und Dotcode-Verarbeitung sind eine MPL-2.0-Adaption aus mGBA;
+Bibliothek und Oberflächenanbindung sind AetherBoy-Code. Echte NES-e-Tests halfen,
+Fehler bei ARM-Statusregisterzugriffen und Sound-FIFO-DMA im gemeinsamen GBA-Kern
+zu beheben. Barcode Boy hat zusätzliche Battle-Space-Regressionen. Eingefügte
+Cheats erhalten eine zeilenweise Prüfung und bessere Formaterkennung; mehrdeutige
+Formate und offene Platzhalter verlangen eine Auswahl beziehungsweise Korrektur.
+Ein erkannter Code garantiert keine passende Spielwirkung.
+[Cheat-Unterstützung und bekannte Grenzen](docs/CHEAT_SUPPORT.md).
+
+Der Linux-Beitrag `641cab0` ist enthalten: vollständiger Local-Link-Speicherabschluss,
+erhaltene Abschlussfehler, Korrektur eines zu frühen Discord-READY-Ereignisses und
+aufbewahrte Linux-CI-Diagnosen. Hardware, WAN-Tausch und allgemeine Spielkompatibilität
+bleiben getrennte Abnahmen. [Herkunft und Lizenzen](THIRD_PARTY_NOTICES.md).
+
+### Vorherige Desktop-Stabilisierung
 
 Beide Oberflächen bieten inzwischen Deutsch/Englisch als Anzeigesprache, sechs
 Themes mit eigenen Farben, den controllerorientierten Sofa-Modus, AVI-Aufnahmen,

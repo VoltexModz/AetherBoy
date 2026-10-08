@@ -16,6 +16,7 @@ namespace AetherBoy.Runtime
         Frameskip = 1 << 6,
         ShoulderButtons = 1 << 7,
         BarcodeBoy = 1 << 8,
+        EReader = 1 << 9,
 
         GameBoyStandard = SaveStates | Rewind | Cheats | MonochromePalettes |
             AudioChannelControls | AudioInspector | Frameskip,

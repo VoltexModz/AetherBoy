@@ -1,5 +1,36 @@
 # Linux-Ausbau
 
+## e-Reader-Kartenbibliothek — 08.10.2026
+
+Unter **Einstellungen → Werkzeuge → e-Reader → Kartenbibliothek** gibt es dieselben
+Grundfunktionen wie Windows: eigene entpackte Firmware auswählen, RAW/kleine ZIP-
+Kartensätze importieren und ergänzen, Titel bearbeiten, Stand mit Vorschau sichern
+und fortsetzen. SDL-/Aether-Darstellung, DE/EN und Themes bleiben erhalten.
+Die Oberfläche verwendet vorhandenes Datei-Picker-Routing; keine Windows-Controls.
+
+Gemeinsame Manifest-/Hashlogik in `AetherBoy.Runtime.EReaderLibrary`; Daten unter
+`<dataPaths.Data>/ereader`, normalerweise `$XDG_DATA_HOME/aetherboy/ereader`
+(die tatsächliche Basis folgt `LinuxDataPaths`, einschließlich Portable-Modus).
+Speicherpfade folgen der gefrorenen Set-/Firmware-/Streifenidentität, nicht nur dem
+ROM-Hash. Resume lädt den vollständigen Scannerzustand ohne doppelten Kartenimport.
+Die neue Seite verwendet die vorhandene Zustands-/Vorschauverwaltung.
+
+13 gemeinsame Bibliothekstests (abschließend 32/32 inklusive Sprachkatalog) und
+2 native DE/EN-Wayland-Seitentests bestanden;
+Linux-Screenshots unter `artifacts/ereader/library-ui-linux/`, dunkel/hell und große
+Schrift. WSLg-Fallbackrenderer, keine zusätzliche Hyprland-/Audio-Geräteabnahme.
+Der reale Bibliotheksablauf mit Donkey Kong-e und Balloon Fight-e bestand 2/2:
+neun Streifen, Spielbild, variable endliche PCM-Daten, zusätzliche 3.600 Frames,
+fünf komplette Save-State-Replays und Neustart aus gespeichertem Flash ohne Scan.
+Originalarchive bleiben unangetastet. Belege: `artifacts/ereader/library-games-linux/`.
+
+Kein Import der gesamten Sammlung, keine automatische Kartenerkennung/-gruppierung,
+kein ROM-freier Start und keine bestätigte Verbindung zum zweiten GBA-Spiel.
+Änderungen am Kartensatz erzeugen einen neuen Speicherbereich; alte Daten bleiben,
+eine Versionsauswahl fehlt noch. Vollständiger gemeinsamer Umfang, Firmware-
+Bestandsaufnahme, Forschungsquellen und offene Punkte stehen im
+[Windows-Arbeitsplan](WINDOWS_ROADMAP.md#e-reader-kartenbibliothek-und-firmware-forschung--08102026).
+
 ## Reparatur nach der Nachprüfung — 03.10.2026
 
 Deutsche Einstellungsüberschrift/Suchhilfe sind getrennt, Navigationshinweise
@@ -45,7 +76,8 @@ Farben bleiben bestehen**. Kantige Panels, diagonal geschnittene Buttons und
 gezielte Akzentverläufe verwenden gemeinsame Farben/Geometrie. Die bestehende
 Wayland-Bedienung bleibt erhalten. Phase 6.1 ist inzwischen als **eigene
 Startanimation** umgesetzt; auch **6.2 Barcode Boy** ist jetzt in beiden Frontends
-und im gemeinsamen Core implementiert. Der erste echte Spieltest steht noch aus.
+und im gemeinsamen Core implementiert. Echte Battle-Space-Tests und die spätere
+Stabilisierung sind im Abschnitt Phase 6.2 unten dokumentiert.
 Details und Grenzen stehen in der
 [gemeinsamen Reihenfolge](WINDOWS_ROADMAP.md#aktuelle-priorität-und-zurückgestellte-arbeiten--02102026).
 Der Designumbau ist gebaut, aber **noch nicht unter echtem Wayland visuell
@@ -61,15 +93,141 @@ Gleiche Runtime/Serial-Implementierung wie Windows; kein zweiter Zubehör-Core.
 Die neue Seite wurde unter WSLg/Wayland bedient und als Screenshot geprüft.
 Das synthetische GB-Testprogramm empfängt unter Linux beide vollständigen Pakete.
 
-Erster echter Testtitel: **Battle Space (Japan, GB)**. Eigene ROM noch ausstehend;
-Scanner-Erkennung/Bytezähler allein bestätigen keine im Spiel akzeptierte Karte.
-**Auf Nutzerwunsch für später vorgemerkt:** Battle-Space-Spielabnahme auf Windows
-und nativem Linux, anschließend Scanner-Timing und die übrigen vier Spiele.
+**Nachtrag 06.10.2026:** Die bereitgestellte **Battle Space (Japan, GB)**-ROM
+akzeptiert Berserker und Valkyrie im isolierten GB-Core-Test auf Linux/WSL und
+Windows. Figuren/Werte erscheinen im Spiel, Bestätigung und ein wiederholter
+Scan funktionieren; neun verglichene Spielbilder sind identisch. Original-ZIP
+unverändert, keine Cheats oder RAM-/ROM-Patches. Details und ROM-Prüfsumme im
+Windows-Plan, lokale Belege unter `artifacts/barcode-live-test/`.
+**Historischer Zwischenstand vor Stabilisierung:** Auch beide Scanner-Buttons mit echter ROM
+unter WSLg/Wayland geprüft: beide Kartenbilder stimmen. Teilpaket-Savestate,
+Rewind, Textimport, ungültige/besetzte Eingabe und Trennen/Reset bestehen.
+11 Barcode-Core-Fälle und 5 Linux-UI-Fälle bestanden; Runtime einschließlich
+Wiederanlauf: 13 bestanden, **2 fehlgeschlagen**, dieselben wie Windows.
+Nach 17 korrekten Karten verlangt das Spiel vor der nächsten Eingabe einen
+Scanner-Neustart; nach fünf emulierten Minuten Wartezeit steht bereits ein
+Fehlerdialog. Die anschließend gelesenen 30 Kartenbytes sind korrekt. Fehler
+bestätigen, Scanner trennen/verbinden und erneut bestätigen erlaubt wieder einen
+Scan, ohne Spielreset. Spiel-Timeout und Emulator-/Handshakefehler noch nicht
+abschließend getrennt; **keine vollständige Dauerabnahme**.
+Gemeinsame optionale ROM-Tests: `AETHERBOY_BATTLE_SPACE_ZIP`; UI zusätzlich
+`AETHERBOY_UI_TESTS=1` in einer Wayland-Sitzung. Belege unter
+`artifacts/barcode-extended/`, vollständige Grenzen/Startanleitung im Windows-Plan.
+**Anschließende Stabilisierung am selben Tag:** Der gemeinsame Core korrigiert
+die interne Taktphase und den DIV-Reset. Zwischen den beiden Barcode-Paketen liegt
+eine gespeicherte, Double-Speed-feste Kompatibilitätspause. Der originale
+Eingabe-Timeout bleibt bestehen; Wiederanlauf ist ein eigener Test, kein RAM-Hack.
+50 aufeinanderfolgende Karten und die 15-Minuten-Idle-Prüfung bestehen. Der
+strengere 1000-Karten-Lauf mit wechselnden Wartezeiten scheitert nach 596
+korrekten Karten bei der nächsten Geräteerkennung, identisch zu Windows.
+Der zusätzliche 1000er-Wiederanlauf besteht: fünf explizite Scanner-Neuverbindungen
+vor Scan 597, 652, 790, 936 und 994, kein ROM-Reset, alle Karten korrekt. Etwa
+88 emulierte Minuten, alle 1000 Abschlussbilder identisch zu Windows.
+Vollständiger Core 285/285, Barcode-Runtime 16 bestanden / 1 fehlgeschlagen, UI 5/5.
+Der strengere Test ohne Wiederverbinden bleibt rot; der zusätzliche Dauerlauf
+ist kein Ersatz für einen unterbrechungsfreien Nachweis. Ergebnisse,
+Quellen, gesicherter Repro und Grenzen stehen im
+[Stabilisierungsabschnitt](WINDOWS_ROADMAP.md#stabilisierung-und-zubehör-nachfolge-06102026).
+**Damals weiter offen:** der seltene Handshake-Zählerkonflikt, längeres tatsächliches
+Spielen und native Desktop-Abnahme beim Kollegen, die übrigen vier Spiele und
+gemessenes physisches Scanner-Timing.
 Die gemeinsame offene Checkliste steht im unten verlinkten Windows-Plan;
 dieser Prüfpunkt blockiert vorerst keine weitere Entwicklung.
-Kein GBA e-Reader, kein Bardigun und kein gleichzeitiger Link-Kabel-Betrieb.
+Barcode Boy ist kein GBA e-Reader oder Bardigun; kein gleichzeitiger Link-Kabel-Betrieb.
 512 Basis-Dots je Scanner-Bit sind eine vorläufige Emulationsrate, noch kein
 Hardware-Timingnachweis. Native Abnahme am Linux-Rechner bleibt auf der Merkliste.
+
+**Nachtrag 08.10.2026:** Der bekannte Repro ist behoben. Der Scanner erlaubt eine
+erneute vollständige Erkennung, bevor Kartenbytes übertragen werden, ohne eine
+vorgemerkte Karte zu verlieren. Bewusste Kompatibilitätserweiterung, kein Beweis
+identischen Hardwareverhaltens. Strenge 50-/1000-Kartenfolgen bestehen nun auch
+unter Linux ohne Neuverbinden oder ROM-Reset; jedes Kartenbild geprüft. Core
+**287/287**. Hardware-Timing, weitere Spiele und Abnahme beim Kollegen bleiben offen.
+Belege: `artifacts/barcode-retry/`; Details im gemeinsamen Windows-Plan.
+
+### Nächstes Zubehörprojekt: e-Reader
+
+Seit 08.10.2026 erster Einzelgeräte-Stand: derselbe GBA-Zubehör-Core wie Windows,
+kein zweiter Parser. Modul-/Scannerregister, Scan-Zyklen/IRQ, geschützte Flash-
+Kalibrierung und vollständiger Zubehör-Savestate. RAW 1872/2912 Byte sowie gepackte
+Punktbilder 3520/5456 Byte, maximal 16 wartende Karten; keine Bilder/dekodierten BINs.
+MPL-2.0-Adaptionen aus mGBA in zwei getrennt gekennzeichneten Dateien, Lizenz wird
+mit ausgeliefert. Normale GBA-Savestates bleiben im bisherigen Schema 6.
+
+**Settings → Tools → Open e-Reader**, DE/EN, Theme-/Customize-Farben, Kartenimport
+über den vorhandenen asynchronen Dateipicker und „Scans verwerfen“. Die Auswahl
+bleibt an die ursprüngliche Sitzung gebunden: kein versehentliches ROM-Laden.
+Abbruch/falsche Dateigröße behalten die vorhandene Warteschlange und Pause.
+ROM-freie GBA-/Zubehör-/Sprach-Regression **288/288**, einschließlich Kalibrierung
+über Beenden/Öffnen und Erhalt importierter Flashdaten. Zubehör-/Theme-UI unter
+WSLg/Wayland **11/11**. DE/EN in Original/hellen Eigenfarben und Schriftgröße 14/18
+gerendert und geprüft. Lokale Artefakte: `artifacts/ereader/`.
+
+Zusätzlich die bereitgestellten USA-Karte-1-ZIPs von Donkey Kong-e und Balloon
+Fight-e geprüft: je zwei RAW-Streifen à 2912 Byte, **2/2 Archivfälle je OS**;
+Decoder-Punktebilder und gespeicherte Warteschlangen sind plattformgleich.
+Original-ZIPs unverändert, keine Kartendaten gebündelt. Mit der nachgereichten
+USA-e-Reader-ROM folgt jetzt der echte Firmware-Scan: beide Streifen von Karte 1
+werden je Spiel erkannt (acht, dann sieben fehlende Dotcodes von insgesamt neun).
+Gemeinsamer Kernfix für spätes Einlegen in einen bereits wartenden zweiten Scan;
+ROM-freier Fehlernachweis und echte Scan-/Zustands-Wiederholungsprüfungen ergänzt.
+`ProvidedEReaderFirmwareTests`: zusätzlich `AETHERBOY_EREADER_ROM_ZIP`, je
+Kartensatz 20 identisch wiederhergestellte Läufe mitten im Scan sowie doppelte
+Karte ohne Fortschrittszuwachs. Belege: `artifacts/ereader/firmware-linux/`.
+Bei dieser ersten Teilprüfung fehlten je Spiel noch sieben Dotcode-Streifen;
+die inzwischen vollständige Sammlung und Spielabnahme folgen unten.
+Abschließende Runtime-Auswahl mit diesen echten Firmware-/Kartenprüfungen:
+**293/293 auf Linux/WSL und Windows**, keine übersprungenen Fälle. Die akzeptierten
+Teilimporte und ihre Bildprüfsummen sind plattformgleich; keine vollständige
+Spiel-/Flashspeicher-Abnahme. Ursprüngliche ZIPs bleiben unverändert.
+Optionale Fixture-Variablen und Grenzen im gemeinsamen Windows-Plan.
+
+**Erweiterte Sammlung, 08.10.2026:** Derselbe gemeinsame ARM-MSR-/Sound-FIFO-DMA-Fix
+wie unter Windows: Flags-Schreibzugriffe erhalten die IRQ-Sperre, Sound-DMA1/2
+erzwingt vier 32-Bit-Wörter und korrekte Nachfüllanforderungen. Vollständige
+Donkey-Kong-/Balloon-Fight-Sets booten, liefern Spielbilder/wechselndes PCM und
+bestehen Zustand-Wiederholungen, Flash-Speichern sowie Öffnen in einer neuen
+Maschine ohne erneute Scans. Kirby Slide Puzzle, Manhole und Air Hockey sind
+zusätzliche Standalone-Regressionen. Weitere elf NES-e-Sets, vier Pokémon-
+Promoansichten/Animationen und Kirby Contest Card geprüft. Die 19 zusätzlichen
+Windows-/Linux-Abläufe erzeugen 978 identische Bild-/Zustandsdateien; kein
+Durchspielnachweis und keine Prüfung aller Karten der Sammlung.
+GBA-/e-Reader-Testauswahl **315/315 je OS**, keine übersprungenen Fälle;
+Linux-Desktop- und Windows-Release-Build ohne Warnungen/Fehler. Linux hier unter WSL.
+Die USA-e-Reader-ROM reicht dafür aus, keine weitere Spiel-ROM nötig.
+`AETHERBOY_EREADER_COLLECTION_ZIP` aktiviert die optionalen Sammlungstests.
+Belege: `artifacts/ereader/matrix-linux/` und `collection-regression-linux/`.
+Dateien/Formatgrenzen und genaue Abnahmetiefe stehen im gemeinsamen Windows-Plan.
+
+**Zusätzliche breite Prüfung, 08.10.2026:** `ProvidedEReaderExtendedTests` ergänzt
+50 optionale Fälle. Die 49er-Matrix und vier vertiefte Läufe (drei davon längere
+Wiederholungen) bestehen auf **Linux/WSL 53/53 und Windows 53/53**, keine
+übersprungenen Fälle. Elf Mario-Party-e-Kartenprogramme werden über je zwei echte
+RAW-Streifen gestartet; 38 Pokémon-e-TCG-Programme über die mitgelieferten
+Flash-Abbilder (23 Minispiele laut Sammlung, acht Animationen, sieben Hilfsprogramme).
+Flash-Start ist kein RAW-Kartenscan-Nachweis. Zusätzlich werden Machop, Machoke und
+Machamp vollständig eingescannt und Machop At Work gestartet, ohne Flash-Injektion.
+
+Je Fall fünf vollständige Zustandswiederholungen; PCM und Eingaben erfasst,
+Originalarchive unverändert. Hauptmatrix mit 1.800 Zusatzframes je Programm;
+Big Boo, Pika Pop und Coin Flipper zusätzlich je 18.000 Frames. Diese Läufe
+enthalten auch Menüs/Game-over und ersetzen keine manuelle Spielabnahme.
+**801 identische Bildpaare und 697 identische Messpunkt-Paare** (Zustand, PCM,
+Diagnosen) zwischen Windows und Linux. 327.644 ausgeführte Frames je Plattform
+inklusive Restore und Boot, keine reine Spielzeit. Kein neuer Kernfehler in dieser
+Auswahl; nur Tests und Dokumentation ergänzt. Builds ohne Warnungen/Fehler.
+Belege in `artifacts/ereader/extended-linux/`, `deep-linux/` und
+`extended-comparison.json`; vollständige Titel und Testgrenzen im Windows-Plan.
+`AETHERBOY_EREADER_EXTENDED_OUTPUT` aktiviert Berichte/Bilder,
+`AETHERBOY_EREADER_SOAK_FRAMES` wählt 1.800–18.000 Zusatzframes.
+Dies ist weiterhin Linux unter WSL, keine native Desktop-/Audiogeräte-Abnahme.
+
+**Offen:** Hörprobe/Controller und längere Spielsitzungen, andere Firmware-Regionen,
+Kartenliste/Einzelentfernung, vollständiger Sammlungsimport in der Oberfläche, anschließend zweiter lokaler GBA
+und echter Kartentransfer. Eine Pokémon-ROM allein reicht nicht. Keine ROM/Karte
+gebündelt; Online-Transfer und Bildkonvertierung noch nicht angebunden. Native
+Desktop-/Controller-Abnahme beim Kollegen offen. GBC-IR bleibt ein separates Projekt.
+[Verbindliche gemeinsame Reihenfolge](WINDOWS_ROADMAP.md#als-nächstes-vorgesehen-e-reader-gemeinsam-für-windows-und-linux).
 
 [Gemeinsame Implementierung, Referenzen und vollständiger Spieltestplan](WINDOWS_ROADMAP.md#phase-62--barcode-boy-02102026).
 

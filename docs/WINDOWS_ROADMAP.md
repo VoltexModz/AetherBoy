@@ -3,6 +3,127 @@
 Aktueller Gesamtstand und gemeinsame Schnittstellen:
 [Übergabe an die Entwicklung (DE/EN)](WINDOWS_DEVELOPMENT_HANDOFF.md).
 
+## e-Reader-Kartenbibliothek und Firmware-Forschung — 08.10.2026
+
+Die erste Kartenbibliothek ist auf Windows und Linux implementiert:
+**Einstellungen → Werkzeuge → e-Reader → Kartenbibliothek**.
+
+- Einmal die eigene entpackte e-Reader-`.gba` auswählen. Es werden weder Nintendo-
+  Firmware noch Karten mitgeliefert.
+- RAW-Streifen oder kleine ZIPs für **ein** Programm importieren; weitere Karten
+  über „Streifen ergänzen“ demselben Eintrag hinzufügen. Titel frei bearbeiten.
+  Unterstützte Größen: 1872/2912 Byte RAW, 3520/5456 Byte gepackte Punktbilder;
+  kein allgemeiner Decoder für beliebige Dateien mit Endung `.bin`, keine Fotos.
+- „Kartensatz öffnen“ stellt die Streifen bereit. Beim ersten Start weiterhin
+  **Scan Card** in der Firmware wählen und deren Karten-/Speicherdialog bedienen.
+  Kein ROM-freier Direktstart und kein Skript, das Firmware-Menüs überspringt.
+- „Stand und Bild sichern“ speichert den Fortsetzen-Stand samt Spielbild.
+  „Fortsetzen“ lädt diesen Zustand einschließlich Scanner/Warteschlange;
+  bereits gescannte Karten werden dabei nicht erneut eingelegt.
+- Battery-Save, Schnell-Speicherplätze, Resume und Vorschau bleiben pro Kartensatz
+  getrennt. Der echte Firmware-Save speichert das Kartenprogramm; ein Save-State
+  kann zusätzlich den laufenden Spielzustand sichern. Nicht jedes Kartenprogramm
+  besitzt eine eigene reguläre Spielstandfunktion.
+
+Gemeinsames Modell: `nanoboy/Runtime/EReaderLibrary.cs`. Die Identität enthält die
+Set-ID, den Firmware-Hash und die geordnete Streifenliste. Zwei Einträge teilen
+deshalb auch bei identischer Firmware keine Speicherplätze. Umbenennen und
+identische Doppelimporte behalten die Identität. Neue Streifen oder andere
+Firmware erzeugen beim nächsten Öffnen einen neuen Speicherbereich; der alte
+wird **nicht gelöscht**, ist aber noch nicht über eine Versionsauswahl erreichbar.
+Die Firmware wird je Startidentität kopiert (bei USA jeweils 8 MiB); keine Hardlinks.
+
+Windows: `<AetherBoy-Datenordner>/EReader/{cards,sets,firmware,launches}`;
+Saves/States verwenden die bestehenden Windows-Speicherordner mit dieser Identität.
+Linux verwendet dieselben Manifeste unter `<Datenordner>/ereader`. Quelldateien
+bleiben unverändert. Hashprüfungen, begrenzte Archive, ein Writer-Lock und atomare
+Metadatenwrites schützen den Import; ZIP-Namen werden nicht als Zielpfade benutzt.
+Maximal 16 Streifen und eine verschachtelte ZIP-Ebene. Vollständigkeit, Region und
+die Zugehörigkeit kurzer/langer TCG-Streifen prüft weiterhin die Firmware.
+
+**Nachweise:** 13 neue ROM-freie Bibliothekstests je Windows/Linux bestanden;
+abschließend einschließlich Sprachkatalog **32/32 je Betriebssystem**.
+Windows-e-Reader-/UI-Policy-Auswahl 5/5 und native Linux-/Wayland-Seiten 2/2.
+Getrennte Speicherpfade, Vorschau, Auswahlliste, Fehleranzeige und DE/EN sind erfasst.
+Windows rendert alle sechs Themes, Linux dunkel/hell mit großer Schrift.
+Der manuelle bisherige Scan-Ablauf von Donkey Kong-e/Balloon Fight-e wurde zusätzlich
+unverändert erneut geprüft (2/2 Windows). Der vorab bestückte Bibliotheksstart
+hat für Balloon Fight eine eigene visuell geprüfte Gameplay-Referenz: der frühere
+Kartenzeitpunkt verändert das spätere Bild. Die alte Referenz wurde nicht ersetzt.
+Der neue vollständige Ablauf bestand **2/2 auf Windows und 2/2 unter Linux**:
+neun Streifen, Gameplay, wechselndes endliches PCM, 3.600 zusätzliche Frames,
+fünf identische Zustandswiederholungen, Flash-Speichern und erneutes Öffnen in einer
+neuen Maschine ohne Scan. 14 erzeugte Spielbilder stimmen zwischen Windows und
+Linux bytegenau überein. Das ist keine pauschale Freigabe aller Kartenspiele.
+Reale Spieltests und UI-Belege liegen privat unter `artifacts/ereader/library-*`.
+Keine Firmware-/Kartendaten werden ins Repository übernommen.
+
+**Noch offen:** automatische Metadaten/Komplettheitsanzeige, Import einer gesamten
+Sammlung mit automatischer Gruppierung, Kartenreihenfolge/Einzelentfernung,
+Versionsverwaltung alter Sets, weitere Regionen sowie manuelle Controller-, DPI-,
+Screenreader- und Hörabnahme. Karten-Link zu einem zweiten GBA/Online bleibt separat.
+
+### Read-only-Bestandsaufnahme der USA-Firmware
+
+`scripts/inspect-ereader-firmware.ps1 -Path <eigene.gba-oder.zip>` gibt nur
+Header/Hash/Byte-Statistik aus; keine ROM, Assets oder Disassemblierung werden
+geschrieben. Ergebnis der bereitgestellten Datei:
+
+| Merkmal | Beobachtung |
+|---|---|
+| Größe | 8.388.608 Byte = 8 MiB, etwa 8,39 MB |
+| Titel / Code / Revision | `CARDE READER` / `PSAE` / 0 |
+| Header-Prüfsumme | gültig |
+| Erster ARM-Sprung | `0x080000C0` |
+| Gleichförmiger Dateischluss | 966.108 Byte `FF`; wahrscheinlich Auffüllbereich |
+| SHA-256 | `72BF37F887E896ADD1342BF95A7CFE3494A689199F878E5E1AA3072639B1B948` |
+
+Das ist **keine vollständige Codeanalyse**. Entropie und Null-/FF-Anteile trennen
+weder ausführbaren Code von Grafiken/Audio noch komprimierte von ungenutzten Daten.
+Eine vollständige öffentliche, bytegenau reproduzierbare USA-Firmware-Decompilation
+wurde bei dieser Recherche nicht gefunden; das beweist nicht, dass keine existiert.
+„Zu fast 100 % dokumentiert“ ist ebenfalls nicht nachgewiesen.
+
+Belastbare Einstiegspunkte:
+
+- [GBATEK e-Reader](https://mgba-emu.github.io/gbatek/#gba-cart-e-reader-overview):
+  Scanner, Flash, Formate, ARM-Programme, Software-NES und Z80-artiger Interpreter;
+  API-Tabellen enthalten weiterhin unbekannte Einträge. Eine funktionierende
+  Hardwareemulation benötigt noch keine vollständige Ersatzimplementierung der API.
+- [nedclib](https://github.com/lambda-larry/nedclib): Dotcode-/VPK-Werkzeuge und
+  Kartenformate, GPL-2.0; Lizenz vor einer möglichen Codeübernahme berücksichtigen.
+- [e-reader-dev](https://github.com/AkBKukU/e-reader-dev): Homebrew-Buildablauf mit
+  devkitARM, VPK, Kartenencoding und druckbaren Dotcodes. Firmwarefunktionen und
+  darin vorhandene Assets werden von manchen Programmen vorausgesetzt.
+- [eReader-Compression](https://github.com/HunterRDev/eReader-Compression):
+  Analyse/Neubau von Kartendaten, nicht die vollständige Firmware-Decompilation.
+- [Pan Docs CPU-Vergleich](https://gbdev.io/pandocs/CPU_Comparison_with_Z80.html):
+  GB/GBC-SM83 ist kein vollständiger Z80. Die e-Reader-Z80-Programme laufen nicht
+  nativ auf der GBA-ARM-CPU; unser GB-Core ist daher kein austauschbarer Interpreter.
+
+**Forschungsplan, noch nicht implementiert:** erst eine eigene kleine Homebrew-Karte
+und reproduzierbare API-Tests; anschließend Aufruf-/Speicherkarte der Firmware,
+streng begrenzter Kartenparser/VPK, kleinster Z80-/API-Ausschnitt mit eigenen
+Grafiken/Tönen; danach getrennt NES-Ausführung und ARM-Karten mit Firmwareaufrufen.
+Jede Funktion mit Dokumentation und Gegenproben absichern. Eine komplette Matching-
+Decompilation ist ein eigenes Ziel und keine Voraussetzung für eine unabhängige
+kompatible Laufzeit innerhalb AetherBoy. Eine auf echter Hardware startbare freie
+GBA-Firmware wäre nochmals ein anderes Lieferobjekt.
+
+**Grobe Aufwandsordnung**, eine erfahrene Person in Vollzeit, keine Terminprognose:
+1–2 Wochen für einen abgegrenzten Untersuchungs-/Homebrew-Einstieg; 4–12 Wochen für
+einen schmalen eigenständigen API-/Interpreter-Prototyp. Breite Kompatibilität mit
+NES, ARM, Audio, Saves, Regionen und eigenen Ersatzressourcen: eher viele Monate
+(als Planungsrahmen 6–18+), nicht „ein paar Tage wegen 8 MB“. Eine vollständige
+Matching-Decompilation lässt sich daraus nicht seriös terminieren und kann ein
+mehrjähriges Community-Projekt werden. Die Zahlen müssen nach dem ersten Prototyp
+an tatsächlich gemessener Abdeckung revidiert werden.
+
+English handoff: shared per-set card library on both hosts; user-supplied firmware
+is still required. Immutable launch identities isolate flash, states and previews.
+The firmware inventory is read-only, not a completed decompilation. Independent
+runtime research remains a separate, staged project; no Nintendo data is bundled.
+
 ## Reparatur nach der Nachprüfung — 03.10.2026
 
 Die danach beauftragte Reihenfolge ist umgesetzt: Speicherabschluss, Fehleranzeige,
@@ -203,6 +324,478 @@ Der folgende Nachweis trennt technische Tests von der noch offenen Spielabnahme.
 
 ## Phase 6.2 — Barcode Boy, 02.10.2026
 
+### Nachtrag: echte Battle-Space-Spielprobe am 06.10.2026
+
+Die vom Nutzer bereitgestellte **Battle Space (Japan)**-ROM wurde isoliert mit
+unserem unveränderten GB-Core auf Windows und Linux/WSL ausgeführt. ROM-SHA256:
+`85B16134B866E1A1009CB0E8EEA892293D60B7592262E64C0FBA85BF73B67DBC`.
+Keine Cheats, ROM-/RAM-Patches oder normale Bibliotheks-/Spielstandpfade verwendet.
+Das Original-ZIP blieb nachweislich unverändert; ROM und Zustände bleiben lokal
+im ignorierten Testordner, nicht im Repository.
+
+- Scanner im Spiel erkannt, Karteneingabe erreicht.
+- **Berserker `4907981000301`** und **Valkyrie `4908052808369`** erscheinen
+  jeweils als richtige Figur mit unterschiedlichen Werten; beide lassen sich
+  bestätigen, danach läuft das Spiel weiter.
+- Bei der Kartenbestätigung „Nein“ gewählt und erneut gescannt: Valkyrie ersetzt
+  Berserker korrekt; zwei abgeschlossene Scans innerhalb derselben Sitzung.
+- Ein eigener Zustand vor dem Scan lässt sich für beide Karten wiederherstellen.
+- Neun identische PNG-Spielbilder auf Windows und Linux/WSL. Lokale Testquelle,
+  Zustände, Ereignisprotokolle und Bilder: `artifacts/barcode-live-test/`.
+
+Dies ersetzt den früheren Stand „keine echte ROM vorhanden“ für diese Teilprobe,
+nicht die vollständige Abnahme unten. Es war ein skriptgesteuerter Kern-Test,
+kein vollständiger Bedienablauf im normalen Windows-/Wayland-Fenster. Offen
+blieben zu diesem Zeitpunkt weitere Karten, längeres Spielen, Textdateiimport
+im echten Spiel, Savestate während des Empfangs/Rewind/Trennen/Reset mit dieser
+ROM sowie die native Linux-Desktop-Abnahme beim Kollegen offen. Der erweiterte
+Nachweis folgt direkt unten; die übrigen Barcode-Boy-Spiele bleiben ungeprüft.
+
+English: the supplied Battle Space ROM accepts both built-in example cards and
+a repeated scan in an isolated, unmodified-core test on Windows and Linux/WSL.
+All nine compared game frames match exactly. Full frontend and long-run game
+acceptance remains open; the original ZIP was not changed or committed.
+
+### Historischer Zwischenstand: erweiterte Regression, 06.10.2026
+
+**Vor der anschließenden Stabilisierung nicht vollständig bestanden.** Die echte ROM wird jetzt durch optionale,
+wiederholbare Tests geprüft, nicht nur durch die einmalige Kernprobe. Neue
+Testdateien: `tests/Shared/BattleSpaceFixture.cs` und
+`tests/AetherBoy.RuntimeTests/BattleSpaceBarcodeGameTests.cs`; zusätzlich echte
+Spieltests in `WindowsBarcodeBoyTests` und `LinuxBarcodeBoyTests`.
+
+| Prüfbereich | Windows | Linux/WSL bzw. WSLg |
+| --- | --- | --- |
+| Bestehende Barcode-Core-Protokolltests | 11 bestanden | 11 bestanden |
+| Runtime einschließlich echter ROM und Wiederanlauf | 13 bestanden, 2 fehlgeschlagen | 13 bestanden, 2 fehlgeschlagen |
+| Scanner-Oberfläche; Windows zusätzlich UI-Policy | 6 bestanden | 5 bestanden |
+
+Gezählt wird jeder Fall je Plattform einmal, keine Wiederholungen zur
+Fehlersuche. Linux-Runtime und Wayland-Tests wurden auch mit eigenem Linux-Build
+ausgeführt. Das ist keine Abnahme auf dem Rechner des Kollegen.
+
+Bestanden mit der unveränderten Battle-Space-ROM:
+
+- Beide Beispielkarten über den tatsächlichen Scanner-Button der Windows- und
+  Wayland-Oberfläche an eine `EmulationSession` übergeben. Nicht nur der Zähler,
+  sondern das vollständige Spielbild einschließlich Figur und Werten stimmt.
+- Zustand während eines teilweise übertragenen Pakets speichern und laden:
+  beide Karten und der vollständige spätere Zustand sind reproduzierbar.
+  Ein Frame-Ende ist nicht zwingend mitten in einem Bit; diese Bitphase deckt
+  separat der bestehende Core-Test ab.
+- Während des Empfangs zurückspulen und anschließend eine andere Karte scannen.
+- UTF-8-Textimport mit BOM/Zeilenende; ungültige Eingabe und zweite vorgemerkte
+  Karte verändern weder den ersten Transfer noch den gespeicherten Zustand.
+- Scanner vor/während Empfang trennen, wieder anschließen und Spiel zurücksetzen;
+  außerdem direkt während Empfang zurücksetzen: kein alter Scan wird nachgeliefert.
+- Nach rund fünf emulierten Minuten Wartezeit den Spiel-Fehler mit A bestätigen,
+  Scanner trennen/verbinden, wieder A und scannen: Berserker funktioniert wieder,
+  **ohne Spielreset, Laden eines alten Zustands oder RAM-Patch**.
+
+Zwei bewusst weiterhin rote Abnahmeszenarien, auf beiden Plattformen identisch:
+
+1. **50 abwechselnde Scans ohne Scanner-Neustart:** Die ersten 17 Karten stimmen.
+   Beim Rückweg zur Eingabe vor Scan 18 erscheint bereits die Aufforderung des
+   Spiels, den Barcode Boy aus-/einzuschalten. Der anschließende Scan liefert
+   keine Karte. Der Test bricht dort ab; die restlichen 32 Scans sind ungetestet.
+2. **Nach fünf emulierten Minuten unmittelbar scannen:** Bereits vor dem Scan
+   zeigt das Spiel „Error“. Der Scan allein schließt den Dialog nicht; Wiederanlauf
+   über Bestätigen und Neuverbinden ist dagegen separat bestanden (siehe oben).
+
+Der lesende CPU-I/O-Trace zeigt in beiden Fällen anschließend alle 30 erwarteten
+Kartenbytes in der richtigen Reihenfolge. Nach dem 17. Scan ist im Wiedererkennen
+zunächst `FF FF 10 07` zu sehen, danach wiederholt das Spiel die Abfrage und bekommt
+nur noch `FF`. `BarcodeBoy.Ready` allein beweist also nicht, dass das Spiel gerade
+Karten annimmt. **Noch ungeklärt:** Welche Grenze kommt vom Originalspiel
+(Eingabe-Timeout/Bedienablauf) und welche von unserer Erkennung oder Zeitsteuerung?
+Vor einem Core-Fix gegen Referenzemulation oder Originalhardware abgleichen.
+Keine Produktionslogik und keine Timing-Konstante für grüne Tests geändert.
+
+Ausführen: `AETHERBOY_BATTLE_SPACE_ZIP` auf das eigene ZIP setzen, optional
+`AETHERBOY_BATTLE_SPACE_CAPTURE_DIR` für Bilder und begrenzte serielle Traces.
+Ohne ROM-Variable werden die echten Spieltests als übersprungen gemeldet; die
+synthetischen Barcode-Tests benötigen keine ROM. Die Fixture prüft die oben
+genannte Revision, schreibt ausschließlich in einen eigenen temporären Ordner
+und prüft abschließend die unveränderte SHA-256 des Originalarchivs. Keine ROM,
+Spielstände oder kommerziellen Bilddaten werden als Testasset mitgeliefert;
+im Code stehen nur Prüfsummen der zuvor visuell geprüften Kartenbilder.
+
+Beispiel: `dotnet test --project tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj -c Release --filter "FullyQualifiedName~BattleSpaceBarcodeGameTests|FullyQualifiedName~BarcodeBoyRuntimeTests"`.
+Aktuell mit der bereitgestellten ROM **Fehlerstatus wegen der zwei offenen
+Abnahmeszenarien erwartet**, nicht als grüner Gesamtnachweis verwenden.
+Lokale Berichte/Bilder/Traces: `artifacts/barcode-extended/`.
+
+English handoff: both real card scans work through Windows and Wayland controls.
+Partial-packet save/restore, rewind, text import, invalid/busy input and reset
+recovery pass. The two long-run acceptance scenarios still fail identically on
+Windows and Linux: re-entry after 17 correct cards, and scanning without
+acknowledging the game's timeout after five emulated minutes. All 30 card bytes
+are received correctly. Acknowledge/power-cycle/retry recovers without a console
+reset. Distinguish original-game behavior from emulator timing/state faults
+before changing production code. No general compatibility or endurance claim.
+
+### Stabilisierung und Zubehör-Nachfolge, 06.10.2026
+
+Die beiden ursprünglichen Langzeitbefunde wurden getrennt untersucht:
+
+1. **Erneute Erkennung nach 17 Karten:** Der interne serielle Takt begann bisher
+   bei jedem SC-Start wieder bei null. Dadurch konnte der serielle Interrupt einen
+   Timer-Interrupt des Spiels so unterbrechen, dass dessen alter Zählerwert den
+   gerade gesetzten Empfangs-Timeout überschrieb. Der Scanner-Handshake verwendet
+   jetzt die Phase des laufenden Systemteilers; ein DIV-Reset berücksichtigt die
+   entsprechende Taktflanke. Referenz für dieses Verhalten:
+   [SameBoy timing.c](https://github.com/LIJI32/SameBoy/blob/master/Core/timing.c)
+   und [SC-Verarbeitung](https://github.com/LIJI32/SameBoy/blob/master/Core/memory.c).
+   Keine übernommenen Quelltextblöcke, keine Abfrage von Spieladressen im Core.
+2. **Fünf Minuten ohne Eingabe:** Der untersuchte Spielcode besitzt selbst einen
+   Eingabe-Timeout. Der ursprüngliche Test verlangte zu Unrecht, dass ein Scan
+   diesen Fehlerdialog ohne Bedienung schließt. Der Ersatztest verlangt den
+   reproduzierbaren Originaldialog, keinen erfundenen Scan und weiteren stabilen
+   Ablauf bis 15 emulierte Minuten. Ein separater Test bestätigt den Wiederanlauf:
+   Fehler mit A bestätigen, Scanner trennen/verbinden, erneut A, Karte scannen.
+   Weder ROM-Reset noch RAM-Patch oder vorheriger Spielstand sind dafür nötig.
+
+**Zusätzlicher Befund durch wechselnde Scan-Zeitpunkte:** Ohne Abstand zwischen
+den zwei Kartenpaketen kann die Wiederholung den ersten Empfangspuffer während
+der Interruptbearbeitung überschreiben. Eine rein emulierte Pause von 14336
+Basis-Dots (ca. 3,42 ms) trennt jetzt beide Pakete. Kleinere getestete Pausen ließen
+den Pufferverlust bestehen, 16384 Dots konnten dagegen den Spiel-Timeout erreichen.
+Die gewählte Pause ist **Kompatibilitätstiming**, keine behauptete Messung des
+echten Scanners. Die Bitrate von 512 Basis-Dots bleibt ebenfalls vorläufig.
+Andere Spiele und echte Hardware bleiben separat zu prüfen.
+
+Die Pause läuft auch ohne aktiven SC-Empfang weiter, berücksichtigt Double-Speed,
+wird durch erneutes SC-Armen nicht verlängert und gehört zum gespeicherten Zustand.
+`BCB2` enthält die Restpause; `BCB1` bleibt lesbar und übernimmt die gespeicherte
+Bitphase. Alte Programme können neue BCB2-Zustände nicht lesen. Reset/Trennen
+verwerfen vorgemerkte Daten; fehlerhafte Zustände werden vor Mutation abgewiesen.
+
+Neue Regression: alle Startphasen des normalen/schnellen internen Takts, vier
+DIV-Reset-Flankenfälle, interner Halbbit-Savestate sowie Paketpause/Abbruch,
+Double-Speed und BCB1-Migration. Der echte Spieltest enthält jetzt eine unveränderte
+50er-Folge und **1000 abwechselnde Karten mit wechselnden Wartezeiten**. Jede Karte
+wird gegen das vollständige zuvor geprüfte Spielbild verglichen, nicht nur gegen
+den Übertragungszähler. Lokale Testartefakte: `artifacts/barcode-stability/`.
+
+**Historischer Befund vom 06.10.: verbessert, noch keine unterbrechungsfreie Dauerfreigabe.**
+Die feste 50er-Folge besteht auf beiden Systemen. Im verschärften 1000er-Lauf
+stimmen 596 Kartenbilder; die erneute Geräteerkennung vor Karte 597 endet auf
+beiden Systemen in der Aufforderung, den Scanner aus-/einzuschalten. Der Emulator
+läuft dabei weiter. Der strenge Test bleibt rot und wurde nicht abgeschwächt.
+
+Der gesicherte Repro zeigt erneut eine verschachtelte Spielroutine: Der Timer
+liest `FFCC=2`, der serielle Interrupt setzt den Empfangszähler auf 5, anschließend
+schreibt der unterbrochene Timer seinen alten, dekrementierten Wert 1 zurück.
+Die vier Handshake-Antworten sind korrekt. Das ist ein beobachteter Ablauf,
+**kein Nachweis**, dass Originalhardware denselben Fehler zeigen muss. Ein
+zusätzlicher, isolierter SameBoy-Core-Vergleich mit eigenem Testadapter zeigt
+ebenfalls solche verlorenen Zähleraktualisierungen; dieser Adapter ist weder
+SameBoys eigene Barcode-Boy-Unterstützung noch ein vollständiger Hardwareersatz.
+Referenz-Commit: `e108490dce6033b0c75d41baa0ba19436ab0d327`.
+
+Der Windows-Repro lässt sich durch Bestätigen, Scanner trennen/verbinden und
+erneutes Bestätigen ohne Konsolenreset zur korrekten Berserker-Karte zurückführen.
+Gesicherter Zustand vor der Wiederverbindung, Fehlerzustand, Takttrace und Bild
+liegen lokal unter `artifacts/barcode-stability/checkpoint/`. Keine Spieladressen
+werden im Produktionscode abgefragt oder verändert. Ein zusätzlicher 1000er-Test
+mit **explizit protokollierter Benutzer-Wiederverbindung** prüft die Erholung;
+er ersetzt den strengeren Test ohne Wiederverbindung nicht.
+
+**Wiederanlauf-Dauerlauf bestanden auf beiden Systemen:** 1000 richtige Karten
+mit **fünf expliziten Scanner-Neuverbindungen**, jeweils vor Scan 597, 652, 790,
+936 und 994. Kein Konsolenreset, kein Spiel-RAM-Patch, keine falsche akzeptierte
+Karte und kein Emulatorabsturz. Etwa 88 Minuten emulierte Zeit pro OS; 1000
+paarweise verglichene Abschlussbilder sind bytegleich. Ein fehlerfreier
+unterbrechungsfreier 1000er-Lauf ist damit **nicht** nachgewiesen.
+
+Abschluss des Testpakets: vollständiger Core **285/285 je OS**, Barcode-Runtime
+einschließlich Wiederanlauf **16 bestanden / 1 fehlgeschlagen je OS**,
+Windows-UI/Policy **6/6**, Linux-/Wayland-UI **5/5**. Insgesamt **613 bestanden,
+2 fehlgeschlagen** in 615 Ausführungen, einschließlich der strengen Dauerlauf-
+Fehler. Dies ist keine vollständige Gesamtsuite aller Emulatorfunktionen.
+Belege: `artifacts/barcode-stability/results/`, `recovery-windows/` und
+`recovery-linux/`. Keine Originaldatei verändert, keine ROM/Spielstände eingecheckt,
+kein Commit/Push.
+
+#### Barcode-Abschluss des bekannten Repros — 08.10.2026
+
+Der unveränderte strenge Test mit **1000 abwechselnden Karten und wechselnden
+Wartezeiten besteht jetzt auf Windows und Linux**, ebenso die feste 50er-Folge.
+Jedes vollständige Kartenbild wird weiterhin geprüft. Keine Scanner-Neuverbindung,
+kein ROM-Reset, kein Spiel-RAM-Patch. Die Original-ZIP bleibt unverändert.
+
+Reparatur: Der Scanner akzeptiert eine erneute vollständige interne Erkennung
+`10 07 10 07`, solange noch kein Kartenbyte übertragen wurde. Das Spiel kann so
+nach seiner verlorenen Handshake-Zähleraktualisierung weiter erkennen; eine
+bereits vorgemerkte Karte bleibt erhalten. Abgebrochene Transfers ändern den
+Erkennungszustand nicht. **Dies ist eine bewusste Kompatibilitätserweiterung**:
+Dokumentierte Hardware wartet nach erfolgreicher Erkennung auf Karten und liefert
+intern `FF`. Der Fix ist kein Beleg für identisches Originalhardware-Verhalten.
+Scanner-Timing und die anderen vier Spiele bleiben separat offen.
+
+Nachweise: vollständiger GB/GBC-Core **287/287 je OS**, strenge 50-/1000-Spieltests
+**2/2 je OS** unter `artifacts/barcode-retry/`. Zwei neue Protokolltests schützen
+die Erkennungswiederholung mit vorgemerkter Karte/Savestate und den Transferabbruch.
+Die Oberflächen melden nun „Scanner bereit“, nicht eine angeblich bestätigte
+Spiel-Erkennung. Die Wiederanlauf-Tests bleiben zusätzliche Prüfungen.
+
+#### Als nächstes vorgesehen: e-Reader (gemeinsam für Windows und Linux)
+
+**Seit 08.10.2026 als erstes Einzelgeräte-Paket implementiert; Teilimport mit
+echter USA-ROM nachgewiesen, vollständiger Spielstart noch offen.** Kein Ausbau der Barcode-Boy-13-Ziffern-
+Schnittstelle und keine automatische Freischaltung in Pokémon-Spielständen.
+Der e-Reader verarbeitet Dotcode-Daten über eigene Modulhardware. mGBAs
+[e-Reader-Implementierung](https://github.com/mgba-emu/mgba/blob/master/src/gba/cart/ereader.c)
+und [Einführung der vollständigen Emulation](https://mgba.io/2021/03/28/mgba-0.9.0/)
+sind Referenzen. `EReader.cs` und `EReaderDotCode.cs` sind ausdrücklich
+C#-Adaptionen unter **MPL-2.0**, mit Herkunft und Lizenz in
+`third_party/mgba-ereader/`. Der Windows-Paketbau nimmt diese Hinweise und den
+passenden veränderten Quellcode mit auf. Keine Firmware-/Kartendumps beigelegt.
+
+Umgesetzt: PEAJ/PSAJ/PSAE-Erkennung, Modul-/Scannerregister, serieller Sensor,
+Scanposition und Game-Pak-IRQ über emulierte Zyklen. Kartenimport für RAW-Streifen
+(1872/2912 Byte) und gepackte Punktbilder (3520/5456 Byte). Keine Fotos/PNGs oder
+dekodierten BIN-Karten. Besitzerthread-Befehle und eine begrenzte Warteschlange
+mit 16 eigenen Kartenpuffern; ungültige Dateien ersetzen keinen laufenden Scan.
+Register, Sensor, Punktebild und Warteschlange werden vollständig gespeichert
+(e-Reader-Schema 7). Normale GBA-ROMs schreiben unverändert Schema 6 und lesen
+Schema 5/6. Alte e-Reader-Zustände ohne Zubehörzustand werden abgelehnt; stattdessen
+den Batteriespielstand laden. Kalibrierung ergänzt nur vollständig gelöschte
+Flash-Sektoren, niemals vorhandene Programm-/Kalibrierdaten.
+
+Bedienung: **Einstellungen → Werkzeuge → e-Reader**, oder Suche „e-Reader“.
+Eigene e-Reader-ROM als Spiel öffnen, Karte aus Datei laden, Menü schließen und
+in der e-Reader-Software scannen. „Scans verwerfen“ leert Warteschlange/aktiven
+Scan, nicht gespeicherte Programme. Der Import setzt pausierte Spiele nicht fort.
+Der Scan-Zähler bestätigt keine vom Spiel akzeptierte Karte. Aether-Komponenten,
+DE/EN und Theme-/Customize-Farben sind auf beiden Plattformen angebunden.
+
+ROM-freie GBA-/Zubehör-/Sprach-Regression: **288/288 je OS**. Vier unabhängig
+ausgeführte unveränderte mGBA-C-Dotcode-Decoder-Fälle mit synthetischen Daten
+erzeugen dieselben SHA-256-Werte wie der C#-Port. Register, FIFO/Reihenfolge,
+IRQ-Zyklen, Reset, Zustandswiederherstellung, beschädigte Zustände und sichere
+Ablehnung bei GB/normalen GBA-ROMs geprüft. Auch der echte Runtime-Speicherabschluss
+erhält Kalibrierung über Beenden/Öffnen und lässt importierte Flashdaten unverändert;
+Integritätsprüfungen verwalteter Saves bleiben aktiv. Windows-UI/Policy/Theme/Sprache:
+**23/23**, Linux-Zubehör/Theme unter WSLg/Wayland: **11/11**. Screenshots und
+Ergebnisse unter `artifacts/ereader/`. Native Linux-, Controller- und echte
+Monitor-DPI-Abnahme bleiben eigene Prüfpunkte.
+
+**Bereitgestellte Karten, 08.10.2026:** Donkey Kong-e (USA), Karte 1 und Balloon
+Fight-e (USA), Karte 1 enthalten jeweils zwei RAW-Streifen mit 2912 Byte. Alle
+vier Streifen bestehen die Decoder-, Warteschlangen- und Zustand-Roundtrip-
+Vorprüfungen auf Windows/Linux (**2/2 Archivfälle je OS**); RAW-/Punktebild-
+SHA-256-Werte sind plattformgleich. `ProvidedEReaderCardTests` liest die Original-
+ZIPs ausschließlich schreibgeschützt und prüft deren unveränderte Prüfsumme.
+Variablen: `AETHERBOY_DONKEY_KONG_CARD1_ZIP` und
+`AETHERBOY_BALLOON_FIGHT_CARD1_ZIP`; ohne Dateien sind die Tests bewusst optional.
+Keine Kartendaten eingecheckt. Belege: `artifacts/ereader/provided-cards-windows/`
+und `provided-cards-linux/`. Diese Vorprüfungen allein bestätigen weder Fehlerkorrektur/Akzeptanz durch
+die echte Firmware noch den Spielstart. Zu diesem Zeitpunkt lagen nur Teilkartensätze vor;
+die spätere vollständige Sammlung und Spielabnahme sind unten dokumentiert.
+
+**Firmware-Abnahme, 08.10.2026:** Die inzwischen bereitgestellte **e-Reader
+(USA)** bootet mit unserem HLE-BIOS. Beide RAW-Streifen von Karte 1 werden bei
+Donkey Kong-e und Balloon Fight-e tatsächlich von der Software akzeptiert:
+Anwendungsname stimmt, Anzeige wechselt von acht auf sieben fehlende Dotcodes
+von insgesamt neun. Das ist ein erfolgreicher Teilimport, **noch kein NES-Spielstart**.
+Neue optionale `ProvidedEReaderFirmwareTests` verwenden zusätzlich
+`AETHERBOY_EREADER_ROM_ZIP`; keine ROM-/Kartendaten im Repository.
+
+Im echten Ablauf gefunden und im gemeinsamen Kern behoben: Nach einem bereits
+beendeten Scan blockierte ein leerer Punktebildpuffer später eingelegte Karten.
+Ein wartender Scanner prüft jetzt weitere Einfügungen und beginnt den neuen
+Streifen an einer definierten Scanposition. Der ROM-freie Regressionstest wurde
+zuerst rot nachgewiesen. Weitere Prüfungen: spätes Einlegen, Import vor Scanstart,
+20 Wiederholungen aus einem Zustand mitten im Scan je Kartensatz sowie doppelte
+Karte ohne zusätzlichen Fortschritt. Der vollständige Zustand wird zwischen
+identisch wiederhergestellten Läufen verglichen. Das ist kein Vergleich mit der
+ununterbrochenen Host-Zeitleiste: Restore setzt die automatische Rewind-Taktung
+zurück, deren Zustandserfassung die CPU bis zur Instruktionsgrenze weiterschaltet.
+Bildbelege und Ergebnisse unter `artifacts/ereader/firmware-windows/` und
+`firmware-linux/`; separate Erkundung unter `artifacts/ereader-live/`.
+Abschließende GBA-/Zubehör-/Sprachprüfung einschließlich echter Firmware- und
+Kartenfälle: **293/293 auf Windows und 293/293 unter Linux/WSL**, keine ausgelassenen
+Fälle in dieser Auswahl. Vier akzeptierte Streifen und die Bilder nach Restore
+sind plattformgleich. Originalarchive unverändert. Manuelle Zusatzprobe unter
+Windows: Balloon-Fight-Streifen in der laufenden Donkey-Kong-Sammlung zeigt die
+Warnung der Firmware vor dem Verwerfen des bisher eingelesenen Programms;
+Bestätigung wurde nicht ausgeführt. Kein kompletter Kartensatz-/Speichertest.
+Aktualisierte UI-Texte: Windows-e-Reader/Policy/Theme/Sprache **34/34** und
+Linux-e-Reader/Theme unter WSLg/Wayland **6/6**, Importbestätigung und Fehlerfall
+erneut auf Deutsch/Englisch und mit dunklen/hellen Farben gerendert und geprüft.
+
+**Vollständige Sammlung und Standalone-Abnahme, 08.10.2026:** Die nachgereichte
+Sammlung enthält 3.187 verschachtelte ZIPs mit 4.458 Nutzdateien: 3.996 strukturell
+dekodierbare RAW-Streifen (1.872 bzw. 2.912 Byte), 461 Flash-Abbilder mit je 128 KiB
+und einen abgelehnten, um ein Byte verkürzten Tom-Nook-Streifen (2.911 Byte).
+Flash-Abbilder sind keine einzuscannenden Karten. Eine erfolgreiche Decoderprüfung
+aller RAW-Dateien ist **keine** vollständige Spiel-/Regionsabnahme.
+
+Zwei im echten NES-e-Ablauf nachgewiesene Fehler des gemeinsamen GBA-Kerns behoben:
+
+- ARM-MSR schreibt nur ausgewählte CPSR-/SPSR-Felder. Ein Flags-Schreibzugriff im
+  NES-Audiomischer hatte IRQs versehentlich freigegeben, dadurch den Rücksprung
+  überschrieben und schließlich Code im RAM zerstört. 14 ROM-freie Tests sichern
+  Feldmasken, Privilegien, Registerbänke und IRQ-Rückkehr ab; die ersten elf Fälle
+  wurden vor dem Fix rot nachgewiesen.
+- Sound-FIFO-DMA1/2 überträgt unabhängig vom Größenbit vier 32-Bit-Wörter und fordert
+  ab 16 verbleibenden Bytes Nachschub an. Ein laufender Transfer wird nicht erneut
+  gestartet. Sechs ROM-freie Tests; drei schlugen vor dem Fix fehl. Damit liefert
+  Balloon Fight nach zuvor konstant null nun wechselnde PCM-Audiosamples.
+  Referenz: [GBATEK Sound DMA](https://mgba-emu.github.io/gbatek/#sound-dma-fifo-timing-mode-dma1-and-dma2-only).
+
+`ProvidedEReaderCollectionTests` verwendet zusätzlich
+`AETHERBOY_EREADER_COLLECTION_ZIP` (Originalarchiv ausschließlich schreibgeschützt):
+vollständige Neun-Streifen-Sets von **Donkey Kong-e und Balloon Fight-e**, sichtbare
+Titel-/Spielbilder, Eingaben, 3.600 zusätzliche Frames, wechselndes endliches PCM,
+fünf vollständige Zustandswiederholungen. Anschließend im Firmware-Dialog ausdrücklich
+**YES** auswählen (Standard ist das blinkende NO), Flash speichern und in einer
+neuen Maschine **Access saved data** aufrufen, ohne Karten neu einzulesen.
+Save-Datei bleibt beim Abspielen unverändert; Originalarchive bleiben unangetastet.
+Kirby Slide Puzzle, Manhole und Air Hockey haben weitere echte Firmware-
+Regressionen mit geprüften Spielbildern und je drei Zustandswiederholungen.
+Screenshots werden optional über `AETHERBOY_EREADER_TEST_OUTPUT` abgelegt.
+
+Zusätzliche gleiche Abläufe auf Windows und Linux/WSL: alle weiteren elf USA-NES-e-
+Sets eingelesen und gestartet — Baseball, Clu Clu Land, Donkey Kong 3, Donkey Kong Jr.,
+Excitebike, Golf, Ice Climber, Mario Bros., Pinball, Tennis, Urban Champion.
+Excitebike/Tennis benötigen nach der ersten Starttaste eine zweite im Auswahlmenü;
+der anschließende Renn-/Tennisbildschirm wurde zusätzlich geprüft.
+Standalone: Kirby Slide Puzzle, Manhole Old-e (E3), Air Hockey-e; Celebi-Animation,
+Ho-oh-/Rapidash-/Suicune-Infoansichten sowie Kirby Contest Card (Loser) mit
+erwarteter Nichtgewinn-Meldung. Bei Celebi ist der lange Streifen ein eigenes
+Programm; der kurze bleibt im gemischten Warteschlangenversuch übrig. Nicht alle
+langen/kurzen Streifen einer TCG-Karte gehören zu einem gemeinsamen Kartensatz.
+Die 19 zusätzlichen Abläufe ergeben **978 identische Bild-/Zustandsdateien** auf
+Windows und Linux/WSL; dies sind Start-/Kurzproben, keine durchgespielten Titel.
+GBA-/e-Reader-Testauswahl mit bereitgestellten Dateien: **315/315 auf Windows und
+315/315 unter Linux/WSL**, keine übersprungenen Fälle. Beide Frontends bauen in
+Release ohne Warnungen/Fehler. Die gemeinsamen Fixes betreffen beide Plattformen;
+der Linux-Nachweis hier ist WSL, keine erneute native Geräteabnahme beim Kollegen.
+Lokale Belege: `artifacts/ereader/matrix-windows-final/`, `matrix-linux/`,
+`collection-regression-windows-final/`, `collection-regression-linux/`.
+
+**Breiterer Programmtest, 08.10.2026 (zusätzlicher Durchlauf):**
+`ProvidedEReaderExtendedTests` ergänzt 50 optionale Fälle mit denselben beiden
+privaten Fixture-Archiven. Keine ROM-, Karten- oder Flash-Daten sind Bestandteil
+der Tests im Repository. Die 49 Fälle der Hauptmatrix und vier vertiefte Läufe
+(ein neuer Scan-Fall, drei längere Wiederholungen) bestanden auf **Windows 53/53**
+und **Linux/WSL 53/53**, jeweils ohne übersprungene Tests. Dies ist zusätzlich zur
+oben dokumentierten 315er-Auswahl, kein erneuter gemeinsamer 365er-Testlauf.
+
+| Gruppe | Umfang | Tatsächlich geprüfter Einstieg |
+|---|---:|---|
+| Mario Party-e | 11 Kartenprogramme | Je beide RAW-Streifen eingescannt; zusätzlich das unabhängige mitgelieferte Flash-Abbild gestartet |
+| Pokémon-e TCG | 23 als Minispiele bezeichnete Programme | Mitgeliefertes Flash-Abbild; **kein** vollständiger RAW-Scan-Nachweis für diese Gruppe |
+| Pokémon-e TCG | 8 Animationen und 7 Hilfsprogramme | Mitgeliefertes Flash-Abbild, Eingaben, Zustandswiederholung und erneutes Laden |
+| Machop At Work | 1 zusätzlicher Scan-Ablauf | Lange Streifen von Machop, Machoke und Machamp nacheinander, ohne eingespritzten Spielstand |
+
+Mario Party-e: Big Boo, Bowser, Daisy, Graceful Princess Peach, Lakitu,
+Princess Peach, Super Waluigi, Super Wario, Waluigi, Wario und Yoshi. Nicht jedes
+dieser Kartenprogramme ist ein eigenständiges Geschicklichkeitsspiel; darunter
+sind auch Zufalls-/Brettspielaktionen.
+
+Pokémon-Minispiele laut Sammlungsbezeichnung:
+
+- Aquapolis: Dream Eater, Harvest Time, Jumping Doduo, Mighty Tyranitar,
+  Punching Bags, Rolling Voltorb, Sneak and Snatch.
+- Expedition: Diving Corsola, Flower Power, Go, Poliwrath!, Hold Down Hoppip,
+  Kingler's Day, Machop At Work.
+- Skyridge: Berry Tree, Ditto Leapfrog, Follow Hoothoot, Haunter, Leek Game,
+  Night Flight, Pika Pop, Ride the Tuft, Teddiursa, Watch Out!.
+
+Die vollständigen Animations-/Hilfsprogramm-Namen stehen in der Testdatenliste;
+darunter Coin Flipper, beide Duel Timer und vier Poké-Power-Anwendungen.
+Alle 49 Startbilder wurden zusätzlich betrachtet. Die Tests prüfen endliche
+PCM-Samples, vollständige Zustandswiederholung (je fünfmal), Öffnen in einer neuen
+Maschine ohne Scan sowie unveränderte Quelldateien. Je Hauptfall kommen 1.800
+Frames mit wechselnden Eingaben hinzu. Big Boo, Pika Pop und Coin Flipper laufen
+zusätzlich mit jeweils **18.000 weiteren Frames** (rund fünf Minuten emuliert).
+Das sind Stabilitätsläufe einschließlich Menüs, Wiederanläufen und Game-over-
+Bildschirmen, keine fünf Minuten garantiert ununterbrochener Spielprogression.
+
+Der echte Machop-Scan zeigt den Kartenfortschritt 2 → 1 → vollständig, startet das
+Spiel und reagiert sichtbar auf Rechts-Eingabe. Ein geprüftes Spielbild ist als
+Regression hinterlegt; fünf Zustandswiederholungen und weitere 1.800 Frames folgen.
+Separate Erkundungen bei Hoppip/Hoothoot lesen bislang nur den ersten Streifen:
+die Firmware verlangt korrekt weitere Karten. Diese Teilimporte gelten **nicht**
+als vollständige Scan-Abnahme; deren Flash-Programme wurden unabhängig geprüft.
+
+Plattformvergleich über Haupt- und vertiefte Läufe: **801 identische PNG-Paare**
+und **697 identische Messpunkt-Paare** mit vollständigem Zustands- und Audio-Hash,
+Samplezahl/-bereich sowie Diagnosen. Insgesamt 327.644 ausgeführte Frames je OS
+(inklusive Boot, Restore-Wiederholungen und Neustart, also keine reine Spielzeit).
+Kein Absturz, fehlgeschlagener Replay oder neuer Kernfehler in dieser Auswahl.
+Die Mario-Karten starten direkt; die anfängliche Testannahme eines NES-artigen
+Speicherdialogs wurde im Test korrigiert, nicht durch eine Änderung am Emulator.
+Die unabhängigen Mario-Flash-Abbilder beweisen keinen Speichervorgang nach Scan.
+Keine Produktcode-Änderung in diesem erweiterten Testpaket; UI-Policy zusätzlich 3/3.
+
+Optionale Belege über `AETHERBOY_EREADER_EXTENDED_OUTPUT`;
+`AETHERBOY_EREADER_SOAK_FRAMES` wählt 1.800 bis 18.000 Zusatzframes.
+Lokale Ergebnisse: `artifacts/ereader/extended-windows/`, `extended-linux/`,
+`deep-windows/`, `deep-linux/` und `extended-comparison.json`.
+Builds ohne Warnungen/Fehler. Für diese Prüfung wurde keine weitere Spiel-ROM
+benötigt. Japanische Firmware, externe Spielverbindungen, physischer Vergleich,
+Hörprobe und manuelles Durchspielen bleiben getrennte, offene Abnahmen.
+
+**Noch offen:** Hörprobe über echte Audioausgabe, längere manuelle Spielsitzungen,
+weitere Karten/Regionen und physischer Hardwarevergleich. Für japanische Karten
+wäre die passende **Card e-Reader(+)-ROM (Japan)** nötig; für die oben genannten
+USA-Standalone-Fälle werden keine weiteren ROMs benötigt. Keine gebündelten
+Nintendo-Daten. Der Diagnose-Runner liest verschachtelte Archive; die normale
+Oberfläche ist damit noch **kein Importer für die gesamte Sammlung**.
+Kartenverwaltung mit Namen/Einzelentfernung und
+Routing zum zweiten lokalen GBA ergänzen. **Pokémon-Übertragung und Online Link
+sind nicht angebunden oder nachgewiesen.** Die ursprüngliche Reihenfolge bleibt
+die Abnahmeliste; Implementierung ist nicht mit Spielabnahme gleichzusetzen:
+
+1. **Bestandsaufnahme im GBA-Core:** Bus-/Moduladressen, Scannerregister,
+   Kartenspeicher, Reset und Flash-Verhalten gegen Dokumentation und mGBA prüfen.
+   `GamePak`, Flash und Scheduler sind inzwischen mit dem e-Reader verbunden;
+   USA-Firmware führt die oben geprüften vollständigen Kartensätze aus; andere
+   Regionen und ein physischer Hardwarevergleich bleiben offen.
+2. **Begrenzter Kartenimport:** zuerst dokumentierte digitale Rohkartendateien,
+   Größen-/Formatprüfung, kontrollierte Warteschlange und eindeutiger Abbruch.
+   Keine Kamera-/OCR-Erkennung als Voraussetzung. Keine fremden ROMs/Karten bündeln.
+3. **Eigenes Zubehörmodell im gemeinsamen Core:** Scanner-/Registerzustände und
+   emulierte Scan-Zeit, sichere Ausführung auf dem Besitzerthread; keine direkten
+   UI-Schreibzugriffe auf Spiel-RAM. e-Reader-Programm als vom Nutzer geladene ROM.
+4. **Zustand und Datenhaltbarkeit:** aktive Karte, Scanposition, Warteschlange,
+   Register und Speicher vollständig sichern/wiederherstellen. Reset, Rewind,
+   Abbruch, beschädigte Datei und getrennte Saves von Anfang an testen.
+5. **Beide Oberflächen gleichzeitig:** eigene Aether-Dateiauswahl/Kartenliste,
+   Scannen/Abbrechen/Status, DE/EN, Themes/Customize, Tastatur und Controller.
+6. **Zunächst Einzelgerät:** mit eigener Homebrew-Testkarte und dann einer
+   bereitgestellten e-Reader-ROM eine tatsächlich ausgeführte Karte nachweisen.
+7. **Danach zwei lokale GBA:** e-Reader in einer Instanz, kompatibles Zielspiel in
+   der anderen; erst ein nachweisbarer Kartentransfer gilt als Erfolg. Unterstützte
+   Region, e-Reader-Variante und Spielrevision einzeln dokumentieren. Kein pauschales
+   Versprechen für deutsche Pokémon-Versionen. Netzwerk ist ein späterer Nachweis.
+8. **Abnahme Windows und Linux:** gleiche Testdaten und Endzustände, lokale
+   Originalspielstände unangetastet. Bildscan-Konverter erst nach stabilem Import.
+
+#### Weitere Folgerungen aus der Zubehör-Recherche
+
+- **GBC-Infrarot:** eigenes Folgepaket für Card Pop/Mystery Gift über das IR-Port-
+  Modell, nicht über SB/SC oder den Barcode-Dialog. Zunächst zwei lokale CGBs;
+  Netzübertragung später separat. Eine GBA-Prototyp-Konstante namens `IR` in
+  `IORegs.cs` ist keine vorhandene CGB-IR-Implementierung.
+- **Rumble:** MBC5-Signal und Ausgabe über Windows-Gamepad bzw. Linux-SDL sind
+  vorhanden. Echte Controller-Abnahme bleibt wichtig; das ist keine allgemeine
+  GBA-Rumble-Zusage.
+- **Solarsensor:** Boktai wäre ein separates GBA-Modul-/GPIO-Projekt; vorhandenes
+  `GpioRtc` ist nur RTC, noch kein Lichtsensor. Nicht mit e-Reader oder Barcode
+  Boy vermischen. Andere Sensoren sind vorerst zurückgestellt.
+- Die eingefügte Recherche nennt falsche/vermischte Spieletitel. Die fünf in
+  [Dan Docs](https://shonumi.github.io/dandocs.html) dokumentierten Barcode-Boy-
+  Titel sind Battle Space, Monster Maker: Barcode Saga, Kattobi Road, Family
+  Jockey 2 und Famista 3. Bundle-Namen sind keine zusätzlichen Spiele. Es gibt
+  dokumentierte Karten mit anderen Präfixen als 49; deshalb keine 49-Sperre,
+  keine automatische Prüfzifferkorrektur. Was ein Code erzeugt, entscheidet das
+  jeweilige Spiel, nicht ein universeller Zufallsalgorithmus des Zubehörs.
+
 ### Gemeinsamer Lieferstand / shared implementation
 
 - Neues Namcot-Zubehör in `Core/BarcodeBoy.cs`, angebunden an SB/SC und die
@@ -252,14 +845,23 @@ Beispielkarten: **Berserker `4907981000301`**, **Valkyrie `4908052808369`**.
 
 ### Nachweise und offene Merkliste
 
-**Nutzerentscheidung vom 02.10.2026:** Den echten Barcode-Boy-Spieltest auf die
-spätere Aufgabenliste setzen. Umsetzung bleibt bestehen; keine Spielabnahme als
-bestanden markieren und vorerst keine ROM als Voraussetzung für weitere Arbeit
-anfordern. Wiederaufnahme, sobald eine eigene passende ROM bereitsteht.
+**Historische Zurückstellung vom 02.10.2026:** Der echte Spieltest war zunächst
+vertagt. Mit der am 06.10.2026 bereitgestellten ROM wurde er wieder aufgenommen.
+Die inzwischen bestandenen Teilprüfungen und offenen Dauerlauf-Grenzen stehen
+oben; eine vollständige Spiele-/Hardwarefreigabe bleibt ausdrücklich offen.
 
 - [ ] **Battle Space (Japan, GB) auf Windows und nativem Linux testen:**
   Geräteerkennung, Berserker-/Valkyrie-Karten im Spiel, wiederholte Scans,
   Textdateiimport, Savestate/Rewind und Trennen/Reset nach dem Testplan unten.
+- [x] Teilnachweise mit echter ROM auf Windows und Linux/WSLg: beide Karten,
+  Scanner-Buttons, Textimport, Savestate mitten im Paket, Rewind und Reset.
+- [x] Wartezeit eingegrenzt: originalen Spiel-Timeout und 15 Minuten weiterlaufenden
+  Emulator nachgewiesen; Wiederanlauf ohne ROM-Reset separat bestanden.
+- [x] Interner DIV-bezogener Takt, DIV-Reset und gespeicherte Paketpause ergänzt;
+  feste 50er-Folge auf beiden Systemen bestanden.
+- [x] Unterbrechungsfreie Dauerfolge: 50 und 1000 Karten je OS bestanden, mit
+  dokumentierter Erkennungs-Kompatibilitätserweiterung vom 08.10.2026. Kein
+  Spiel-RAM-Patch, Scanner-Neuverbinden oder stiller Konsolenreset.
 - [ ] Scanner-Timing und die übrigen vier dokumentierten Spiele gesondert prüfen;
   synthetische Tests nicht als allgemeine Spielekompatibilität ausgeben.
 
@@ -277,8 +879,9 @@ anfordern. Wiederaufnahme, sobald eine eigene passende ROM bereitsteht.
   läuft auch unter Linux. Das ersetzt keine Abnahme am Rechner des Kollegen.
 - Screenshots: `artifacts/barcode-boy-20261002/`. Beide Oberflächen verwenden das
   neue Logo aus demselben Markenasset. Kein Commit/Push in diesem Arbeitspaket.
-- **Offen:** eigener Battle-Space-Spieltest. Nutzer nach ROM gefragt; keine
-  kommerzielle ROM heruntergeladen/beigelegt. Andere vier Spiele ebenfalls offen.
+- **Offen:** längeres freies Spielen, physischer Hardware-/Timingvergleich und
+  die anderen vier Spiele. Der bekannte 597er-Repro und die strengen Dauerläufe
+  bestehen seit 08.10.2026. Keine kommerzielle ROM heruntergeladen/beigelegt.
 - **Timinggrenze:** 512 Basis-Dots pro Scanner-Bit ist die gewählte anfängliche
   Emulationsrate, keine Messung des Original-Scanneroszillators. Reale Gerätequirks
   und die Abfragen/Timeouts der fünf Spiele müssen gegen echte Software geprüft werden.
@@ -301,9 +904,11 @@ anfordern. Wiederaufnahme, sobald eine eigene passende ROM bereitsteht.
 
 English handoff: One shared Barcode Boy serial device and equivalent Windows/Linux
 controls are implemented. Synthetic CPU programs and UI integration are tested.
-Battle Space is the intended first real-game test; its ROM has not been supplied.
-Hardware clock accuracy and all five games remain acceptance items. Bardigun and
-GBA e-Reader are not included.
+Battle Space passes strict 50/1000-card runs on both platforms with the documented
+re-detection compatibility extension. Hardware timing and other games remain
+unverified. Bardigun is not included. The separate GBA e-Reader peripheral and
+RAW-card UI are implemented; real firmware/card acceptance and transfer to another
+GBA are still pending. See the 2026-10-08 handoff above.
 
 ## Phase 6.1 — Eigene Startanimation, 02.10.2026
 

@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\nanoboy\nanoboy.csproj" />
+    <Compile Include="..\Shared\BattleSpaceFixture.cs" Link="BattleSpaceFixture.cs" />
     <EmbeddedResource Include="WindowsUiDebt.json" LogicalName="AetherBoy.WindowsUiDebt.json" />
   </ItemGroup>
 

@@ -27,7 +27,6 @@ namespace nanoboy
             this.lblCode = new System.Windows.Forms.Label();
             this.txtCode = new nanoboy.Controls.AetherTextBox();
             this.btnAdd = new nanoboy.Controls.AetherButton();
-            this.btnToggle = new nanoboy.Controls.AetherButton();
             this.btnRemove = new nanoboy.Controls.AetherButton();
             this.lblExperimentalInfo = new System.Windows.Forms.Label();
             this.SuspendLayout();
@@ -111,16 +110,6 @@ namespace nanoboy
             this.btnAdd.UseVisualStyleBackColor = true;
             this.btnAdd.Click += new System.EventHandler(this.btnAdd_Click);
             //
-            // btnToggle
-            //
-            this.btnToggle.Location = new System.Drawing.Point(12, 304);
-            this.btnToggle.Name = "btnToggle";
-            this.btnToggle.Size = new System.Drawing.Size(100, 25);
-            this.btnToggle.TabIndex = 6;
-            this.btnToggle.Text = global::AetherBoy.Runtime.Localization.UiText.Get("An / Aus");
-            this.btnToggle.UseVisualStyleBackColor = true;
-            this.btnToggle.Click += new System.EventHandler(this.btnToggle_Click);
-            //
             // btnRemove
             //
             this.btnRemove.Location = new System.Drawing.Point(118, 304);
@@ -147,7 +136,6 @@ namespace nanoboy
             this.ClientSize = new System.Drawing.Size(484, 341);
             this.Controls.Add(this.lblExperimentalInfo);
             this.Controls.Add(this.btnRemove);
-            this.Controls.Add(this.btnToggle);
             this.Controls.Add(this.btnAdd);
             this.Controls.Add(this.txtCode);
             this.Controls.Add(this.lblCode);
@@ -176,7 +164,6 @@ namespace nanoboy
         private System.Windows.Forms.Label lblCode;
         private nanoboy.Controls.AetherTextBox txtCode;
         private System.Windows.Forms.Button btnAdd;
-        private System.Windows.Forms.Button btnToggle;
         private System.Windows.Forms.Button btnRemove;
         private System.Windows.Forms.Label lblExperimentalInfo;
     }

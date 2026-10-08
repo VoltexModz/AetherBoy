@@ -52,7 +52,9 @@ internal sealed partial class WaylandEmulatorHost
                 string path = LinuxRomPath.Resolve(candidate);
                 using var archiveSource = RomArchiveSource.Open(path, Path.Combine(dataPaths.Data, "roms"), token, archiveChoice);
                 path = archiveSource.Path;
-                string identity = LinuxRomStorage.Identify(path, token);
+                var cardLibrary = new EReaderLibrary(Path.Combine(dataPaths.Data, "ereader"));
+                string? cardIdentity = cardLibrary.IdentifyLaunch(path, verify: true);
+                string identity = cardIdentity ?? LinuxRomStorage.Identify(path, token);
                 if (archiveSource.WasArchive)
                     path = LinuxPortableRomStore.Import(dataPaths, path, identity, token);
                 if (expectedIdentity is not null && identity != expectedIdentity)
@@ -64,7 +66,7 @@ internal sealed partial class WaylandEmulatorHost
                     return new PreparedRom(path, null, null, null, null);
                 }
                 acquired = LinuxRomStorage.OpenIdentified(dataPaths, path, identity, token);
-                if (PortableStorage.IsEnabled)
+                if (PortableStorage.IsEnabled && cardIdentity is null)
                     path = LinuxPortableRomStore.Import(dataPaths, path, identity, token);
                 if (checkpoint is not null) await checkpoint(token).ConfigureAwait(false);
                 token.ThrowIfCancellationRequested();
@@ -92,6 +94,9 @@ internal sealed partial class WaylandEmulatorHost
                 token.ThrowIfCancellationRequested();
                 if (next.State == SessionState.Faulted)
                     throw next.Fault ?? new InvalidOperationException(global::AetherBoy.Runtime.Localization.UiText.Get("The ROM could not be started."));
+                if (cardIdentity is not null && expectedIdentity is null)
+                    foreach (byte[] card in cardLibrary.ReadLaunchCards(path))
+                        await next.QueueEReaderCardAsync(card, token).ConfigureAwait(false);
                 return new PreparedRom(path, acquired, next, profile, notice);
             }
             catch

@@ -38,7 +38,7 @@ namespace AetherBoy.Runtime
     }
 
     /// <summary>
-    /// AetherBoy host adapter for the vendored MIT-licensed GBADotnet core.
+    /// AetherBoy host adapter for GBADotnet (MIT) with the e-Reader extension (MPL-2.0).
     /// The emulator stays owned by EmulationSession's single owner thread.
     /// Save states and rewind use AetherBoy's versioned, ROM-bound GBA state
     /// contract. The backend exposes PSG channel control and inspection through
@@ -123,6 +123,7 @@ namespace AetherBoy.Runtime
             saveLength = ConfigureInitialSaveLength();
             BatterySaveLoadStatus saveStatus = LoadPersistentState();
             lastSaveHash = SHA256.HashData(GetPersistentState());
+            gamePak.InitializeEReaderCalibration();
             LoadRtcState();
             audioEnabled = configuration.AudioEnabled;
             frameskip = configuration.Frameskip;
@@ -155,7 +156,20 @@ namespace AetherBoy.Runtime
 
         public VideoGeometry VideoGeometry => AetherBoy.Runtime.VideoGeometry.GameBoyAdvance;
 
-        public EmulationFeature Features => EmulationFeature.GameBoyAdvanceStandard;
+        public EmulationFeature Features => EmulationFeature.GameBoyAdvanceStandard |
+            (gamePak.EReader is null ? EmulationFeature.None : EmulationFeature.EReader);
+
+        internal void QueueEReaderCard(byte[] card)
+        {
+            ThrowIfDisposed();
+            (gamePak.EReader ?? throw new NotSupportedException("Open an e-Reader cartridge first.")).QueueCard(card);
+        }
+
+        internal void ClearEReaderCards()
+        {
+            ThrowIfDisposed();
+            (gamePak.EReader ?? throw new NotSupportedException("Open an e-Reader cartridge first.")).ClearCards();
+        }
 
         internal LocalSerialLink ConnectLocalLink(GbaProductionMachine peer)
         {
@@ -357,7 +371,8 @@ namespace AetherBoy.Runtime
                         entry.Category.ToString(),
                         entry.Message,
                         entry.Address))
-                    .ToArray(), cheatButtonPressed: cheatEngine.ButtonPressed);
+                    .ToArray(), cheatButtonPressed: cheatEngine.ButtonPressed,
+                eReader: gamePak.EReader is { } reader ? new EReaderSnapshot(reader.QueuedCards, reader.CardsStarted, reader.HasCard) : null);
         }
 
         public void Dispose()

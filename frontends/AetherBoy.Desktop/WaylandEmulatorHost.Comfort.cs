@@ -156,6 +156,7 @@ internal sealed partial class WaylandEmulatorHost
             if (result.ClearUndo) { undoState = null; undoIdentity = null; }
             audioOutput?.Clear(); displayedFrameSequence = 0;
             statusMessage = result.Message;
+            ClearLibraryPreviews();
             RequestDiskRefresh();
         }
         catch (Exception ex)

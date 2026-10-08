@@ -1,5 +1,84 @@
 # UI-Farben und Logo-Abgleich — lokaler Arbeitsstand vom 28. September 2026
 
+## e-Reader-Kartenbibliothek — 08.10.2026
+
+- Eigene Bibliotheksseite auf Windows mit zentralem `AetherSelect`, `AetherTextBox`,
+  Aether-Buttons/Dateiauswahl und themegebundener Bildvorschau. Linux nutzt die
+  bestehenden SDL-Eingaben, Schaltflächen und Vorschau. Keine neue native UI-Schuld.
+- Import/Ergänzen, freie Titel, eigene Firmware und getrennte Saves/Resume pro Set;
+  DE/EN im gemeinsamen Katalog. Noch kein Sammlungs-Organizer mit Metadaten,
+  Kartenentfernung oder Versionsauswahl. Bedienung/Grenzen in beiden Roadmaps.
+- Windows-e-Reader-/UI-Policy-Auswahl 5/5 und Linux-Wayland-Seiten 2/2 bestanden;
+  alle sechs Windows-Themes gerendert, dunkel/hell angesehen. Linux mit großer
+  englischer Schrift geprüft; Zeilenumbruch und unterer Hilfeabstand korrigiert.
+  Fehleranzeige und zentraler Auswahl-Popup zusätzlich erfasst. Vorschauflächen
+  dieser UI-Tests sind bewusst synthetisch, keine behaupteten Spielaufnahmen.
+- Belege: `artifacts/ereader/library-ui-windows/` und `library-ui-linux/`.
+  Reale DPI, Screenreader, IME, Controller und vollständige manuelle Abnahme aller
+  Import-/Dateidialogfälle bleiben offen. Themes/Customize wurden nicht ersetzt.
+- Die Scannerseite nennt inzwischen vollständige Standalone-Kartentests; die ältere
+  Beschränkung auf „Karte 1“ im nachfolgenden historischen Abschnitt ist überholt.
+
+## e-Reader und Barcode-Status — 08.10.2026
+
+- Neue e-Reader-Werkzeugseite auf Windows mit zentralen Aether-Buttons und
+  Aether-Dateiauswahl; Linux mit bestehenden SDL-Komponenten/Dateipicker-Routing.
+  Keine neue Windows-UI-Ausnahme, keine Änderung der Schulden-Baseline.
+- Import, Warteschlangenzähler, Scans verwerfen, leere/falsche ROM und fehlerhafte
+  Datei geprüft. Pause und vorgemerkte Karten bleiben bei Fehlern erhalten.
+  Sichtbare Zähler behaupten keine erfolgreich vom Spiel eingelesene Karte.
+- Gemeinsame DE/EN-Texte, Themes/Customize unverändert. Renderings in Aether
+  Original (DE) und hellen Eigenfarben (EN), Linux zusätzlich große Schrift.
+  Abstände nach Sichtprüfung korrigiert, damit der Entwicklungsstand-Hinweis
+  nicht mit dem unteren Linux-Status kollidiert. Belege: `artifacts/ereader/`.
+- Windows-UI/Policy/Theme/Sprache 23/23; Linux-Zubehör/Theme unter WSLg 11/11.
+  Physischer Controller, Screenreader und reale Monitor-DPI bleiben offen.
+  Die nachgereichte USA-e-Reader-ROM akzeptiert Karte 1 von Donkey Kong-e und
+  Balloon Fight-e; beide UI-Hinweise grenzen dies jetzt vom noch offenen
+  vollständigen Spielstart ab. Feedback erklärt das automatische Lesen einer
+  später eingelegten Karte bei bereits wartendem Scan. Barcode-Status sagt „Scanner bereit“ statt
+  eine erfolgreiche Erkennung durch das Spiel vorzutäuschen.
+- Nach den Firmware-Tests e-Reader-Hinweise erneut geprüft: Windows-Auswahl
+  aus e-Reader/Policy/Theme/Sprache **34/34**, Linux-e-Reader/Theme unter
+  WSLg/Wayland **6/6**. Importbestätigung und Fehlerfall in DE/EN, dunkel/hell
+  gerendert; Linux mit großer Schrift. Textprüfung: keine Hinweise in den beiden
+  e-Reader-Seiten oder ihren geänderten Katalogeinträgen. Andere Fundstellen im
+  Gesamtkatalog sind dadurch nicht als bereinigt erklärt.
+
+## Cheat-Einfügeprüfung — 06.10.2026
+
+- Windows ergänzt ausschließlich zentrale Aether-Bauteile: Prüftabelle,
+  scrollbar lesbares Detailmemo, Kandidatenbuttons und Bestätigung für den
+  möglichen Platzhalter `AAAA`. Kein nativer Dialog/Widget und keine neue
+  UI-Schulden-Ausnahme. Sechs Themes und eigene Farben bleiben wirksam.
+- Die Tabellenzeile ist per Enter/Doppelklick in der unveränderten Eingabe
+  auswählbar; Überschriften, Beschriftungen, `svg` und unsichtbare Zeichen werden
+  nicht heimlich entfernt. Kandidatenwahl setzt den vorhandenen Formatselektor.
+- Linux verwendet dieselbe gemeinsame Prüfung, aber seine eigenen SDL-Buttons,
+  Texteingabe und Vor/Zurück-Navigation. Fehler bleiben auf der Prüfseite lesbar,
+  die endgültige Sitzungsprüfung und Online-Link-Sperren bleiben bestehen.
+- Deutsche/englische Windows-Renderings in allen sechs Themes; Original und
+  Pocket Light visuell geprüft. Native Wayland-Eingabe-/Prüfseitentests und
+  Screenshots unter WSLg. Echte Monitor-DPI-/Screenreader-/Controller-Abnahme
+  bleibt wie bisher offen. Keine Zusage zur Wirkung der Cheats im Spiel.
+
+## Cheat-Checkboxen — 06.10.2026
+
+- Windows `frmCheats`: alter Umschaltknopf entfernt. `AetherList` zeichnet eigene
+  Checkboxen in der Aktiv-Spalte, ohne native Checkbox-/ListView-Fenster.
+  Häkchenzeichnung zentral mit `AetherCheckBox` geteilt; sechs Themes und
+  Eigenfarben bleiben erhalten. Klick auf Zeilentext wählt nur aus.
+- Leertaste und Accessibility-Standardaktion fordern denselben Sitzungswechsel
+  an. Während der Bestätigung sind weitere Änderungen gesperrt; keine vorzeitig
+  als aktiv gezeichneten Cheats. Neue Einträge sind wie bisher sofort aktiv.
+- Die gesonderte Cheat-Modul-Taste ist ein Aether-Häkchen mit klarer Erklärung.
+  Formatfehler behalten jetzt ihre konkrete technische Begründung, bekannte
+  Meldungen sind deutsch/englisch angebunden.
+- Automatisierte Maus-/Tastatur-/Accessibility- und GB/GBC/GBA-Tests; Renderbilder
+  in beiden Sprachen für sechs Themes. Aether Original (DE) und Pocket Light (EN)
+  visuell geprüft. Interaktive DPI-/Screenreader-Abnahme und Linux-Checkboxen
+  bleiben offen. UI-Schulden-Baseline weder erhöht noch regeneriert.
+
 ## Transparente Logos für alle sechs Themes — 03.10.2026
 
 **Für Windows und Linux umgesetzt; mit diesem Änderungspaket versioniert.** Nutzerauftrag:

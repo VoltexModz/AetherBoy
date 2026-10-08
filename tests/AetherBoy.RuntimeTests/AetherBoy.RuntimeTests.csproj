@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\nanoboy\Runtime\AetherBoy.Runtime.csproj" />
+    <Compile Include="..\Shared\BattleSpaceFixture.cs" Link="BattleSpaceFixture.cs" />
   </ItemGroup>
 
 </Project>

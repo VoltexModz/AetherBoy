@@ -9,7 +9,7 @@ namespace nanoboy
     {
         private readonly EmulationSession session;
         private readonly AetherSelect codeFormat = new();
-        private readonly AetherButton deviceButton = new();
+        private readonly AetherCheckBox deviceButton = new();
 
         public frmCheats(EmulationSession session)
         {
@@ -21,6 +21,7 @@ namespace nanoboy
             Text = $"Cheats – {ProductInfo.DisplayName}";
             RefreshCheatList();
             ConfigureAetherLayout();
+            ConfigureInputReview();
             AetherDialog.Apply(
                 this,
                 "CHEATS",
@@ -38,10 +39,13 @@ namespace nanoboy
             lstCheats.Location = new System.Drawing.Point(24, 24);
             lstCheats.Size = new System.Drawing.Size(812, 282);
             lstCheats.ShowItemToolTips = true;
-            colStatus.Width = 78;
-            colName.Width = 286;
-            colCode.Width = 218;
-            colType.Width = 228;
+            lstCheats.CheckBoxes = true;
+            lstCheats.ItemCheckRequested += ToggleCheat;
+            colStatus.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Aktiv");
+            colStatus.Width = 64;
+            colName.Width = 242;
+            colCode.Width = 290;
+            colType.Width = 192;
 
             lblName.Location = new System.Drawing.Point(24, 332);
             lblName.Text = "Name";
@@ -59,7 +63,7 @@ namespace nanoboy
             txtCode.AcceptsReturn = true;
             txtCode.ScrollBars = ScrollBars.Vertical;
             txtCode.Font = new System.Drawing.Font("Cascadia Mono", 10f);
-            txtCode.CharacterCasing = CharacterCasing.Upper;
+            txtCode.CharacterCasing = CharacterCasing.Normal;
 
             btnAdd.Location = new System.Drawing.Point(624, 350);
             btnAdd.Size = new System.Drawing.Size(212, 40);
@@ -75,9 +79,11 @@ namespace nanoboy
             codeFormat.Visible = IsGba;
             Controls.Add(codeFormat);
             deviceButton.Name = "cheatDeviceButton";
-            deviceButton.Bounds = new System.Drawing.Rectangle(624, 534, 212, 40);
+            deviceButton.Bounds = new System.Drawing.Rectangle(436, 534, 400, 40);
             deviceButton.Visible = IsGba;
-            deviceButton.Text = session.LatestSnapshot.CheatButtonPressed ? global::AetherBoy.Runtime.Localization.UiText.Get("Gerätetaste: gehalten") : global::AetherBoy.Runtime.Localization.UiText.Get("Gerätetaste: losgelassen");
+            deviceButton.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Cheat-Modul-Taste halten");
+            deviceButton.AutoCheck = false;
+            deviceButton.Checked = session.LatestSnapshot.CheatButtonPressed;
             deviceButton.Click += async (_, _) =>
             {
                 if (!CanModifyCheats()) return;
@@ -85,7 +91,7 @@ namespace nanoboy
                 try
                 {
                     await session.SetCheatButtonAsync(!session.LatestSnapshot.CheatButtonPressed);
-                    if (!IsDisposed) deviceButton.Text = session.LatestSnapshot.CheatButtonPressed ? global::AetherBoy.Runtime.Localization.UiText.Get("Gerätetaste: gehalten") : global::AetherBoy.Runtime.Localization.UiText.Get("Gerätetaste: losgelassen");
+                    if (!IsDisposed) deviceButton.Checked = session.LatestSnapshot.CheatButtonPressed;
                 }
                 catch (Exception) { if (!IsDisposed) ShowCheatError(global::AetherBoy.Runtime.Localization.UiText.Get("Die Gerätetaste konnte nicht geändert werden.")); }
                 finally { if (!IsDisposed) deviceButton.Enabled = true; }
@@ -94,21 +100,13 @@ namespace nanoboy
 
             lblExperimentalInfo.Location = new System.Drawing.Point(24, 451);
             lblExperimentalInfo.AutoSize = false;
-            lblExperimentalInfo.Size = new System.Drawing.Size(812, 62);
+            lblExperimentalInfo.Size = new System.Drawing.Size(812, 78);
             lblExperimentalInfo.Text = IsGba
-                ? global::AetherBoy.Runtime.Localization.UiText.Get("Wähle das Codeformat. Füge Mastercode und zugehörige Zeilen zusammen ein; Zeilenumbrüche oder + trennen sie.\nDie Gerätetaste aktiviert Codes, die den Knopf am Cheat-Modul benötigen. Codes gelten nur für diese Sitzung.\nPrüfe selbst, ob die Codes zu deinem Spiel passen. Falsche Codes können auch den Spielstand verändern.")
-                : global::AetherBoy.Runtime.Localization.UiText.Get("GB/GBC: GameShark (01VVLLHH), Game Genie (6 oder 9 Hex-Zeichen), CodeBreaker (00AAAA-VV) oder AAAA:VV.\nZeilenumbrüche oder + verbinden mehrere Codes zu einem Eintrag. Codes gelten nur für diese Sitzung.\nPrüfe selbst, ob die Codes zu deinem Spiel passen. Falsche Codes können auch den Spielstand verändern.");
+                ? global::AetherBoy.Runtime.Localization.UiText.Get("Neue Cheats sind sofort aktiv. Die Häkchen schalten sie für diese Sitzung um.\nFüge zusammengehörige Zeilen vollständig ein, bei Bedarf mit Mastercode. Bei unklarem Format wähle es selbst.\nDie Cheat-Modul-Taste gilt nur für Codes, die diesen Zusatzknopf abfragen, nicht für normale Spieltasten.\nFalsche Codes können das Spiel anhalten oder den Spielstand verändern. Teste mit einer Spielstandkopie.")
+                : global::AetherBoy.Runtime.Localization.UiText.Get("Neue Cheats sind sofort aktiv. Die Häkchen schalten sie für diese Sitzung um.\nGB/GBC: GameShark, Game Genie, CodeBreaker oder AAAA:VV. Zeilenumbrüche oder + verbinden ein Set.\nFalsche Codes können das Spiel anhalten oder den Spielstand verändern. Teste mit einer Spielstandkopie.");
             lblExperimentalInfo.Font = new System.Drawing.Font("Segoe UI", 7.5f, System.Drawing.FontStyle.Bold);
 
-            btnToggle.Location = new System.Drawing.Point(24, 534);
-            btnToggle.Size = new System.Drawing.Size(210, 40);
-            btnToggle.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Ein- oder ausschalten");
-            if (btnToggle is AetherButton toggleButton)
-            {
-                toggleButton.Kind = AetherButtonKind.Secondary;
-            }
-
-            btnRemove.Location = new System.Drawing.Point(246, 534);
+            btnRemove.Location = new System.Drawing.Point(24, 534);
             btnRemove.Size = new System.Drawing.Size(170, 40);
             btnRemove.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Code entfernen");
             if (btnRemove is AetherButton removeButton)
@@ -119,6 +117,8 @@ namespace nanoboy
 
         private void RefreshCheatList()
         {
+            Guid? selected = GetSelectedCheat()?.Id;
+            lstCheats.BeginUpdate();
             lstCheats.Items.Clear();
 
             foreach (CheatSnapshot cheat in session.LatestSnapshot.Cheats)
@@ -130,9 +130,12 @@ namespace nanoboy
                     IsGba ? GetGbaCheatType(cheat.Code) : GetGameBoyCheatType(cheat.Code)
                 });
                 item.Tag = cheat;
+                item.Checked = cheat.Enabled;
                 item.ToolTipText = cheat.Code;
                 lstCheats.Items.Add(item);
+                if (cheat.Id == selected) item.Selected = true;
             }
+            lstCheats.EndUpdate();
         }
 
         private async void btnAdd_Click(object sender, EventArgs e)
@@ -151,6 +154,14 @@ namespace nanoboy
                 return;
             }
 
+            UpdateInputReview();
+            if (inputReview.HasErrors || (inputReview.NeedsValueConfirmation && !confirmCheatValues.Checked))
+            {
+                reviewDetails.Text = inputReview.Summary;
+                reviewList.Focus();
+                return;
+            }
+
             btnAdd.Enabled = false;
             try
             {
@@ -164,16 +175,20 @@ namespace nanoboy
                 txtCode.Clear();
                 RefreshCheatList();
                 AetherSignal.Show(this,
-                    global::AetherBoy.Runtime.Localization.UiText.Get("Code für diese Spielsitzung hinzugefügt."),
+                    global::AetherBoy.Runtime.Localization.UiText.Get("Code hinzugefügt und für diese Spielsitzung aktiviert."),
                     "Cheats",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
             }
-            catch (FormatException)
+            catch (FormatException error)
             {
-                ShowCheatError(IsGba
+                chooseShark.Visible = System.Linq.Enumerable.Contains(CheatCodeInput.Candidates(error), CheatCodeFormat.GameShark);
+                chooseReplay.Visible = System.Linq.Enumerable.Contains(CheatCodeInput.Candidates(error), CheatCodeFormat.ActionReplayV3);
+                reviewDetails.Text = global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(error.Message);
+                ShowCheatError((IsGba
                     ? global::AetherBoy.Runtime.Localization.UiText.Get("Der GBA-Code wurde nicht übernommen. Prüfe das gewählte Format und füge alle zugehörigen Zeilen vollständig ein. Unbekannte Befehle, ungültige Adressen und unvollständige Code-Sets werden abgewiesen.")
-                    : global::AetherBoy.Runtime.Localization.UiText.Get("Das GB/GBC-Codeformat wird nicht unterstützt. Prüfe den eingegebenen Code."));
+                    : global::AetherBoy.Runtime.Localization.UiText.Get("Das GB/GBC-Codeformat wird nicht unterstützt. Prüfe den eingegebenen Code."))
+                    + "\n\n" + global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(error.Message));
             }
             catch (InvalidOperationException) when (!CanAcceptCommands())
             {
@@ -204,7 +219,11 @@ namespace nanoboy
         private static string GetGbaCheatType(string code)
         {
             if (code.Contains(" + ", StringComparison.Ordinal))
-                return global::AetherBoy.Runtime.Localization.UiText.Get("Mehrzeiliges Set");
+            {
+                var types = System.Linq.Enumerable.Distinct(System.Linq.Enumerable.Select(
+                    code.Split(" + ", StringSplitOptions.None), GetGbaCheatType));
+                return string.Join(" + ", types);
+            }
             if (code.StartsWith("CB:", StringComparison.Ordinal) || code.StartsWith("CBRAW:", StringComparison.Ordinal))
                 return "CodeBreaker";
             if (code.StartsWith("GS:", StringComparison.Ordinal))
@@ -264,15 +283,15 @@ namespace nanoboy
             }
         }
 
-        private async void btnToggle_Click(object sender, EventArgs e)
+        private async void ToggleCheat(AetherListItem item)
         {
-            CheatSnapshot? selectedCheat = GetSelectedCheat();
+            CheatSnapshot? selectedCheat = item.Tag as CheatSnapshot;
             if (selectedCheat == null || !CanModifyCheats())
             {
                 return;
             }
 
-            btnToggle.Enabled = false;
+            lstCheats.Enabled = btnAdd.Enabled = btnRemove.Enabled = false;
             try
             {
                 await session.ToggleCheatAsync(selectedCheat.Id).ConfigureAwait(true);
@@ -293,7 +312,7 @@ namespace nanoboy
             {
                 if (!IsDisposed)
                 {
-                    btnToggle.Enabled = true;
+                    lstCheats.Enabled = btnAdd.Enabled = btnRemove.Enabled = true;
                 }
             }
         }

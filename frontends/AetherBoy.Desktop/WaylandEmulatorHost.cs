@@ -1300,7 +1300,10 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
         pressedKeys.Clear();
         if (session is not null && !IsOnlineLink) session.SetTurboAsync(false).GetAwaiter().GetResult();
-        statusMessage = pickingBarcode ? global::AetherBoy.Runtime.Localization.UiText.Get("Choose a UTF-8 text file containing one 13-digit barcode.") : global::AetherBoy.Runtime.Localization.UiText.Get("Choose a ROM in the file picker. You can also drop a file here.");
+        statusMessage = pickingEReaderLibrary == EReaderPick.Firmware ? global::AetherBoy.Runtime.Localization.UiText.Get("e-Reader-ROM auswählen")
+            : pickingEReaderLibrary != EReaderPick.None || pickingEReaderSession is not null ? global::AetherBoy.Runtime.Localization.UiText.Get("e-Reader-Karte auswählen")
+            : pickingBarcode ? global::AetherBoy.Runtime.Localization.UiText.Get("Choose a UTF-8 text file containing one 13-digit barcode.")
+            : global::AetherBoy.Runtime.Localization.UiText.Get("Choose a ROM in the file picker. You can also drop a file here.");
         string? defaultLocation = romPath is null ? null : Path.GetDirectoryName(romPath);
         try
         {
@@ -1324,6 +1327,8 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             pickingLocalLinkPlayer = -1;
             pickingIntroImage = null;
             pickingBarcode = false;
+            pickingEReaderSession = null;
+            pickingEReaderLibrary = EReaderPick.None; pickingEReaderSetId = null;
             ReportError(exception);
         }
     }
@@ -1351,7 +1356,9 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             }
             else if (!string.IsNullOrWhiteSpace(selection.Path))
             {
-                if (pickingBarcode) ImportBarcode(selection.Path);
+                if (pickingEReaderLibrary != EReaderPick.None) ImportEReaderLibraryFile(selection.Path);
+                else if (pickingEReaderSession is not null) ImportEReaderCard(selection.Path);
+                else if (pickingBarcode) ImportBarcode(selection.Path);
                 else if (pickingIntroImage is bool image) ImportIntroAsset(selection.Path, image);
                 else if (pickingLocalLinkPlayer >= 0) SelectLocalLinkRom(selection.Path);
                 else if (pickingPatch != PatchSelection.None)
@@ -1375,6 +1382,8 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             }
             pickingFirmware = false;
             pickingBarcode = false;
+            pickingEReaderSession = null;
+            pickingEReaderLibrary = EReaderPick.None; pickingEReaderSetId = null;
             pickingIntroImage = null;
             pickingBatterySave = false;
             pickingPatch = PatchSelection.None;
@@ -1551,6 +1560,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         if (page != ControlCenterPage.Audio) showAudioInspector = false;
         showGameplayCapture = false;
         showBarcodeBoy = editingBarcode = false;
+        showEReader = false;
         ResetSettingsNavigation();
         showController = false;
         showBackups = false;

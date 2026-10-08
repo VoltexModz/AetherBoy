@@ -43,24 +43,31 @@ internal sealed class AetherCheckBox : CheckBox
         int size = Math.Min(Height - 4, Math.Max(18 * DeviceDpi / 96, Font.Height));
         bool rtl = RightToLeft == RightToLeft.Yes;
         var box = new Rectangle(rtl ? Width - size - 2 : 2, (Height - size) / 2, size, size);
-        using var path = AetherWidgetPaint.Outline(box, 4 * DeviceDpi / 96);
-        using var fill = new SolidBrush(AetherColors.SurfaceRaised);
-        using var border = new Pen(Enabled && (Focused || hovered) ? AetherColors.Cyan : AetherColors.Muted);
-        e.Graphics.FillPath(fill, path);
-        e.Graphics.DrawPath(border, path);
-        if (CheckState != CheckState.Unchecked)
-        {
-            using var mark = new Pen(Enabled ? AetherColors.Cyan : AetherColors.Muted, Math.Max(2, size / 9f));
-            if (CheckState == CheckState.Indeterminate)
-                e.Graphics.DrawLine(mark, box.Left + size / 4, box.Top + size / 2, box.Right - size / 4, box.Top + size / 2);
-            else
-                e.Graphics.DrawLines(mark, new PointF[] { new(box.Left + size * .23f, box.Top + size * .5f),
-                    new(box.Left + size * .43f, box.Top + size * .72f), new(box.Left + size * .8f, box.Top + size * .28f) });
-        }
+        DrawIndicator(e.Graphics, box, CheckState, Enabled, Focused || hovered, DeviceDpi);
         var text = new Rectangle(rtl ? 4 : box.Right + 9, 2, Math.Max(1, Width - size - 17), Height - 4);
         TextRenderer.DrawText(e.Graphics, Text, Font, text, ink,
             TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak |
             (rtl ? TextFormatFlags.RightToLeft | TextFormatFlags.Right : TextFormatFlags.Left));
         if (Focused) AetherWidgetPaint.Focus(e.Graphics, Rectangle.Inflate(ClientRectangle, -1, -1), AetherColors.Cyan);
+    }
+
+    // Shared with checkable AetherList rows: no native checkbox window in the list.
+    internal static void DrawIndicator(Graphics graphics, Rectangle box, CheckState state, bool enabled, bool highlighted, int dpi)
+    {
+        int size = box.Width;
+        using var path = AetherWidgetPaint.Outline(box, 4 * dpi / 96);
+        using var fill = new SolidBrush(AetherColors.SurfaceRaised);
+        using var border = new Pen(enabled && highlighted ? AetherColors.Cyan : AetherColors.Muted);
+        graphics.FillPath(fill, path);
+        graphics.DrawPath(border, path);
+        if (state != CheckState.Unchecked)
+        {
+            using var mark = new Pen(enabled ? AetherColors.Cyan : AetherColors.Muted, Math.Max(2, size / 9f));
+            if (state == CheckState.Indeterminate)
+                graphics.DrawLine(mark, box.Left + size / 4, box.Top + size / 2, box.Right - size / 4, box.Top + size / 2);
+            else
+                graphics.DrawLines(mark, new PointF[] { new(box.Left + size * .23f, box.Top + size * .5f),
+                    new(box.Left + size * .43f, box.Top + size * .72f), new(box.Left + size * .8f, box.Top + size * .28f) });
+        }
     }
 }

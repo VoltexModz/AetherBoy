@@ -360,8 +360,12 @@ namespace nanoboy
                 ShowAudioUnavailableMessage();
             }
 
+            System.Collections.Generic.IReadOnlyList<byte[]>? initialReaderCards = null;
             try
             {
+                var cardLibrary = new EReaderLibrary(WindowsDataPaths.Default.EReader);
+                if (!resume && cardLibrary.IdentifyLaunch(path) is not null)
+                    initialReaderCards = cardLibrary.ReadLaunchCards(path);
                 string savePath = WindowsRomLibrary.Default.GetSavePath(path);
                 romWriteLease = AetherBoy.Runtime.Storage.RomWriteLease.Acquire(savePath + ".lock");
                 session = new EmulationSession(
@@ -406,6 +410,10 @@ namespace nanoboy
                 updateTimer.Start();
                 return;
             }
+
+            if (initialReaderCards is not null)
+                foreach (byte[] card in initialReaderCards)
+                    ObserveSessionCommand(session.QueueEReaderCardAsync(card));
 
             if (preparedAudioOutput != null)
             {
@@ -561,6 +569,15 @@ namespace nanoboy
                 PreviewBootIntro = () => PlayGameIntroAsync(CancellationToken.None, controlCenter),
                 SetBarcodeBoyEnabled = enabled => (session ?? throw new InvalidOperationException(global::AetherBoy.Runtime.Localization.UiText.Get("Kein Spiel geöffnet."))).SetBarcodeBoyEnabledAsync(enabled),
                 ScanBarcodeBoy = code => (session ?? throw new InvalidOperationException(global::AetherBoy.Runtime.Localization.UiText.Get("Kein Spiel geöffnet."))).ScanBarcodeBoyAsync(code),
+                QueueEReaderCard = card => (session ?? throw new InvalidOperationException()).QueueEReaderCardAsync(card),
+                ClearEReaderCards = () => (session ?? throw new InvalidOperationException()).ClearEReaderCardsAsync(),
+                LaunchEReaderSet = async (path, resume) =>
+                {
+                    if (IsOnlineLink) throw new InvalidOperationException();
+                    controlCenter?.Close();
+                    await PrepareRomLoadAsync(path, resume);
+                },
+                SaveEReaderResume = () => SaveCheckpointAsync(WindowsSaveStateStore.ResumeSlot),
                 GamepadProvider = () => GamepadInput.GetState(),
                 RomPathProvider = () => currentRomPath,
                 SetPalette = SetPalette,

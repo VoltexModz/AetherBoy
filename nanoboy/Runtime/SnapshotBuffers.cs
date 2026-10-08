@@ -28,7 +28,8 @@ namespace AetherBoy.Runtime
             ReadOnlySpan<GbaDiagnosticEventSnapshot> diagnosticEvents = default,
             bool rumbleActive = false,
             bool cheatButtonPressed = false,
-            BarcodeBoySnapshot? barcodeBoy = null)
+            BarcodeBoySnapshot? barcodeBoy = null,
+            EReaderSnapshot? eReader = null)
         {
             State = state;
             IsPaused = isPaused;
@@ -42,6 +43,7 @@ namespace AetherBoy.Runtime
             RumbleActive = rumbleActive;
             CheatButtonPressed = cheatButtonPressed;
             BarcodeBoy = barcodeBoy;
+            EReader = eReader;
             this.cheats = cheats.ToArray();
             readOnlyCheats = Array.AsReadOnly(this.cheats);
             this.diagnosticEvents = diagnosticEvents.ToArray();
@@ -60,6 +62,7 @@ namespace AetherBoy.Runtime
         public bool RumbleActive { get; }
         public bool CheatButtonPressed { get; }
         public BarcodeBoySnapshot? BarcodeBoy { get; }
+        public EReaderSnapshot? EReader { get; }
         public IReadOnlyList<CheatSnapshot> Cheats => readOnlyCheats;
         public IReadOnlyList<GbaDiagnosticEventSnapshot> DiagnosticEvents => readOnlyDiagnosticEvents;
         public bool HasVideoFrame => VideoFrameSequence != 0;
@@ -78,7 +81,7 @@ namespace AetherBoy.Runtime
                 VideoGeometry,
                 Features,
                 diagnosticEvents,
-                RumbleActive, CheatButtonPressed, BarcodeBoy);
+                RumbleActive, CheatButtonPressed, BarcodeBoy, EReader);
         }
 
         internal EmulationSnapshot WithVideoGeometry(VideoGeometry geometry)
@@ -88,7 +91,7 @@ namespace AetherBoy.Runtime
 
             return new EmulationSnapshot(
                 State, IsPaused, IsTurboEnabled, EmulatedFrameCount, VideoFrameSequence,
-                Rom, Audio, cheats, geometry, Features, diagnosticEvents, RumbleActive, CheatButtonPressed, BarcodeBoy);
+                Rom, Audio, cheats, geometry, Features, diagnosticEvents, RumbleActive, CheatButtonPressed, BarcodeBoy, EReader);
         }
 
         public bool Supports(EmulationFeature feature) =>

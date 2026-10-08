@@ -20,6 +20,7 @@ public class GamePak
     public readonly FlashBackup? _flashBackup;
     public readonly EEPromBackup? _eepromBackup;
     public readonly GpioRtc? _rtc;
+    public EReader? EReader { get; internal set; }
 
     public readonly uint RomEntryPoint;
     public readonly byte[] LogoCompressed = new byte[156];
@@ -64,7 +65,9 @@ public class GamePak
 
         Array.Fill<byte>(_sram, 0xFF);
 
-        RomBackupType = romBackupType ?? CalculateRomBackupType(data);
+        bool isEReader = GameCode is "PEAJ" or "PSAJ" or "PSAE";
+        RomBackupType = isEReader ? RomBackupType.FLASH128 : romBackupType ?? CalculateRomBackupType(data);
+        if (isEReader) EReader = new EReader();
         if (data.AsSpan().IndexOf("SIIRTC_V"u8) >= 0 ||
             data.AsSpan().IndexOf("RTC_V"u8) >= 0)
         {
@@ -114,6 +117,12 @@ public class GamePak
         return RomBackupType.SRAM;
     }
 
+    public void InitializeEReaderCalibration()
+    {
+        if (EReader is not null && _flashBackup is not null)
+            EReader.InitializeCalibration(_flashBackup._data);
+    }
+
     private static string ReadHeaderText(ReadOnlySpan<byte> bytes)
     {
         int terminator = bytes.IndexOf((byte)0);
@@ -132,7 +141,8 @@ public class GamePak
     /// to be hit a lot by predeciding which function will be correct
     /// using delegate* at construction
     /// </remarks>
-    internal byte ReadBackupStorage(uint address) => RomBackupType switch
+    internal byte ReadBackupStorage(uint address) => EReader is not null && Rom.EReader.IsFlashRegister(address)
+        ? EReader.ReadFlash(address) : RomBackupType switch
     {
         RomBackupType.SRAM => _sram[address & 0x0EFF_FFFF & 0x7FFF],
         RomBackupType.FLASH64 => _flashBackup!.Read(address),
@@ -143,6 +153,8 @@ public class GamePak
 
     internal void WriteBackupStorage(uint address, byte value)
     {
+        if (EReader is not null && Rom.EReader.IsFlashRegister(address))
+        { EReader.WriteFlash(address, value); return; }
         switch (RomBackupType)
         {
             case RomBackupType.SRAM:
@@ -160,6 +172,8 @@ public class GamePak
 
     internal void Write(uint address, byte value)
     {
+        if (EReader is not null && Rom.EReader.IsRegisterAddress(address))
+        { EReader.Write(address, value); return; }
         uint offset = address & RomMask;
         if (_rtc != null && offset is GpioRtc.DataOffset or GpioRtc.DirectionOffset or GpioRtc.ControlOffset)
         {
@@ -174,6 +188,8 @@ public class GamePak
 
     internal byte ReadByte(uint address)
     {
+        if (EReader is not null && Rom.EReader.IsRegisterAddress(address))
+            return (byte)(EReader.Read(address & ~1u) >> (int)((address & 1) * 8));
         uint offset = address & RomMask;
 
         if (_rtc != null && offset is >= GpioRtc.DataOffset and <= GpioRtc.ControlOffset + 1)
@@ -198,6 +214,7 @@ public class GamePak
 
     internal ushort ReadHalfWord(uint address)
     {
+        if (EReader is not null && Rom.EReader.IsRegisterAddress(address)) return EReader.Read(address);
         uint offset = address & RomMask & 0xFFFF_FFFE;
         if (_rtc != null && offset is GpioRtc.DataOffset or GpioRtc.DirectionOffset or GpioRtc.ControlOffset)
         {
@@ -218,6 +235,8 @@ public class GamePak
 
     internal uint ReadWord(uint address)
     {
+        if (EReader is not null && Rom.EReader.IsRegisterAddress(address))
+            return (uint)(EReader.Read(address & ~3u) | EReader.Read((address & ~3u) + 2) << 16);
         uint offset = address & RomMask & 0xFFFF_FFFC;
         if (_rtc != null && offset is GpioRtc.DataOffset or GpioRtc.DirectionOffset or GpioRtc.ControlOffset)
         {

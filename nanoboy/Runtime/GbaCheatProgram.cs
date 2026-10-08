@@ -37,6 +37,7 @@ internal sealed class GbaCheatProgram
     private string[] lines = [];
     private int cursor;
     private Format format;
+    private bool automaticFormat = true;
     private enum Format { Auto, CodeBreaker, CodeBreakerRaw, GameShark, GameSharkRaw, ActionReplay, ActionReplayRaw }
     private static readonly (string Prefix, Format Format)[] Prefixes =
     [
@@ -57,25 +58,34 @@ internal sealed class GbaCheatProgram
         if (result.lines.Length is 0 or > 512) throw new FormatException("Use between 1 and 512 code lines per set.");
         while (result.cursor < result.lines.Length)
         {
-            string line = result.lines[result.cursor];
-            // Explicit raw addresses retain their deliberately narrow RAM contract.
-            string[] raw = line.Split([':', '=']);
-            if (raw.Length == 2 && raw[0].Trim().Length == 8 && raw[1].Trim().Length is 2 or 4 or 8 &&
-                Hex(raw[0].Trim(), out uint address) && Hex(raw[1].Trim(), out uint value))
+            int commandStart = result.cursor;
+            try
             {
-                int width = raw[1].Trim().Length / 2;
-                ValidateRam(address, width);
-                result.Write(address, value, width);
-                result.normalized.Add($"{address:X8}:{value.ToString($"X{width * 2}", CultureInfo.InvariantCulture)}");
-                result.cursor++;
-                continue;
+                string line = result.lines[result.cursor];
+                // Explicit raw addresses retain their deliberately narrow RAM contract.
+                string[] raw = line.Split([':', '=']);
+                if (raw.Length == 2 && raw[0].Trim().Length == 8 && raw[1].Trim().Length is 2 or 4 or 8 &&
+                    Hex(raw[0].Trim(), out uint address) && Hex(raw[1].Trim(), out uint value))
+                {
+                    int width = raw[1].Trim().Length / 2;
+                    ValidateRam(address, width);
+                    result.Write(address, value, width);
+                    result.normalized.Add($"{address:X8}:{value.ToString($"X{width * 2}", CultureInfo.InvariantCulture)}");
+                    result.cursor++;
+                    continue;
+                }
+                (uint first, uint second) = result.NextLine();
+                switch (result.format)
+                {
+                    case Format.CodeBreaker: case Format.CodeBreakerRaw: result.CodeBreaker(first, second); break;
+                    case Format.ActionReplay: case Format.ActionReplayRaw: result.ActionReplay(first, second); break;
+                    default: result.GameShark(first, second); break;
+                }
             }
-            (uint first, uint second) = result.NextLine();
-            switch (result.format)
+            catch (FormatException error)
             {
-                case Format.CodeBreaker: case Format.CodeBreakerRaw: result.CodeBreaker(first, second); break;
-                case Format.ActionReplay: case Format.ActionReplayRaw: result.ActionReplay(first, second); break;
-                default: result.GameShark(first, second); break;
+                if (!error.Data.Contains("CheatLine")) error.Data["CheatLine"] = Math.Max(commandStart + 1, result.cursor);
+                throw;
             }
         }
         result.CloseBlock();
@@ -95,21 +105,20 @@ internal sealed class GbaCheatProgram
         Format selected = format;
         foreach (var item in Prefixes)
             if (text.StartsWith(item.Prefix, StringComparison.Ordinal))
-            { selected = item.Format; text = text[item.Prefix.Length..]; break; }
+            { selected = item.Format; automaticFormat = false; text = text[item.Prefix.Length..]; break; }
         if (continuation && selected != format) throw new FormatException("A continuation must use the same code format.");
         string compact = string.Concat(text.Where(c => !char.IsWhiteSpace(c) && c != '-'));
         if (compact.Length is not (12 or 16) || !Hex(compact[..8], out uint first) || !Hex(compact[8..], out uint second))
             throw new FormatException("Use an eight-digit address and a four- or eight-digit value.");
+        // Auto may cross device families between complete commands (for example an
+        // AR master followed by plain CodeBreaker money writes), never mid-command.
+        if (automaticFormat && !continuation &&
+            (selected == Format.Auto || (compact.Length == 12) != (selected == Format.CodeBreaker)))
+            selected = Format.Auto;
         if (selected == Format.Auto)
         {
             if (compact.Length == 12) selected = Format.CodeBreaker;
-            else
-            {
-                var decoded = Cipher.DecodeTea(first, second, false);
-                bool raw = IsSimpleShark(first), encrypted = IsSimpleShark(decoded.Item1);
-                if (raw == encrypted) throw new FormatException("Choose GS:, GSRAW:, AR3: or AR3RAW: for this code set.");
-                selected = raw ? Format.GameSharkRaw : Format.GameShark;
-            }
+            else selected = DetectWideFormat(cursor - 1);
         }
         bool breaker = selected is Format.CodeBreaker or Format.CodeBreakerRaw;
         if (compact.Length != (breaker ? 12 : 16)) throw new FormatException("The code length does not match the selected format.");
@@ -127,6 +136,39 @@ internal sealed class GbaCheatProgram
             Format.ActionReplay => Cipher.DecodeTea(first, second, true),
             _ => (first, second)
         };
+    }
+
+    private Format DetectWideFormat(int start)
+    {
+        // Validate an entire same-width run on isolated compiler/cipher state.
+        // A plausible first opcode alone cannot identify an encrypted device code.
+        var run = new List<string>();
+        for (int index = start; index < lines.Length; index++)
+        {
+            string line = lines[index];
+            if (line.Contains(':') || line.Contains('=')) break;
+            string compact = string.Concat(line.Where(c => !char.IsWhiteSpace(c) && c != '-'));
+            if (compact.Length != 16) break;
+            run.Add(line);
+        }
+        string code = string.Join(" + ", run);
+        var matches = new List<Format>();
+        // RAW is deliberately opt-in. Ciphertext can also look like valid raw
+        // instructions, which is not evidence that the user intended RAW.
+        foreach (var candidate in new[] { ("GS:", Format.GameShark), ("AR3:", Format.ActionReplay) })
+        {
+            try { _ = Compile(candidate.Item1 + code, this); }
+            catch (FormatException) { continue; }
+            matches.Add(candidate.Item2);
+        }
+        if (matches.Count > 1)
+        {
+            var error = new FormatException("Both GameShark v1/v2 and Action Replay v3 match this set. Select the format stated by your source; they can change different memory addresses.");
+            error.Data["CheatCandidates"] = new[] { CheatCodeFormat.GameShark, CheatCodeFormat.ActionReplayV3 };
+            error.Data["CheatLine"] = start + 1;
+            throw error;
+        }
+        return matches.Count == 1 ? matches[0] : throw new FormatException("No supported format matches the complete code set. Select the source format and check every line.");
     }
 
     private void CodeBreaker(uint first, uint second)
@@ -327,7 +369,6 @@ internal sealed class GbaCheatProgram
     internal static uint Mask(uint value, int width) => width switch { 1 => value & 255, 2 => value & 65535, _ => value };
     private static uint ReplayAddress(uint value) => (value & 0xFFFFF) | ((value << 4) & 0x0F000000);
     private static bool Hex(string value, out uint result) => uint.TryParse(value, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out result);
-    private static bool IsSimpleShark(uint first) => first >> 28 < 3 && IsRam(first & 0x0FFFFFFF, 1 << (int)(first >> 28));
     internal static bool IsRam(uint address, int width) => Aligned(address, width) &&
         ((address >= 0x02000000 && (ulong)address + (uint)width <= 0x02040000) ||
          (address >= 0x03000000 && (ulong)address + (uint)width <= 0x03008000));

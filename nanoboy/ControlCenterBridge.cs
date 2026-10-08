@@ -24,6 +24,10 @@ namespace nanoboy
         public Func<System.Threading.Tasks.Task>? PreviewBootIntro { get; init; }
         public Func<bool, System.Threading.Tasks.Task>? SetBarcodeBoyEnabled { get; init; }
         public Func<string, System.Threading.Tasks.Task>? ScanBarcodeBoy { get; init; }
+        public Func<byte[], System.Threading.Tasks.Task>? QueueEReaderCard { get; init; }
+        public Func<System.Threading.Tasks.Task>? ClearEReaderCards { get; init; }
+        public Func<string, bool, System.Threading.Tasks.Task>? LaunchEReaderSet { get; init; }
+        public Func<System.Threading.Tasks.Task>? SaveEReaderResume { get; init; }
         public Func<string> AudioOutputProvider { get; init; } = () => "No output";
         public Func<string> VideoOutputProvider { get; init; } = () => "No output";
         public Func<string> SaveFeedbackProvider { get; init; } = () => "Noch keine Save-State-Aktion.";

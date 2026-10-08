@@ -30,10 +30,13 @@ internal sealed partial class WaylandEmulatorHost
     private void DrawToolsPage()
     {
         if (showBarcodeBoy) { DrawBarcodeBoyPage(); return; }
+        if (showEReader) { DrawEReaderPage(); return; }
         if (showOnlineLinkPage) { DrawOnlineLinkPage(); return; }
         if (showGameplayCapture) { DrawGameplayCapturePage(); return; }
+        if (showCheatReview) { DrawCheatReviewPage(); return; }
         Ink(300, 198, global::AetherBoy.Runtime.Localization.UiText.Get("WAV RECORDING"), 14, Colors.Cyan, true);
         ActionButton(830, 184, 280, 38, global::AetherBoy.Runtime.Localization.UiText.Get("OPEN BARCODE BOY"), () => OpenSettingsDestination(LinuxSettingsDestination.BarcodeBoy));
+        ActionButton(565, 184, 245, 38, global::AetherBoy.Runtime.Localization.UiText.Get("e-Reader öffnen"), () => OpenSettingsDestination(LinuxSettingsDestination.EReader));
         ActionButton(300, 233, 245, 44, recorder is null ? global::AetherBoy.Runtime.Localization.UiText.Get("START RECORDING") : global::AetherBoy.Runtime.Localization.UiText.Get("STOP RECORDING"), ToggleRecording,
             recorder is not null, session is not null && audioOutput is not null);
         ActionButton(565, 233, 245, 44, global::AetherBoy.Runtime.Localization.UiText.Get("OPEN RECORDINGS"), () => OpenFolder(Path.Combine(dataPaths.Data, "recordings")));
@@ -52,12 +55,8 @@ internal sealed partial class WaylandEmulatorHost
             ActionButton(967, 371, 143, 42, formats[(int)cheatFormat], () => cheatFormat = (CheatCodeFormat)(((int)cheatFormat + 1) % formats.Length), enabled: !IsOnlineLink);
         }
         DrawTextEntry(TextField.Cheat, 300, 371, 510, 42, global::AetherBoy.Runtime.Localization.UiText.Get("ENTER CHEAT CODE"), session is not null && !IsOnlineLink);
-        ActionButton(830, 371, 120, 42, global::AetherBoy.Runtime.Localization.UiText.Get("ADD"), () => TryUiAction(() =>
-        {
-            if (session is null) return;
-            session.AddCheatAsync("Cheat", gbaCheats ? CheatCodeInput.Prepare(cheatCode, cheatFormat) : cheatCode).GetAwaiter().GetResult();
-            editingCheat = false; SDL.StopTextInput(window); cheatCode = "";
-        }, global::AetherBoy.Runtime.Localization.UiText.Get("Cheat added for this session.")), enabled: session is not null && !IsOnlineLink && !string.IsNullOrWhiteSpace(cheatCode));
+        ActionButton(830, 371, 120, 42, global::AetherBoy.Runtime.Localization.UiText.Get("Prüfen"), OpenCheatReview,
+            enabled: session is not null && !IsOnlineLink && !string.IsNullOrWhiteSpace(cheatCode));
         var cheats = session?.LatestSnapshot.Cheats;
         cheatPage = Math.Clamp(cheatPage, 0, Math.Max(0, ((cheats?.Count ?? 0) - 1) / 2));
         int row = 0;

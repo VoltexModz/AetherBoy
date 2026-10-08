@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
 using AetherBoy.Runtime;
+using AetherBoy.Testing;
 using nanoboy;
 using nanoboy.Controls;
 using nanoboy.Core;
@@ -13,6 +14,40 @@ namespace AetherBoy.SmokeTests;
 [DoNotParallelize]
 public sealed class WindowsBarcodeBoyTests
 {
+    [STATestMethod]
+    [DataRow(BarcodeBoyInput.BattleSpaceBerserker)]
+    [DataRow(BarcodeBoyInput.BattleSpaceValkyrie)]
+    public void RealBattleSpaceCardArrivesThroughWindowsScannerButton(string code)
+    {
+        using var f = new BattleSpaceFixture(); f.BootToScan();
+        _ = WindowsRomLibrary.Default;
+        var oldPaths = WindowsDataPaths.Default;
+        bool oldAudio = nanoboy.Properties.Settings.Default.AudioEnable;
+        try
+        {
+            WindowsDataPaths.Default = new(f.Root); nanoboy.Properties.Settings.Default.AudioEnable = false;
+            using var main = new frmNano(); main.Show(); Call(main, "OpenControlCenter"); Application.DoEvents();
+            var center = Field<frmControlCenter>(main, "controlCenter"); Call(center, "ShowPage", "barcode");
+            using var session = new EmulationSession(f.RomPath, Path.Combine(f.Root, "ui.sav"), null,
+                new EmulatorConfiguration(0, false, true, true, true, true, 44100));
+            Pump(() => session.State == SessionState.Running);
+            session.SetPausedAsync(true).GetAwaiter().GetResult();
+            session.RestoreStateAsync(SaveState.Capture(f.Emulator)).GetAwaiter().GetResult();
+            Set(main, "session", session); Call(center, "RefreshAll");
+            Find<AetherTextBox>(center, "barcodeInput").Text = code;
+            Find<AetherButton>(center, "barcodeScan").PerformClick();
+            Pump(() => session.LatestSnapshot.BarcodeBoy!.Pending && !Field<bool>(center, "barcodeBusy"));
+            Assert.IsTrue(session.LatestSnapshot.IsPaused);
+            session.SetPausedAsync(false).GetAwaiter().GetResult();
+            Pump(() => session.LatestSnapshot.BarcodeBoy!.CompletedScans == 1 && BattleSpaceFixture.SessionShowsCard(session, code));
+            session.SetPausedAsync(true).GetAwaiter().GetResult();
+            BattleSpaceFixture.AssertImage(BattleSpaceFixture.SessionImage(session), code, "windows-ui-" + code);
+            Assert.IsFalse(session.LatestSnapshot.BarcodeBoy!.Pending);
+            center.Close(); main.Close();
+        }
+        finally { WindowsDataPaths.Default = oldPaths; nanoboy.Properties.Settings.Default.AudioEnable = oldAudio; }
+    }
+
     [STATestMethod]
     public void ScannerPageConnectsQueuesAndDisconnectsThroughRealSession()
     {

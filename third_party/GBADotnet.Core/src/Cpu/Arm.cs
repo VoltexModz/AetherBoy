@@ -943,54 +943,12 @@ internal static unsafe partial class Arm
     }
     internal static void msr_rc(Core core, uint instruction)
     {
-        var rm = instruction & 0b1111;
-        var val = core.R[rm];
-
-        // "In User mode, the control bits of the CPSR are protected from change, so only
-        // the condition code flags of the CPSR can be changed. In other(privileged)
-        // modes the entire CPSR can be changed"
-        // Special format of msr which only affects condition flags, can't disambiguate
-        // them in lookup table as bit 16 isn't included
-        if (((instruction >> 16) & 1) == 0 || core.Cpsr.Mode == CPSRMode.User)
-        {
-            val &= 0xF000_0000;
-            _ = core.Cpsr.Set(val);
-        }
-        else
-        {
-            var newMode = core.Cpsr.Set(val);
-            if (newMode != core.Cpsr.Mode)
-            {
-                core.SwitchMode(newMode);
-            }
-        }
-
+        WritePsr(core, instruction, core.R[instruction & 0xF], saved: false);
         core.MoveExecutePipelineToNextInstruction();
     }
     internal static void msr_rs(Core core, uint instruction)
     {
-        // Can't set SPSR in user/system modes because it doesn't exist
-        if (core.Cpsr.Mode is not (CPSRMode.User or CPSRMode.OldUser or CPSRMode.System))
-        {
-            var rm = instruction & 0b1111;
-            var val = core.R[rm];
-            // "In User mode, the control bits of the CPSR are protected from change, so only
-            // the condition code flags of the CPSR can be changed. In other(privileged)
-            // modes the entire CPSR can be changed"
-            // Special format of msr which only affects condition flags, can't disambiguate
-            // them in lookup table as bit 16 isn't included
-            if (((instruction >> 16) & 1) == 0)
-            {
-                val &= 0xF000_0000;
-                _ = core.CurrentSpsr().Set(val);
-            }
-            else
-            {
-                core.CurrentSpsr().Mode = core.CurrentSpsr().Set(val);
-                core.CurrentSpsr().ThumbMode = (val & 0x20) == 0x20;
-            }
-        }
-
+        WritePsr(core, instruction, core.R[instruction & 0xF], saved: true);
         core.MoveExecutePipelineToNextInstruction();
     }
     internal static void msr_imm_cpsr(Core core, uint instruction)
@@ -999,51 +957,46 @@ internal static unsafe partial class Arm
         var rot = ((instruction >> 8) & 0b1111) * 2;
         var val = Shifter.RORInternal(offset, (byte)rot);
 
-        // "In User mode, the control bits of the CPSR are protected from change, so only
-        // the condition code flags of the CPSR can be changed. In other(privileged)
-        // modes the entire CPSR can be changed"
-        // Special format of msr which only affects condition flags, can't disambiguate
-        // them in lookup table as bit 16 isn't included
-        if (((instruction >> 16) & 1) == 0 || core.Cpsr.Mode == CPSRMode.User)
-        {
-            val &= 0xF000_0000;
-            _ = core.Cpsr.Set(val);
-        }
-        else
-        {
-            var newMode = core.Cpsr.Set(val);
-            if (newMode != core.Cpsr.Mode)
-            {
-                core.SwitchMode(newMode);
-            }
-        }
+        WritePsr(core, instruction, val, saved: false);
         core.MoveExecutePipelineToNextInstruction();
     }
     internal static void msr_imm_spsr(Core core, uint instruction)
     {
-        // Can't set SPSR in user/system modes because it doesn't exist
-        if (core.Cpsr.Mode is not (CPSRMode.User or CPSRMode.OldUser or CPSRMode.System))
-        {
-            var offset = instruction & 0xFF;
-            var rot = ((instruction >> 8) & 0b1111) * 2;
-            var val = Shifter.RORInternal(offset, (byte)rot);
-
-            // "In User mode, the control bits of the CPSR are protected from change, so only
-            // the condition code flags of the CPSR can be changed. In other(privileged)
-            // modes the entire CPSR can be changed"
-            // Special format of msr which only affects condition flags, can't disambiguate
-            // them in lookup table as bit 16 isn't included
-            if (((instruction >> 16) & 1) == 0 || core.Cpsr.Mode == CPSRMode.User)
-            {
-                val &= 0xF000_0000;
-                _ = core.CurrentSpsr().Set(val);
-            }
-            else
-            {
-                core.CurrentSpsr().Mode = core.CurrentSpsr().Set(val);
-            }
-        }
+        var offset = instruction & 0xFF;
+        var rot = ((instruction >> 8) & 0b1111) * 2;
+        WritePsr(core, instruction, Shifter.RORInternal(offset, (byte)rot), saved: true);
         core.MoveExecutePipelineToNextInstruction();
+    }
+
+    private static void WritePsr(Core core, uint instruction, uint value, bool saved)
+    {
+        bool user = core.Cpsr.Mode is CPSRMode.User or CPSRMode.OldUser;
+        if (saved && (user || core.Cpsr.Mode == CPSRMode.System))
+            return; // No SPSR exists in these modes.
+
+        // ARM7TDMI MSR writes only the selected PSR fields. In particular,
+        // CPSR_f must preserve I/F: clearing I here permits nested IRQs inside
+        // the e-Reader NES audio mixer and destroys its banked return address.
+        // The extension/status fields are reserved on ARMv4T. CPSR.T is not
+        // changed by MSR; SPSR.T can be prepared for a later exception return.
+        uint mask = (instruction & (1u << 19)) != 0 ? 0xF000_0000u : 0;
+        if ((instruction & (1u << 16)) != 0 && (saved || !user))
+            mask |= saved ? 0xFFu : 0xDFu;
+
+        if (saved)
+        {
+            ref CPSR target = ref core.CurrentSpsr();
+            uint merged = (target.Get() & ~mask) | (value & mask);
+            target.Mode = target.Set(merged);
+            target.ThumbMode = (merged & 0x20) != 0;
+        }
+        else
+        {
+            uint merged = (core.Cpsr.Get() & ~mask) | (value & mask);
+            var mode = core.Cpsr.Set(merged);
+            if (mode != core.Cpsr.Mode)
+                core.SwitchMode(mode);
+        }
     }
     #endregion
 

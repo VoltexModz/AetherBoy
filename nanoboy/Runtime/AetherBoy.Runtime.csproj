@@ -24,6 +24,7 @@
   <ItemGroup>
     <Content Include="../../third_party/online-native-licenses/*" Link="licenses/online-native/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../../third_party/mgba-cheats/*" Link="licenses/mgba-cheats/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../third_party/mgba-ereader/*" Link="licenses/mgba-ereader/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../../third_party/sharpcompress/*" Link="licenses/sharpcompress/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../../third_party/discord-rpc/*" Link="licenses/discord-rpc/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(PkgMediaToolkit_WebRtc_Native_win-x64)/native/win-x64/datachannel.dll" Link="datachannel.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

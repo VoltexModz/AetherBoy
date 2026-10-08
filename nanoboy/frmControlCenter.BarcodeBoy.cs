@@ -42,7 +42,7 @@ internal sealed partial class frmControlCenter
             barcodeFeedback.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Scan vorgemerkt. Schließe das Menü und setze das Spiel fort. Der Scanner wartet auf die Empfangsbereitschaft des Spiels.");
         });
         barcodeFeedback = CreateSmallLabel("", 0, 501, 780, 90); barcodeFeedback.Name = "barcodeFeedback"; page.Controls.Add(barcodeFeedback);
-        page.Controls.Add(CreateSmallLabel(global::AetherBoy.Runtime.Localization.UiText.Get("Battle Space: dokumentierte Beispielkarten. Die Buttons tragen nur den Code ein. Der echte Spieltest steht noch aus."), 0, 608, 780, 65));
+        page.Controls.Add(CreateSmallLabel(global::AetherBoy.Runtime.Localization.UiText.Get("Battle Space: Diese beiden Karten sind im Spiel getestet. Die Buttons tragen nur den Code ein. Andere Spiele sind noch nicht geprüft."), 0, 608, 780, 65));
         AddActionButton(page, global::AetherBoy.Runtime.Localization.UiText.Get("Berserker-Code einsetzen"), 0, 683, 380, () => barcodeInput.Text = BarcodeBoyInput.BattleSpaceBerserker);
         AddActionButton(page, global::AetherBoy.Runtime.Localization.UiText.Get("Valkyrie-Code einsetzen"), 400, 683, 380, () => barcodeInput.Text = BarcodeBoyInput.BattleSpaceValkyrie);
         page.Controls.Add(CreateSmallLabel(global::AetherBoy.Runtime.Localization.UiText.Get("Spiele: Battle Space, Monster Maker: Barcode Saga, Kattobi Road, Family Jockey 2 und Famista 3. Nur im Einzelspiel; der Anschluss kann nicht gleichzeitig als Link-Kabel dienen."), 0, 754, 780, 95));
@@ -82,7 +82,7 @@ internal sealed partial class frmControlCenter
         barcodeStatus.Text = !supported ? global::AetherBoy.Runtime.Localization.UiText.Get("Öffne ein GB-Spiel im Einzelmodus. Barcode Boy ist nicht für GBA oder Link-Sitzungen verfügbar.")
             : scanner is null ? global::AetherBoy.Runtime.Localization.UiText.Get("Scanner getrennt. Schließe ihn an, bevor das Spiel nach dem Gerät sucht.")
             : scanner.Pending ? global::AetherBoy.Runtime.Localization.UiText.Format("Scan wartet oder wird übertragen: {0}/30 Bytes. Setze das Spiel fort.", scanner.BytesSent)
-            : scanner.Ready ? global::AetherBoy.Runtime.Localization.UiText.Format("Spiel hat den Scanner erkannt. Abgeschlossene Übertragungen: {0}.", scanner.CompletedScans)
+            : scanner.Ready ? global::AetherBoy.Runtime.Localization.UiText.Format("Scanner bereit. Abgeschlossene Übertragungen: {0}. Beachte die Anzeige im Spiel.", scanner.CompletedScans)
             : global::AetherBoy.Runtime.Localization.UiText.Format("Warte auf die Geräteerkennung im Spiel. Abgeschlossene Übertragungen: {0}.", scanner.CompletedScans);
     }
 }

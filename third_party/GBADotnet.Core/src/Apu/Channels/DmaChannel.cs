@@ -53,12 +53,12 @@ public class DmaChannel : BaseChannel
 
         // If the FIFO buffer doesn't have enough data left then request a DMA
         // from whichever DMA channel is controlling this audio channel
-        if (FifoWritePtr - FifoReadPtr <= 4)
+        if (FifoWritePtr - FifoReadPtr <= 16)
         {
             for (var ii = 1; ii < 3; ii++)
             {
                 var dmaChannel = _device.DmaData.Channels[ii];
-                if (dmaChannel.ControlReg.DmaEnable && 
+                if (dmaChannel.ControlReg.DmaEnable && !dmaChannel.IsRunning &&
                     dmaChannel.ControlReg.StartTiming == Dma.StartTiming.Special &&
                     dmaChannel.DestinationAddress == _channelAddress)
                 {

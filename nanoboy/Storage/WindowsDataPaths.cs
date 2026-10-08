@@ -22,6 +22,7 @@ internal sealed class WindowsDataPaths
     internal string States => Path.Combine(Root, "States");
     internal string Settings => Path.Combine(Root, "Settings");
     internal string Firmware => Path.Combine(Root, "Firmware");
+    internal string EReader => Path.Combine(Root, "EReader");
     internal string Recordings => Path.Combine(Root, "Recordings");
     internal string Screenshots => Path.Combine(Root, "Screenshots");
     internal string Exports => Path.Combine(Root, "Exports");

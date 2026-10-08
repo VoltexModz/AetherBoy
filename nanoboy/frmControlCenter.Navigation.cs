@@ -23,7 +23,7 @@ internal sealed partial class frmControlCenter
         "palette" or "performance" => "display",
         "controller" or "stick" or "shortcuts" => "input",
         "desktop" or "profiles" or "firmware" or "discord" or "updates" or "intro" or "language" => "system",
-        "barcode" => "tools",
+        "barcode" or "ereader" => "tools",
         _ => key
     };
 
@@ -43,6 +43,8 @@ internal sealed partial class frmControlCenter
         tools.Controls.Add(CreateSmallLabel(global::AetherBoy.Runtime.Localization.UiText.Get("Online Link ist ein Entwicklungsstand. Spielsitzungen verwenden Spielstandkopien. Ein erfolgreicher Verbindungstest bestätigt noch keinen Pokémon-Tausch."), 0, 609, 780, 75));
         AddPageLink(tools, 700, global::AetherBoy.Runtime.Localization.UiText.Get("Barcode Boy öffnen"), global::AetherBoy.Runtime.Localization.UiText.Get("Kartencodes für unterstützte Game-Boy-Spiele scannen."), "barcode");
         BuildBarcodeBoyPage();
+        AddPageLink(tools, 790, global::AetherBoy.Runtime.Localization.UiText.Get("e-Reader öffnen"), global::AetherBoy.Runtime.Localization.UiText.Get("Digitale Karten mit einer e-Reader-ROM lesen."), "ereader");
+        BuildEReaderPage();
         nav.Controls.Add(CreateSmallLabel(global::AetherBoy.Runtime.Localization.UiText.Get("Suchen · Strg+K"), 18, 87, 184, 20));
         settingsSearch = new nanoboy.Controls.AetherTextBox
         {

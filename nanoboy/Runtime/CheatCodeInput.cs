@@ -4,7 +4,7 @@ namespace AetherBoy.Runtime;
 
 public enum CheatCodeFormat { Automatic, CodeBreaker, GameShark, GameSharkRaw, ActionReplayV3, ActionReplayV3Raw }
 
-public static class CheatCodeInput
+public static partial class CheatCodeInput
 {
     public static string Prepare(string code, CheatCodeFormat format)
     {

@@ -19,6 +19,8 @@ internal sealed class WindowsRomLibrary
     {
         cancellationToken.ThrowIfCancellationRequested();
         string source = Path.GetFullPath(sourcePath);
+        if (new AetherBoy.Runtime.EReaderLibrary(paths.EReader).IdentifyLaunch(source, verify: true) is not null)
+            return source;
         if (!RomFiles.IsSupportedPath(source))
             throw new InvalidDataException(global::AetherBoy.Runtime.Localization.UiText.Get("Unterstützt werden .gb, .gbc und .gba."));
 
@@ -103,6 +105,8 @@ internal sealed class WindowsRomLibrary
     internal string GetIdentity(string romPath)
     {
         string fullPath = Path.GetFullPath(romPath);
+        string? readerIdentity = new AetherBoy.Runtime.EReaderLibrary(paths.EReader).IdentifyLaunch(fullPath);
+        if (readerIdentity is not null) return readerIdentity;
         string? directory = Path.GetDirectoryName(fullPath);
         string identity = Path.GetFileName(directory)!;
         if (!IsIdentity(identity) || !string.Equals(Path.GetDirectoryName(directory), paths.Roms,

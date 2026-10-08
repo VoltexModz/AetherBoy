@@ -32,7 +32,7 @@ internal sealed class LinuxSdlTextClipboard : ILinuxTextClipboard
 
 internal sealed partial class WaylandEmulatorHost
 {
-    private enum TextField { None, Title, Tags, Search, SettingsSearch, Cheat, RoomCode, RoomServer, RoomAccessKey, ThemePrimary, ThemeSecondary, ThemeBackground, DiscordApplicationId, Barcode }
+    private enum TextField { None, Title, Tags, Search, SettingsSearch, Cheat, RoomCode, RoomServer, RoomAccessKey, ThemePrimary, ThemeSecondary, ThemeBackground, DiscordApplicationId, Barcode, EReaderTitle }
 
     private TextField onlineEditingField;
     private TextField appearanceEditingField;
@@ -48,8 +48,9 @@ internal sealed partial class WaylandEmulatorHost
         : controlCenterVisible && controlCenterPage == ControlCenterPage.System && showAppearance ? appearanceEditingField
         : controlCenterVisible && controlCenterPage == ControlCenterPage.System && systemSection == SystemSection.Discord && editingDiscordId ? TextField.DiscordApplicationId
         : controlCenterVisible && controlCenterPage == ControlCenterPage.Tools && showBarcodeBoy && editingBarcode ? TextField.Barcode
+        : controlCenterVisible && showEReader && showEReaderLibrary && editingEReaderTitle ? TextField.EReaderTitle
         : controlCenterVisible && showOnlineLinkPage && !showLegacyOnlineLink ? onlineEditingField : TextField.None;
-    private string? ActiveTextEntryName => ActiveTextField switch
+    private string? ActiveTextEntryName => ActiveTextField == TextField.EReaderTitle ? global::AetherBoy.Runtime.Localization.UiText.Get("Titel des Kartensatzes") : ActiveTextField switch
     { TextField.Title => global::AetherBoy.Runtime.Localization.UiText.Get("Cartridge title"), TextField.Tags => global::AetherBoy.Runtime.Localization.UiText.Get("Cartridge tags"), TextField.Search => global::AetherBoy.Runtime.Localization.UiText.Get("Search cartridges"), TextField.SettingsSearch => global::AetherBoy.Runtime.Localization.UiText.Get("Search settings"), TextField.Cheat => global::AetherBoy.Runtime.Localization.UiText.Get("Cheat code"), TextField.RoomCode => global::AetherBoy.Runtime.Localization.UiText.Get("Room code"), TextField.RoomServer => global::AetherBoy.Runtime.Localization.UiText.Get("Room server address"), TextField.RoomAccessKey => global::AetherBoy.Runtime.Localization.UiText.Get("Server access key"),
       TextField.ThemePrimary => global::AetherBoy.Runtime.Localization.UiText.Get("Primary UI color"), TextField.ThemeSecondary => global::AetherBoy.Runtime.Localization.UiText.Get("Secondary UI color"), TextField.ThemeBackground => global::AetherBoy.Runtime.Localization.UiText.Get("UI background color"), TextField.DiscordApplicationId => global::AetherBoy.Runtime.Localization.UiText.Get("Discord application ID"), TextField.Barcode => global::AetherBoy.Runtime.Localization.UiText.Get("Barcode Boy card code"), _ => null };
     private string? ActiveTextName => ActiveTextEntryName;
@@ -64,7 +65,7 @@ internal sealed partial class WaylandEmulatorHost
         }
     }
 
-    private string TextFieldValue(TextField field) => field switch
+    private string TextFieldValue(TextField field) => field == TextField.EReaderTitle ? eReaderTitleInput : field switch
     { TextField.Title => titleInput, TextField.Tags => tagsInput, TextField.Search => librarySearch, TextField.SettingsSearch => settingsSearch, TextField.Cheat => cheatCode,
       TextField.RoomCode => roomCodeInput, TextField.RoomServer => roomServerInput, TextField.RoomAccessKey => roomAccessKeyInput,
       TextField.ThemePrimary => primaryColorInput, TextField.ThemeSecondary => secondaryColorInput, TextField.ThemeBackground => backgroundColorInput, TextField.DiscordApplicationId => discordApplicationIdInput, TextField.Barcode => barcodeInput, _ => "" };
@@ -75,6 +76,7 @@ internal sealed partial class WaylandEmulatorHost
         textEditor.LineBreakReplacement = field == TextField.Cheat ? " + " : "";
         textEditor.MaximumLength = field is TextField.RoomServer or TextField.RoomAccessKey ? 256
             : field == TextField.Tags ? 240
+            : field == TextField.EReaderTitle ? 120
             : field == TextField.Cheat ? 32768
             : field is TextField.ThemePrimary or TextField.ThemeSecondary or TextField.ThemeBackground ? 7
             : field == TextField.DiscordApplicationId ? 20 : field == TextField.RoomCode ? 14 : 80;
@@ -101,6 +103,7 @@ internal sealed partial class WaylandEmulatorHost
             case TextField.ThemeBackground: backgroundColorInput = textEditor.Text; break;
             case TextField.DiscordApplicationId: discordApplicationIdInput = textEditor.Text; break;
             case TextField.Barcode: barcodeInput = textEditor.Text; break;
+            case TextField.EReaderTitle: eReaderTitleInput = textEditor.Text; break;
         }
     }
 
@@ -116,6 +119,7 @@ internal sealed partial class WaylandEmulatorHost
         editingCheat = field == TextField.Cheat;
         editingDiscordId = field == TextField.DiscordApplicationId;
         editingBarcode = field == TextField.Barcode;
+        editingEReaderTitle = field == TextField.EReaderTitle;
         editorField = TextField.None;
         EnsureTextEditor(); editorHasFocus = true; focusedControl = -1;
         pressedKeys.Clear();
@@ -157,6 +161,7 @@ internal sealed partial class WaylandEmulatorHost
         editingSearch = editingCheat = false;
         editingDiscordId = false;
         editingBarcode = false;
+        editingEReaderTitle = false;
         onlineEditingField = TextField.None;
         appearanceEditingField = TextField.None;
         editorField = TextField.None; SDL.StopTextInput(window);

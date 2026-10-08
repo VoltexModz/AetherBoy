@@ -1,0 +1,25 @@
+mGBA e-Reader peripheral and digital dotcode reference
+Copyright (c) 2013-2020 Jeffrey Pfau
+Mozilla Public License, version 2.0 (see LICENSE.txt)
+
+Source: https://github.com/mgba-emu/mgba/blob/master/src/gba/cart/ereader.c
+Header: https://github.com/mgba-emu/mgba/blob/master/include/mgba/internal/gba/cart/ereader.h
+Reference: user-supplied mGBA source archive, reviewed 2026-10-08.
+SHA256 of referenced ereader.c:
+63561a9bc6feb29aef3d5ba52d833e82c523563dc017bf4cf6772c83dbbc62c1
+
+Adapted files (MPL-2.0):
+third_party/GBADotnet.Core/src/Rom/EReader.cs
+third_party/GBADotnet.Core/src/Rom/EReaderDotCode.cs
+
+AetherBoy changes: C# port, bounded FIFO and owned card buffers, digital RAW/
+packed-dot formats only, bounded register reads, serial read-byte wrap, scheduled
+Game Pak IRQ, reset/cancel, complete versioned peripheral state, input validation,
+late card insertion while firmware is already waiting for the next scan.
+No firmware or commercial card payloads are included.
+
+Corresponding modified source is distributed in the AetherBoy source tree:
+https://github.com/VoltexModz/AetherBoy
+Distributors must make the corresponding covered source available under MPL-2.0
+and preserve these notices. The remainder of the GBADotnet directory retains its
+existing license; these two files are not relicensed as MIT.

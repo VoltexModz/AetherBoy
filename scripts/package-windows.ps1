@@ -38,7 +38,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Quelldateien konnten nicht ermittelt werden.' 
 $rootFiles = @('Directory.Build.props', 'Directory.Build.targets', 'NuGet.config', 'global.json', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'CHANGELOG.md')
 $extensions = @('.cs', '.csproj', '.props', '.targets', '.json', '.config', '.resx', '.settings', '.md', '.txt', '.ps1', '.sh', '.py', '.html', '.js')
 $sourceFiles = @(foreach ($relative in ($listedFiles | Sort-Object -Unique)) {
-    if ($relative -notin $rootFiles -and $relative -notmatch '^(nanoboy/|third_party/(GBADotnet.Core|online-native-licenses|mgba-cheats|sharpcompress|discord-rpc)/|branding/|scripts/)') { continue }
+    if ($relative -notin $rootFiles -and $relative -notmatch '^(nanoboy/|third_party/(GBADotnet.Core|online-native-licenses|mgba-cheats|mgba-ereader|sharpcompress|discord-rpc)/|branding/|scripts/)') { continue }
     if ($relative -match '(^|/)(bin|obj|\.git)/') { continue }
     $extension = [IO.Path]::GetExtension($relative).ToLowerInvariant()
     $branding = $relative -match '^(branding/|nanoboy/Branding/)' -and $extension -in @('.png', '.ico', '.ttf')

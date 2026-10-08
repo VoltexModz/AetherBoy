@@ -9,7 +9,7 @@ namespace GameboyAdvanced.Core;
 public unsafe partial class Device
 {
     private const uint StateMagic = 0x53414241; // "ABAS" in little endian.
-    private const ushort StateSchemaVersion = 6;
+    private const ushort StateSchemaVersion = 7;
     private const int StateDigestLength = 32;
     private const int MaximumBoundaryWaitCycles = CPU_CYCLES_PER_FRAME * 2;
 
@@ -27,7 +27,9 @@ public unsafe partial class Device
         using (var writer = new BinaryWriter(bodyStream, System.Text.Encoding.UTF8, leaveOpen: true))
         {
             writer.Write(StateMagic);
-            writer.Write(StateSchemaVersion);
+            // Ordinary cartridges retain byte-for-byte schema 6 layout, which
+            // also avoids changing existing link-session state identities.
+            writer.Write(Gamepak.EReader is null ? (ushort)6 : StateSchemaVersion);
             writer.Write((ushort)0);
             writer.Write(SHA256.HashData(Bus._bios._bios));
             WriteCpuState(writer);
@@ -44,6 +46,12 @@ public unsafe partial class Device
             writer.Write(InstructionBufferPtr);
             foreach (uint address in InstructionBuffer)
                 writer.Write(address);
+            if (Gamepak.EReader is { } eReader)
+            {
+                byte[] accessory = eReader.Capture();
+                writer.Write(accessory);
+                writer.Write(accessory.Length);
+            }
         }
 
         byte[] body = bodyStream.ToArray();
@@ -73,7 +81,7 @@ public unsafe partial class Device
         if (reader.ReadUInt32() != StateMagic)
             throw new InvalidDataException("The file is not an AetherBoy GBA core state.");
         ushort version = reader.ReadUInt16();
-        if (version is not (5 or StateSchemaVersion))
+        if (version is not (5 or 6 or StateSchemaVersion))
         {
             throw new NotSupportedException(
                 $"GBA state schema {version} is unsupported; expected {StateSchemaVersion}.");
@@ -83,6 +91,21 @@ public unsafe partial class Device
         byte[] activeBiosDigest = SHA256.HashData(Bus._bios._bios);
         if (!CryptographicOperations.FixedTimeEquals(savedBiosDigest, activeBiosDigest))
             throw new InvalidDataException("The GBA state requires a different BIOS image.");
+
+        // Validate the bounded peripheral tail before changing any live state.
+        EReader? nextReader = null;
+        int accessoryLength = 0;
+        if (version >= 7)
+        {
+            accessoryLength = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(body[^4..]);
+            if (accessoryLength < 0 || accessoryLength > 150_000 || accessoryLength > body.Length - stream.Position - 4)
+                throw new InvalidDataException("Invalid e-Reader state length.");
+            if ((accessoryLength != 0) != (Gamepak.EReader is not null))
+                throw new InvalidDataException("The GBA state requires different e-Reader hardware.");
+            if (accessoryLength != 0) nextReader = EReader.Decode(body.Slice(body.Length - 4 - accessoryLength, accessoryLength).ToArray());
+        }
+        else if (Gamepak.EReader is not null)
+            throw new NotSupportedException("Legacy GBA states do not contain e-Reader hardware. Load the battery save instead.");
 
         ReadCpuState(reader);
         ReadBusState(reader);
@@ -98,6 +121,15 @@ public unsafe partial class Device
         InstructionBufferPtr = reader.ReadByte();
         for (int index = 0; index < InstructionBuffer.Length; index++)
             InstructionBuffer[index] = reader.ReadUInt32();
+
+        if (version >= 7)
+        {
+            if (stream.Position != stream.Length - accessoryLength - 4)
+                throw new InvalidDataException("Invalid e-Reader state boundary.");
+            stream.Position = stream.Length;
+            Gamepak.EReader = nextReader;
+            nextReader?.Attach(this);
+        }
 
         if (stream.Position != stream.Length)
             throw new InvalidDataException("The GBA state contains unexpected trailing data.");

@@ -2,6 +2,36 @@
 
 Dieses Dokument unterscheidet bewusst zwischen vorhandenen, verifizierten und noch nicht freigegebenen Funktionen.
 
+## Unveröffentlicht — Cheats, Barcode Boy und e-Reader (2026-10-08)
+
+- Gemeinsam: zeilenweise Cheat-Einfügeprüfung, Platzhalter-/Begleittextdiagnose,
+  bessere automatische Geräteerkennung und konkrete Auswahl bei Mehrdeutigkeit.
+  Windows verwendet Aether-Häkchen für sofort aktive neue Cheat-Sets; Linux behält
+  vorerst seine Set-Schaltflächen. Der gemeldete Walk-through-walls-Hänger gilt
+  ausdrücklich nicht als generell behoben. Details: `docs/CHEAT_SUPPORT.md`.
+- Barcode-Boy-Protokoll/Timing gehärtet; optionale Battle-Space-Spieltests mit
+  Originalschutz, wiederholten Scans und Zustandswiederholung. Andere Spiele und
+  beliebige Produktbarcodes sind damit nicht pauschal bestätigt.
+- e-Reader-Scanner und Dotcode-Verarbeitung als gekennzeichnete C#-Adaption aus
+  mGBA (MPL-2.0), vollständiger Zubehörzustand, begrenzte Warteschlange und
+  Windows-/Linux-Werkzeuge. Lizenz/Herkunft werden mit ausgeliefert.
+- Eigene Kartenbibliothek mit benannten Kartensätzen, RAW-/kleinem ZIP-Import,
+  unveränderlichen Startidentitäten, getrenntem Flash/States und Resume-Vorschau.
+  Nutzer-Firmware bleibt erforderlich; keine Nintendo-Dateien im Repository.
+- Gemeinsamer GBA-Kern: ARM-MSR-Feldmasken/Privilegien und Direct-Sound-FIFO-DMA
+  korrigiert. Echte NES-e-Tests prüfen Bild, Audio, Replays und Flash-Neustart;
+  weitere Standalone-Karten haben dokumentierte Start-/Stabilitätsproben.
+- Read-only-Firmware-Inventar und abgegrenzter Forschungsplan; keine vollständige
+  Decompilation oder selbstständige Ersatzfirmware behauptet. Beide Roadmaps und
+  die UI-Abnahmeliste dokumentieren Tests sowie verbleibende Grenzen.
+- Linux-Beitrag `641cab0` integriert: vollständiger Local-Link-Speicherabschluss,
+  erhaltene Fehler, Discord-READY-Synchronisation und verbesserte CI-Diagnostik.
+- English: shared cheat-input review, Barcode Boy regressions, attributed MPL-2.0
+  e-Reader peripheral adaptation, per-set library/save/resume on both frontends,
+  ARM MSR and sound-DMA fixes, optional owner-provided game tests, firmware research
+  notes and the colleague's Linux/Discord/CI follow-up. No bundled ROMs/cards/saves,
+  universal compatibility claim or verified WAN Pokémon trade.
+
 ## Unveröffentlicht – WebRTC-Diagnose / Windows parity (2026-09-13)
 
 - Linux-Commits `6e69f83` und `3850464` unverändert übernommen: F10-Reservierung,

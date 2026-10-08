@@ -13,6 +13,27 @@ namespace AetherBoy.SmokeTests;
 public sealed class WindowsAetherWidgetsTests
 {
     [STATestMethod]
+    public void CheckableListUsesOnlyIndicatorOrSpaceAndWaitsForConfirmedState()
+    {
+        using var form = Window();
+        using var list = new AetherList { Bounds = new(10, 10, 360, 180), CheckBoxes = true };
+        list.Columns.Add("Active", 60); list.Columns.Add("Name", 270);
+        var item = new AetherListItem(["On", "Example"]) { Checked = true };
+        list.Items.Add(item); form.Controls.Add(list); form.Show(); Application.DoEvents();
+        int requests = 0; list.ItemCheckRequested += _ => requests++;
+        Rectangle check = list.CheckBounds(0);
+        Invoke(list, "OnMouseDown", new MouseEventArgs(MouseButtons.Left, 1, check.X + 2, check.Y + 2, 0));
+        Assert.AreEqual(1, requests); Assert.IsTrue(item.Checked, "Request must not optimistically alter runtime state.");
+        item.Checked = false;
+        Invoke(list, "OnMouseDown", new MouseEventArgs(MouseButtons.Left, 1, 150, check.Y + 2, 0));
+        Assert.AreEqual(1, requests, "Selecting row text must not toggle the cheat.");
+        Invoke(list, "OnKeyDown", new KeyEventArgs(Keys.Space)); Assert.AreEqual(2, requests);
+        list.Enabled = false; list.RequestItemCheck(item); Assert.AreEqual(2, requests);
+        Assert.IsTrue(list.AccessibilityObject.GetChild(0)!.State.HasFlag(AccessibleStates.Unavailable));
+        form.Close();
+    }
+
+    [STATestMethod]
     public void SelectionEventsAndCollectionEditsPreserveTheChosenObject()
     {
         using var choice = new AetherSelect();

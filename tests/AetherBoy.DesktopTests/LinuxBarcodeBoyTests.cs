@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 using AetherBoy.Runtime;
+using AetherBoy.Testing;
 using nanoboy.Core;
 using SDL3;
 
@@ -10,6 +11,41 @@ namespace AetherBoy.Desktop.Tests;
 [DoNotParallelize]
 public sealed class LinuxBarcodeBoyTests
 {
+    [TestMethod]
+    [DataRow(BarcodeBoyInput.BattleSpaceBerserker)]
+    [DataRow(BarcodeBoyInput.BattleSpaceValkyrie)]
+    public void RealBattleSpaceCardArrivesThroughWaylandScannerButton(string code)
+    {
+        if (!OperatingSystem.IsLinux() || Environment.GetEnvironmentVariable("AETHERBOY_UI_TESTS") != "1")
+        { Assert.Inconclusive("Requires AETHERBOY_UI_TESTS=1 in a Wayland session."); return; }
+        using var f = new BattleSpaceFixture(); f.BootToScan();
+        string settings = Path.Combine(f.Root, "settings.json");
+        LinuxSettingsStore.Save(settings, new LinuxFrontendOptions { AudioEnabled = false, DiscordPresenceEnabled = false });
+        SDL.SetHint("SDL_VIDEO_DRIVER", "wayland"); Assert.IsTrue(SDL.Init(SDL.InitFlags.Video | SDL.InitFlags.Events), SDL.GetError());
+        try
+        {
+            using var host = new WaylandEmulatorHost(LinuxDesktopProfile.Detect(), settings, hidden: true);
+            using var session = new EmulationSession(f.RomPath, Path.Combine(f.Root, "ui.sav"), null,
+                new EmulatorConfiguration(0, false, true, true, true, true, 44100));
+            Assert.IsTrue(SpinWait.SpinUntil(() => session.State == SessionState.Running, TimeSpan.FromSeconds(5)));
+            session.SetPausedAsync(true).GetAwaiter().GetResult();
+            session.RestoreStateAsync(SaveState.Capture(f.Emulator)).GetAwaiter().GetResult();
+            Set(host, "session", session);
+            Call(host, "ToggleControlCenter"); Call(host, "OpenSettingsDestination", LinuxSettingsDestination.BarcodeBoy);
+            Call(host, "BeginTextEditing", Enum.Parse(host.GetType().GetNestedType("TextField", BindingFlags.NonPublic)!, "Barcode"));
+            Call(host, "ReceiveTextInput", code); Call(host, "CommitActiveText"); Call(host, "DrawShell");
+            Click(host, "SCAN CODE");
+            Assert.IsTrue(session.LatestSnapshot.BarcodeBoy!.Pending); Assert.IsTrue(session.LatestSnapshot.IsPaused);
+            session.SetPausedAsync(false).GetAwaiter().GetResult();
+            Assert.IsTrue(SpinWait.SpinUntil(() => session.LatestSnapshot.BarcodeBoy!.CompletedScans == 1 &&
+                BattleSpaceFixture.SessionShowsCard(session, code), TimeSpan.FromSeconds(5)));
+            session.SetPausedAsync(true).GetAwaiter().GetResult();
+            BattleSpaceFixture.AssertImage(BattleSpaceFixture.SessionImage(session), code, "wayland-ui-" + code);
+            Assert.IsFalse(session.LatestSnapshot.BarcodeBoy!.Pending);
+        }
+        finally { SDL.Quit(); }
+    }
+
     [TestMethod]
     public void SearchFindsScannerWithoutTreatingItAsGbaReader() =>
         Assert.IsTrue(LinuxSettingsCatalog.Search("barcode").Any(e => e.Destination == LinuxSettingsDestination.BarcodeBoy));

@@ -4,7 +4,7 @@ internal enum LinuxSettingsDestination
 {
     Picture, Scaling, Fullscreen, Palette, Performance, Keyboard, Controller, ControllerStick, Shortcuts,
     Volume, Channels, Appearance, TextSize, Desktop, Profiles, Firmware, Storage,
-    Saves, Backups, Gallery, Library, PatchLab, Tools, Online, Diagnostics, VideoCapture, Discord, Updates, Intro, BarcodeBoy, Language
+    Saves, Backups, Gallery, Library, PatchLab, Tools, Online, Diagnostics, VideoCapture, Discord, Updates, Intro, BarcodeBoy, Language, EReader
 }
 
 internal sealed record LinuxSettingEntry(LinuxSettingsDestination Destination, string Title,
@@ -17,6 +17,7 @@ internal static class LinuxSettingsCatalog
     [
         new(LinuxSettingsDestination.Language, global::AetherBoy.Runtime.Localization.UiText.Get("Display language"), "Deutsch / English", global::AetherBoy.Runtime.Localization.UiText.Get("App & files"), "language sprache deutsch english englisch system österreich schweiz"),
         new(LinuxSettingsDestination.BarcodeBoy, "Barcode Boy", global::AetherBoy.Runtime.Localization.UiText.Get("Connect the scanner and enter a card code or load a text file."), global::AetherBoy.Runtime.Localization.UiText.Get("Tools > Barcode Boy"), "barcode boy scanner namcot battle space berserker valkyrie accessory kartencode"),
+        new(LinuxSettingsDestination.EReader, "e-Reader", global::AetherBoy.Runtime.Localization.UiText.Get("Digitale Karten mit einer e-Reader-ROM lesen."), global::AetherBoy.Runtime.Localization.UiText.Get("Werkzeuge"), "ereader e-reader dotcode raw card karte scanner"),
         new(LinuxSettingsDestination.Intro, global::AetherBoy.Runtime.Localization.UiText.Get("Game start animation"), global::AetherBoy.Runtime.Localization.UiText.Get("Choose your logo and sound or disable the intro."), global::AetherBoy.Runtime.Localization.UiText.Get("App & files > Firmware > Start animation"), "boot intro startup logo sound ton bild png wav startanimation"),
         new(LinuxSettingsDestination.Discord, global::AetherBoy.Runtime.Localization.UiText.Get("Discord activity"), global::AetherBoy.Runtime.Localization.UiText.Get("Choose whether to share activity and game titles."), global::AetherBoy.Runtime.Localization.UiText.Get("App & files > Desktop > Discord"), "rich presence privacy spielstatus datenschutz application id"),
         new(LinuxSettingsDestination.Updates, "Updates", global::AetherBoy.Runtime.Localization.UiText.Get("Check for release packages and download them."), global::AetherBoy.Runtime.Localization.UiText.Get("App & files > Files & updates"), "version update upgrade download aktualisierung"),

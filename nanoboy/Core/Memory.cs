@@ -382,6 +382,7 @@ namespace nanoboy.Core
                         }
                         break;
                     case 0x04:
+                        BarcodeScanner?.DividerReset();
                         Audio.ResetFrameSequencerDivider(Timer.WriteDiv(cpu.IsDoubleSpeed));
                         break;
                     case 0x05:

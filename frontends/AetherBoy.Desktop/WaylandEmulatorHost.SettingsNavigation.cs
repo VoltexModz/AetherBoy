@@ -26,6 +26,8 @@ internal sealed partial class WaylandEmulatorHost
         showControllerStick = false;
         editingDiscordId = false;
         editingBarcode = showBarcodeBoy = false;
+        showEReader = false;
+        showEReaderLibrary = editingEReaderTitle = false;
     }
 
     private void FocusSettingsSearch()
@@ -57,13 +59,14 @@ internal sealed partial class WaylandEmulatorHost
             LinuxSettingsDestination.Volume or LinuxSettingsDestination.Channels => ControlCenterPage.Audio,
             LinuxSettingsDestination.Saves or LinuxSettingsDestination.Backups or LinuxSettingsDestination.Gallery => ControlCenterPage.Saves,
             LinuxSettingsDestination.Library or LinuxSettingsDestination.PatchLab => ControlCenterPage.Library,
-            LinuxSettingsDestination.Tools or LinuxSettingsDestination.Online or LinuxSettingsDestination.VideoCapture or LinuxSettingsDestination.BarcodeBoy => ControlCenterPage.Tools,
+            LinuxSettingsDestination.Tools or LinuxSettingsDestination.Online or LinuxSettingsDestination.VideoCapture or LinuxSettingsDestination.BarcodeBoy or LinuxSettingsDestination.EReader => ControlCenterPage.Tools,
             LinuxSettingsDestination.Diagnostics => ControlCenterPage.Diagnostics,
             _ => ControlCenterPage.System
         };
         SelectControlCenterPage(page);
         showGameplayCapture = destination == LinuxSettingsDestination.VideoCapture;
         showBarcodeBoy = destination == LinuxSettingsDestination.BarcodeBoy;
+        showEReader = destination == LinuxSettingsDestination.EReader;
         graphicsSection = destination == LinuxSettingsDestination.Palette ? GraphicsSection.Palette
             : destination == LinuxSettingsDestination.Performance ? GraphicsSection.Performance : GraphicsSection.Picture;
         showController = destination is LinuxSettingsDestination.Controller or LinuxSettingsDestination.ControllerStick;
@@ -94,6 +97,8 @@ internal sealed partial class WaylandEmulatorHost
     private void BackFromSettings()
     {
         if (ShowingSettingsSearch) { ClearSettingsSearch(); return; }
+        if (controlCenterPage == ControlCenterPage.Tools && showEReader)
+        { showEReader = false; focusedControl = -1; return; }
         if (controlCenterPage == ControlCenterPage.Tools && showBarcodeBoy)
         { CommitActiveText(); showBarcodeBoy = false; focusedControl = -1; return; }
         if (controlCenterPage == ControlCenterPage.Audio && showAudioInspector)

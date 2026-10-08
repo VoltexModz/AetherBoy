@@ -15,7 +15,8 @@ implementation; no C function body, BIOS binary or test ROM was copied into the
 product. The archive identity, inspected areas, hardware-documentation sources
 for the newly written code and limitations are recorded in
 [docs/MGBA_REVIEW.md](docs/MGBA_REVIEW.md). This is not a claim of formal clean-room
-development. The later cheat-decoder source reuse is recorded below separately.
+development. Later cheat-decoder and e-Reader source adaptations are recorded
+below separately and are included in the product under MPL-2.0.
 
 ### mGBA cheat cipher adaptations (2026-10-01)
 
@@ -165,6 +166,16 @@ The license is shipped as `licenses/sharpcompress/LICENSE.txt`, from
 `third_party/sharpcompress/LICENSE.txt`. Package metadata additionally states
 Copyright (c) 2025 Adam Hathcock. Archive selection, staging, bounds, import and
 the AVI capture writer are AetherBoy implementation, not copied upstream code.
+
+## e-Reader peripheral (2026-10-08)
+
+`third_party/GBADotnet.Core/src/Rom/EReader.cs` and `EReaderDotCode.cs` are C#
+adaptations of mGBA's e-Reader implementation, Copyright (c) 2013-2020 Jeffrey
+Pfau, under **MPL-2.0**. They are explicit exceptions to the original MIT
+GBADotnet source. Provenance, modifications and license are shipped in
+`licenses/mgba-ereader/` from `third_party/mgba-ereader/`. Covered source is
+provided in this repository; distributors must retain notices and provide the
+corresponding MPL-covered source. No e-Reader firmware or card content is bundled.
 
 ## Optional Discord activity (2026-10-02)
 

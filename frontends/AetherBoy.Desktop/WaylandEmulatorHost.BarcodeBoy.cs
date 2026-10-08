@@ -13,7 +13,7 @@ internal sealed partial class WaylandEmulatorHost
     {
         Ink(300, 198, "Barcode Boy", 20, Colors.Cyan, true);
         ActionButton(860, 192, 250, 38, global::AetherBoy.Runtime.Localization.UiText.Get("BACK TO TOOLS"), () => OpenSettingsDestination(LinuxSettingsDestination.Tools));
-        DrawSettingsParagraph(300, 244, global::AetherBoy.Runtime.Localization.UiText.Get("Namcot scanner for GB games, not Bardigun or GBA e-Reader. Battle Space example cards below; actual game test pending."), 810);
+        DrawSettingsParagraph(300, 244, global::AetherBoy.Runtime.Localization.UiText.Get("Battle Space: Diese beiden Karten sind im Spiel getestet. Die Buttons tragen nur den Code ein. Andere Spiele sind noch nicht geprüft."), 810);
         var scanner = session?.LatestSnapshot.BarcodeBoy;
         ActionButton(300, 302, 310, 42, scanner is null ? global::AetherBoy.Runtime.Localization.UiText.Get("CONNECT SCANNER") : global::AetherBoy.Runtime.Localization.UiText.Get("DISCONNECT SCANNER"), () => BarcodeAction(() =>
         {
@@ -24,7 +24,7 @@ internal sealed partial class WaylandEmulatorHost
         DrawSettingsParagraph(635, 300, !CanUseBarcodeBoy ? global::AetherBoy.Runtime.Localization.UiText.Get("Open a GB game in single-player mode. Unavailable for GBA and link sessions.")
             : scanner is null ? global::AetherBoy.Runtime.Localization.UiText.Get("Connect before the game checks for its scanner.")
             : scanner.Pending ? global::AetherBoy.Runtime.Localization.UiText.Format("Scan waiting or sending: {0}/30 bytes. Resume the game.", scanner.BytesSent)
-            : scanner.Ready ? global::AetherBoy.Runtime.Localization.UiText.Format("Scanner recognized. Transfers completed: {0}.", scanner.CompletedScans)
+            : scanner.Ready ? global::AetherBoy.Runtime.Localization.UiText.Format("Scanner bereit. Abgeschlossene Übertragungen: {0}. Beachte die Anzeige im Spiel.", scanner.CompletedScans)
             : global::AetherBoy.Runtime.Localization.UiText.Format("Waiting for the game to detect the scanner. Transfers completed: {0}.", scanner.CompletedScans), 475);
         DrawTextEntry(TextField.Barcode, 300, 390, 380, 42, global::AetherBoy.Runtime.Localization.UiText.Get("13-digit card code"));
         ActionButton(700, 390, 410, 42, global::AetherBoy.Runtime.Localization.UiText.Get("LOAD CODE FROM TEXT FILE"), () =>
