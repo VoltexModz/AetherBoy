@@ -1,5 +1,31 @@
 # Gemeinsame Stabilisierungsrunde — 02.10.2026
 
+## Zusammenführung und Push-Prüfung — 08.10.2026
+
+Kollegenbeitrag `641cab0` und Zubehör-/Cheat-Stand `a651885` wurden im Merge
+`23d0abf` konfliktfrei zusammengeführt. Die vorhandene Historie bleibt erhalten.
+README, Änderungsübersicht und neue app-eigene Texte liegen auf Deutsch/Englisch vor.
+
+Frische isolierte Release-Builds: Windows-Gesamtlösung und Linux-Desktoptests,
+jeweils ohne Warnungen/Fehler. Danach Windows-Core **287/287**, Runtime **723
+bestanden, 79 übersprungen**, ausgewählte Windows-UI-/Theme-/Sprach-/Cheat-/e-Reader-
+Prüfungen **38/38**. Die Runtime-Skips betreffen optionale bereitgestellte ROMs/Karten,
+nicht aktivierte native Online-Räume und einen Linux-Symlink-Fall; sie sind kein
+neuer Spiel- oder WAN-Nachweis. Unter WSLg/Wayland bestanden **16/16** ausgewählte
+Linux-Tests einschließlich aller neuen Local-Link-Shutdown-Fälle des Kollegen,
+Cheat-Prüfseite, e-Reader und Themes. SDL verwendete nach EGL/Zink-Warnungen einen
+Fallbackrenderer; echte GPU-/Audio-Hardware bleibt getrennt abzunehmen.
+
+Lokale TRX/Builds: `artifacts/prepush-20261008/`. Frühere echte Karten-/Barcode-
+Spieltests und deren Grenzen stehen in beiden Roadmaps; sie wurden nicht durch
+diesen ROM-freien Integrationslauf ersetzt. Fremde OHVL-Projekte, Archive,
+Nutzer-ROMs/Karten/Saves und lokale Testausgaben bleiben außerhalb des Commits.
+
+English: integrated the colleague's save-finalization/Discord/CI changes without
+rewriting history. Fresh Windows and Linux builds passed; Core 287, Runtime 723
+(79 optional/platform skips), Windows UI selection 38 and Linux Wayland selection
+16 passed. This is integration evidence, not a new claim of retail/WAN compatibility.
+
 ## Commit-Nachprüfung vom 03.10.2026: Linux-Abschluss, Discord und CI
 
 Die Commits `8b67e5d` (gemeinsame Desktop-Werkzeuge, DE/EN und Speicherabschluss)
