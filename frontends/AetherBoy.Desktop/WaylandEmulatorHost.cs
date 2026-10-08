@@ -213,25 +213,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             pendingScreenshot = null;
         }
         FinishRomPreparation();
-        StopLocalLink();
-        try { localLinkPlanTask?.Wait(TimeSpan.FromSeconds(2)); } catch { }
-        try { localLinkStartupTask?.Wait(TimeSpan.FromSeconds(2)); } catch { }
-        if (localLinkStartupTask is { IsCompletedSuccessfully: true } unclaimedStartup)
-        {
-            try { unclaimedStartup.Result.ShutdownAsync().Wait(TimeSpan.FromSeconds(2)); }
-            catch (Exception exception) { diagnostics.Failure("local_link_shutdown", exception); }
-        }
-        else if (localLinkStartupTask is { IsCompleted: false } finishingStartup)
-        {
-            // A constructor may finish after the bounded window shutdown wait. It must not
-            // leave a newly created local-link owner running without a UI to collect it.
-            _ = finishingStartup.ContinueWith(async finished =>
-            {
-                if (finished.IsCompletedSuccessfully) await finished.Result.ShutdownAsync().ConfigureAwait(false);
-                else _ = finished.Exception;
-            }, TaskScheduler.Default).Unwrap();
-        }
-        try { localLinkStopTask?.Wait(TimeSpan.FromSeconds(2)); } catch { }
+        Exception? localLinkError = FinishLocalLinkForDisposal();
         ReleaseLocalLinkTextures();
         CloseSecondLocalGamepad();
         FlushSettingsIfDue(force: true);
@@ -269,6 +251,8 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
         textRenderer.Dispose();
         SDL.DestroyRenderer(renderer);
         SDL.DestroyWindow(window);
+        if (localLinkError is not null)
+            throw new IOException(global::AetherBoy.Runtime.Localization.UiText.Get("Local link could not close cleanly. Check the local report."), localLinkError);
     }
 
     private unsafe void HandleEvent(in SDL.Event currentEvent)

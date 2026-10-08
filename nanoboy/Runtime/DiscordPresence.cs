@@ -167,7 +167,7 @@ internal sealed class DiscordIpcClient : IDiscordPresenceClient
         client.OnConnectionFailed += (_, _) => Volatile.Write(ref state, (int)DiscordPresenceStatus.WaitingForDiscord);
         client.OnClose += (_, _) => Volatile.Write(ref state, (int)DiscordPresenceStatus.WaitingForDiscord);
         client.OnError += (_, _) => Volatile.Write(ref state, (int)DiscordPresenceStatus.Error);
-        try { if (!client.Initialize()) throw new InvalidOperationException("Discord IPC initialization failed."); }
+        try { if (!this.pipe.InitializeClient(client.Initialize)) throw new InvalidOperationException("Discord IPC initialization failed."); }
         catch { client.Dispose(); throw; }
     }
 
@@ -185,6 +185,7 @@ internal sealed class DiscordIpcClient : IDiscordPresenceClient
 // and refuse stale queued writes as soon as consent is revoked. No UI-thread I/O or sleeps.
 internal sealed class ClosingDiscordPipe(INamedPipeClient inner) : INamedPipeClient
 {
+    private readonly object initialization = new();
     private int stopping, closed;
     private bool wroteActivity;
     private DiscordActivityPayload? desired;
@@ -193,7 +194,13 @@ internal sealed class ClosingDiscordPipe(INamedPipeClient inner) : INamedPipeCli
     public ILogger Logger { get => inner.Logger; set => inner.Logger = value; }
     public bool IsConnected => inner.IsConnected;
     public int ConnectedPipe => -1;
-    public bool Connect(int pipe) => Volatile.Read(ref stopping) == 0 && inner.Connect(pipe);
+    // v1.6.1 starts the IPC worker before Initialize assigns IsInitialized. An immediate READY
+    // can otherwise make SynchronizeState throw before OnReady, permanently losing that READY.
+    // Hold Connect until initialization returns; only the IPC worker waits, without any I/O here.
+    public bool InitializeClient(Func<bool> initialize)
+    { lock (initialization) return initialize(); }
+    public bool Connect(int pipe)
+    { lock (initialization) return Volatile.Read(ref stopping) == 0 && inner.Connect(pipe); }
     public bool ReadFrame(out PipeFrame frame) => inner.ReadFrame(out frame);
     public bool WriteFrame(PipeFrame frame)
     {

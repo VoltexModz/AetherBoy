@@ -1,5 +1,48 @@
 # Gemeinsame Stabilisierungsrunde — 02.10.2026
 
+## Commit-Nachprüfung vom 03.10.2026: Linux-Abschluss, Discord und CI
+
+Die Commits `8b67e5d` (gemeinsame Desktop-Werkzeuge, DE/EN und Speicherabschluss)
+und `e108490` (transparente Theme-Logos) sind lokal übernommen. Die Nachprüfung
+hat zwei konkrete Fehler und veraltete CI-Testuntergrenzen ergeben:
+
+- Linux-Fenster-`Dispose` kehrte nach begrenzten Wartezeiten zurück, obwohl ein
+  Local-Link-Owner noch speichern konnte. Ein kontrolliert blockierter Save
+  reproduzierte die Rückkehr nach rund 2013 ms im Zustand `Stopping`. Jetzt
+  werden Planung, Start und beide Speicherabschlüsse vollständig abgewartet,
+  bevor Diagnose und SDL freigegeben werden. Speicherfehler bleiben auch nach
+  vorherigem Stoppen erhalten, werden bereinigt protokolliert und nach dem
+  Fenster-Cleanup als Fehler gemeldet. Nur der eigene Start-Abbruch gilt als
+  erwartete Cancellation; eine fremde Cancellation beim Speichern bleibt ein Fehler.
+- DiscordRPC 1.6.1 startet den IPC-Thread vor Abschluss von `Initialize`.
+  Ein sofortiges `READY` konnte dadurch vor dem Bereitschaftsereignis verloren
+  gehen. Der Adapter hält die erste Verbindung bis zum Initialisierungsabschluss
+  zurück. Ein Parallelstart-Probeaufbau verlor vorher 6 von 256 READYs, danach
+  0 von 256. Die Tests steuern Handshake/READY gezielt und prüfen Replay anhand
+  der zweiten Verbindung. Keine verlängerten Timeouts oder Wiederholungen.
+- CI-Untergrenzen entsprechen jetzt Core **271**, Runtime **646**, Desktop
+  **215**, Windows-UI **344** und Linux-Headless **212 ausgeführten** Fällen.
+  Linux behält TRX und Diagnostik je Architektur; die .NET- und Headless-Suiten
+  können nach Fehlern anderer Tests weiterlaufen, sofern ihr Build erfolgreich war.
+
+Finaler lokaler Release-Build einschließlich Windows-Ziel: **0 Warnungen,
+0 Fehler**. Core **271/271**, Runtime mit nativen lokalen Verbindungen
+**646/646**, Browser-/Raumserver **8/8**. Desktop-Logik **149 bestanden,
+66 übersprungen**; isoliertes Weston/D-Bus **212 bestanden, drei Audio-Hardware-
+Skips, kein Fehler**. Darin neun neue native Abschlussfälle mit Save-Inhalt,
+Integritätsprüfung, Sperrfreigabe, spätem Start und Fehlerpfaden. Copy-Prüfung:
+**0 Prüfpunkte**; vorhandener lokalisierter Fehlertext wiederverwendet.
+Rohdaten und TRX: `artifacts/commit-followup-20261003/`.
+Der lokale Linux-Build unter `artifacts/AetherBoy-linux-x64/` ist aktualisiert;
+Version und Plattformabfrage funktionieren. Der isolierte Installationstest
+bestätigt Migration, Fehler-Rollback, Pfade mit Leerzeichen/Sonderzeichen,
+Start mit minimalem PATH und Deinstallation unter Erhalt der Test-Spielstände.
+
+Die neue Windows-Laufzeit und ARM64 wurden hier nicht ausgeführt; die vorhandenen
+CI-Läufe dieser Commits ersetzen keinen CI-Lauf der lokalen Korrekturen.
+Die kontrollierten Verzögerungen belegen den Abschlussvertrag, keine bestimmte
+Datenträgergeschwindigkeit. Keine privaten ROMs oder Spielstände verwendet.
+
 ## Reparaturrunde vom 03.10.2026: Speichern, Fehleranzeige, Sprache
 
 Die unten dokumentierten Befunde wurden anschließend bearbeitet. Dies ist eine
