@@ -95,28 +95,30 @@ public sealed class WindowsAetherRemainderTests
         {
             string existing = Path.Combine(root, "existing.sav"); File.WriteAllText(existing, "preserve"); File.WriteAllText(Path.Combine(root, "other.txt"), "other");
             using var open = new AetherFileDialog { Filter = "Spielstände|*.sav|Alles|*.*", InitialDirectory = root };
-            open.Build();
+            open.Build(); WaitForNavigation(open);
             var list = (AetherList)open.Window!.Controls.Find("fileEntries", true).Single();
             Assert.AreEqual(1, list.Items.Count); Assert.AreEqual("existing.sav", list.Items[0].Text);
             Assert.IsFalse(open.TryAccept(Path.Combine(root, "missing.sav"))); Assert.AreEqual("", open.FileName);
             Assert.IsFalse(open.TryAccept(Path.Combine(root, "other.txt"))); Assert.AreEqual("", open.FileName);
-            open.LoadDirectory(Path.Combine(root, "missing-folder")); Assert.AreEqual(1, list.Items.Count, "A failed navigation retains the old list.");
+            open.LoadDirectory(Path.Combine(root, "missing-folder")); WaitForNavigation(open); Assert.AreEqual(1, list.Items.Count, "A failed navigation retains the old list.");
             string subfolder = Directory.CreateDirectory(Path.Combine(root, "subfolder")).FullName;
-            open.LoadDirectory(root); open.Window.Show(); list.Focus(); list.Items.Single(item => (string?)item.Tag == subfolder).Selected = true;
+            open.LoadDirectory(root); WaitForNavigation(open); open.Window.Show(); list.Focus(); list.Items.Single(item => (string?)item.Tag == subfolder).Selected = true;
             GamepadNavigation.Navigate(open.Window, PadUiAction.Accept);
+            WaitForNavigation(open);
             Assert.AreEqual(subfolder, ((AetherTextBox)open.Window.Controls.Find("fileLocation", true).Single()).Text);
             open.LoadDirectory(root);
+            WaitForNavigation(open);
             string? imageDirectory = Environment.GetEnvironmentVariable("AETHERBOY_SMOKE_SCREENSHOTS");
             if (!string.IsNullOrWhiteSpace(imageDirectory)) { Directory.CreateDirectory(imageDirectory); using var bitmap = new Bitmap(open.Window.Width, open.Window.Height); open.Window.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(Path.Combine(imageDirectory, "aether-file-picker.png")); }
             open.Window.Close(); Assert.AreEqual("", open.FileName);
             using var save = new AetherFileDialog { Save = true, Filter = "Spielstände|*.sav", InitialDirectory = root };
-            save.Build(); int prompts = 0;
+            save.Build(); WaitForNavigation(save); int prompts = 0;
             Assert.IsFalse(save.TryAccept(existing, _ => { prompts++; return false; })); Assert.AreEqual(1, prompts); Assert.AreEqual("", save.FileName);
             Assert.AreEqual("preserve", File.ReadAllText(existing));
             Assert.IsTrue(save.TryAccept(existing, _ => { prompts++; return true; })); Assert.AreEqual(2, prompts);
             Assert.AreEqual("preserve", File.ReadAllText(existing), "Even confirmed selection must not write the file.");
             using var fresh = new AetherFileDialog { Save = true, Filter = "Audio|*.wav", InitialDirectory = root };
-            fresh.Build(); Assert.IsTrue(fresh.TryAccept(Path.Combine(root, "capture")));
+            fresh.Build(); WaitForNavigation(fresh); Assert.IsTrue(fresh.TryAccept(Path.Combine(root, "capture")));
             Assert.AreEqual(Path.Combine(root, "capture.wav"), fresh.FileName); Assert.IsFalse(File.Exists(fresh.FileName));
         }
         finally { Directory.Delete(root, true); }
@@ -208,6 +210,14 @@ public sealed class WindowsAetherRemainderTests
     }
     private static Form Window() => new() { ClientSize = new Size(640, 400), ShowInTaskbar = false, FormBorderStyle = FormBorderStyle.None };
     private static void Invoke(Control control, string name, object value) => control.GetType().GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(control, [value]);
+    private static void WaitForNavigation(AetherFileDialog picker)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (picker.IsBusy && DateTime.UtcNow < deadline)
+        { picker.PollNavigation(); Application.DoEvents(); Thread.Sleep(1); }
+        Assert.IsFalse(picker.IsBusy, "The isolated picker navigation did not complete.");
+    }
+
     private static IEnumerable<Control> Descendants(Control parent) { foreach (Control child in parent.Controls) { yield return child; foreach (var nested in Descendants(child)) yield return nested; } }
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] private static extern IntPtr GetWindowLongPtr(IntPtr handle, int index);
 }

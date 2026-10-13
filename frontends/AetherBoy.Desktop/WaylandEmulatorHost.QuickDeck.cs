@@ -41,6 +41,7 @@ internal sealed partial class WaylandEmulatorHost
     {
         // Modal commands replace the hidden game's hit targets and focus targets.
         shellCommands.Clear(); focusTargets.Clear(); focusIdentities.Clear();
+        accessibleCommands.Clear(); accessibleDescriptions.Clear(); textEntryBounds.Clear();
         float x = LogicalWidth / 2f - 272, y = LogicalHeight / 2f - 202;
         Panel(x, y, 544, 404, global::AetherBoy.Runtime.Localization.UiText.Get("QUICK MENU"));
         Ink(x + 26, y + 58, global::AetherBoy.Runtime.Localization.UiText.Get("Your game is paused while this menu is open."), 14, Colors.Muted);
@@ -50,7 +51,8 @@ internal sealed partial class WaylandEmulatorHost
         for (int i = 0; i < 5; i++)
         {
             int slot = i + 1;
-            ActionButton(x + 26 + i * 98, y + 194, 84, 40, slot.ToString(), () => SelectSaveSlot(slot), options.SaveSlot == slot);
+            ActionButton(x + 26 + i * 98, y + 194, 84, 40, slot.ToString(), () => SelectSaveSlot(slot), options.SaveSlot == slot,
+                focusId: "option:save-slot:" + slot);
         }
         ActionButton(x + 26, y + 263, 230, 42, global::AetherBoy.Runtime.Localization.UiText.Get("CHANGE VIDEO FILTER"), () =>
             SetVideoFilter((LinuxVideoFilter)(((int)options.VideoFilter + 1) % 3)));

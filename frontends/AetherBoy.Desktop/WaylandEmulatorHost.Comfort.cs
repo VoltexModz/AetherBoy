@@ -8,6 +8,7 @@ internal sealed partial class WaylandEmulatorHost
 {
     private Task<LinuxDiskSnapshot>? diskRefresh;
     private LinuxDiskSnapshot? diskSnapshot;
+    private string? diskInspectionError;
     private int diskGeneration;
     private int requestedDiskGeneration;
     private Task<StateOutcome>? stateOperation;
@@ -34,6 +35,7 @@ internal sealed partial class WaylandEmulatorHost
     private void RequestDiskRefresh()
     {
         diskGeneration++;
+        diskInspectionError = null;
         diskRefreshAgain = storage is not null && !IsOnlineLink;
         if (diskSnapshot?.BasePath != StateBasePath) { diskSnapshot = null; ClearPreviewTextures(); }
         StartDiskRefreshIfReady();
@@ -57,10 +59,29 @@ internal sealed partial class WaylandEmulatorHost
             if (requestedDiskGeneration == diskGeneration && snapshot.BasePath == StateBasePath)
             { diskSnapshot = snapshot; ClearPreviewTextures(); }
         }
-        catch (Exception ex) { statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Save information unavailable: ") + global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(ex.Message); }
+        catch (Exception ex)
+        {
+            if (requestedDiskGeneration == diskGeneration)
+            {
+                diskInspectionError = ex.Message;
+                SetMessageFailure(global::AetherBoy.Runtime.Localization.UiText.Get("Save information could not be read. Refresh and try again."), ex);
+            }
+        }
         StartDiskRefreshIfReady();
     }
     private LinuxStateCard? StateCard(int slot) => diskSnapshot?.States.FirstOrDefault(card => card.Slot == slot);
+    private LinuxSaveInformationState SaveInformationState(int slot) => LinuxSaveInformation.Resolve(session is not null && storage is not null,
+        diskRefresh is not null || diskRefreshAgain, StateCard(slot), diskInspectionError);
+    private string SaveInformationMessage(int slot) => SaveInformationState(slot) switch
+    {
+        LinuxSaveInformationState.NoGame => global::AetherBoy.Runtime.Localization.UiText.Get("Open a game to inspect its save states."),
+        LinuxSaveInformationState.Loading => global::AetherBoy.Runtime.Localization.UiText.Get("Loading save information…"),
+        LinuxSaveInformationState.Unavailable => global::AetherBoy.Runtime.Localization.UiText.Get("State cannot be read. Refresh or select another slot."),
+        LinuxSaveInformationState.Empty => slot == 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("Empty slot")
+            : global::AetherBoy.Runtime.Localization.UiText.Format("Slot {0} is empty. Save here with F5.", slot),
+        _ => slot == 0 ? global::AetherBoy.Runtime.Localization.UiText.Format("Resume point saved {0:yyyy-MM-dd HH:mm}", StateCard(slot)!.SavedAt)
+            : global::AetherBoy.Runtime.Localization.UiText.Format("Slot {0} saved {1:yyyy-MM-dd HH:mm}", slot, StateCard(slot)!.SavedAt)
+    };
     private void ClearPreviewTextures()
     { foreach (IntPtr texture in previewTextures.Values) SDL.DestroyTexture(texture); previewTextures.Clear(); }
 
@@ -120,10 +141,11 @@ internal sealed partial class WaylandEmulatorHost
             return new StateOutcome(slot == 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("Resume point saved separately from manual slots.") : global::AetherBoy.Runtime.Localization.UiText.Format("Saved slot {0}.", slot));
         });
     }
-    private void QueueLoadState(int slot)
+    private void QueueLoadState(int slot) => QueueLoadStateCore(slot, requireInspection: true);
+    private void QueueLoadStateCore(int slot, bool requireInspection)
     {
         if (IsOnlineLink) { statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("Save states are disabled during Online Link."); return; }
-        if (session is null || storage is null || IsLoading || stateOperation is not null) return;
+        if (session is null || storage is null || IsLoading || stateOperation is not null || requireInspection && SaveInformationState(slot) != LinuxSaveInformationState.Saved) return;
         EmulationSession owner = session; string path = storage.StateBasePath;
         resumeOperation = slot == 0 ? 1 : 0;
         statusMessage = slot == 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("Loading resume point…") : global::AetherBoy.Runtime.Localization.UiText.Format("Loading slot {0}…", slot);
@@ -135,7 +157,9 @@ internal sealed partial class WaylandEmulatorHost
             return new StateOutcome(slot == 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("Session resumed. Undo load is available.") : global::AetherBoy.Runtime.Localization.UiText.Format("Loaded slot {0}. Undo load is available.", slot), before);
         });
     }
-    private void LoadResume() => QueueLoadState(0);
+    // Continue starts immediately after session creation, before the async gallery inspection is ready.
+    // The existing bounded read and Runtime restore validate the resume on the background worker.
+    private void LoadResume() => QueueLoadStateCore(0, requireInspection: false);
     private void UndoLoad()
     {
         if (IsOnlineLink) return;
@@ -162,8 +186,10 @@ internal sealed partial class WaylandEmulatorHost
         catch (Exception ex)
         {
             if (completedResumeOperation == 1) preserveResumeAfterFailure = true;
-            statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("State operation failed: ") + global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(ex.Message);
-            if (preserveResumeAfterFailure) statusMessage += global::AetherBoy.Runtime.Localization.UiText.Get(" Previous resume kept; replace it explicitly in Gallery.");
+            string summary = preserveResumeAfterFailure
+                ? global::AetherBoy.Runtime.Localization.UiText.Get("Loading failed. The previous resume point is kept. Check Details before trying again.")
+                : global::AetherBoy.Runtime.Localization.UiText.Get("The state could not be saved or loaded. Check Details and try again.");
+            SetMessageFailure(summary, ex);
             diagnostics.Failure("state_operation", ex);
         }
     }
@@ -218,7 +244,7 @@ internal sealed partial class WaylandEmulatorHost
     private void DrawStateGallery()
     {
         ActionButton(300, 198, 200, 42, global::AetherBoy.Runtime.Localization.UiText.Get("BACK TO SAVES"), () => { showGallery = false; focusedControl = -1; });
-        ActionButton(520, 198, 200, 42, global::AetherBoy.Runtime.Localization.UiText.Get("REFRESH"), RequestDiskRefresh, enabled: diskRefresh is null);
+        ActionButton(520, 198, 200, 42, global::AetherBoy.Runtime.Localization.UiText.Get("REFRESH"), RequestDiskRefresh, enabled: session is not null && storage is not null && diskRefresh is null);
         Ink(740, 210, stateOperation is null ? global::AetherBoy.Runtime.Localization.UiText.Get("Select a slot to inspect it") : global::AetherBoy.Runtime.Localization.UiText.Get("Working…"), 14, Colors.Muted);
         for (int i = 0; i < 6; i++)
         {
@@ -239,14 +265,18 @@ internal sealed partial class WaylandEmulatorHost
             SDL.FRect target = new() { X = 312 + (288 - card.Width * scale) / 2, Y = 336 + (204 - card.Height * scale) / 2, W = card.Width * scale, H = card.Height * scale };
             SDL.RenderTexture(renderer, texture, IntPtr.Zero, in target);
         }
-        else Ink(322, 420, card is null ? global::AetherBoy.Runtime.Localization.UiText.Get("Loading…") : card.Error is not null ? global::AetherBoy.Runtime.Localization.UiText.Get("Unavailable") : card.Exists ? global::AetherBoy.Runtime.Localization.UiText.Get("No verified preview") : global::AetherBoy.Runtime.Localization.UiText.Get("Empty slot"), 16, Colors.Muted);
+        else DrawSettingsParagraph(322, 410, SaveInformationState(gallerySlot) == LinuxSaveInformationState.NoGame
+            ? global::AetherBoy.Runtime.Localization.UiText.Get("No game open") : card is null && SaveInformationState(gallerySlot) == LinuxSaveInformationState.Loading
+            ? global::AetherBoy.Runtime.Localization.UiText.Get("Loading…") : card?.Error is not null || SaveInformationState(gallerySlot) == LinuxSaveInformationState.Unavailable
+            ? global::AetherBoy.Runtime.Localization.UiText.Get("Unavailable") : card?.Exists == true ? global::AetherBoy.Runtime.Localization.UiText.Get("No verified preview") : global::AetherBoy.Runtime.Localization.UiText.Get("Empty slot"), 262, 16);
         Ink(642, 330, gallerySlot == 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("LAST SESSION") : global::AetherBoy.Runtime.Localization.UiText.Format("MANUAL SLOT {0}", gallerySlot), 18, Colors.Cyan, true);
-        Ink(642, 370, card is null ? global::AetherBoy.Runtime.Localization.UiText.Get("Loading save information…") : card.Error is not null ? global::AetherBoy.Runtime.Localization.UiText.Get("Cannot read this state") : !card.Exists ? global::AetherBoy.Runtime.Localization.UiText.Get("Empty slot") : card.SavedAt.ToString("dd MMM yyyy · HH:mm"), 16);
-        Ink(642, 410, global::AetherBoy.Runtime.Localization.UiText.Get("Preview shows the last completed frame."), 14, Colors.Muted);
-        Ink(642, 444, global::AetherBoy.Runtime.Localization.UiText.Get("Loading keeps an undo point in this session."), 14, Colors.Muted);
-        ActionButton(642, 496, 205, 44, gallerySlot == 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("CONTINUE") : global::AetherBoy.Runtime.Localization.UiText.Get("LOAD SLOT"), () => QueueLoadState(gallerySlot), true, card?.Exists == true && card.Error is null && stateOperation is null);
+        DrawSettingsParagraph(642, 366, SaveInformationMessage(gallerySlot), 454, 16);
+        if (card?.Error is { } error)
+            ActionButton(642, 443, 205, 38, global::AetherBoy.Runtime.Localization.UiText.Get("Details"), () => OpenMessageDetails(global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(error)), focusId: "state:details");
+        else DrawSettingsParagraph(642, 443, global::AetherBoy.Runtime.Localization.UiText.Get("Loading keeps an undo point in this session."), 454, 14);
+        ActionButton(642, 496, 205, 44, gallerySlot == 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("CONTINUE") : global::AetherBoy.Runtime.Localization.UiText.Get("LOAD SLOT"), () => QueueLoadState(gallerySlot), true, SaveInformationState(gallerySlot) == LinuxSaveInformationState.Saved && stateOperation is null);
         ActionButton(865, 496, 235, 44, global::AetherBoy.Runtime.Localization.UiText.Get("UNDO LAST LOAD"), UndoLoad, enabled: undoState is not null && stateOperation is null);
         ActionButton(300, 580, 310, 42, gallerySlot == 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("UPDATE RESUME POINT") : global::AetherBoy.Runtime.Localization.UiText.Get("SAVE TO THIS SLOT"), () => QueueSaveState(gallerySlot), enabled: session is not null && stateOperation is null);
-        Ink(642, 590, global::AetherBoy.Runtime.Localization.UiText.Get("Resume never replaces your five manual slots."), 14, Colors.Muted);
+        DrawSettingsParagraph(642, 573, global::AetherBoy.Runtime.Localization.UiText.Get("Resume never replaces your five manual slots."), 454, 14);
     }
 }

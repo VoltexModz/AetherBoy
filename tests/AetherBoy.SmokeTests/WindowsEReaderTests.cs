@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Drawing;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Windows.Forms;
 using AetherBoy.Runtime;
 using AetherBoy.Runtime.Localization;
@@ -103,6 +104,41 @@ public sealed class WindowsEReaderTests
                 UiText.Get("Aktion in der Kartenbibliothek fehlgeschlagen. Prüfe Dateien, Kartensatz und Schreibrechte."));
             Assert.AreEqual("Donkey Kong-e · Test", cardLibrary.ReadEntry(firstSet.Id).Title);
             Capture(center, "library-" + language + "-error");
+            string invalidFirmware = Path.Combine(root, "wrong.gba"), invalidCard = Path.Combine(root, "invalid.raw");
+            File.WriteAllBytes(invalidFirmware, new byte[512]); File.WriteAllBytes(invalidCard, new byte[13]);
+            var originalEntry = cardLibrary.ReadEntry(firstSet.Id);
+            string libraryError = UiText.Get("Aktion in der Kartenbibliothek fehlgeschlagen. Prüfe Dateien, Kartensatz und Schreibrechte.");
+            foreach (Action invalidImport in new Action[]
+            {
+                () => cardLibrary.SetFirmware(invalidFirmware),
+                () => cardLibrary.Import(invalidCard, firstSet.Id)
+            })
+            {
+                Field<Label>(center, "eReaderLibraryFeedback").Text = "";
+                task = (Task)Call(center, "CardLibraryAction", (Func<Task>)(() => Task.Run(invalidImport)))!;
+                Pump(() => task.IsCompleted); task.GetAwaiter().GetResult();
+                Assert.IsFalse(Field<bool>(center, "eReaderBusy"));
+                StringAssert.Contains(Field<Label>(center, "eReaderLibraryFeedback").Text, libraryError);
+                Assert.AreEqual(originalEntry.LaunchId, cardLibrary.ReadEntry(firstSet.Id).LaunchId);
+                Assert.AreEqual(1, cardLibrary.ReadEntry(firstSet.Id).Cards.Length);
+                Assert.AreEqual(firstLaunch, cardLibrary.PrepareLaunch(firstSet.Id));
+                Assert.AreSame(session, Field<EmulationSession>(main, "session"));
+                Assert.IsTrue(session.LatestSnapshot.IsPaused); Assert.IsNull(session.Fault);
+                Assert.AreEqual(0, session.LatestSnapshot.EReader!.QueuedCards);
+                Assert.IsTrue(states.Inspect(firstLaunch, 0).Exists);
+            }
+            Capture(center, "library-" + language + "-validation-error");
+            string metadata = Path.Combine(cardLibrary.Root, "sets", firstSet.Id, "set.json");
+            byte[] originalMetadata = File.ReadAllBytes(metadata);
+            try
+            {
+                File.WriteAllBytes(metadata, JsonSerializer.SerializeToUtf8Bytes(originalEntry with { Title = "" }));
+                Field<Label>(center, "eReaderLibraryFeedback").Text = ""; Call(center, "ReloadEReaderLibrary", firstSet.Id);
+                StringAssert.Contains(Field<Label>(center, "eReaderLibraryFeedback").Text, libraryError);
+                Assert.AreEqual(2, sets.Items.Count);
+            }
+            finally { File.WriteAllBytes(metadata, originalMetadata); }
+            Call(center, "ReloadEReaderLibrary", firstSet.Id);
             sets.SelectedIndex = sets.SelectedIndex == 0 ? 1 : 0;
             Assert.IsFalse(Field<AetherButton>(center, "eReaderSetResume").Enabled);
             Assert.IsNull(Find<PictureBox>(center, "eReaderSetPreview").Image);

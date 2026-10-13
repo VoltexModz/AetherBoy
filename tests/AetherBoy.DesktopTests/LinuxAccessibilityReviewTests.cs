@@ -122,7 +122,7 @@ public sealed class LinuxAccessibilityReviewTests
             void Call(string name, params object[] args) => typeof(WaylandEmulatorHost).GetMethod(name, flags)!.Invoke(host, args);
             T Field<T>(string name) => (T)typeof(WaylandEmulatorHost).GetField(name, flags)!.GetValue(host)!;
             Type pageType = typeof(WaylandEmulatorHost).GetNestedType("ControlCenterPage", BindingFlags.NonPublic)!;
-            void Page(string name) { Call("SelectControlCenterPage", Enum.Parse(pageType, name)); Call("DrawShell"); Call("UpdateAccessibleControls"); }
+            void Page(string name) { Call("OpenControlPage", Enum.Parse(pageType, name)); Call("DrawShell"); Call("UpdateAccessibleControls"); }
             Call("HandleKeyboard", new SDL.KeyboardEvent { Scancode = SDL.Scancode.F7, Down = true }, true);
             Assert.IsNull(Field<LinuxAccessibleControls?>("accessibleControls"), "Unmodified F7 remains the established Rewind shortcut.");
             Call("HandleKeyboard", new SDL.KeyboardEvent { Scancode = SDL.Scancode.F7, Mod = SDL.Keymod.Ctrl, Down = true }, true);
@@ -145,7 +145,7 @@ public sealed class LinuxAccessibilityReviewTests
             panel.ActivateForTest(KeyFor("Sharp"));
             Page("Saves"); // Pending old-page callback must not alter the replacement page/session.
             Assert.AreEqual(LinuxVideoFilter.Smooth, Field<LinuxFrontendOptions>("options").VideoFilter);
-            Assert.IsTrue(panel.InspectActions().Any(item => item.Name.StartsWith("1 ", StringComparison.Ordinal) && item.Role == "toggle button" && item.Checked), "Active manual slot must have checked semantics.");
+            Assert.IsTrue(panel.InspectActions().Any(item => item.Name == "Save slot 1" && item.Role == "toggle button" && item.Checked && !item.Enabled), "The selected manual slot must expose its name and checked state, and remain disabled without a game.");
             VisitNamed(panel, "BACKUPS / EXPORT", accessible => Assert.IsTrue(Role(accessible) is "push button" or "button", "ATK_ROLE_BUTTON is the renamed ATK_ROLE_PUSH_BUTTON alias."));
             Assert.AreEqual(0, gtk_widget_get_mapped(panel.Window));
         }

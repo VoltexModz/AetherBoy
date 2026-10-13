@@ -15,6 +15,7 @@ public sealed class LinuxAccessibilityBusTests
         if (!OperatingSystem.IsLinux() || Environment.GetEnvironmentVariable("AETHERBOY_ACCESSIBILITY_BUS_TESTS") != "1")
         { Assert.Inconclusive("Explicit isolated AT-SPI bus opt-in required."); return; }
         Assert.AreEqual("wayland-accessibility-test", Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"), "Never map this probe on a personal display.");
+        Assert.IsNull(Environment.GetEnvironmentVariable("WAYLAND_SOCKET"), "An inherited display FD would bypass WAYLAND_DISPLAY isolation.");
         Assert.AreEqual("Weston", Environment.GetEnvironmentVariable("XDG_CURRENT_DESKTOP"));
         Assert.AreEqual("1", Environment.GetEnvironmentVariable("AETHERBOY_ISOLATED_ACCESSIBILITY_BUS"), "Runner must provide its own dbus-run-session.");
         Assert.IsTrue(LinuxAccessibleControls.TryCreate(out var controls, out string? error), error);

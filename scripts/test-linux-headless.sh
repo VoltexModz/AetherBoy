@@ -12,7 +12,7 @@ chmod 700 "$XDG_RUNTIME_DIR"
 export WAYLAND_DISPLAY=wayland-accessibility-test
 export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=Weston SDL_RENDER_DRIVER=software
 export GSETTINGS_BACKEND=memory NO_AT_BRIDGE=0 GDK_BACKEND=wayland
-unset AT_SPI_BUS_ADDRESS DBUS_STARTER_ADDRESS DBUS_STARTER_BUS_TYPE
+unset DISPLAY WAYLAND_SOCKET AT_SPI_BUS_ADDRESS DBUS_STARTER_ADDRESS DBUS_STARTER_BUS_TYPE
 compositor_pid=""
 cleanup() {
     if [[ -n "$compositor_pid" ]]; then kill "$compositor_pid" 2>/dev/null || true; wait "$compositor_pid" 2>/dev/null || true; fi
@@ -27,6 +27,4 @@ for attempt in {1..50}; do
     sleep 0.1
 done
 test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
-dbus-run-session -- env AETHERBOY_PLAYTEST=0 AETHERBOY_UI_TESTS=1 AETHERBOY_ACCESSIBILITY_TESTS=1 \
-    AETHERBOY_ACCESSIBILITY_BUS_TESTS=1 AETHERBOY_ISOLATED_ACCESSIBILITY_BUS=1 \
-    dotnet "$test_assembly" "$@"
+dbus-run-session -- bash "$repository_root/scripts/run-linux-accessibility-session.sh" "$test_assembly" "$@"

@@ -87,7 +87,7 @@ internal sealed partial class frmControlCenter
             eReaderSets.SelectedIndex = entries.Count == 0 ? -1 : Math.Max(0, entries.ToList().FindIndex(e => e.Id == selectId));
             RefreshEReaderSet();
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or ArgumentException)
         { ShowEReaderLibraryError(ex); }
     }
 
@@ -125,7 +125,7 @@ internal sealed partial class frmControlCenter
         if (eReaderBusy) return;
         eReaderBusy = true;
         try { await action(); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or InvalidOperationException or NotSupportedException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or ArgumentException or InvalidOperationException or NotSupportedException)
         { if (!IsDisposed) ShowEReaderLibraryError(ex); }
         finally { eReaderBusy = false; }
     }

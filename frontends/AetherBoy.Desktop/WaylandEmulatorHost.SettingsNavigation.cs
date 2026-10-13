@@ -96,6 +96,7 @@ internal sealed partial class WaylandEmulatorHost
 
     private void BackFromSettings()
     {
+        if (showMessageDetails) { CloseMessageDetails(); return; }
         if (ShowingSettingsSearch) { ClearSettingsSearch(); return; }
         if (controlCenterPage == ControlCenterPage.Tools && showEReader)
         { showEReader = false; focusedControl = -1; return; }
@@ -124,16 +125,12 @@ internal sealed partial class WaylandEmulatorHost
 
     private float DrawSettingsParagraph(float x, float y, string text, float width, int size = 14, SDL.Color? color = null)
     {
-        string line = "";
         float step = Math.Max(size, textRenderer.MinimumSize) + 7;
-        foreach (string word in text.Split(' '))
+        foreach (var line in LinuxMessageLayout.Wrap(text, width, value => textRenderer.Measure(value, size)))
         {
-            string candidate = line.Length == 0 ? word : line + " " + word;
-            if (line.Length > 0 && textRenderer.Measure(candidate, size) > width)
-            { Ink(x, y, line, size, color ?? Colors.Muted); y += step; line = word; }
-            else line = candidate;
+            Ink(x, y, line.Read(text), size, color ?? Colors.Muted);
+            y += step;
         }
-        if (line.Length > 0) { Ink(x, y, line, size, color ?? Colors.Muted); y += step; }
         return y;
     }
 

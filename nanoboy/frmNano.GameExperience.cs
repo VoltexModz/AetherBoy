@@ -74,7 +74,7 @@ public partial class frmNano
             if (ReferenceEquals(current, session)) SetSaveFeedback(global::AetherBoy.Runtime.Localization.UiText.Format("{0} · Speichern fehlgeschlagen", SlotName(slot)), true);
             if (!automatic) AetherSignal.Show(this, global::AetherBoy.Runtime.Localization.UiText.TechnicalDetails(ex.Message), global::AetherBoy.Runtime.Localization.UiText.Get("Save State fehlgeschlagen"), MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
-        finally { stateOperationInProgress = false; }
+        finally { stateOperationInProgress = false; aetherSaveSlots.Invalidate(); }
     }
 
     private async Task LoadCheckpointAsync(int slot, bool undo = false)

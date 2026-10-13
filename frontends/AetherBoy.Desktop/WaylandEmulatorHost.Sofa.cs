@@ -130,6 +130,7 @@ internal sealed partial class WaylandEmulatorHost
     private void DrawSofaQuickMenu()
     {
         shellCommands.Clear(); focusTargets.Clear(); focusIdentities.Clear();
+        accessibleCommands.Clear(); accessibleDescriptions.Clear(); textEntryBounds.Clear();
         float x = LogicalWidth / 2f - 300, y = LogicalHeight / 2f - 232;
         Panel(x, y, 600, 464, global::AetherBoy.Runtime.Localization.UiText.Get("Game menu"));
         Ink(x + 24, y + 54, global::AetherBoy.Runtime.Localization.UiText.Get("Your game is paused while the menu is open."), 18, Colors.Muted);
@@ -148,6 +149,8 @@ internal sealed partial class WaylandEmulatorHost
     private bool HandleSofaKeyboard(SDL.KeyboardEvent key, bool down)
     {
         if (!sofaMode) return false;
+        if (down && !key.Repeat && key.Scancode == SDL.Scancode.F7 && (key.Mod & SDL.Keymod.Ctrl) != 0)
+        { OpenAccessibleControls(); return true; }
         if (key.Scancode == SDL.Scancode.F11 && (key.Mod & SDL.Keymod.Ctrl) != 0 && (key.Mod & SDL.Keymod.Shift) != 0)
         { if (down && !key.Repeat) ExitSofaMode(); return true; }
         if (IsLoading) return false;

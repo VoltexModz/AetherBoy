@@ -38,7 +38,7 @@ internal sealed partial class WaylandEmulatorHost
     private readonly List<FocusIdentity> focusIdentities = new();
     private FocusIdentity? previousFocus;
     private int focusedControl = -1;
-    private string FocusContext => archiveSelection is not null ? "archive:" + archiveSelection.Path + ":" + archiveSelectedIndex / ArchivePageSize
+    private string FocusContext => showMessageDetails ? "message:details" : archiveSelection is not null ? "archive:" + archiveSelection.Path + ":" + archiveSelectedIndex / ArchivePageSize
         : sofaMode ? "sofa:" + showSofaLibrary + ":" + showQuickDeck + ":" + sofaSection + ":" + sofaPage
         : !controlCenterVisible ? "main:" + storage?.Identity
         : $"{controlCenterPage}:{graphicsSection}:{systemSection}:{showInputShortcuts}:{showControllerStick}:{settingsSearch}:{settingsSearchPage}:{showAppearance}:{showController}:{showBackups}:{showGallery}:{showPatchLab}:{editingTitleIdentity}:{storage?.Identity}";
@@ -181,14 +181,16 @@ internal sealed partial class WaylandEmulatorHost
         AetherShapeRenderer.Fill(renderer, x, y, w, h, cut, start, end ?? start);
 
     private void ActionButton(float x, float y, float w, float h, string label, Action action,
-        bool primary = false, bool enabled = true, string? focusId = null, bool emphasis = false)
+        bool primary = false, bool enabled = true, string? focusId = null, bool emphasis = false,
+        string? displayLabel = null, float labelRightInset = 0)
     {
         enabled = enabled && (!IsLoading || label == global::AetherBoy.Runtime.Localization.UiText.Get("CANCEL LOAD") || (archiveSelection is not null && focusId?.StartsWith("archive:") == true));
-        DrawButton(x, y, w, h, label, primary, enabled, focusId, emphasis);
+        DrawButton(x, y, w, h, label, primary, enabled, focusId, emphasis, displayLabel, labelRightInset);
         if (enabled) shellCommands.Add((new SDL.FRect { X = x, Y = y, W = w, H = h }, action));
     }
 
-    private void DrawButton(float x, float y, float width, float height, string label, bool selected, bool enabled = true, string? focusId = null, bool emphasis = false)
+    private void DrawButton(float x, float y, float width, float height, string label, bool selected, bool enabled = true, string? focusId = null, bool emphasis = false,
+        string? displayLabel = null, float labelRightInset = 0)
     {
         enabled = enabled && (!IsLoading || label == global::AetherBoy.Runtime.Localization.UiText.Get("CANCEL LOAD") || (archiveSelection is not null && focusId?.StartsWith("archive:") == true));
         AddAccessibleCommand(x, y, width, height, label, selected, enabled, focusId);
@@ -221,9 +223,9 @@ internal sealed partial class WaylandEmulatorHost
             SDL.RenderRect(renderer, in focus);
         }
         drawingButtonLabel = true;
-        label = textRenderer.Fit(label, width - 16, 13, true);
+        label = textRenderer.Fit(displayLabel ?? label, width - 16 - labelRightInset, 13, true);
         if (navigation) Ink(x + 16, y + (height - 20) / 2, label, 15, foreground, selected);
-        else Center(x + width / 2, y + (height - 17) / 2 - 1, label, 12,
+        else Center(x + (width - labelRightInset) / 2, y + (height - 17) / 2 - 1, label, 12,
             foreground, true);
         drawingButtonLabel = false;
     }
@@ -287,6 +289,7 @@ internal sealed partial class WaylandEmulatorHost
         float centerY = dy / 2;
         Paint(0, 0, LogicalWidth, LogicalHeight, Colors.Void);
         if (introClock is not null) { DrawBootIntro(); return; }
+        if (showMessageDetails) { DrawMessageDetails(); return; }
         if (archiveSelection is not null) { DrawArchiveSelection(); return; }
         if (sofaMode)
         {
@@ -367,7 +370,7 @@ internal sealed partial class WaylandEmulatorHost
         }
         Ink(906 + dx, 601, IsOnlineLink ? global::AetherBoy.Runtime.Localization.UiText.Get("Private online save") : global::AetherBoy.Runtime.Localization.UiText.Get("F5 save · F8 load"), 11, Colors.Muted);
         Ink(906 + dx, 619, textRenderer.Fit(IsOnlineLink ? global::AetherBoy.Runtime.Localization.UiText.Get("F10 connection and saves") : global::AetherBoy.Runtime.Localization.UiText.Get("Hold Tab for turbo"), 228, 12), 12, Colors.Muted);
-        Ink(24, 659 + dy, textRenderer.Fit(loadError ?? statusMessage, LogicalWidth - 48, 12), 12, loadError is null ? Colors.Muted : Colors.Danger);
+        DrawMessageStatus(24, 654 + dy, LogicalWidth - 48, 30, loadError ?? statusMessage, loadError is not null, singleLine: true);
         Paint(0, 688 + dy, LogicalWidth, 72, Colors.Chrome);
         AccentLine(0, 688 + dy, LogicalWidth, 2);
         bool playable = session is not null && !IsLoading;
@@ -399,7 +402,7 @@ internal sealed partial class WaylandEmulatorHost
         Paint(0, 0, LogicalWidth, 84, Colors.Chrome);
         Mark(20, 14, 52);
         Ink(92, 12, "AetherBoy", 12, Colors.Muted, true);
-        Ink(92, 29, global::AetherBoy.Runtime.Localization.UiText.Get("Settings"), 22, bold: true);
+        Ink(92, 29, global::AetherBoy.Runtime.Localization.UiText.Get(controlCenterPage == ControlCenterPage.Library && !ShowingSettingsSearch ? "Library" : "Settings"), 22, bold: true);
         Ink(92, 60, global::AetherBoy.Runtime.Localization.UiText.Get("Find settings with Ctrl+K"), 12, Colors.Muted);
         ActionButton(LogicalWidth - 66, 23, 42, 36, "×", CloseControlCenter);
         AccentLine(0, 82, LogicalWidth, 2);
@@ -415,7 +418,7 @@ internal sealed partial class WaylandEmulatorHost
         DrawSettingsParagraph(24, LogicalHeight - 78, settingsDirty || settingsWrite is not null ? global::AetherBoy.Runtime.Localization.UiText.Get("Saving changes…") : global::AetherBoy.Runtime.Localization.UiText.Get("Changes save automatically"), 200, 12);
         Ink(280, 108, CurrentPageName, 26);
         Ink(280, 150, textRenderer.Fit(CurrentPageDescription, LogicalWidth - 310), 14, Colors.Muted);
-        Panel(278, 180, LogicalWidth - 302, 456);
+        Panel(278, 180, LogicalWidth - 302, controlCenterPage == ControlCenterPage.Library && !ShowingSettingsSearch ? LogicalHeight - 304 : 456);
         if (ShowingSettingsSearch) DrawSettingsResults();
         else
         switch (controlCenterPage)
@@ -435,9 +438,10 @@ internal sealed partial class WaylandEmulatorHost
             ? ShowingSettingsSearch || showInputShortcuts ? "" : showController ? global::AetherBoy.Runtime.Localization.UiText.Get("Controller mappings are saved for this device.")
             : usingGameProfile ? global::AetherBoy.Runtime.Localization.UiText.Get("Changes apply to this game’s profile.") : global::AetherBoy.Runtime.Localization.UiText.Get("Changes apply to global defaults.")
             : "";
-        DrawSettingsParagraph(280, 648, loadError ?? (string.IsNullOrEmpty(statusMessage) ? scope : statusMessage), LogicalWidth - 310, 12,
-            loadError is null ? Colors.Muted : Colors.Danger);
+        DrawMessageStatus(280, controlCenterPage == ControlCenterPage.Library && !ShowingSettingsSearch ? LogicalHeight - 118 : 640,
+            LogicalWidth - 310, 56, loadError ?? (string.IsNullOrEmpty(statusMessage) ? scope : statusMessage), loadError is not null);
         DrawSettingsParagraph(280, LogicalHeight - 59, global::AetherBoy.Runtime.Localization.UiText.Get("F6 switches region. Tab moves focus; Ctrl+Tab changes section. Enter selects; Esc returns."), LogicalWidth - 310, 12);
+        if (aetherSelection is not null) DrawAetherSelectionPopup();
     }
 
     private void OpenAppearancePage()

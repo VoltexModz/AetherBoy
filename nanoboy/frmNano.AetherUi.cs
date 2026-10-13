@@ -50,6 +50,7 @@ namespace nanoboy
         private AetherButton aetherTurboButton = null!;
         private AetherButton aetherMaximizeButton = null!;
         private AetherButton[] aetherSlotButtons = Array.Empty<AetherButton>();
+        private readonly AetherSaveSlotInventory aetherSaveSlots = new();
         private AetherCommandMenu? aetherCommandMenu;
         private AetherButton? aetherActiveNav;
 
@@ -164,9 +165,9 @@ namespace nanoboy
                 WrapContents = false,
                 Width = 136
             };
-            AetherButton minimize = CreateChromeButton("—", (_, _) => WindowState = FormWindowState.Minimized);
-            aetherMaximizeButton = CreateChromeButton("□", (_, _) => ToggleAetherMaximize());
-            AetherButton close = CreateChromeButton("×", (_, _) => Close(), AetherButtonKind.Danger);
+            AetherButton minimize = CreateChromeButton("—", global::AetherBoy.Runtime.Localization.UiText.Get("Fenster minimieren"), (_, _) => WindowState = FormWindowState.Minimized);
+            aetherMaximizeButton = CreateChromeButton("□", global::AetherBoy.Runtime.Localization.UiText.Get("Fenster maximieren"), (_, _) => ToggleAetherMaximize());
+            AetherButton close = CreateChromeButton("×", global::AetherBoy.Runtime.Localization.UiText.Get("Fenster schließen"), (_, _) => Close(), AetherButtonKind.Danger);
             windowControls.Controls.Add(minimize);
             windowControls.Controls.Add(aetherMaximizeButton);
             windowControls.Controls.Add(close);
@@ -214,7 +215,8 @@ namespace nanoboy
                 RowCount = 1
             };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 248f));
+            // Keep the five save slots visible when the rail viewport reserves a vertical scrollbar.
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 264f));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
             aetherStage = new AetherStagePanel
@@ -515,10 +517,12 @@ namespace nanoboy
 
         private AetherButton CreateChromeButton(
             string text,
+            string accessibleName,
             EventHandler click,
             AetherButtonKind kind = AetherButtonKind.Ghost)
         {
             AetherButton button = CreateActionButton(text, kind, 38);
+            button.AccessibleName = accessibleName;
             button.Height = 36;
             button.Margin = new Padding(3, 0, 0, 0);
             button.Font = new Font("Segoe UI", 11f, FontStyle.Regular, GraphicsUnit.Point);
@@ -675,6 +679,8 @@ namespace nanoboy
 
             bool hasSession = session != null && snapshot != null;
             bool hasRom = snapshot?.Rom != null;
+            aetherSaveSlots.Update(hasRom && !IsOnlineLink ? session : null,
+                hasRom && !IsOnlineLink ? currentRomPath : null);
             aetherEmptyState.Visible = !hasRom;
             gameView.Visible = hasRom || immersiveFullscreen;
             if (!hasRom)
@@ -734,7 +740,6 @@ namespace nanoboy
             bool supportsRewind = !IsOnlineLink && (features & EmulationFeature.Rewind) != 0;
             aetherRewindButton.Enabled = actionsEnabled && supportsRewind && !stateOperationInProgress;
             aetherSaveButton.Enabled = actionsEnabled && supportsSaveStates && !stateOperationInProgress;
-            aetherLoadButton.Enabled = actionsEnabled && supportsSaveStates && !stateOperationInProgress;
             aetherSaveSafetyButton.Enabled = actionsEnabled && !IsOnlineLink &&
                 snapshot?.Rom?.BatterySave.IsEnabled == true &&
                 snapshot.Rom.BatterySave.ExpectedLength > 0 &&
@@ -761,16 +766,50 @@ namespace nanoboy
 
         private void UpdateAetherSlotButtons()
         {
+            if (aetherLoadButton is not null)
+            {
+                EmulationSnapshot? current = session?.LatestSnapshot;
+                aetherLoadButton.Enabled = current?.Rom is not null &&
+                    current.State is not SessionState.Stopping and not SessionState.Stopped and not SessionState.Faulted &&
+                    current.Supports(EmulationFeature.SaveStates) && !IsOnlineLink && !stateOperationInProgress &&
+                    aetherSaveSlots[settings.SaveSlot] == AetherSaveSlotState.Saved;
+            }
             for (int index = 0; index < aetherSlotButtons.Length; index++)
             {
-                aetherSlotButtons[index].Selected = settings.SaveSlot == index + 1;
+                int slot = index + 1;
+                AetherSaveSlotState state = aetherSaveSlots[slot];
+                AetherButton button = aetherSlotButtons[index];
+                button.Selected = settings.SaveSlot == slot;
+                button.Text = slot + (state switch
+                {
+                    AetherSaveSlotState.Reading => "…",
+                    AetherSaveSlotState.Empty => "−",
+                    AetherSaveSlotState.Saved => "●",
+                    AetherSaveSlotState.Unreadable => "!",
+                    _ => ""
+                });
+                button.AccessibleName = global::AetherBoy.Runtime.Localization.UiText.Format("Slot {0}: {1}", slot,
+                    AetherSaveSlotLabel(state));
             }
 
             if (aetherSlotValue != null)
             {
-                aetherSlotValue.Text = settings.SaveSlot.ToString();
+                aetherSlotValue.Text = global::AetherBoy.Runtime.Localization.UiText.Format("{0} · {1}", settings.SaveSlot,
+                    AetherSaveSlotLabel(aetherSaveSlots[settings.SaveSlot]));
+                aetherSlotValue.AutoEllipsis = true;
             }
         }
+
+        private string AetherSaveSlotLabel(AetherSaveSlotState state) =>
+            IsOnlineLink ? global::AetherBoy.Runtime.Localization.UiText.Get("Save States sind im Online-Link gesperrt") :
+            global::AetherBoy.Runtime.Localization.UiText.Get(state switch
+            {
+                AetherSaveSlotState.Reading => "wird gelesen",
+                AetherSaveSlotState.Empty => "leer",
+                AetherSaveSlotState.Saved => "gespeichert",
+                AetherSaveSlotState.Unreadable => "nicht lesbar",
+                _ => "Spiel öffnen"
+            });
 
         private void frmNano_DragEnter(object? sender, DragEventArgs e)
         {
@@ -835,6 +874,8 @@ namespace nanoboy
             if (aetherMaximizeButton != null)
             {
                 aetherMaximizeButton.Text = WindowState == FormWindowState.Maximized ? "❐" : "□";
+                aetherMaximizeButton.AccessibleName = global::AetherBoy.Runtime.Localization.UiText.Get(
+                    WindowState == FormWindowState.Maximized ? "Fenster wiederherstellen" : "Fenster maximieren");
             }
         }
 

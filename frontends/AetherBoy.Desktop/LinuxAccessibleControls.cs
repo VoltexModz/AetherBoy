@@ -7,7 +7,7 @@ namespace AetherBoy.Desktop;
 internal sealed class LinuxAccessibleControls : IDisposable
 {
     internal sealed record Command(string Key, string Label, bool Enabled, bool? Selected = null, bool Navigation = false);
-    internal sealed record TextField(string Key, string Label, string Value, bool ReadOnly, int MaximumLength = 80);
+    internal sealed record TextField(string Key, string Label, string Value, bool ReadOnly, int MaximumLength = 80, bool Multiline = false);
     internal sealed record AccessibleAction(string Name, string Role, bool Enabled, bool Checked);
     private sealed record Button(IntPtr Widget, Callback Handler, ulong Signal, bool Toggle, bool Navigation);
     private readonly Dictionary<string, Button> buttons = new();
@@ -18,10 +18,10 @@ internal sealed class LinuxAccessibleControls : IDisposable
     private readonly EventCallback closeHandler;
     private readonly EventCallback keyHandler;
     private readonly ulong changedSignal, activateSignal, closeSignal, keySignal;
-    private readonly IntPtr window, heading, details, status, navigation, actions, entry, entryLabel, entryBox;
+    private readonly IntPtr window, heading, details, status, navigation, actions, entry, entryLabel, entryBox, memo, memoScroll;
     private string[] structure = [];
     private string? textKey;
-    private string lastHeading = "", lastDetails = "", lastStatus = "";
+    private string lastHeading = "", lastDetails = "", lastStatus = "", lastMemoValue = "";
     private bool updating, disposed;
     public bool IsOpen { get; private set; }
     internal IntPtr Window => window;
@@ -53,12 +53,14 @@ internal sealed class LinuxAccessibleControls : IDisposable
         navigation = gtk_box_new(1, 6); gtk_widget_set_size_request(navigation, 190, -1);
         var navScroll = Scroll(navigation); gtk_box_pack_start(columns, navScroll, 0, 1, 0);
         var body = gtk_box_new(1, 10); gtk_box_pack_start(columns, Scroll(body), 1, 1, 0);
-        details = Label(""); Pack(body, details);
+        details = Label(""); gtk_label_set_selectable(details, 1); Pack(body, details);
         entryBox = gtk_box_new(1, 6); Pack(body, entryBox);
         entryLabel = Label("Text"); Pack(entryBox, entryLabel);
         entry = gtk_entry_new(); gtk_entry_set_max_length(entry, 160); Pack(entryBox, entry);
+        memo = gtk_text_view_new(); gtk_text_view_set_editable(memo, 0); gtk_text_view_set_wrap_mode(memo, 3);
+        memoScroll = Scroll(memo); gtk_widget_set_size_request(memoScroll, -1, 220); Pack(entryBox, memoScroll);
         actions = gtk_box_new(1, 6); Pack(body, actions);
-        status = Label(""); Pack(outer, status);
+        status = Label(""); gtk_label_set_selectable(status, 1); Pack(outer, status);
         atk_object_set_name(gtk_widget_get_accessible(status), global::AetherBoy.Runtime.Localization.UiText.Get("Session status"));
         changedHandler = (_, _) =>
         {
@@ -79,7 +81,7 @@ internal sealed class LinuxAccessibleControls : IDisposable
         changedSignal = Connect(entry, "changed", changedHandler); activateSignal = Connect(entry, "activate", activateHandler);
         closeSignal = Connect(window, "delete-event", closeHandler); keySignal = Connect(window, "key-press-event", keyHandler);
         gtk_widget_show_all(outer); // Children are accessible, but the toplevel is still unmapped.
-        gtk_widget_hide(entryBox);
+        gtk_widget_hide(entryBox); gtk_widget_hide(memoScroll);
     }
 
     public bool CaptureKeys { get; set; }
@@ -132,7 +134,7 @@ internal sealed class LinuxAccessibleControls : IDisposable
             {
                 IntPtr widget = buttons[command.Key].Widget;
                 if (Utf8(gtk_button_get_label(widget)) != command.Label) gtk_button_set_label(widget, command.Label);
-                atk_object_set_name(gtk_widget_get_accessible(widget), command.Label);
+                SetAccessibleName(widget, command.Label);
                 gtk_widget_set_sensitive(widget, command.Enabled ? 1 : 0);
                 if (command.Selected is { } selected) gtk_toggle_button_set_active(widget, selected ? 1 : 0);
                 gtk_widget_show(widget);
@@ -142,13 +144,25 @@ internal sealed class LinuxAccessibleControls : IDisposable
             if (field is null) gtk_widget_hide(entryBox);
             else
             {
-                gtk_entry_set_max_length(entry, field.MaximumLength);
-                gtk_label_set_text(entryLabel, field.Label);
-                atk_object_set_name(gtk_widget_get_accessible(entry), field.Label);
-                if (Utf8(gtk_entry_get_text(entry)) != field.Value) gtk_entry_set_text(entry, field.Value);
+                if (Utf8(gtk_label_get_text(entryLabel)) != field.Label) gtk_label_set_text(entryLabel, field.Label);
                 gtk_editable_set_editable(entry, field.ReadOnly ? 0 : 1);
+                if (field.Multiline && field.ReadOnly)
+                {
+                    SetAccessibleName(memo, field.Label);
+                    if (lastMemoValue != field.Value)
+                    { gtk_text_buffer_set_text(gtk_text_view_get_buffer(memo), field.Value, -1); lastMemoValue = field.Value; }
+                    gtk_widget_hide(entry); gtk_widget_show(memoScroll);
+                    if (changedField) gtk_widget_grab_focus(memo);
+                }
+                else
+                {
+                    gtk_entry_set_max_length(entry, field.MaximumLength);
+                    SetAccessibleName(entry, field.Label);
+                    if (Utf8(gtk_entry_get_text(entry)) != field.Value) gtk_entry_set_text(entry, field.Value);
+                    gtk_widget_hide(memoScroll); gtk_widget_show(entry);
+                    if (changedField) { gtk_widget_grab_focus(entry); gtk_editable_set_position(entry, -1); }
+                }
                 gtk_widget_show(entryBox);
-                if (changedField) { gtk_widget_grab_focus(entry); gtk_editable_set_position(entry, -1); }
             }
         }
         finally { updating = false; }
@@ -174,7 +188,9 @@ internal sealed class LinuxAccessibleControls : IDisposable
     internal void ActivateForTest(string key) => gtk_button_clicked(buttons[key].Widget);
     internal string? FocusedKey => buttons.FirstOrDefault(pair => pair.Value.Widget == gtk_window_get_focus(window)).Key;
     internal void FocusForTest(string key) => gtk_widget_grab_focus(buttons[key].Widget);
+    internal void CommitTextForTest() => gtk_widget_activate(entry);
     internal IntPtr EntryAccessible => gtk_widget_get_accessible(entry);
+    internal IntPtr MemoAccessible => gtk_widget_get_accessible(memo);
 
     public void Dispose()
     {
@@ -192,6 +208,11 @@ internal sealed class LinuxAccessibleControls : IDisposable
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         if (threadId != Environment.CurrentManagedThreadId) throw new InvalidOperationException("GTK controls must stay on their owner thread.");
+    }
+    private static void SetAccessibleName(IntPtr widget, string name)
+    {
+        IntPtr accessible = gtk_widget_get_accessible(widget);
+        if (!string.Equals(Utf8(atk_object_get_name(accessible)), name, StringComparison.Ordinal)) atk_object_set_name(accessible, name);
     }
     private static string Utf8(IntPtr value) => Marshal.PtrToStringUTF8(value) ?? "";
     private static IntPtr Label(string value)
@@ -220,6 +241,8 @@ internal sealed class LinuxAccessibleControls : IDisposable
     [DllImport(Gtk)] private static extern void gtk_container_set_border_width(IntPtr container, uint border);
     [DllImport(Gtk)] private static extern IntPtr gtk_label_new(string text);
     [DllImport(Gtk)] private static extern void gtk_label_set_text(IntPtr label, string text);
+    [DllImport(Gtk)] private static extern IntPtr gtk_label_get_text(IntPtr label);
+    [DllImport(Gtk)] private static extern void gtk_label_set_selectable(IntPtr label, int selectable);
     [DllImport(Gtk)] private static extern void gtk_label_set_line_wrap(IntPtr label, int wrap);
     [DllImport(Gtk)] private static extern void gtk_label_set_xalign(IntPtr label, float xalign);
     [DllImport(Gtk)] private static extern IntPtr gtk_scrolled_window_new(IntPtr hadjustment, IntPtr vadjustment);
@@ -240,6 +263,12 @@ internal sealed class LinuxAccessibleControls : IDisposable
     [DllImport(Gtk)] private static extern void gtk_widget_set_sensitive(IntPtr widget, int sensitive);
     [DllImport(Gtk)] private static extern int gtk_widget_get_sensitive(IntPtr widget);
     [DllImport(Gtk)] private static extern void gtk_widget_grab_focus(IntPtr widget);
+    [DllImport(Gtk)] private static extern int gtk_widget_activate(IntPtr widget);
+    [DllImport(Gtk)] private static extern IntPtr gtk_text_view_new();
+    [DllImport(Gtk)] private static extern void gtk_text_view_set_editable(IntPtr view, int editable);
+    [DllImport(Gtk)] private static extern void gtk_text_view_set_wrap_mode(IntPtr view, int wrapMode);
+    [DllImport(Gtk)] private static extern IntPtr gtk_text_view_get_buffer(IntPtr view);
+    [DllImport(Gtk)] private static extern void gtk_text_buffer_set_text(IntPtr buffer, string text, int length);
     [DllImport(Gtk)] private static extern IntPtr gtk_entry_new();
     [DllImport(Gtk)] private static extern void gtk_entry_set_text(IntPtr entry, string text);
     [DllImport(Gtk)] private static extern IntPtr gtk_entry_get_text(IntPtr entry);

@@ -46,9 +46,9 @@ internal sealed partial class WaylandEmulatorHost
     {
         Paint(x, y, width, height, Colors.Chrome);
         if (!libraryPreviewCards.TryGetValue(identity, out LinuxStateCard? card))
-        { RequestLibraryPreview(identity); Ink(x + 8, y + height / 2 - 8, global::AetherBoy.Runtime.Localization.UiText.Get("Loading…"), 11, Colors.Muted); return; }
+        { RequestLibraryPreview(identity); DrawLibraryPreviewPlaceholder(x, y, width, height, "Loading…"); return; }
         if (card.Pixels is null)
-        { Ink(x + 8, y + height / 2 - 8, card.Exists ? global::AetherBoy.Runtime.Localization.UiText.Get("No preview") : global::AetherBoy.Runtime.Localization.UiText.Get("No resume"), 11, Colors.Muted); return; }
+        { DrawLibraryPreviewPlaceholder(x, y, width, height, card.Exists ? "No image" : "Empty"); return; }
         if (!libraryPreviewTextures.TryGetValue(identity, out IntPtr texture))
         {
             texture = SDL.CreateTexture(renderer, SDL.PixelFormat.ARGB8888, SDL.TextureAccess.Static, card.Width, card.Height);
@@ -64,5 +64,21 @@ internal sealed partial class WaylandEmulatorHost
             W = card.Width * scale, H = card.Height * scale
         };
         SDL.RenderTexture(renderer, texture, IntPtr.Zero, in target);
+    }
+
+    private void DrawLibraryPreviewPlaceholder(float x, float y, float width, float height, string source)
+    {
+        string text = global::AetherBoy.Runtime.Localization.UiText.Get(source);
+        float available = Math.Max(1, width - 12);
+        float step = Math.Max(11, textRenderer.MinimumSize) + 3;
+        var lines = LinuxMessageLayout.Wrap(text, available, value => textRenderer.Measure(value, 11));
+        int count = Math.Min(lines.Length, Math.Max(1, (int)((height - 8) / step)));
+        float top = y + (height - count * step) / 2;
+        for (int i = 0; i < count; i++)
+        {
+            string line = lines[i].Read(text);
+            if (i == count - 1 && count < lines.Length) line = textRenderer.Fit(line + "…", available, 11);
+            Center(x + width / 2, top + i * step, line, 11, Colors.Muted);
+        }
     }
 }

@@ -393,7 +393,7 @@ internal sealed partial class WaylandEmulatorHost
 
     private GameBoyButtons ReadLocalLinkButtons(int player)
     {
-        if (!windowFocused || controlCenterVisible || fileDialogOpen != 0) return GameBoyButtons.None;
+        if (!windowFocused || controlCenterVisible || showMessageDetails || fileDialogOpen != 0) return GameBoyButtons.None;
         GameBoyButtons buttons = GameBoyButtons.None;
         if (player == 0)
         {
@@ -428,7 +428,7 @@ internal sealed partial class WaylandEmulatorHost
 
     private GameBoyAdvanceButtons ReadLocalLinkAdvance(int player)
     {
-        if (!windowFocused || controlCenterVisible || fileDialogOpen != 0) return GameBoyAdvanceButtons.None;
+        if (!windowFocused || controlCenterVisible || showMessageDetails || fileDialogOpen != 0) return GameBoyAdvanceButtons.None;
         GameBoyAdvanceButtons shoulders = GameBoyAdvanceButtons.None;
         if (player == 0)
         {

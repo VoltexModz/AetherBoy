@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using AetherBoy.Runtime;
 using AetherBoy.Runtime.Localization;
 using SDL3;
@@ -72,6 +73,37 @@ public sealed class LinuxEReaderTests
                 { Thread.Sleep(5); Call(host, "DrawShell"); }
                 Assert.IsNotNull(LinuxStateGallery.ReadPreview(firstStorage.StateBasePath).Pixels);
                 Capture(host, "library-" + language);
+                string invalidFirmware = Path.Combine(root, "wrong.gba"), invalidCard = Path.Combine(root, "invalid.raw");
+                File.WriteAllBytes(invalidFirmware, new byte[512]); File.WriteAllBytes(invalidCard, new byte[13]);
+                var originalEntry = cardLibrary.ReadEntry(first.Id);
+                string libraryError = UiText.Get("Aktion in der Kartenbibliothek fehlgeschlagen. Prüfe Dateien, Kartensatz und Schreibrechte.");
+                foreach (var (purpose, path) in new[] { ("Firmware", invalidFirmware), ("Append", invalidCard) })
+                {
+                    Set(host, "eReaderLibraryFeedback", "");
+                    DeliverFile(host, session, path, purpose, first.Id);
+                    Assert.AreEqual(libraryError, Field<string>(host, "eReaderLibraryFeedback"));
+                    Assert.AreEqual(originalEntry.LaunchId, cardLibrary.ReadEntry(first.Id).LaunchId);
+                    Assert.AreEqual(1, cardLibrary.ReadEntry(first.Id).Cards.Length);
+                    Assert.AreEqual(firstStorage.Identity, cardLibrary.IdentifyLaunch(cardLibrary.PrepareLaunch(first.Id), true));
+                    Assert.AreSame(session, Field<EmulationSession>(host, "session"));
+                    Assert.IsTrue(session.LatestSnapshot.IsPaused); Assert.IsNull(session.Fault);
+                    Assert.AreEqual(0, session.LatestSnapshot.EReader!.QueuedCards);
+                    Capture(host, "library-" + language + "-" + purpose.ToLowerInvariant() + "-error");
+                }
+                string metadata = Path.Combine(cardLibrary.Root, "sets", first.Id, "set.json");
+                byte[] originalMetadata = File.ReadAllBytes(metadata);
+                try
+                {
+                    File.WriteAllBytes(metadata, JsonSerializer.SerializeToUtf8Bytes(originalEntry with { Title = "" }));
+                    Set(host, "eReaderLibraryFeedback", ""); Call(host, "ReloadEReaderLibrary", first.Id);
+                    Assert.AreEqual(libraryError, Field<string>(host, "eReaderLibraryFeedback"));
+                    Assert.AreEqual(2, Field<IReadOnlyList<EReaderLibraryEntry>>(host, "eReaderSets").Count);
+                }
+                finally { File.WriteAllBytes(metadata, originalMetadata); }
+                DeliverFile(host, session, rom, "Firmware");
+                Assert.AreEqual(UiText.Get("Lokale Kopie übernommen. Originaldateien bleiben unverändert."), Field<string>(host, "eReaderLibraryFeedback"));
+                Assert.AreEqual(originalEntry.LaunchId, cardLibrary.ReadEntry(first.Id).LaunchId);
+                Assert.IsNotNull(LinuxStateGallery.ReadPreview(firstStorage.StateBasePath).Pixels);
                 // Existing theme tests validate every preset; this path checks dark/light and large text.
                 Call(host, "SelectEReaderSet", 0); Call(host, "DrawShell");
                 Assert.AreEqual(2, Field<IReadOnlyList<EReaderLibraryEntry>>(host, "eReaderSets").Count);
@@ -90,19 +122,27 @@ public sealed class LinuxEReaderTests
         try { Assert.IsTrue(SDL.SavePNG(surface, Path.Combine(output, "ereader-linux-" + name + ".png")), SDL.GetError()); } finally { SDL.DestroySurface(surface); }
     }
 
-    private static void DeliverFile(WaylandEmulatorHost host, EmulationSession session, string? path)
+    private static void DeliverFile(WaylandEmulatorHost host, EmulationSession session, string? path, string? libraryPurpose = null, string? setId = null)
     {
-        Set(host, "pickingEReaderSession", session); Set(host, "fileDialogOpen", 1);
+        if (libraryPurpose is null) Set(host, "pickingEReaderSession", session);
+        else
+        {
+            var purposeField = host.GetType().GetField("pickingEReaderLibrary", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            purposeField.SetValue(host, Enum.Parse(purposeField.FieldType, libraryPurpose));
+            Set(host, "pickingEReaderSetId", setId);
+        }
+        Set(host, "fileDialogOpen", 1);
         IntPtr text = path is null ? IntPtr.Zero : Marshal.StringToCoTaskMemUTF8(path), list = Marshal.AllocHGlobal(IntPtr.Size * 2);
         try
         {
             Marshal.WriteIntPtr(list, text); Marshal.WriteIntPtr(list, IntPtr.Size, IntPtr.Zero);
             Call(host, "OnFileDialogCompleted", IntPtr.Zero, list, 0); Call(host, "DrainDialogSelections");
             Assert.AreEqual(0, Field<int>(host, "fileDialogOpen")); Assert.IsNull(Field<EmulationSession?>(host, "pickingEReaderSession"));
+            Assert.AreEqual("None", Field<object>(host, "pickingEReaderLibrary").ToString()); Assert.IsNull(Field<string?>(host, "pickingEReaderSetId"));
         }
         finally { if (text != IntPtr.Zero) Marshal.FreeCoTaskMem(text); Marshal.FreeHGlobal(list); }
     }
     private static T Field<T>(object o, string n) => (T)o.GetType().GetField(n, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(o)!;
-    private static void Set(object o, string n, object value) => o.GetType().GetField(n, BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(o, value);
+    private static void Set(object o, string n, object? value) => o.GetType().GetField(n, BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(o, value);
     private static void Call(object o, string n, params object[] args) => o.GetType().GetMethod(n, BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(o, args);
 }

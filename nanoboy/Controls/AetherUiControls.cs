@@ -123,6 +123,26 @@ namespace nanoboy.Controls
 
                 selected = value;
                 Invalidate();
+                AccessibilityNotifyClients(AccessibleEvents.StateChange, -1);
+            }
+        }
+
+        protected override AccessibleObject CreateAccessibilityInstance() =>
+            new AetherButtonAccessibleObject(this);
+
+        private sealed class AetherButtonAccessibleObject(AetherButton owner)
+            : ButtonBaseAccessibleObject(owner)
+        {
+            // One ButtonBaseAccessibleObject follows the owner handle lifecycle, including handle recreation.
+            // A selected command remains a button and explicit role overrides stay authoritative.
+            public override AccessibleRole Role => owner.AccessibleRole == AccessibleRole.Default
+                ? AccessibleRole.PushButton : owner.AccessibleRole;
+            public override AccessibleStates State => base.State |
+                (owner.Selected ? AccessibleStates.Selected : AccessibleStates.None);
+            public override void DoDefaultAction()
+            {
+                // Match button activation: no disposed/handleless, disabled or unvalidated actions.
+                if (!owner.IsDisposed && owner.IsHandleCreated) owner.PerformClick();
             }
         }
 

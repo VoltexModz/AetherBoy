@@ -168,6 +168,7 @@ namespace nanoboy.Controls
                 Location = new Point(contentSize.Width - 55, 20),
                 Size = new Size(38, 34),
                 Text = "×",
+                AccessibleName = global::AetherBoy.Runtime.Localization.UiText.Get("Fenster schließen"),
                 TabStop = false
             };
             closeButton.Click += (_, _) => form.Close();
@@ -188,6 +189,7 @@ namespace nanoboy.Controls
                     Location = new Point(contentSize.Width - 99, 20),
                     Size = new Size(38, 34),
                     Text = "−",
+                    AccessibleName = global::AetherBoy.Runtime.Localization.UiText.Get("Fenster minimieren"),
                     TabStop = false
                 };
                 minimizeButton.Click += (_, _) => form.WindowState = FormWindowState.Minimized;

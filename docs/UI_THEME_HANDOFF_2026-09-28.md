@@ -1,7 +1,93 @@
 # UI-Farben und Logo-Abgleich — lokaler Arbeitsstand vom 28. September 2026
 
+## UI-Restarbeiten und zusätzliche Abnahmen — 09.10.2026
+
+- Die sieben Softwarepakete aus dem [UI-Arbeitsplan](UI_REVIEW_PLAN_2026-10-08.md)
+  sind umgesetzt. Abschließende unabhängige Fremd-Codeprüfung **9,4/10** und
+  betrachtete Linux-Darstellung **9,4/10**; keine offenen P1/P2 im geprüften Delta.
+  Die Noten gelten für diesen geprüften Umfang, nicht für eine vollständige
+  Plattform-/Gerätefreigabe.
+- Linux-Speicherseite neu aufgeteilt: fünf Slots, Fehlerstatus und sämtliche
+  Nebenaktionen passen in DE/EN auch bei Mindestformat und Textgröße 18.
+  Trefferflächen, Umbruch und Fokusreihenfolge geprüft; alle 18 neuen
+  NoGame/Saved/Error-Bilder unabhängig betrachtet.
+- Privater Weston-/D-Bus-/AT-SPI-Starter vervollständigt; geerbte Display-FDs
+  werden entfernt. Nativer UI-Lauf **61/61** sowie externe Komponenten- und
+  Emulator-AT-SPI-Probe jeweils **1/1**, ohne Skips. Der Fremdclient führt echte
+  Save/Load-/Undo-Aktionen und Auswahl/Kopieren vollständiger Unicode-Details aus.
+  Gemeinsame Lokalisierung **19/19**.
+- Echte Orca-Softwareprobe deckte eine P1-Flut unveränderter Namen auf:
+  Linux-Code vorübergehend **8,7/10**. Zentraler Guardfix setzt native Namen/Labels
+  nur bei Änderung; Regression prüft 120 identische Frames ohne Zusatzsignale und
+  echte DE-/Unicode-Änderungen mit Signal. Frische 61+1+1 = **63 unterschiedliche
+  Linux-Fälle** grün, danach unabhängiger Codereview wieder **9,4/10**, P1 geschlossen.
+  Gleicher Orca-Ablauf spricht nun Bibliothek, Suche, Speicher-/Zustandsaktionen
+  und readonly Details bis zur stummen Speech-Dispatcher-Ausgabe. Definierte
+  Queueing-Namenslogzeilen 60.156→32; keine künstlichen Sprachaufrufe.
+- Windows-Kompatibilitätslauf mit offizieller .NET-10-Runtime unter privatem
+  Wine **43/43**, ohne Skips: Policy3, Followup15, Remainder10, Theme11, Sprache4.
+  Belegter Slotüberlauf durch die eigene Scrollleiste behoben; Mindestformat bei
+  100/125/150 Prozent geprüft. Ein einziges handlegebundenes AccessibleObject
+  erhält die Buttonrolle und Disabled-/Selected-Zustände nach Handle-Neuerzeugung.
+  Bestehende Assertions, Policy und Schulden-Baseline bleiben unverändert.
+- Frische Builds ohne Warnungen/Fehler. Tatsächliche Xvfb-Fensterpixel aus
+  Original DE und Pocket Light EN unabhängig angesehen; vollständige Slots und
+  zentrale Aktionen. Befunde, Noten und reproduzierbare temporäre Belege stehen
+  im Arbeitsplan. Diese Ergebnisse aktualisieren den Prüfstand vom 08.10. unten.
+- Keine Windows-VM vorhanden (Nutzerbestätigung 09.10.); echte Windows-Live-/UIA-
+  Abnahme, Monitor-DPI-Wechsel, reale IME und physischer Controller bleiben offen.
+  Externe AT-SPI- und Orca-Softwareprüfungen ersetzen Hörtest und vollständige
+  praktische Screenreaderbedienung am echten Desktop nicht. Orca-Startup- und
+  Cleanup-Warnungen der temporären Probe bleiben im Arbeitsplan dokumentiert.
+
+## Kritischer UI-Review und Umsetzung — 08.10.2026
+
+- Arbeitsaufteilung, Abnahme und Reviewrunden stehen im
+  [UI-Arbeitsplan](UI_REVIEW_PLAN_2026-10-08.md). Drei Umsetzungspakete und
+  voneinander getrennte Fremd-Code-/Visualprüfungen; Abschluss erst über 9,3 in
+  beiden Bewertungen. Bei zwei stagnierenden Runden wird der Ansatz gewechselt.
+  Runde 2: Code **9,4/10**, betrachtete Linux-Darstellung **9,4/10**; keine offenen
+  P1/P2 im geprüften Änderungsumfang. Die praktische Plattformabnahme unten
+  bleibt offen und wird durch diese Noten nicht ersetzt.
+- Linux: themegebundene Speichertexte, ausdrückliche Slotzustände und ein
+  scrollbar lesbarer Detailbereich für vollständige Fehlermeldungen. Details
+  schützen laufende Sessions, beide lokale Link-Spieler und Metadatenentwürfe
+  über Fokuswechsel hinweg; Tastatur-/Controller-Eingaben erreichen kein
+  verdecktes Spiel. Vollständige Texte bleiben auswählbar und kopierbar.
+- Bibliothek: flächenabhängige Liste/Kacheln, direkte System-/Genre-/Sortierwahl,
+  geometrischer Chevron und lesbare Auswahlwerte bei großer Schrift.
+  Vorschaustatus bleibt innerhalb der Bildfläche. GTK-/ATK-Hauptspielbefehle,
+  Auswahlsemantik und modale Aktionsgrenzen ergänzt; alte wartende Textbefehle
+  dürfen unter einem Popup keinen Entwurf speichern.
+- Windows: gemeinsame Fensteraktionen und ausgewählte Buttons mit passenden
+  Accessibilitynamen/-zuständen. Deaktivierte, versteckte oder entsorgte Buttons
+  werden durch Accessibility nicht ausgelöst. Speicherplätze werden im
+  Hintergrund für die jeweilige Sitzung gelesen; Dateipicker verwerfen alte
+  Ergebnisse und bleiben bei laufenden Zugriffen abbrechbar. Keine neue
+  UI-Schuldenausnahme; `WindowsUiDebt.json` unverändert.
+- Frische Builds Linux/Windows samt Testprojekten ohne Warnungen/Fehler.
+  Gezielter nativer Wayland-/GTK-Lauf **45/45**, anschließende Bibliotheksprüfung
+  mit korrigierter großer Schrift **2/2**, Lokalisierung **19/19**; keine Skips.
+  Synthetische Spiele, temporäre Saves und versteckte Fenster mit privatem
+  D-Bus. Bilder einschließlich echter sechs Themes, DE/EN, heller Eigenfarben
+  und Mindestformat in `/tmp/aetherboy-ui-work-review/` sowie im Visualreview.
+- Die Windows-UI-Policy-/Funktionsausführung ist hier wegen fehlender
+  Windows-Desktop-Runtime nicht möglich; Windows-Livebilder, UIA und DPI bleiben
+  offen. Linux-ATK wird nativ geprüft; ein separater AT-SPI-Client unter einem
+  privaten Weston-Compositor fehlt. Echte Controller, IME, Screenreader und
+  Monitor-DPI-Wechsel bleiben gesonderte praktische Abnahmen.
+
 ## e-Reader-Kartenbibliothek — 08.10.2026
 
+- Nachprüfung: `InvalidDataException` wird jetzt bei Bibliotheksaktionen auf
+  beiden Plattformen und beim Windows-Neuladen abgefangen. Ungültige Firmware,
+  Kartendateien und Metadaten zeigen die vorhandene Fehlermeldung.
+  DE/EN-Regressionen prüfen Sitzungs-/Pause-Erhalt, Picker-/Busy-Freigabe und
+  unveränderte Startidentitäten/Resume-Stände. Linux samt Theme-Auswahl **5/5**;
+  Fehlerbilder dunkel/hell mit großer englischer Schrift geprüft. Windows-Build
+  inklusive Smoke-Tests ohne Warnungen/Fehler; UI-Policy-/UI-Testausführung hier
+  wegen fehlender Windows-Desktop-Runtime 10 nicht möglich. Die Schulden-Baseline
+  bleibt unverändert; Windows-Laufzeitabnahme bleibt offen.
 - Eigene Bibliotheksseite auf Windows mit zentralem `AetherSelect`, `AetherTextBox`,
   Aether-Buttons/Dateiauswahl und themegebundener Bildvorschau. Linux nutzt die
   bestehenden SDL-Eingaben, Schaltflächen und Vorschau. Keine neue native UI-Schuld.

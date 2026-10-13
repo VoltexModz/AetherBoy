@@ -82,7 +82,7 @@ internal sealed partial class WaylandEmulatorHost
     private void EReaderLibraryAction(Action action)
     {
         try { action(); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or InvalidOperationException or NotSupportedException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or ArgumentException or InvalidOperationException or NotSupportedException)
         { eReaderLibraryFeedback = UiText.Get("Aktion in der Kartenbibliothek fehlgeschlagen. Prüfe Dateien, Kartensatz und Schreibrechte."); diagnostics.Failure("ereader_library", ex); }
     }
 }

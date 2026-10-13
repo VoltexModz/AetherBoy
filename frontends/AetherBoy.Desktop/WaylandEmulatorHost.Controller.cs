@@ -124,7 +124,7 @@ internal sealed partial class WaylandEmulatorHost
     {
         if (showOnScreenKeyboard && down && (SDL.GamepadButton)input.Button is SDL.GamepadButton.East or SDL.GamepadButton.LeftStick or SDL.GamepadButton.RightStick)
         { CancelActiveText(); return; }
-        if (showLocalLinkPage && !controlCenterVisible)
+        if (showLocalLinkPage && !controlCenterVisible && !showMessageDetails)
         {
             bool belongs = gamepad != IntPtr.Zero && input.Which == SDL.GetGamepadID(gamepad)
                 || secondGamepad != IntPtr.Zero && input.Which == SDL.GetGamepadID(secondGamepad);
@@ -143,7 +143,9 @@ internal sealed partial class WaylandEmulatorHost
             if (down && button is SDL.GamepadButton.South or SDL.GamepadButton.East) FinishBootIntro(true);
             return;
         }
+        if (HandleMessageDetailsGamepad(button, down)) return;
         if (HandleSofaGamepad(button, down)) return;
+        if (HandleAetherSelectionGamepad(button, down)) return;
         if (archiveSelection is not null)
         {
             if (!down) return;
