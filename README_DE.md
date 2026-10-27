@@ -1,281 +1,147 @@
 <p align="center">
-  <img src="branding/exports/aetherboy-mark-256.png" alt="AetherBoy Logo" width="112" height="112">
+  <img src="branding/exports/themes/128/aether-original.png" alt="AetherBoy-Logo" width="112" height="112">
 </p>
 
-<h1 align="center">AetherBoy</h1>
+# AetherBoy
 
-<p align="center"><strong>by NekoZDevTeam</strong></p>
+AetherBoy ist ein quelloffener **Game-Boy- und Game-Boy-Color-Emulator mit
+experimenteller Game-Boy-Advance-Unterstützung**, geschrieben in C# für Windows
+und natives Linux mit Wayland. Er verbindet eine Spielebibliothek, Tastatur- und
+Controllersteuerung, geschützte Spielstände, Zurückspulen und Diagnosewerkzeuge
+in einer anpassbaren Desktop-Oberfläche.
 
-## Entwicklungsstand — 8. Oktober 2026
+[![CI](https://github.com/VoltexModz/AetherBoy/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-4.8.0--alpha.1-8B38FF)](Directory.Build.props)
+[![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)](global.json)
+[![Lizenz: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-555555)](LICENSE)
 
-Windows und Linux haben jetzt eine **e-Reader-Kartenbibliothek** unter Einstellungen →
-Werkzeuge → e-Reader: Kartensätze importieren und benennen, Streifen ergänzen,
-getrennte Spielstände und Fortsetzen mit Vorschaubild. Eigene e-Reader-Firmware
-und Kartendateien werden weiterhin benötigt; nichts davon wird mitgeliefert.
-Noch kein Firmware-Ersatz und kein automatischer Import einer ganzen Sammlung.
-[Bedienung, Tests und Forschungsplan](docs/WINDOWS_ROADMAP.md#e-reader-kartenbibliothek-und-firmware-forschung--08102026).
+[English](README.md) · **Deutsch**
 
-Scanner und Dotcode-Verarbeitung sind eine MPL-2.0-Adaption aus mGBA;
-Bibliothek und Oberflächenanbindung sind AetherBoy-Code. Echte NES-e-Tests halfen,
-Fehler bei ARM-Statusregisterzugriffen und Sound-FIFO-DMA im gemeinsamen GBA-Kern
-zu beheben. Barcode Boy hat zusätzliche Battle-Space-Regressionen. Eingefügte
-Cheats erhalten eine zeilenweise Prüfung und bessere Formaterkennung; mehrdeutige
-Formate und offene Platzhalter verlangen eine Auswahl beziehungsweise Korrektur.
-Ein erkannter Code garantiert keine passende Spielwirkung.
-[Cheat-Unterstützung und bekannte Grenzen](docs/CHEAT_SUPPORT.md).
-
-Der Linux-Beitrag `641cab0` ist enthalten: vollständiger Local-Link-Speicherabschluss,
-erhaltene Abschlussfehler, Korrektur eines zu frühen Discord-READY-Ereignisses und
-aufbewahrte Linux-CI-Diagnosen. Hardware, WAN-Tausch und allgemeine Spielkompatibilität
-bleiben getrennte Abnahmen. [Herkunft und Lizenzen](THIRD_PARTY_NOTICES.md).
-
-### Vorherige Desktop-Stabilisierung
-
-Beide Oberflächen bieten inzwischen Deutsch/Englisch als Anzeigesprache, sechs
-Themes mit eigenen Farben, den controllerorientierten Sofa-Modus, AVI-Aufnahmen,
-ZIP-/7z-Import und erweiterte Sitzungs-Cheats. Windows verwendet die gemeinsamen
-eigenen Aether-Bedienelemente; Linux behält seine native Wayland-Oberfläche.
-Implementierung ist keine pauschale Hardware- oder Spielkompatibilitätsfreigabe.
-
-Die jüngste Stabilisierung reduziert unnötiges Neuschreiben älterer Save-Backups,
-ergänzt datensparsame Speicherphasen-Diagnose und ersetzt blockierende Windows-
-Hintergrundfehlerdialoge durch einen dauerhaften Hinweis mit Wiederholfunktion.
-Acht vollständige Runtime-Lastläufe bestanden ohne erneuten GBA-Shutdown-Timeout.
-Reale Hardware- und Langzeitabnahmen bleiben offen.
-[Änderungen, genaue Testergebnisse und Grenzen (DE/EN)](docs/STABILIZATION_2026-10-02.md).
-
-In den Einstellungen nach **Sprache** suchen: Deutsch, Englisch oder Systemsprache,
-wirksam nach Neustart. Deutsche Systemsprachen einschließlich Deutschland,
-Österreich und Schweiz wählen automatisch Deutsch; sonst Englisch. Die Sprache
-der Spiele wird dadurch nicht verändert.
-
-Aktuelle Pläne: [Windows](docs/WINDOWS_ROADMAP.md) · [Linux](docs/LINUX_ROADMAP.md).
-
-### Gemeinsame Funktionen und Entwicklungsdokumentation
-
-Windows ↔ Linux: gemeinsame Turbo-Audio-/Screenshot-/Performance-Grundlage und
-eigene Windows-Menüs. [Umgesetzt, geprüft und noch offen: Funktionsabgleich (DE/EN)](docs/PLATFORM_PARITY.md).
-Die Plattformpläne unterscheiden implementierte Werkzeuge von offenen Hardware- und Spieltests.
-
-Neu unter Windows: Firmware Station für eigene Boot-ROMs/BIOS und steuerbare,
-begrenzte lokale Diagnose. [Bedienung, Datenschutz und Übergabe (DE/EN)](docs/WINDOWS_FIRMWARE_DIAGNOSTICS.md).
-
-Experimentelles Local Link Lab unter Windows und Linux: zwei GB-/GBC- oder zwei GBA-Spielinstanzen in einer
-gemeinsamen lokalen Sitzung, mit getrennten Spielständen. Dieses Lab bleibt lokal;
-echte Spiele müssen noch qualifiziert werden. Die native Linux-Zwei-Spieler-Oberfläche ist implementiert.
-[Anleitung, Grenzen und Linux-Übergabe (DE/EN)](docs/LOCAL_LINK_LAB.md).
-[GBA-Kabel-/CPU-Ausbau](docs/GBA_LOCAL_LINK_HANDOFF.md) ·
-[Neuester Linux-Beitrag und Integrationsprüfung](docs/LINUX_UPSTREAM_INTEGRATION_REVIEW.md).
-
-Neu als separater **GB/GBC-Online-Link-Prototyp** für Windows und Linux: ein eigenes
-Spiel je Rechner und private Sitzungsspielstände. Native Raumcodes nutzen einen
-eingerichteten privaten Raumdienst; manuelle WebRTC-Browserkopplung bleibt verfügbar.
-Noch kein bestätigter Pokémon-Tausch;
-Internet-Verbindungen können STUN/TURN-Konfiguration benötigen.
-[Anleitung, Schutzmaßnahmen und Grenzen (DE/EN)](docs/ONLINE_LINK_HANDOFF.md).
-[Erster Windows↔Linux-Test über zwei Internetanschlüsse](docs/ONLINE_PLAYTEST_DE.md).
-
-Neu: **GBA-Pokémon-Gen3-Onlineprofil für Entwicklungstests** über denselben
-Windows-/Linux-Transport mit eigener Spielprotokoll-Anbindung. Nur exakt erkannte
-Originalfassungen und ausdrückliche Entwicklungsfreigabe; kein geprüfter Tauschrelease
-oder universelles GBA-Internetkabel. Beide Oberflächen können protokollierte
-Sitzungskopien prüfen und einen sauber beendeten Stand bewusst mit Sicherung übernehmen.
-[GBA-Anleitung, Spielstandschutz und offene Abnahme (DE/EN)](docs/GBA_ONLINE_HANDOFF.md).
-
-Windows-Entwicklungsupdate: Stereo/WASAPI, GPU-Ausgabe, State-Galerie und Fortsetzen,
-Controller-Quick-Deck, Spielprofile und IPS-/BPS-/UPS-Patch Lab.
-[Änderungen, Bedienung und Übergabe an die Linux-Entwicklung (DE/EN)](docs/WINDOWS_DEVELOPMENT_HANDOFF.md#deutsch).
-
-Linux-Nachtrag: zentrale Saves, Stereo, State-Galerie/Fortsetzen/Undo, Spielprofile,
-Favoriten/Spielzeit, Controller-Profile und Patch Lab. Neue Texteingabe, optionale
-GTK-Zugänglichkeit und abbrechbares Laden ergänzen den nativen Client.
-[Linux-Übergabe an die Windows-Entwicklung und den nächsten ChatGPT](docs/LINUX_DEVELOPMENT_HANDOFF.md).
-
-<p align="center">
-  <a href="README.md" lang="en">English</a> · <strong lang="de">Deutsch</strong>
-</p>
-
-<p align="center">
-  <strong>Drei Handhelds. Eine Oberfläche.</strong><br>
-  Game Boy · Game Boy Color · Game Boy Advance<br>
-  Ein Emulator in C# für Windows und natives Linux / Wayland.
-</p>
-
-<p align="center">
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Version-4.8.0--alpha.1-8B38FF?style=flat-square" alt="Version 4.8.0-alpha.1"></a>
-  <a href=".github/workflows/ci.yml"><img src="https://github.com/VoltexModz/AetherBoy/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="global.json"><img src="https://img.shields.io/badge/.NET-10-512BD4?style=flat-square" alt=".NET 10"></a>
-  <a href="docs/LINUX_WAYLAND.md"><img src="https://img.shields.io/badge/Linux-Wayland-29E2ED?style=flat-square" alt="Linux mit nativem Wayland"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/Lizenz-GPL--3.0--only-555555?style=flat-square" alt="Lizenz GPL-3.0-only"></a>
-</p>
-
-<p align="center">
-  <a href="#linux-build">Linux-Build</a> ·
-  <a href="#windows-build">Windows-Build</a> ·
-  <a href="#steuerung-unter-linux">Steuerung</a> ·
-  <a href="COMPATIBILITY.md">Kompatibilität</a> ·
-  <a href="#dokumentation">Dokumentation</a> ·
-  <a href="https://github.com/VoltexModz/AetherBoy/issues">Issues</a>
-</p>
+[Einstieg](#einstieg) · [Tests](#entwicklung-und-tests) ·
+[Dokumentation](#dokumentation-und-hilfe) · [Mitmachen](CONTRIBUTING.md)
 
 > [!IMPORTANT]
-> **AetherBoy ist eine Alpha-Version.** GB und GBC besitzen breite automatisierte Testabdeckung. GBA und das Linux-Frontend sind experimentell und benötigen weitere Spiel-, Audio- und Langzeittests. Ein erfolgreicher ROM-Start ist noch kein Nachweis vollständiger Spielbarkeit.
+> AetherBoy ist eine Alpha-Version. GBA und die Link-Funktionen bleiben
+> experimentell. Ein erfolgreicher Start oder Verbindungsaufbau bestätigt weder
+> die Spielkompatibilität noch einen erfolgreichen Pokémon-Tausch. ROMs,
+> BIOS-Abbilder sowie e-Reader-Firmware und Kartendateien werden nicht mitgeliefert.
 
-## Ein Blick auf AetherBoy
+## Funktionen
 
-Die Desktop-Oberfläche stellt das Spiel in den Mittelpunkt: **Spiel öffnen**, Pause, Speichern, Laden und Zurückspulen sind direkt erreichbar. Das gemeinsame Aether-Design nutzt schräg abgeschnittene Bedienelemente und Violett/Cyan als Standard-Akzente, mit dunklen und hellen Themes. Weitere Optionen liegen in den Einstellungen.
+- **Bibliothek und Steuerung:** `.gb`-, `.gbc`- und `.gba`-Dateien öffnen, Spiele
+  aus ZIP-/7z-Archiven importieren, Favoriten verwalten und Tastatur oder Gamepad
+  frei belegen. Der Sofa-Modus bietet eine controllerorientierte Bedienung.
+- **Spielstandschutz:** atomare Schreibvorgänge für Batterie-Spielstände,
+  Integritätsprüfungen, drei rotierende Sicherungen, fünf Save-State-Slots,
+  eine State-Galerie und Zurückspulen.
+- **Bild und Ton:** Skalierung mit korrektem Seitenverhältnis, die Filter Scharf,
+  Weich und LCD-Raster, Game-Boy-Farbpaletten und Stereo. Screenshots, WAV-Audio
+  oder AVI-Videos eines einzelnen Spiels mit Ton aufnehmen.
+- **Spielwerkzeuge:** IPS-/BPS-/UPS-Patches erzeugen getrennte ROM-Dateien.
+  Gemeinsame Decoder für Sitzungs-Cheats unterstützen die dokumentierten GB-/GBC-
+  und GBA-Formate. Grenzen stehen in der [Cheat-Übersicht](docs/CHEAT_SUPPORT.md).
+- **Anpassung:** sechs Themes, eigene Farben, Einstellungen je Spiel und
+  Deutsch oder Englisch als Anzeigesprache sowie optionale Discord-Aktivität.
+- **Portabler Speicher:** mit `--portable` oder der Markerdatei `aetherboy.portable`
+  die Anwendungsdaten neben der ausführbaren Datei ablegen.
+- **Entwicklungswerkzeuge:** Konformitätsprüfungen ohne Fenster, synthetische
+  Hardware-Regressionstests, Audio- und Core-Inspektoren sowie lokale Diagnoseberichte.
 
-Unter Darstellung stehen sechs Theme-Vorgaben sowie frei wählbare Akzent- und Hintergrundfarben bereit. Diese globalen UI-Farben bleiben von den Farbpaletten der Spiele getrennt.
+Beide Oberflächen verwenden dieselbe Emulations-Runtime. Windows nutzt WinForms
+mit eigenen Aether-Bedienelementen, NAudio und Direct2D; Linux nutzt SDL3 mit
+nativem Wayland. Der [Plattformvergleich](docs/PLATFORM_PARITY.md) beschreibt
+umgesetzte Werkzeuge und noch offene Prüfungen je Plattform.
 
-<p align="center">
-  <img src="docs/images/aetherboy-linux.png" alt="AetherBoy unter Linux: Hauptfenster mit ROM-Auswahl, Sessionleiste, fünf Save-Slots und direkten Spielaktionen" width="1000">
-  <br>
-  <sub>Frühere native Linux-Ansicht ohne geladene ROM. Aktuelle Builds enthalten zusätzlich das erneuerte Aether-Design und die Sprachauswahl.</sub>
-</p>
+![Aktuelle AetherBoy-Oberfläche unter Linux mit Seitennavigation und leerer Spielansicht](docs/images/aetherboy-linux-start-de.png)
+
+Native Linux-/Wayland-Oberfläche aus dem aktuellen Quellstand, ohne geladenes Spiel.
 
 <details>
-<summary><strong>Einstellungen ansehen</strong></summary>
+<summary>Aussehen und Grafikeinstellungen ansehen</summary>
 
-<p align="center">
-  <img src="docs/images/aetherboy-control-center.png" alt="AetherBoy-Einstellungen unter Linux: Videoseite mit Filtern, Frameskip und DMG-Paletten" width="1000">
-</p>
+![AetherBoy-Aussehen mit sechs Theme-Vorschauen und eigenen Farben](docs/images/aetherboy-linux-appearance-de.png)
 
-Neun Bereiche bündeln Übersicht, Video, Audio, Steuerung, Spielstände, System, Diagnose, Bibliothek und Werkzeuge. Die Aufnahme zeigt die Video-Einstellungen des Linux-Clients.
+![AetherBoy-Grafikeinstellungen mit gemeinsamer Navigation und Bildfiltern](docs/images/aetherboy-linux-graphics-de.png)
 
 </details>
 
-<details>
-<summary><strong>Oberflächenfarben anpassen</strong></summary>
-
-<p align="center">
-  <img src="docs/images/aetherboy-appearance.png" alt="AetherBoy-Einstellungen unter Linux mit anpassbarem violettem und cyanfarbenem Akzent sowie dunklem Hintergrund" width="1000">
-</p>
-
-</details>
-
-## Was AetherBoy mitbringt
-
-| Bereich | Funktionen |
-| --- | --- |
-| **Drei Systeme** | `.gb`, `.gbc` und experimentell `.gba` im selben Frontend; GBA mit optionalem BIOS und eingebautem HLE-Fallback. |
-| **Bild und Audio** | Sharp, Smooth und LCD Grid, DMG-Paletten, Frameskip und Audioausgabe; GBA mit PSG und Direct Sound. |
-| **Spielsteuerung** | Tastatur und Gamepad, Pause, Turbo, Vollbild und ROM-Drag-and-drop. |
-| **Speichern und Zurückspulen** | Batterie-Spielstände, fünf Save-State-Slots und Rewind für GB, GBC und GBA. |
-| **Save-Schutz** | Atomare `.sav`-Schreibvorgänge, Integritätsprüfung und drei rotierende Backups. |
-| **Lokale Einstellungen** | Persistente Display-, Audio- und Eingabeoptionen im Control Center. |
-| **Bibliothek und Sofa-Modus** | Favoriten, Tags, Bewertungen, Spielzeit und controllerorientierte Vollbildnavigation. |
-| **Aufnahmen und Archive** | Screenshots, WAV-Audio, Einzelspiel-AVI mit Ton sowie ZIP-/7z-ROM-Import mit Spielauswahl. |
-| **Patches** | IPS/BPS/UPS mit ausdrücklichem Patchen und Starten; Ergebnisse bleiben separat gespeicherte ROMs. Keine automatische Anwendung benachbarter Patches. |
-| **Sitzungs-Cheats** | Gemeinsame GB-/GBC-/GBA-Decoder; [Formate und Grenzen](docs/CHEAT_SUPPORT.md). |
-| **Anpassung** | Deutsch/Englisch, sechs Themes, eigene Farben, einstellbares Spielstart-Intro und optionale Discord-Aktivität. |
-| **Portabler Speicher** | `--portable` oder `aetherboy.portable` speichert beim Programm; keine automatische Profilübernahme. |
-| **Barcode Boy** | Gemeinsame Zubehör-Implementierung und manuelle Barcode-Eingabe; Prüfung mit unterstütztem Spiel noch offen. |
-
-### Windows und Linux im Vergleich
-
-Beide Frontends verwenden denselben plattformneutralen Core und dieselbe Runtime. Entsprechende Werkzeuge sind implementiert; Plattformintegration und Abnahme auf echten Geräten bleiben getrennt:
-
-| | Windows | Linux |
-| --- | --- | --- |
-| **Frontend** | Windows Forms | SDL3, natives Wayland |
-| **Aether-Oberfläche und Control Center** | Vorhanden | Vorhanden, an Kachel- und Breitbildfenster angepasst |
-| **ROM öffnen** | Dateidialog und Drag-and-drop | XDG Desktop Portal, Dateipfad und Drag-and-drop |
-| **Tastatur / Gamepad** | Beide, mit Belegungseinstellungen | Beide frei belegbar; Controller-Profile und Deadzone |
-| **Batterie-Saves, fünf State-Slots, Rewind** | Vorhanden | Vorhanden |
-| **Cartridge Vault, Cheat-Verwaltung, Save Safety Center** | Vorhanden, teils experimentell | Linux-Bibliothek, Sitzungs-Cheats und Backup-Wiederherstellung vorhanden |
-| **WAV-Aufnahme und Boot-ROM-Auswahl** | Vorhanden | Unter Tools / System vorhanden |
-| **State-Galerie/Fortsetzen und Spielprofile** | Vorhanden | Jetzt vorhanden, einschließlich Lade-Undo und globaler Profilvererbung |
-| **Native Screenshots / Performance** | Gemeinsame Runtime-Dienste | F12 / F9 und Tools; native Bedienprobe für den vereinten Stand noch offen |
-| **Schnellmenü / Audio Inspector** | Vorhanden | In der nativen Oberfläche vorhanden |
-| **IPS-/BPS-/UPS-Patch Lab** | Integriert; UPS-Rückpatchen ausdrücklich wählbar | Unter Library → Patch Lab; ausdrückliches UPS-Rückpatchen |
-| **Stereo-Ausgabe** | GB/GBC/GBA durchgängig | GB/GBC/GBA durchgängig |
-| **Lokales GB/GBC/GBA-Link-Kabel** | Experimentelles Zwei-Spieler-Lab | Native Zwei-Spieler-Oberfläche; dieselbe Runtime und Hardwarefamilien-Grenzen |
-| **Sprache / Themes / Sofa / AVI / Archive** | Implementiert | Implementiert; weitere native Desktop-Abnahme erforderlich |
-
-Die genaue Zuordnung steht in [Windows → Linux: UI-Stand](docs/LINUX_UI_PARITY.md).
-
-## Linux-Build
-
-**Neu: ein eigener nativer Linux-Client mit SDL3 und Wayland**, einschließlich Hyprland-Profil, Audio, Gamepads, Control Center und Installation ins App-Menü. Die Build-Skripte erkennen **x86-64** und **ARM64** automatisch.
+## Einstieg
 
 ### Voraussetzungen
 
-- Linux mit einer **nativen Wayland-Sitzung** und funktionierendem Grafiktreiber.
-- **.NET SDK 10.0.302** oder ein neuerer Patch derselben `10.0.3xx`-Feature-Band, entsprechend [`global.json`](global.json).
-- Die üblichen .NET-Systembibliotheken einschließlich ICU sowie PipeWire-, PulseAudio- oder ALSA-Clientbibliotheken für Audio.
-- Ein passendes **XDG Desktop Portal** für den Dateidialog. Unter Hyprland: `xdg-desktop-portal-hyprland` plus GTK- oder KDE-Portal für die Dateiauswahl.
+- **Git** und **.NET SDK 10.0.302** oder ein neuerer Patch innerhalb des
+  `10.0.3xx`-Featurebands. [global.json](global.json) legt das zulässige SDK fest.
+  Prüfe deine Version mit `dotnet --version` im Repository-Verzeichnis.
+- **Windows:** Windows 10 ab Version 2004 (Build 19041), einschließlich Windows 11.
+- **Linux:** x86-64 oder ARM64, glibc **2.38+**, eine native Wayland-Sitzung und
+  funktionierende Grafiktreiber. Die bereitgestellten Linux-Builds unterstützen
+  weder X11/XWayland noch musl-basierte Distributionen.
+- **Linux-Buildwerkzeuge:** CMake, eine C-/C++-Toolchain, Make und
+  OpenSSL-Entwicklungsdateien. Das Buildskript lädt eine festgelegte Revision von
+  `libdatachannel` herunter und baut sie. Unter Ubuntu 24.04 installierst du die
+  Werkzeuge mit:
 
-SDL3, Logo und Schriften werden über das Projekt mitgeliefert. Der Linux-Client setzt natives Wayland voraus; **X11 und XWayland werden nicht unterstützt**. Hyprland, KDE Plasma und GNOME werden separat erkannt.
+  ```bash
+  sudo apt-get update
+  sudo apt-get install cmake build-essential libssl-dev
+  ```
 
-### Bauen und starten
+- **Linux-Laufzeitbibliotheken:** die üblichen .NET-Abhängigkeiten einschließlich
+  ICU und OpenSSL, Wayland-Clientbibliotheken sowie PipeWire, PulseAudio oder ALSA
+  für die Tonausgabe. Die Dateiauswahl benötigt ein XDG Desktop Portal mit einem
+  Dateiauswahl-Backend. Siehe [Wayland-Einrichtung](docs/LINUX_WAYLAND.md) und
+  [Distributionsanforderungen](docs/LINUX_DISTRIBUTION.md#host-requirements-and-limits).
 
-Der aktuelle Entwicklungsstand liegt auf dem Branch `development`:
+SDL3 und die Oberflächenressourcen werden über das Projekt bereitgestellt. Der
+erste Build benötigt Internetzugriff für NuGet-Pakete und unter Linux zusätzlich
+für die Quellen der nativen Abhängigkeit. Node.js 24 wird für den optionalen
+Raumdienst sowie Netzwerk- und Browsertests verwendet; Python 3 für Prüf- und
+Paketierungsskripte im Repository.
+
+### Quellcode holen
 
 ```bash
 git clone --branch development https://github.com/VoltexModz/AetherBoy.git
 cd AetherBoy
+```
+
+Führe die folgenden Befehle aus diesem Verzeichnis aus. Die historischen
+`nanoboy`-Namen für Projekt und Solution bleiben in den Buildpfaden erhalten.
+
+### Linux-Build
+
+```bash
 bash scripts/build-linux.sh
 bash scripts/run-linux.sh
 ```
 
-Danach eine `.gb`-, `.gbc`- oder `.gba`-Datei über **Spiel öffnen**, die Taste **O** oder Drag-and-drop öffnen. ZIP-/7z-Archive werden unterstützt; bei mehreren Spielen erscheint eine Auswahl. Importierte Spiele bleiben als separate ROMs gespeichert. Eine ROM lässt sich auch direkt übergeben:
+Der Build wählt `linux-x64` oder `linux-arm64` und legt das Ergebnis unter
+`artifacts/AetherBoy-<runtime>/` ab, etwa `artifacts/AetherBoy-linux-x64/`.
+Zum Start wird die installierte .NET-10-Runtime benötigt; sie ist im SDK enthalten.
+`run-linux.sh` baut automatisch neu, wenn die Ausgabe fehlt oder älter als die
+Quelldateien ist.
+
+Ein Spiel direkt öffnen:
 
 ```bash
-bash scripts/run-linux.sh "/pfad/zu/deinem-spiel.gba"
+bash scripts/run-linux.sh "/path/to/game.gbc"
 ```
 
-| Architektur | Build-Ausgabe |
-| --- | --- |
-| x86-64 | `artifacts/AetherBoy-linux-x64/` |
-| ARM64 | `artifacts/AetherBoy-linux-arm64/` |
-
-Der Build benötigt auch beim Ausführen eine installierte **.NET-10-Runtime**; sie wird nicht in die Ausgabe eingebettet. Das SDK bringt die Runtime bereits mit. `run-linux.sh` baut automatisch neu, wenn der Build fehlt oder älter als die Quelldateien ist.
-
-### Im App-Menü installieren
-
-Nach dem Build kann AetherBoy ohne Root-Rechte für den aktuellen Benutzer installiert werden:
+Die gebaute Anwendung mit Menüeintrag für den aktuellen Benutzer installieren:
 
 ```bash
 bash scripts/install-linux-user.sh
-aetherboy "/pfad/zu/deinem-spiel.gbc"
+aetherboy "/path/to/game.gbc"
 ```
 
-Die Programmdateien liegen standardmäßig unter `~/.local/share/aetherboy/program`, der Starter unter `~/.local/bin/aetherboy`. Das Skript installiert außerdem den Desktop-Eintrag und die Icons. Für den Terminalaufruf muss `~/.local/bin` im `PATH` liegen. Der installierte Starter kennt auch den beim Installieren erkannten Runtime-Pfad. Updates bereiten einen neuen Release-Ordner vor dem Umschalten vor.
+Für den Befehl `aetherboy` muss `~/.local/bin` im `PATH` liegen. Die Installation
+verwendet standardmäßig `~/.local/share/aetherboy/program` und benötigt keine
+Root-Rechte. Steuerung und Desktop-Einrichtung stehen im
+[Linux-Benutzerhandbuch](docs/LINUX_USER_GUIDE.md).
 
-<details>
-<summary><strong>Wayland prüfen und Startprobleme eingrenzen</strong></summary>
+### Windows-Build
 
-```bash
-echo "$XDG_SESSION_TYPE"
-echo "$WAYLAND_DISPLAY"
-dotnet --version
-```
-
-`WAYLAND_DISPLAY` muss gesetzt sein; eine als `x11` gemeldete Sitzung wird abgelehnt.
-
-Desktop-Erkennung ohne Fenster prüfen:
-
-```bash
-dotnet run --project frontends/AetherBoy.Desktop/AetherBoy.Desktop.csproj -- --platform-info
-```
-
-Wayland und das Standard-Audiogerät gemeinsam prüfen:
-
-```bash
-bash scripts/run-linux.sh --audio-info
-```
-
-Falls unter Hyprland kein Dateidialog erscheint, die [Portal-Konfiguration](docs/LINUX_WAYLAND.md#hyprland-profil) prüfen. Weitere Hilfe gibt es im [Linux User Guide](docs/LINUX_USER_GUIDE.md#7-troubleshooting).
-
-</details>
-
-**Weiterlesen:** [Linux / Wayland / Hyprland (Deutsch)](docs/LINUX_WAYLAND.md) · [Linux User Guide (English)](docs/LINUX_USER_GUIDE.md)
-
-## Windows-Build
-
-Benötigt werden Windows und dasselbe **.NET SDK 10.0.302** beziehungsweise ein neuerer Patch der `10.0.3xx`-Feature-Band. Audio benötigt ein funktionierendes Windows-Ausgabegerät; WASAPI und WinMM stehen zur Verfügung.
-
-Im Repository-Verzeichnis mit PowerShell ausführen:
+Unter Windows in PowerShell ausführen:
 
 ```powershell
 dotnet restore ./nanoboy.sln --locked-mode --configfile ./NuGet.config
@@ -283,123 +149,132 @@ dotnet build ./nanoboy.sln -c Release --no-restore
 dotnet run --project ./nanoboy/nanoboy.csproj -c Release --no-build
 ```
 
-### Windows: lokale Daten und Entwicklungsdiagnose
+Ein Spiel beim Start öffnen:
 
-Die normale Anwendung ist standardmäßig ein Development-Build, auch bei
-`-c Release`. Sie zeichnet lokale Sitzungsberichte automatisch auf. Es gibt
-keine separate Tester-Anwendung und keinen erforderlichen Startschalter.
-Der Buildkanal steht in der EXE; Git wird auf dem Rechner des Spielers nicht benötigt.
-Für spätere stabile Veröffentlichungen kann beim Bauen/Publishen
-`-p:AetherBoyChannel=stable` gesetzt werden; dann ist die Sitzungsaufzeichnung
-standardmäßig aus. `--tester-mode` bleibt als optionaler Diagnoseschalter kompatibel.
+```powershell
+dotnet run --project ./nanoboy/nanoboy.csproj -c Release --no-build -- "C:\Games\game.gbc"
+```
 
-Alle verwalteten Windows-Daten liegen unter `%LOCALAPPDATA%\AetherBoy`:
+### Erste Schritte
 
-| Unterordner | Inhalt |
+1. Wähle **Spiel öffnen** oder ziehe eine ROM ins Fenster. Bei ZIP-/7z-Archiven mit
+   mehreren Spielen erscheint eine Spielauswahl.
+2. Passe Tastatur, Controller und Ton in den **Einstellungen** an. Suche nach
+   **Sprache**, um Deutsch, Englisch oder Systemsprache auszuwählen, und starte
+   die Anwendung anschließend neu. Die Systemauswahl verwendet bei deutschen
+   Systemsprachen Deutsch, sonst Englisch.
+3. Speichere im Spiel für einen Batterie-Spielstand oder nutze einen Save-State-Slot
+   für den genauen Emulationszustand. Save States sind an ROM, Hardwaremodell und
+   gegebenenfalls BIOS gebunden; ältere inkompatible Formate werden abgewiesen.
+
+Unter Linux gelten standardmäßig die Pfeiltasten, **Z/X** für A/B (**Y/X** auf
+deutschen Tastaturen), **Enter/Backspace** für Start/Select und **Q/E** für GBA L/R.
+**F5/F8** speichern beziehungsweise laden den gewählten Slot, **F7** spult zurück
+und **F11** wechselt ins Vollbild. Spieltasten verwenden physische Tastenpositionen;
+siehe [alle Linux-Tastenkürzel](docs/LINUX_USER_GUIDE.md#5-controls).
+
+### Spielstände und Firmware
+
+| Daten | Standardpfad |
 | --- | --- |
-| `Roms/<SHA-256>/` | Lokale Kopie jeder geöffneten ROM, mit lesbarem Dateinamen |
-| `Saves/<SHA-256>/` | `game.sav`, RTC, Integritätsdateien und rotierende Backups |
-| `States/<SHA-256>/` | `game.ss1`–`game.ss5`, `game.resume`, Vorschauen und vorherige States als Backup |
-| `Settings/` | `settings.json`, Sicherung, ROM-Verlauf und `Profiles/<SHA-256>.json` |
-| `Library/` | Titel, Favoriten, Spielzeit und Vorschaumetadaten je ROM |
-| `Screenshots/<SHA-256>/` | Manuell aufgenommene Spielbild-PNGs in nativer Auflösung |
-| `Firmware/` | Optional selbst bereitgestellte Boot-ROMs/BIOS |
-| `Recordings/` | Audio- und Gameplay-Aufnahmen |
-| `development/Sessions/` | Diagnoseberichte pro Programmstart |
-| `development/Crashes/` | Crashlogs der Development-Builds |
+| Windows-Anwendungsdaten | `%LOCALAPPDATA%\AetherBoy`, unter anderem mit `Saves`, `States` und `Settings` |
+| Linux-Spiele und Spielstände | `$XDG_DATA_HOME/aetherboy`, normalerweise `~/.local/share/aetherboy` |
+| Linux-Einstellungen | `$XDG_CONFIG_HOME/aetherboy`, normalerweise `~/.config/aetherboy` |
+| Linux-Diagnose und Cache | `$XDG_STATE_HOME/aetherboy` und `$XDG_CACHE_HOME/aetherboy` |
 
-Die ROM-Bibliothek bietet **ROM-Ordner öffnen**, das **Control Center → Ordner**
-zusätzlich Zugriff auf die übrigen Daten. Beim Öffnen einer externen ROM wird sie
-kopiert; das Original bleibt erhalten. Gleiche Inhalte werden wiederverwendet,
-unterschiedliche ROM-Hacks erhalten getrennte Saves. Auch ältere importierte
-Spiele bleiben in der Bibliothek auffindbar, unabhängig vom begrenzten Verlauf.
+Der portable Modus verwendet `AetherBoyData` neben der Anwendung. Er benötigt
+einen beschreibbaren Programmordner und übernimmt vorhandene Profile nicht
+automatisch. Windows und Linux verwenden unterschiedliche Ordnerstrukturen;
+lies vor einem Umzug die [Anleitung zum portablen Modus](docs/PORTABLE_MODE.md).
 
-Beim ersten Import werden vorhandene ROM-nahe `.sav`-, RTC-, Backup-, Guard- und
-`.ss1`–`.ss5`-Dateien mit übernommen. Bereits vorhandene zentrale Save-/State-Ordner
-haben Vorrang; ein erneuter Import überschreibt sie nicht. Alte Dateien werden
-nicht gelöscht. Einstellungen werden beim ersten Zugriff aus dem bisherigen
-WinForms-Speicherort übernommen. Beschädigte zentrale Einstellungen können aus
-der letzten lesbaren Sicherung geladen werden. Stabile Builds speichern Crashlogs
-unter `Crashes/`; vorhandene ältere `Logs/` und `TesterSessions/` bleiben erhalten.
+Ohne bereitgestelltes BIOS verwendet GBA den eingebauten High-Level-BIOS-Ersatz.
+Ein optionales eigenes GBA-BIOS muss genau 16 KiB groß sein. Firmware lässt sich
+über die Einstellungen importieren. Die e-Reader-Kartenbibliothek benötigt
+zusätzlich eigene passende e-Reader-Firmware und Kartendateien.
 
-Diagnoseberichte enthalten Buildidentität, ROM-Header/Hash, Frame-Fortschritt,
-Controllerwechsel und Save-State-/Rewind-Ergebnisse. Sie enthalten keine ROM-Dateien,
-ROM-Pfade oder Save-Inhalte. Es gibt keinen Upload. Unter **Diagnostics** kann der
-aktive Bericht manuell als ZIP exportiert werden. Ein fortschreitender Framezähler
-beweist noch keine korrekte Spielgrafik und ersetzt keinen Spieltest.
+### Distributionspakete erstellen
 
-Für die Weitergabe per USB den vollständigen Publish-Ordner kopieren. Die EXE
-und ihre Abhängigkeiten gehören zusammen; persönliche Spieldaten bleiben auf
-dem jeweiligen Rechner. [`--portable` oder die Markerdatei](docs/PORTABLE_MODE.md)
-speichert neue Daten stattdessen beim Programm; vorhandene Profile werden nicht
-automatisch übernommen. Der weitere Ausbau steht im [Windows-Plan](docs/WINDOWS_ROADMAP.md).
+Diese Skripte bündeln die .NET-Runtime, den zugehörigen Quellcode und Lizenzhinweise:
 
-Die historischen Datei- und Ordnernamen `nanoboy` bleiben im Quellbaum erhalten; das Produkt heißt **AetherBoy**.
+```bash
+# Linux: verwendet die Hostarchitektur; benötigt Python 3.12+, GNU tar und gzip.
+bash scripts/package-linux.sh
+```
 
-## Steuerung unter Linux
+```powershell
+# Windows x64: unter Windows ausführen.
+./scripts/package-windows.ps1
+```
 
-Die wichtigsten Standardbelegungen; Spieltasten lassen sich unter **Control Center → Input** ändern.
+Linux-Archive landen unter `artifacts/packages/`, Windows-Pakete unter
+`artifacts/windows-packages/`. Entpacke ein Paket und starte `launch-linux.sh`
+beziehungsweise `AetherBoy.exe`; alle mitgelieferten Dateien müssen zusammenbleiben.
+Linux benötigt weiterhin die oben genannten Systembibliotheken und eine
+Wayland-Sitzung. Prüfsummen und Paketierungsoptionen beschreibt die
+[Linux-Distributionsanleitung](docs/LINUX_DISTRIBUTION.md).
 
-| Aktion | Tastatur | Gamepad |
-| --- | --- | --- |
-| Steuerkreuz | Pfeiltasten | D-Pad oder linker Stick |
-| A / B | Z / X auf US-Layouts, **Y / X auf deutschen Layouts** | Untere / rechte Aktionstaste |
-| Start / Select | Enter / Rücktaste | Start / Back |
-| GBA L / R | Q / E | Linke / rechte Schultertaste |
-| ROM öffnen / Control Center | O / C | — |
-| Pause / Turbo halten | Leertaste / Tab | — |
-| Save-State-Slot auswählen | 1–5 | — |
-| Schnellspeichern / Schnellladen | F5 / F8 | — |
-| Einen Rewind-Schritt zurück | F7 | — |
-| Vollbild | F11 | — |
-| Einstellungen schließen / Vollbild verlassen | Escape | — |
+## Kompatibilität und Grenzen
 
-Die A/B-Vorgaben beziehen sich auf die physischen Tastenpositionen. AetherBoy zeigt die Belegung passend zum aktuellen Tastaturlayout an. Alle Shortcuts und die Tastaturnavigation stehen im [Linux User Guide](docs/LINUX_USER_GUIDE.md#5-controls).
+- **GB/GBC:** verbreitete MBC1-/MBC1M-/MBC2-/MBC3-/MBC5-Cartridges sind implementiert,
+  einschließlich MBC3-Echtzeituhr. Einzelne Timing-Eigenschaften und ungewöhnliche
+  Cartridge-Hardware bleiben unvollständig. [COMPATIBILITY.md](COMPATIBILITY.md)
+  dokumentiert die geprüfte Konformitätsmatrix, keine allgemeine Spielkompatibilitätsquote.
+- **GBA:** die Anwendung verwendet einen gepflegten Quellcode-Fork des
+  MIT-lizenzierten [GBADotnet-Kerns](third_party/GBADotnet.Core/README.md).
+  Timing, Sonderfälle der Bildausgabe und breitere Spieltests bleiben offen;
+  siehe [GBA.md](GBA.md).
+- **Local Link Lab:** zwei GB-/GBC-Spiele oder zwei GBA-Spiele laufen in einer
+  lokalen Sitzung mit getrennten Spielständen. Die Kompatibilität mit
+  kommerziellen Spielen ist noch nicht bestätigt. GBA kann nicht mit GB/GBC
+  verbunden werden. Siehe [Local Link Lab](docs/LOCAL_LINK_LAB.md).
+- **Online Link:** GB-/GBC-Verbindungen und ein begrenztes GBA-Pokémon-Gen3-Profil
+  stehen für Entwicklungstests bereit. Sitzungen nutzen private Spielstandkopien;
+  eine Verbindung bestätigt keinen Tausch. Allgemeiner GBA-Netzwerkmehrspieler,
+  Wireless, Joybus und Vier-Spieler-Link sind nicht verfügbar. Siehe
+  [GB-/GBC-Anleitung](docs/ONLINE_LINK_HANDOFF.md) und
+  [GBA-Gen3-Anleitung](docs/GBA_ONLINE_HANDOFF.md).
 
-Prioritäten, unabhängige Kritik und reproduzierbare Tests: [Linux-Roadmap](docs/LINUX_ROADMAP.md), [Kritik Runde 3](docs/LINUX_CRITIQUE_ROUND3.md), [Playtest Runde 3](docs/LINUX_PLAYTEST_ROUND3.md), [Fixliste](docs/LINUX_FIX_LOG.md). Pakete mit eingebetteter .NET-Runtime: [Linux-Distribution](docs/LINUX_DISTRIBUTION.md). Das optionale zugängliche Control Center öffnet mit Ctrl+F7; F7 bleibt Rewind.
+Native Raumcodes benötigen einen eingerichteten privaten Signalisierungsdienst
+und Relay-Zugangsdaten. Die manuelle WebRTC-Verbindung mit Browserunterstützung
+bleibt verfügbar. Für Arbeiten an Raumverbindungen helfen die
+[Raumdienst-README](services/online-rooms/README.md) und
+[Verbindungsdiagnose](docs/ONLINE_CONNECTION_DIAGNOSTICS.md). Normale lokale
+Emulation benötigt keinen Dienst.
 
-## Spielstände und BIOS
+## Projektstruktur
 
-- **Batterie-Spielstände:** Unter Windows zentral in `AetherBoy\Saves`; unter Linux in `$XDG_DATA_HOME/aetherboy/saves/<ROM-SHA256>`. `.bak1` bis `.bak3` und `.guard`-Dateien schützen die Spielstände. Nur das jeweilige Save-Verzeichnis muss beschreibbar sein.
-- **Save States:** fünf Slots von `.ss1` bis `.ss5`, gebunden an die exakte ROM, das Hardwaremodell und gegebenenfalls das BIOS. Inkompatible Zustandsversionen werden abgelehnt; eine automatische Migration älterer Schemata ist noch nicht vorhanden.
-- **Rewind:** ein sitzungsgebundener Puffer mit bis zu etwa zehn Sekunden Historie; für GBA zusätzlich durch ein Speicherbudget begrenzt.
-- **Linux-Einstellungen:** unter `$XDG_CONFIG_HOME/aetherboy/settings.json`, normalerweise `~/.config/aetherboy/settings.json`.
-- **GBA-BIOS:** ohne eigene Firmware greift der eingebaute HLE-Fallback. Der Kern unterstützt optional ein exakt 16 KiB großes `gba_bios.bin`; der Import erfolgt unter **Settings → System → Import boot ROM / BIOS**.
+| Pfad | Aufgabe |
+| --- | --- |
+| [nanoboy/Core](nanoboy/Core) | Plattformneutrale GB-/GBC-Emulation, Speicherverträge und gemeinsame Grundlagen; `Advance/` enthält einen eigenständigen GBA-Prototyp. |
+| [nanoboy/Runtime](nanoboy/Runtime) | Sitzungsverwaltung, Befehle und Snapshots, GBA-Anbindung, Aufnahmen, Cheats, Lokalisierung und Link-Transporte. |
+| [nanoboy](nanoboy) | Windows-WinForms-Oberfläche, eigene Aether-Bedienelemente und Windows-Plattformdienste. |
+| [frontends/AetherBoy.Desktop](frontends/AetherBoy.Desktop) | Linux-SDL3-/Wayland-Oberfläche und Desktop-Integration. |
+| [third_party](third_party) | Eingebundener GBADotnet-Quellcode sowie Lizenz- und Herkunftsnachweise für Abhängigkeiten. |
+| [tests](tests) | Tests für Core, Runtime, Linux-Oberfläche, Windows-Smoke-/UI-Tests und Browsertests. |
+| [tools](tools) | Konformitätsrunner, GBA-, Verbindungs- und Leerlaufproben sowie UI-Migrationshilfen. |
+| [services/online-rooms](services/online-rooms) | Optionaler privater Signalisierungsdienst mit Node.js ohne zusätzliche Paketabhängigkeiten. |
+| [scripts](scripts) und [packaging](packaging) | Werkzeuge für Build, Installation, Distribution und isolierte UI-Tests. |
+| [docs](docs) und [branding](branding) | Benutzer- und Entwickleranleitungen, Prüfberichte und gemeinsame Grafikressourcen. |
 
-ROMs und Boot-ROMs werden nicht mitgeliefert und sind zum Bauen nicht erforderlich.
+Eine `EmulationSession` verwaltet den veränderlichen Emulationszustand auf einem
+eigenen Thread. Die Oberflächen senden typisierte Befehle und lesen Snapshots
+sowie synchronisierte Bild- und Audiodaten. Plattform-APIs gehören in die
+Frontend-Schicht. Der eigenständige Prototyp unter `Core/Advance` ist vom
+GBADotnet-basierten GBA-Backend der Anwendung getrennt.
 
-Neue GB/GBC-States enthalten Stereo-Audiohistorie: Neue Builds lesen alte Mono-States,
-ältere Builds jedoch nicht die neue Erweiterung. Batterie-Saves und GBA-State-Formate
-bleiben in diesem Update unverändert. [Kompatibilitätsdetails](docs/WINDOWS_DEVELOPMENT_HANDOFF.md#deutsch).
-
-## Kompatibilität und offene Arbeit
-
-**GB / GBC:** MBC1, MBC1M, MBC2, MBC3 mit RTC und MBC5 sind implementiert. Die ausgewählten Blargg-Soundsuiten bestehen laut dokumentierter Matrix auf DMG und CGB jeweils 12/12 Tests. Das ersetzt keinen Durchspieltest und ist keine pauschale Kompatibilitätsquote. Spezialmapper wie MMM01, MBC4, Pocket Camera und HuC1/HuC3 werden abgelehnt; exakte Pixel-FIFO- und einzelne Timing-Effekte bleiben offen.
-
-**GBA:** Ein vendorter, MIT-lizenzierter [GBADotnet-Kern](third_party/GBADotnet.Core/README.md) ist an Bild, Eingabe, Audio, SRAM/Flash/EEPROM/RTC, Save States und Rewind angebunden. Vollständig zyklusgenaues Timing, weitere Renderer-Grenzfälle und breitere Praxistests stehen noch aus.
-
-**Sitzungs-Cheats:** Die [Support-Matrix](docs/CHEAT_SUPPORT.md) beschreibt GB-/GBC-GameShark-`01`-Schreibcodes, CodeBreaker, Rohadressen und Game Genie mit sechs/neun Zeichen. GBA unterstützt CodeBreaker-Masterstreams, GameShark v1/v2 und Action Replay v3 samt Bedingungen, Füllbefehlen, Hooks, indirekten Schreibzugriffen und reversiblen ROM-Änderungen im Speicher. Beide Oberflächen verwenden dieselben Decoder, Formatwahl und virtuelle Gerätetaste. Sets werden nicht dauerhaft gespeichert; passende Spielversion und erforderliche Mastercodes liegen beim Nutzer. Einzelne Spezialbefehle und GB-Bankwechselvarianten fehlen weiterhin. Erfolgreiches Einlesen beweist keine korrekte Wirkung im Spiel.
-
-**Weitere Grenzen:** Das experimentelle [Local Link Lab für GB/GBC/GBA](docs/LOCAL_LINK_LAB.md) unter Windows/Linux ist noch nicht mit kommerziellen Spielen validiert. Separate [GB/GBC-Online-Link](docs/ONLINE_LINK_HANDOFF.md)- und [GBA-Pokémon-Gen3-Onlineprofile](docs/GBA_ONLINE_HANDOFF.md) sind Entwicklungstests, kein bestätigter Pokémon-Tauschrelease. Universelles GBA-Netzwerk, GBA-Wireless, Joybus und Vier-Spieler-Link fehlen; GBA lässt sich nicht mit GB/GBC koppeln. Der Debugger bleibt experimentell.
-
-Details und reproduzierbare Ergebnisse: [Kompatibilitätsmatrix](COMPATIBILITY.md) · [GBA-Status](GBA.md) · [Projektstatus](docs/PROJECT_STATUS_DE.md).
+Abhängigkeiten stehen in den Projektdateien; die aufgelösten Versionen sind in
+den eingecheckten `packages.lock.json`-Dateien festgehalten.
+[Directory.Build.props](Directory.Build.props) definiert die gemeinsame Version
+und Buildregeln; [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) dokumentiert die
+Herkunft der Abhängigkeiten.
 
 ## Entwicklung und Tests
 
-Die Lösung trennt **Core**, **Runtime** und **Desktop-Frontends**. Der Emulationszustand gehört einem dedizierten Owner-Thread; die Oberflächen kommunizieren über typisierte Befehle und unveränderliche Snapshots. NuGet-Lockfiles und das gepinnte SDK halten den Build reproduzierbar.
+Die Tests verwenden MSTest mit **Microsoft.Testing.Platform**, ausgewählt durch
+`global.json`. Verwende die unten gezeigte Form mit `--project` oder `--solution`.
 
-Die [GitHub-Actions-CI](.github/workflows/ci.yml) baut und testet die Lösung auf Windows sowie Core, Runtime und den nativen Desktop-Host auf Linux. Pushes auf `main` und `development` werden geprüft; der Workflow sichert Mindest-Testzahlen ab. Die Linux-CI prüft Frontend-Logik und Plattform-Erkennung, anschließend native UI und Zugänglichkeit in isoliertem Weston/D-Bus. Echte Hardware- und Spieltests bleiben getrennte Abnahmen.
-
-<details>
-<summary><strong>Testbefehle und Entwicklungswerkzeuge</strong></summary>
-
-Gesamte Lösung auf Windows testen, nach dem oben beschriebenen Build:
-
-```powershell
-dotnet test --solution ./nanoboy.sln -c Release --no-build --no-restore
-```
-
-Plattformneutrale Tests und Linux-Frontend-Tests:
+Führe unter Linux die plattformneutralen Tests einzeln aus; die vollständige
+Solution enthält auch reine Windows-Projekte:
 
 ```bash
 dotnet test --project tests/AetherBoy.CoreTests/AetherBoy.CoreTests.csproj -c Release
@@ -407,53 +282,90 @@ dotnet test --project tests/AetherBoy.RuntimeTests/AetherBoy.RuntimeTests.csproj
 dotnet test --project tests/AetherBoy.DesktopTests/AetherBoy.DesktopTests.csproj -c Release
 ```
 
-Zusätzlicher nativer UI-Test innerhalb einer Wayland-Sitzung:
+Unter Windows nach dem oben beschriebenen Solution-Build:
 
-```bash
-AETHERBOY_UI_TESTS=1 dotnet test --project tests/AetherBoy.DesktopTests
+```powershell
+dotnet test --solution ./nanoboy.sln -c Release --no-build --no-restore
 ```
 
-Eigene lokale GB-/GBC-Conformance-ROMs ausführen:
+Browserbrücke und Raumdienst mit Node.js testen; `npm install` ist nicht nötig:
 
 ```bash
-dotnet run --project tools/AetherBoy.Conformance/AetherBoy.Conformance.csproj -c Release -- \
-  "/pfad/zur/testsuite" --max-frames 600 --json ./artifacts/conformance.json
+node --test tests/browser/WebRtcBridge.test.cjs services/online-rooms/server.test.mjs
 ```
 
-Die CLI unterstützt einzelne ROMs, Verzeichnisse und ein [JSON-Manifest](tools/AetherBoy.Conformance/compatibility.example.json). Test-ROMs sind nicht enthalten. Exitcode `0` bedeutet bestandene Pflichtläufe, `1` einen blockierenden Fehler oder Timeout und `2` einen Aufruffehler.
+Hardwareabhängige Tests müssen ausdrücklich aktiviert werden. Setze
+`AETHERBOY_TEST_NATIVE_ONLINE=1`, um nach dem Bau der nativen Bibliothek die
+nativen Online-Transporttests einzuschließen; diese benötigen ebenfalls Node.js.
+Für isolierte Linux-UI- und Barrierefreiheitstests baust du zunächst das oben
+gezeigte Desktop-Testprojekt und startest dann:
 
-Den separaten ARM/Thumb/Mode-3-Prototyp mit einem generierten Testprogramm prüfen:
+```bash
+bash scripts/test-linux-headless.sh
+```
+
+Das Headless-Skript startet einen eigenen Weston-Compositor und eine separate
+D-Bus-Sitzung. Es benötigt Weston, GTK3/AT-SPI, D-Bus und Python mit GI-/AT-SPI-
+Anbindung; die genauen CI-Pakete stehen im [Workflow](.github/workflows/ci.yml).
+Tests mit echten Audio- und Controllergeräten sowie Langzeitprüfungen bleiben
+separate Abnahmen.
+
+Entwicklungswerkzeuge ohne kommerzielle ROM ausprobieren:
 
 ```bash
 dotnet run --project tools/AetherBoy.GbaProbe/AetherBoy.GbaProbe.csproj -c Release
+dotnet run --project tools/AetherBoy.Conformance/AetherBoy.Conformance.csproj -c Release -- --help
+dotnet run --project tools/AetherBoy.OnlineProbe/AetherBoy.OnlineProbe.csproj -c Release -- --help
 ```
 
-Dieser Lern- und Regressionpfad schreibt `artifacts/gba-prototype.bmp`. Er ist vom GBADotnet-Kern der normalen Anwendung unabhängig; mGBA dient ausschließlich als Referenz.
+`GbaProbe` führt erzeugten Testcode auf dem eigenständigen Prototyp aus und schreibt
+`artifacts/gba-prototype.bmp`. Konformitätsläufe benötigen separat bereitgestellte
+Test-ROMs; siehe das [Beispielmanifest](tools/AetherBoy.Conformance/compatibility.example.json).
+Die normalen automatisierten Tests verwenden synthetische Daten. Optionale Tests
+mit bereitgestellter Firmware oder Karten benötigen lokale Testdateien.
 
-</details>
+Die [CI](.github/workflows/ci.yml) umfasst Windows- und Linux-x64-/ARM64-Builds,
+Wiederherstellung anhand der Lockdateien, Mindesttestzahlen, nativen Transport und
+isolierte Wayland-Tests. Sie dient als Referenz für den vollständigen Prüfablauf.
 
-## Dokumentation
+## Dokumentation und Hilfe
 
-| Thema | Einstieg |
+| Anliegen | Einstieg |
 | --- | --- |
-| Neueste Stabilisierung und Prüfgrenzen | [Speicherabschluss, Fehlerbehandlung und Sprache (DE/EN)](docs/STABILIZATION_2026-10-02.md) |
-| Aktuelles Windows-Entwicklungspaket | [DE/EN-Übergabe, gemeinsame Schnittstellen, Tests und nächste Schritte](docs/WINDOWS_DEVELOPMENT_HANDOFF.md) |
-| Projektstand und nächste Schritte | [Deutsch](docs/PROJECT_STATUS_DE.md) · [English](docs/PROJECT_STATUS_EN.md) |
-| Linux einrichten und bedienen | [Wayland / Hyprland (DE)](docs/LINUX_WAYLAND.md) · [User Guide (EN)](docs/LINUX_USER_GUIDE.md) |
-| Windows- und Linux-Oberfläche | [UI-Zuordnung und offene Funktionen](docs/LINUX_UI_PARITY.md) |
-| Emulationskompatibilität | [Testmatrix](COMPATIBILITY.md) · [GBA-Status](GBA.md) |
-| GBA-Technik und Herkunft | [Architektur](docs/GBA_CORE_ARCHITECTURE.md) · [GBADotnet-Review](docs/GBADOTNET_REVIEW.md) |
-| Änderungen und Abhängigkeiten | [Changelog](CHANGELOG.md) · [Drittanbieterhinweise](THIRD_PARTY_NOTICES.md) |
+| Linux-Einrichtung, Steuerung oder Starthilfe | [Benutzerhandbuch](docs/LINUX_USER_GUIDE.md) · [Wayland-/Hyprland-Einrichtung](docs/LINUX_WAYLAND.md) |
+| Windows-Werkzeuge und Einstellungen | [Entwicklungs- und Bedienungsanleitung](docs/WINDOWS_DEVELOPMENT_HANDOFF.md) · [Firmware und Diagnose](docs/WINDOWS_FIRMWARE_DIAGNOSTICS.md) |
+| Speicherorte und Umzug einer Installation | [Portabler Modus](docs/PORTABLE_MODE.md) |
+| Kompatibilität und Cheats | [GB-/GBC-Matrix](COMPATIBILITY.md) · [GBA-Status](GBA.md) · [Cheat-Unterstützung](docs/CHEAT_SUPPORT.md) |
+| Planung und jüngste Änderungen | [Windows-Roadmap](docs/WINDOWS_ROADMAP.md) · [Linux-Roadmap](docs/LINUX_ROADMAP.md) · [Änderungsprotokoll](CHANGELOG.md) |
+| Architektur und Beitragsregeln | [GBA-Architektur](docs/GBA_CORE_ARCHITECTURE.md) · [Mitwirken](CONTRIBUTING.md) |
 
-Fehler gefunden? Ein [Issue](https://github.com/VoltexModz/AetherBoy/issues) mit Version, Betriebssystem, unter Linux auch Desktop/Compositor, Reproduktionsschritten und erwarteter Ausgabe hilft bei der Eingrenzung. Keine ROMs, BIOS-Dateien oder persönlichen Spielstände hochladen.
+Öffne bei Fehlern oder Fragen ein [GitHub-Issue](https://github.com/VoltexModz/AetherBoy/issues).
+Nenne Version oder Commit, Betriebssystem, unter Linux auch den Compositor,
+Reproduktionsschritte sowie erwartetes und tatsächliches Verhalten. Prüfe
+Diagnoseberichte vor dem Teilen. Hänge keine ROMs, Firmware, privaten
+Raumzugangsdaten oder persönlichen Spielstände an. Datierte Übergaben beschreiben
+den damals geprüften Quellstand; spätere Änderungen zeigen der aktuelle Code
+und die CI.
+
+## Wartung und Mitarbeit
+
+**NekoZDevTeam und die AetherBoy-Mitwirkenden** pflegen das Projekt unter
+[VoltexModz/AetherBoy](https://github.com/VoltexModz/AetherBoy). Fehlermeldungen,
+Dokumentationsverbesserungen, reproduzierbare Kompatibilitätsbefunde und
+Codebeiträge sind willkommen.
+
+Lies vor einem Pull Request die [CONTRIBUTING.md](CONTRIBUTING.md). Sie beschreibt
+den Entwicklungsablauf, erwartete Prüfungen und Regeln für Oberfläche und
+Lokalisierung.
 
 ## Lizenz und Herkunft
 
-**NekoZDevTeam** entwickelt und pflegt AetherBoy für Windows und Linux.
-Mit diesem gemeinsamen Projekt lassen wir unseren früheren Teamnamen wieder aufleben.
+AetherBoy entstand 2014 als **NanoBoy** von **Frédéric Meyer**, wurde als
+**ChiiBoy Color** weitergeführt und wird heute unter dem Namen AetherBoy gepflegt.
+Die Urheberrechtshinweise der ursprünglichen Autoren und späteren Mitwirkenden
+bleiben erhalten.
 
-AetherBoy begann 2014 als **nanoboy** von **Frédéric Meyer**, wurde als **ChiiBoy Color** weitergeführt und wird heute von NekoZDevTeam unter dem Namen AetherBoy modernisiert. Urheberschaft und Copyright verbleiben bei den ursprünglichen Autoren und späteren Beitragenden.
-
-Der Emulatorcode steht unter **GPL-3.0-only**; siehe [LICENSE](LICENSE). Drittanbieterkomponenten, insbesondere der MIT-lizenzierte GBADotnet-Kern und die gebündelten Schriften, besitzen eigene Lizenzen: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-Verwende nur ROMs und Firmware, zu deren Nutzung du berechtigt bist. Die Codelizenz gewährt keine Rechte an Spielen oder Nintendo-Firmware. AetherBoy ist nicht mit Nintendo verbunden oder von Nintendo autorisiert; Game Boy, Game Boy Color und Game Boy Advance sind Marken ihrer jeweiligen Rechteinhaber.
+Das Projekt steht unter **GPL-3.0-only**; siehe [LICENSE](LICENSE).
+Drittkomponenten behalten ihre eigenen Lizenzen, darunter der MIT-lizenzierte
+GBADotnet-Kern und die MPL-2.0-Adaptionen der mGBA-Cheat- und e-Reader-Funktionen.
+Vollständige Herkunftsnachweise stehen in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
