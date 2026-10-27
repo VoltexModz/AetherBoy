@@ -25,10 +25,10 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
 
     private int LogicalWidth = 1180;
     private int LogicalHeight = 760;
-    private const int GameAreaX = 40;
-    private const int GameAreaY = 134;
-    private int GameAreaWidth => LogicalWidth - 376;
-    private int GameAreaHeight => LogicalHeight - 264;
+    private float GameAreaX => nanoboy.Core.UiDesktopLayout.Create(LogicalWidth, LogicalHeight).GameX;
+    private float GameAreaY => nanoboy.Core.UiDesktopLayout.Create(LogicalWidth, LogicalHeight).GameY;
+    private float GameAreaWidth => nanoboy.Core.UiDesktopLayout.Create(LogicalWidth, LogicalHeight).GameWidth;
+    private float GameAreaHeight => nanoboy.Core.UiDesktopLayout.Create(LogicalWidth, LogicalHeight).GameHeight;
 
 
     private readonly LinuxDesktopProfile desktop;
@@ -85,7 +85,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
     private LinuxRomStorage? pendingStorage;
     private string? StateBasePath => IsOnlineLink ? null : storage?.StateBasePath;
     private bool HasSelectedState => !IsOnlineLink && stateOperation is null && SaveInformationState(options.SaveSlot) == LinuxSaveInformationState.Saved;
-    private string statusMessage = global::AetherBoy.Runtime.Localization.UiText.Get("OPEN OR DROP A ROM");
+    private string statusMessage = "";
     private string? audioError;
     private bool running = true;
     private bool isFullscreen;
@@ -500,7 +500,7 @@ internal sealed partial class WaylandEmulatorHost : IDisposable
             {
                 int direction = (keyEvent.Mod & SDL.Keymod.Shift) != 0 ? -1 : 1;
                 if ((keyEvent.Mod & SDL.Keymod.Ctrl) != 0)
-                    SelectControlCenterPage((ControlCenterPage)(((int)controlCenterPage + direction + PageNames.Length) % PageNames.Length));
+                    CycleSettingsSection(direction);
                 else if (focusTargets.Count > 0)
                     focusedControl = focusedControl < 0 ? (direction > 0 ? 0 : focusTargets.Count - 1)
                         : (focusedControl + direction + focusTargets.Count) % focusTargets.Count;

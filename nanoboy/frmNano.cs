@@ -426,7 +426,7 @@ namespace nanoboy
             lastPadState = GamepadInput.GetState();
             UpdateAetherGamepadUi(lastPadState);
             gameView.ClearFrame();
-            SetSaveFeedback(firmwareLoadWarning ?? global::AetherBoy.Runtime.Localization.UiText.Get("F5 speichern · F8 laden · F6 State-Galerie · F11 Vollbild"), firmwareLoadWarning is not null);
+            SetSaveFeedback(firmwareLoadWarning ?? "", firmwareLoadWarning is not null);
 
             if (audiotoolwindow != null && !audiotoolwindow.IsDisposed)
             {

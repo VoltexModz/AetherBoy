@@ -17,6 +17,7 @@ namespace nanoboy.Controls
         public static Color Surface => From(palette.Surface);
         public static Color SurfaceRaised => From(palette.Raised);
         public static Color Hairline => From(palette.Border);
+        public static Color Selection => From(palette.Selection);
         public static Color Text => From(palette.Text);
         public static Color Muted => From(palette.Muted);
         public static Color Violet => From(palette.PrimaryText);
@@ -32,9 +33,9 @@ namespace nanoboy.Controls
 
         public static void Apply(UiThemePalette next)
         {
-            Color[] before = [Void, Chrome, Surface, SurfaceRaised, Hairline, Text, Muted, Violet, Cyan, Primary, Success, Danger];
+            Color[] before = [Void, Chrome, Surface, SurfaceRaised, Hairline, Text, Muted, Violet, Cyan, Primary, Success, Danger, Selection];
             palette = next;
-            Color[] after = [Void, Chrome, Surface, SurfaceRaised, Hairline, Text, Muted, Violet, Cyan, Primary, Success, Danger];
+            Color[] after = [Void, Chrome, Surface, SurfaceRaised, Hairline, Text, Muted, Violet, Cyan, Primary, Success, Danger, Selection];
             foreach (Form form in Application.OpenForms)
                 Recolor(form, before, after);
         }
@@ -81,7 +82,7 @@ namespace nanoboy.Controls
             Cursor = Cursors.Hand;
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
-            Font = new Font("Segoe UI", 9.5f, FontStyle.Bold, GraphicsUnit.Point);
+            Font = AetherTypography.Create(10.5f);
             ForeColor = AetherColors.Text;
             Size = new Size(112, 38);
             TabStop = true;
@@ -93,6 +94,15 @@ namespace nanoboy.Controls
                 ControlStyles.UserPaint,
                 true);
         }
+
+        [DefaultValue(nanoboy.Core.UiIcon.None)]
+        public nanoboy.Core.UiIcon Icon { get; set; }
+        [DefaultValue(false)]
+        public bool IconOnly { get; set; }
+        [DefaultValue(false)]
+        public bool AlignLeft { get; set; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public nanoboy.Core.UiThemePreset? ThemePreview { get; set; }
 
         [DefaultValue(AetherButtonKind.Primary)]
         public AetherButtonKind Kind
@@ -141,8 +151,13 @@ namespace nanoboy.Controls
                 (owner.Selected ? AccessibleStates.Selected : AccessibleStates.None);
             public override void DoDefaultAction()
             {
-                // Match button activation: no disposed/handleless, disabled or unvalidated actions.
-                if (!owner.IsDisposed && owner.IsHandleCreated) owner.PerformClick();
+                // UIA Invoke must return before a click handler opens a modal dialog.
+                // Recheck at dispatch time: the owner may have closed or become disabled.
+                if (owner.IsDisposed || !owner.IsHandleCreated || !owner.CanSelect) return;
+                owner.BeginInvoke(() =>
+                {
+                    if (!owner.IsDisposed && owner.IsHandleCreated && owner.CanSelect) owner.PerformClick();
+                });
             }
         }
 
@@ -196,11 +211,11 @@ namespace nanoboy.Controls
             if (Width < 3 || Height < 3) return;
 
             Rectangle bounds = new Rectangle(0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1));
-            using GraphicsPath path = CreateChamferedPath(bounds, Math.Min(8, Height / 3));
+            using GraphicsPath path = CreateChamferedPath(bounds, kind == AetherButtonKind.Primary ? Math.Min(8 * DeviceDpi / 96, Height / 3) : 0);
 
             Color foreground = Enabled ? AetherColors.Text : AetherColors.Muted;
             Color border = Focused ? AetherColors.Cyan : AetherColors.Hairline;
-            Color surface = AetherColors.SurfaceRaised;
+            Color surface = Enabled ? AetherColors.Surface : AetherColors.SurfaceRaised;
 
             if (kind == AetherButtonKind.Danger)
             {
@@ -229,36 +244,46 @@ namespace nanoboy.Controls
                 }
                 else if (selected && Enabled)
                 {
-                    surface = AetherColors.SurfaceRaised;
-                    border = AetherColors.Cyan;
+                    surface = AetherColors.Selection;
+                    border = AetherColors.Selection;
                 }
                 else if (hovered && Enabled && kind != AetherButtonKind.Danger)
                     border = Focused ? AetherColors.Cyan : AetherColors.Violet;
 
                 using var fill = new SolidBrush(surface);
                 graphics.FillPath(fill, path);
-                if (Enabled && (selected || hovered) && Width > 12 && Height > 12)
+                if (Enabled && selected && Width > 12 && Height > 12)
                 {
                     using var signal = new Pen(selected ? AetherColors.Cyan : AetherColors.Violet, 2f);
                     graphics.DrawLine(signal, 4, 5, 4, Height - 9);
                 }
             }
 
-            using (var outline = new Pen(border, selected ? 1.6f : 1f))
+            if (kind != AetherButtonKind.Ghost || hovered || Focused)
+            using (var outline = new Pen(border, 1f))
             {
                 graphics.DrawPath(outline, path);
             }
 
-            TextRenderer.DrawText(
-                graphics,
-                Text,
-                Font,
-                bounds,
-                foreground,
-                TextFormatFlags.HorizontalCenter |
-                TextFormatFlags.VerticalCenter |
-                TextFormatFlags.EndEllipsis |
-                TextFormatFlags.NoPadding);
+            Rectangle textBounds = bounds;
+            if (ThemePreview is { } preview)
+            {
+                int captionHeight = Math.Max(Font.Height + 6, 25 * DeviceDpi / 96);
+                AetherIconPaint.Theme(graphics, new Rectangle(8, 8, Width - 16, Math.Max(12, Height - captionHeight - 12)), preview);
+                textBounds = new Rectangle(4, Height - captionHeight, Width - 8, captionHeight);
+            }
+            else if (Icon != nanoboy.Core.UiIcon.None)
+            {
+                int size = Math.Max(16, (int)(18 * DeviceDpi / 96f));
+                int textWidth = TextRenderer.MeasureText(Text, Font, Size.Empty, TextFormatFlags.NoPadding).Width;
+                int x = IconOnly ? (Width - size) / 2 : AlignLeft ? 14 * DeviceDpi / 96 : Math.Max(12, (Width - size - 9 - textWidth) / 2);
+                AetherIconPaint.Draw(graphics, Icon, new Rectangle(x, (Height - size) / 2, size, size), selected && kind != AetherButtonKind.Primary ? AetherColors.Violet : foreground);
+                textBounds = new Rectangle(x + size + 9, 0, Math.Max(1, Width - x - size - 18), Height);
+            }
+            if (!IconOnly)
+                TextRenderer.DrawText(graphics, Text, Font, textBounds, foreground,
+                    (AlignLeft || Icon != nanoboy.Core.UiIcon.None ? TextFormatFlags.Left : TextFormatFlags.HorizontalCenter) |
+                    TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
 
             if (Focused && Width > 12 && Height > 12)
             {
@@ -270,6 +295,7 @@ namespace nanoboy.Controls
         private static GraphicsPath CreateChamferedPath(Rectangle bounds, int cut)
         {
             var path = new GraphicsPath();
+            if (cut == 0) { path.AddRectangle(bounds); return path; }
             Span<nanoboy.Core.UiPoint> vertices = stackalloc nanoboy.Core.UiPoint[nanoboy.Core.UiChamfer.VertexCount];
             nanoboy.Core.UiChamfer.Write(vertices, bounds.X, bounds.Y, bounds.Width, bounds.Height, cut);
             var points = new PointF[vertices.Length];
@@ -293,6 +319,9 @@ namespace nanoboy.Controls
         [DefaultValue(false)]
         public bool AccentEdge { get; set; }
 
+        [DefaultValue(false)]
+        public bool DividerOnly { get; set; }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
@@ -300,7 +329,8 @@ namespace nanoboy.Controls
             e.Graphics.Clear(BackColor);
             Rectangle border = new Rectangle(0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1));
             using var borderPen = new Pen(AetherColors.Hairline);
-            e.Graphics.DrawRectangle(borderPen, border);
+            if (DividerOnly) e.Graphics.DrawLine(borderPen, 0, Height - 1, Width, Height - 1);
+            else e.Graphics.DrawRectangle(borderPen, border);
             if (AccentEdge)
             {
                 using var accent = new LinearGradientBrush(ClientRectangle, AetherColors.Primary, AetherColors.Secondary, 90f);
@@ -326,47 +356,18 @@ namespace nanoboy.Controls
                 return;
             }
 
-            using var line = new LinearGradientBrush(ClientRectangle, AetherColors.Primary, AetherColors.Secondary, 0f);
-            e.Graphics.FillRectangle(line, 0, Math.Max(0, Height - 2), Width, Math.Min(2, Height));
+            using var line = new SolidBrush(AetherColors.Hairline);
+            e.Graphics.FillRectangle(line, 0, Math.Max(0, Height - 1), Width, 1);
         }
     }
 
     internal sealed class AetherStagePanel : AetherSurfacePanel
     {
-        private readonly Font labelFont = new Font("Segoe UI", 9f, FontStyle.Bold, GraphicsUnit.Point);
-
         public AetherStagePanel()
         {
             BackColor = AetherColors.Void;
-            Padding = new Padding(18, 42, 18, 18);
-            AccentEdge = true;
-        }
-
-        protected override void OnPaint(PaintEventArgs e)
-        {
-            base.OnPaint(e);
-            TextRenderer.DrawText(
-                e.Graphics,
-                global::AetherBoy.Runtime.Localization.UiText.Get("GAME SCREEN"),
-                labelFont,
-                new Rectangle(18, 12, Math.Max(1, Width - 36), 20),
-                AetherColors.Muted,
-                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-            if (Width > 120 && Height > 24)
-            {
-                using var signal = new Pen(AetherColors.Cyan, 2f);
-                e.Graphics.DrawLine(signal, Width - 58, 22, Width - 20, 22);
-            }
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                labelFont.Dispose();
-            }
-
-            base.Dispose(disposing);
+            Padding = Padding.Empty;
+            AccentEdge = false;
         }
     }
 

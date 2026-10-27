@@ -115,11 +115,14 @@ internal sealed class AetherCommandMenu : AetherSurfacePanel, IMessageFilter
         }
         body.ResumeLayout(true);
         int contentHeight = body.Controls.Cast<Control>().Sum(control => control.Height + control.Margin.Vertical);
-        Height = Math.Min(maximumHeight, 140 + Math.Max(48, contentHeight));
-        viewport.Height = Height - 136;
-        viewport.ScrollTo(0, 0);
         hint.Text = rows.Count == 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("Hier sind gerade keine Aktionen verfügbar.") :
             global::AetherBoy.Runtime.Localization.UiText.Get("Pfeile navigieren · Enter wählen · Esc schließen");
+        hint.Height = Math.Max(28, hint.GetPreferredSize(new Size(hint.Width, 0)).Height);
+        back.Top = hint.Bottom + 5;
+        viewport.Top = back.Bottom + 10;
+        Height = Math.Min(maximumHeight, viewport.Top + 18 + Math.Max(48, contentHeight));
+        viewport.Height = Math.Max(1, Height - viewport.Top - 14);
+        viewport.ScrollTo(0, 0);
         rows.FirstOrDefault(row => row.Enabled)?.Focus();
     }
 

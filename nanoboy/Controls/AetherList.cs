@@ -137,14 +137,14 @@ internal sealed class AetherList : Control
     protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
     protected override void OnPaint(PaintEventArgs e)
     {
-        e.Graphics.Clear(AetherColors.SurfaceRaised);
+        e.Graphics.Clear(BackColor);
         var state = e.Graphics.Save(); e.Graphics.SetClip(ContentArea);
         int first = View == View.Details ? vertical.Value / RowHeight : vertical.Value / TileHeight * TileColumns;
         int count = View == View.Details ? ContentArea.Height / RowHeight + 2 : (ContentArea.Height / TileHeight + 2) * TileColumns;
         for (int i = first; i < Math.Min(Items.Count, first + count); i++)
         {
             var item = Items[i]; Rectangle bounds = ItemBounds(i);
-            using var fill = new SolidBrush(item.Selected ? AetherColors.Surface : AetherColors.SurfaceRaised); e.Graphics.FillRectangle(fill, bounds);
+            using var fill = new SolidBrush(item.Selected ? AetherColors.Selection : BackColor); e.Graphics.FillRectangle(fill, bounds);
             Color color = !Enabled ? AetherColors.Muted : item.Selected ? AetherColors.Cyan : AetherColors.Text;
             if (View == View.Details)
             {

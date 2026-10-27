@@ -21,6 +21,8 @@ public sealed class WindowsStorageTests
     [AssemblyInitialize]
     public static void IsolateWindowsData(TestContext context)
     {
+        // Surface UI callback failures to the runner instead of blocking on an exception dialog.
+        System.Windows.Forms.Application.SetUnhandledExceptionMode(System.Windows.Forms.UnhandledExceptionMode.ThrowException, false);
         // UI smoke tests must never change a real player's settings, ROMs or history.
         WindowsDataPaths.Default = new WindowsDataPaths(Path.Combine(TestRoot, "ui"));
         // Existing copy assertions have a deterministic baseline on English CI

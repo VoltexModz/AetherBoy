@@ -11,7 +11,7 @@ public sealed class UiThemePaletteTests
         var defaults = new UiThemePalette(null, null, null);
         Assert.AreEqual("#8B38FF", defaults.Primary.Hex);
         Assert.AreEqual("#29E2ED", defaults.Secondary.Hex);
-        Assert.AreEqual("#050712", defaults.Background.Hex);
+        Assert.AreEqual("#0D1019", defaults.Background.Hex);
 
         var custom = new UiThemePalette("#ff8000", "0066cc", "#f7f7f7");
         Assert.AreEqual("#FF8000", custom.Primary.Hex);

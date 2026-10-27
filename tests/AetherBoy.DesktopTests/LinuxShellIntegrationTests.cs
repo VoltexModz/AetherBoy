@@ -32,12 +32,16 @@ public sealed class LinuxShellIntegrationTests
             void Draw() => Call(host, "DrawShell");
             void Click(float x, float y) { Draw(); Call(host, "HandleMouseClick", x, y); Draw(); }
             void Key(SDL.Scancode key) => Call(host, "HandleKeyboard", new SDL.KeyboardEvent { Scancode = key }, true);
+            void ClickControl(string suffix)
+            {
+                Draw();
+                var target = Field<List<(LinuxAccessibleControls.Command Command, SDL.FRect Bounds)>>(host, "accessibleCommands").Single(pair => pair.Command.Key.EndsWith(suffix, StringComparison.Ordinal));
+                Click(target.Bounds.X + target.Bounds.W / 2, target.Bounds.Y + target.Bounds.H / 2);
+            }
             string Page() => Field<object>(host, "controlCenterPage").ToString()!;
             Draw();
             Capture(host, "main");
-            Click(1110, 564); // fifth main-window slot
-            Assert.AreEqual(5, options.SaveSlot);
-            Click(270, 724);
+            Key(SDL.Scancode.C);
             Assert.AreEqual("Overview", Page());
             Assert.IsTrue(Field<bool>(host, "controlCenterVisible"));
             Capture(host, "overview");
@@ -69,14 +73,14 @@ public sealed class LinuxShellIntegrationTests
             Key(SDL.Scancode.Return);
             Assert.AreEqual("Palette", Field<object>(host, "graphicsSection").ToString());
             // A search result must not leak pointer clicks into the page it covers.
-            Click(120, 345);
+            ClickControl("nav:settings:audio");
             int previousVolume = options.AudioVolume;
             Search("nonesuch");
             Click(580, 350);
             Assert.AreEqual(previousVolume, options.AudioVolume);
             Key(SDL.Scancode.Escape);
 
-            Click(120, 295);
+            ClickControl("nav:settings:display");
             Assert.AreEqual("Display", Page());
             Click(1040, 300);
             Assert.AreEqual(LinuxVideoFilter.LcdGrid, options.VideoFilter);
@@ -91,7 +95,7 @@ public sealed class LinuxShellIntegrationTests
             Click(1000, 424);
             Assert.AreEqual(4, options.PaletteIndex);
             Capture(host, "display");
-            Click(120, 345);
+            ClickControl("nav:settings:audio");
             Key(SDL.Scancode.Home);
             Key(SDL.Scancode.Right);
             Assert.AreEqual(1, options.AudioVolume);
@@ -100,14 +104,14 @@ public sealed class LinuxShellIntegrationTests
             Call(host, "SetVolumeFromPointer", 870f);
             Assert.AreEqual(100, options.AudioVolume);
             Capture(host, "audio");
-            Click(120, 395);
+            ClickControl("nav:settings:input");
             Click(480, 293);
             Key(SDL.Scancode.V);
             Assert.AreEqual(SDL.Scancode.V, options.Keys[LinuxInputAction.A]);
             Capture(host, "input");
-            Click(120, 445);
+            ClickControl("nav:settings:saves");
             Capture(host, "saves");
-            Click(120, 495);
+            ClickControl("nav:settings:system");
             Assert.AreEqual("System", Page());
             Capture(host, "system");
             Click(1000, 222);
@@ -116,7 +120,7 @@ public sealed class LinuxShellIntegrationTests
             for (int index = 0; index < UiThemePresets.All.Count; index++)
             {
                 UiThemePreset preset = UiThemePresets.All[index];
-                Click(430 + index % 3 * 274, 298 + index / 3 * 49);
+                ClickControl(":theme:" + preset.Id);
                 Assert.AreEqual(preset.Id, UiThemePresets.Match(options.UiPrimaryColor,
                     options.UiSecondaryColor, options.UiBackgroundColor)?.Id);
                 Assert.AreEqual(preset.Id, Field<string>(host, "brandVariant"));
@@ -129,50 +133,52 @@ public sealed class LinuxShellIntegrationTests
                 }
                 Capture(host, "appearance-" + preset.Id);
             }
-            void EnterColor(float x, string value)
+            void EnterColor(string field, string value)
             {
-                Click(x, 455);
+                ClickControl(":text:" + field);
                 Call(host, "HandleKeyboard", new SDL.KeyboardEvent { Scancode = SDL.Scancode.A, Mod = SDL.Keymod.Ctrl }, true);
                 Call(host, "ReceiveTextInput", value);
             }
-            EnterColor(450, "#FF8800");
-            EnterColor(724, "#0066CC");
-            EnterColor(998, "#EFEFEF");
-            Click(430, 524);
+            EnterColor("ThemePrimary", "#FF8800");
+            EnterColor("ThemeSecondary", "#0066CC");
+            EnterColor("ThemeBackground", "#EFEFEF");
+            Draw();
+            var apply = Field<List<(LinuxAccessibleControls.Command Command, SDL.FRect Bounds)>>(host, "accessibleCommands").Single(pair => pair.Command.Label == AetherBoy.Runtime.Localization.UiText.Get("Farben anwenden"));
+            Click(apply.Bounds.X + apply.Bounds.W / 2, apply.Bounds.Y + apply.Bounds.H / 2);
             Assert.AreEqual("#FF8800", options.UiPrimaryColor);
             Assert.AreEqual("aether-original", Field<string>(host, "brandVariant"));
             Capture(host, "appearance-custom");
-            Click(360, 218);
-            Click(120, 545);
+            ClickControl("nav:settings:system");
+            ClickControl("nav:settings:diagnostics");
             Assert.AreEqual("Diagnostics", Page());
             Capture(host, "diagnostics");
-            Click(120, 595);
+            ClickControl("nav:settings:return");
+            ClickControl("nav:desktop:library");
             Capture(host, "library");
-            Click(120, 645);
+            ClickControl("nav:desktop:tools");
             Capture(host, "tools");
-            Click(120, 395);
+            ClickControl("nav:settings:input");
             Click(700, 214);
             Assert.IsTrue(Field<bool>(host, "showController"));
             Capture(host, "controller");
             Click(410, 220);
-            Click(120, 445);
+            ClickControl("nav:settings:saves");
             Click(990, 250);
             Capture(host, "backups");
             Click(375, 220);
-            Click(120, 545);
-            Call(host, "HandleKeyboard", new SDL.KeyboardEvent { Scancode = SDL.Scancode.Tab, Mod = SDL.Keymod.Ctrl }, true);
-            Assert.AreEqual("Library", Page());
-            Call(host, "HandleKeyboard", new SDL.KeyboardEvent { Scancode = SDL.Scancode.Tab, Mod = SDL.Keymod.Ctrl }, true);
-            Assert.AreEqual("Tools", Page());
+            ClickControl("nav:settings:diagnostics");
             Call(host, "HandleKeyboard", new SDL.KeyboardEvent { Scancode = SDL.Scancode.Tab, Mod = SDL.Keymod.Ctrl }, true);
             Assert.AreEqual("Overview", Page());
+            Call(host, "HandleKeyboard", new SDL.KeyboardEvent { Scancode = SDL.Scancode.Tab, Mod = SDL.Keymod.Ctrl }, true);
+            Assert.IsTrue(Field<bool>(host, "showAppearance"));
+            ClickControl("nav:settings:overview");
             Draw();
             Call(host, "HandleKeyboard", new SDL.KeyboardEvent { Scancode = SDL.Scancode.Tab, Mod = SDL.Keymod.Shift }, true);
             Assert.AreEqual(Field<List<SDL.FRect>>(host, "focusTargets").Count - 1, Field<int>(host, "focusedControl"));
             Key(SDL.Scancode.Tab);
             Assert.AreEqual(0, Field<int>(host, "focusedControl"));
             Capture(host, "keyboard-focus");
-            Key(SDL.Scancode.Return); // focused close button
+            ClickControl("nav:settings:return"); // explicit return, independent of window actions
             Assert.IsFalse(Field<bool>(host, "controlCenterVisible"));
             Key(SDL.Scancode.C);
             Key(SDL.Scancode.Escape);
@@ -186,7 +192,7 @@ public sealed class LinuxShellIntegrationTests
             }, TimeSpan.FromSeconds(10)), "The latest preferences did not finish saving: " + Field<string?>(host, "loadError"));
             var loaded = LinuxSettingsStore.Load(settings, out var error);
             Assert.IsNull(error);
-            Assert.AreEqual(5, loaded.SaveSlot);
+            Assert.AreEqual(1, loaded.SaveSlot);
             Assert.AreEqual(4, loaded.PaletteIndex);
             Assert.AreEqual("#FF8800", loaded.UiPrimaryColor);
             Assert.AreEqual("#0066CC", loaded.UiSecondaryColor);
@@ -212,19 +218,22 @@ public sealed class LinuxShellIntegrationTests
                 Call(host, "CompletePendingLoad");
                 return Field<EmulationSession?>(host, "session") is not null;
             }, TimeSpan.FromSeconds(10)), Field<string?>(host, "loadError"));
+            ClickControl(":select:desktop-slot");
+            ClickControl(":option:select:desktop-slot:5");
+            Assert.AreEqual(5, options.SaveSlot);
             var session = Field<EmulationSession>(host, "session");
             Assert.IsTrue(SpinWait.SpinUntil(() => session.LatestSnapshot.EmulatedFrameCount >= 6,
                 TimeSpan.FromSeconds(10)), "The generated ROM did not produce frames.");
             Call(host, "UpdateEmulation");
             Assert.Contains(unchecked((int)0xFF00FFFF), Field<int[]>(host, "framePixels"),
                 "The generated ROM's cyan tile pixels must reach the Linux renderer.");
-            Click(405, 724);
+            ClickControl(":desktop:pause");
             Assert.IsTrue(session.LatestSnapshot.IsPaused);
-            Click(710, 724);
+            ClickControl(":desktop:save");
             Assert.IsTrue(File.Exists(LinuxSaveStateStore.GetPath(Field<LinuxRomStorage>(host, "storage").StateBasePath, 5)));
-            Click(870, 724);
+            ClickControl(":desktop:load");
             Assert.IsTrue(Field<string>(host, "statusMessage").Contains("LOADED", StringComparison.OrdinalIgnoreCase));
-            Click(1040, 724);
+            ClickControl(":turbo");
             Assert.IsTrue(Field<bool>(host, "mouseTurbo"));
             Call(host, "ReleaseMouseTurbo");
             Assert.IsFalse(Field<bool>(host, "mouseTurbo"));

@@ -119,8 +119,10 @@ internal sealed partial class WaylandEmulatorHost
     private void SettingsLink(float y, string title, string description, string button, Action action, string id)
     {
         Ink(302, y + 3, title, 18, bold: true);
-        DrawSettingsParagraph(302, y + 31, description, 584, 14);
-        ActionButton(910, y + 9, 200, 42, button, action, focusId: "setting:" + id);
+        float buttonX = LogicalWidth - 232;
+        DrawSettingsParagraph(302, y + 31, description, buttonX - 326, 14);
+        ActionButton(buttonX, y + 9, 200, 42, button, action, focusId: "setting:" + id);
+        Paint(302, y - 10, LogicalWidth - 334, 1, Colors.Border);
     }
 
     private float DrawSettingsParagraph(float x, float y, string text, float width, int size = 14, SDL.Color? color = null)
@@ -292,12 +294,12 @@ internal sealed partial class WaylandEmulatorHost
         if (showAppearance) { DrawAppearancePage(); return; }
         if (systemSection == SystemSection.Overview)
         {
-            SettingsLink(198, global::AetherBoy.Runtime.Localization.UiText.Get("Appearance"), global::AetherBoy.Runtime.Localization.UiText.Get("Accent and background colors for the whole app."), global::AetherBoy.Runtime.Localization.UiText.Get("Change colors"), OpenAppearancePage, "appearance");
-            SettingsLink(284, global::AetherBoy.Runtime.Localization.UiText.Get("Desktop & accessibility"), global::AetherBoy.Runtime.Localization.UiText.Get("Text size, automatic pause and accessible controls."), global::AetherBoy.Runtime.Localization.UiText.Get("Open desktop"), () => systemSection = SystemSection.Desktop, "desktop");
-            SettingsLink(370, global::AetherBoy.Runtime.Localization.UiText.Get("Game profiles"), global::AetherBoy.Runtime.Localization.UiText.Get("Choose global defaults or settings for this game."), global::AetherBoy.Runtime.Localization.UiText.Get("Open profiles"), () => systemSection = SystemSection.Profiles, "profiles");
-            SettingsLink(456, "Firmware", global::AetherBoy.Runtime.Localization.UiText.Get("Import boot ROMs and choose how games start."), global::AetherBoy.Runtime.Localization.UiText.Get("Open firmware"), () => systemSection = SystemSection.Firmware, "firmware");
-            SettingsLink(542, global::AetherBoy.Runtime.Localization.UiText.Get("Files & updates"), global::AetherBoy.Runtime.Localization.UiText.Get("Find app data or check for release packages."), global::AetherBoy.Runtime.Localization.UiText.Get("Open files & updates"), () => systemSection = SystemSection.Files, "files");
-            SettingsLink(628, global::AetherBoy.Runtime.Localization.UiText.Get("Display language"), "Deutsch / English", global::AetherBoy.Runtime.Localization.UiText.Get("Choose language"), () => systemSection = SystemSection.Language, "language");
+            SettingsLink(186, global::AetherBoy.Runtime.Localization.UiText.Get("Appearance"), global::AetherBoy.Runtime.Localization.UiText.Get("Accent and background colors for the whole app."), global::AetherBoy.Runtime.Localization.UiText.Get("Change colors"), OpenAppearancePage, "appearance");
+            SettingsLink(268, global::AetherBoy.Runtime.Localization.UiText.Get("Desktop & accessibility"), global::AetherBoy.Runtime.Localization.UiText.Get("Text size, automatic pause and accessible controls."), global::AetherBoy.Runtime.Localization.UiText.Get("Open desktop"), () => systemSection = SystemSection.Desktop, "desktop");
+            SettingsLink(350, global::AetherBoy.Runtime.Localization.UiText.Get("Game profiles"), global::AetherBoy.Runtime.Localization.UiText.Get("Choose global defaults or settings for this game."), global::AetherBoy.Runtime.Localization.UiText.Get("Open profiles"), () => systemSection = SystemSection.Profiles, "profiles");
+            SettingsLink(432, "Firmware", global::AetherBoy.Runtime.Localization.UiText.Get("Import boot ROMs and choose how games start."), global::AetherBoy.Runtime.Localization.UiText.Get("Open firmware"), () => systemSection = SystemSection.Firmware, "firmware");
+            SettingsLink(514, global::AetherBoy.Runtime.Localization.UiText.Get("Files & updates"), global::AetherBoy.Runtime.Localization.UiText.Get("Find app data or check for release packages."), global::AetherBoy.Runtime.Localization.UiText.Get("Open files & updates"), () => systemSection = SystemSection.Files, "files");
+            SettingsLink(596, global::AetherBoy.Runtime.Localization.UiText.Get("Display language"), "Deutsch / English", global::AetherBoy.Runtime.Localization.UiText.Get("Choose language"), () => systemSection = SystemSection.Language, "language");
             return;
         }
         ActionButton(300, 194, 182, 40, global::AetherBoy.Runtime.Localization.UiText.Get("Back"), () => { CommitActiveText(); systemSection = SystemSection.Overview; focusedControl = -1; });

@@ -52,7 +52,7 @@ internal sealed class AetherSelect : Control, IMessageFilter
         if (Width < 4 || Height < 4) return;
         var bounds = new Rectangle(0, 0, Width - 1, Height - 1);
         using var path = AetherWidgetPaint.Outline(bounds);
-        using var fill = new SolidBrush(AetherColors.SurfaceRaised);
+        using var fill = new SolidBrush(AetherColors.Surface);
         using var border = new Pen(Enabled && (Focused || hovered || IsOpen) ? AetherColors.Cyan : AetherColors.Hairline);
         e.Graphics.FillPath(fill, path); e.Graphics.DrawPath(border, path);
         bool rtl = RightToLeft == RightToLeft.Yes;
@@ -251,7 +251,7 @@ internal sealed class AetherSelect : Control, IMessageFilter
                 var bounds = new Rectangle(3, 2 + row * RowHeight, Math.Max(1, Width - (scroll.Visible ? scroll.Width + 6 : 6)), RowHeight);
                 if (index == Highlight)
                 {
-                    using var fill = new SolidBrush(AetherColors.SurfaceRaised); e.Graphics.FillRectangle(fill, bounds);
+                    using var fill = new SolidBrush(AetherColors.Surface); e.Graphics.FillRectangle(fill, bounds);
                     AetherWidgetPaint.Focus(e.Graphics, Rectangle.Inflate(bounds, -1, -1), AetherColors.Cyan);
                 }
                 TextRenderer.DrawText(e.Graphics, select.Items[index].ToString(), Font, Rectangle.Inflate(bounds, -9, 0),

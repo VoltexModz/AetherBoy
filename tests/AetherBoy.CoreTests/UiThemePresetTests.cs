@@ -30,14 +30,14 @@ public sealed class UiThemePresetTests
     }
 
     [TestMethod]
-    public void OriginalRestoresHistoricalAetherWaveSurfaces()
+    public void OriginalMatchesApprovedPenDesktopSurfaces()
     {
         var palette = new UiThemePalette(null, null, null);
-        Assert.AreEqual("#080B18", palette.Chrome.Hex);
-        Assert.AreEqual("#0C101F", palette.Surface.Hex);
-        Assert.AreEqual("#111629", palette.Raised.Hex);
-        Assert.AreEqual("#2F3753", palette.Border.Hex);
-        Assert.AreEqual("#F1F4FF", palette.Text.Hex);
-        Assert.AreEqual("#8B94B1", palette.Muted.Hex);
+        Assert.AreEqual("#111520", palette.Chrome.Hex);
+        Assert.AreEqual("#171C29", palette.Surface.Hex);
+        Assert.AreEqual("#212838", palette.Raised.Hex);
+        Assert.AreEqual("#30384A", palette.Border.Hex);
+        Assert.AreEqual("#F0F2F8", palette.Text.Hex);
+        Assert.AreEqual("#A1ABC0", palette.Muted.Hex);
     }
 }

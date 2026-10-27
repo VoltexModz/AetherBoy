@@ -22,7 +22,7 @@ internal sealed partial class WaylandEmulatorHost
     private void AddAccessibleCommand(float x, float y, float width, float height, string label, bool selected, bool enabled, string? focusId)
     {
         bool navigation = focusId?.StartsWith("nav:", StringComparison.Ordinal) == true;
-        string key = navigation ? "navigation:" + y : FocusContext + ":" + (focusId ?? "button") + (focusId is null ? $":{x}:{y}" : "");
+        string key = navigation ? ((focusId!.StartsWith("nav:desktop:", StringComparison.Ordinal) || focusId.StartsWith("nav:appearance:", StringComparison.Ordinal) || focusId.StartsWith("nav:settings:", StringComparison.Ordinal)) ? "navigation:" + focusId : "navigation:" + y) : FocusContext + ":" + (focusId ?? "button") + (focusId is null ? $":{x}:{y}" : "");
         string name = label == "×" ? global::AetherBoy.Runtime.Localization.UiText.Get(aetherSelection is not null ? "CANCEL" : "Return to game") : label;
         if (focusId?.StartsWith("text:", StringComparison.Ordinal) == true) name = focusId switch
         { "text:Title" => global::AetherBoy.Runtime.Localization.UiText.Get("Edit cartridge title"), "text:Tags" => global::AetherBoy.Runtime.Localization.UiText.Get("Edit cartridge tags"), "text:Search" => global::AetherBoy.Runtime.Localization.UiText.Get("Search cartridges"), "text:SettingsSearch" => global::AetherBoy.Runtime.Localization.UiText.Get("Search settings"), "text:Cheat" => global::AetherBoy.Runtime.Localization.UiText.Get("Edit cheat code"), _ => global::AetherBoy.Runtime.Localization.UiText.Get("Edit text") };
@@ -73,7 +73,7 @@ internal sealed partial class WaylandEmulatorHost
     private void DescribeAccessibleText(float x, float y, string text)
     {
         if (!drawingButtonLabel && !string.IsNullOrWhiteSpace(text) &&
-            (!controlCenterVisible || x >= 278 && y >= 180 && y < LogicalHeight - 124 || aetherSelection is not null))
+            (!controlCenterVisible || x >= nanoboy.Core.UiDesktopLayout.Create(LogicalWidth, LogicalHeight).ContentX && y >= 88 && y < LogicalHeight - 32 || aetherSelection is not null))
             accessibleDescriptions.Add(text);
     }
     private void UpdateAccessibleControls()

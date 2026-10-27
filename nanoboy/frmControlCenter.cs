@@ -10,6 +10,7 @@ using AetherBoy.Runtime;
 using nanoboy.Controls;
 using nanoboy.Core;
 using nanoboy.Input;
+using UiText = AetherBoy.Runtime.Localization.UiText;
 using nanoboy.Storage;
 
 namespace nanoboy
@@ -24,7 +25,6 @@ namespace nanoboy
         private readonly List<AetherButton> scaleButtons = new();
         private readonly List<AetherButton> volumeButtons = new();
         private readonly List<AetherButton> latencyButtons = new();
-        private readonly List<(Panel Swatch, AetherButton Picker, Func<string> Read)> themeControls = new();
         private readonly List<(UiThemePreset Preset, AetherButton Button)> themePresetButtons = new();
         private AetherButton gpuButton = null!, vsyncButton = null!;
         private readonly List<AetherButton> pictureSizeButtons = new();
@@ -36,6 +36,8 @@ namespace nanoboy
         private readonly AetherButton[] channelButtons = new AetherButton[4];
         private readonly System.Windows.Forms.Timer liveTimer;
         private readonly Panel contentHost;
+        private readonly AetherTextBox[] desktopColorFields = new AetherTextBox[3];
+        private bool desktopColorsDirty;
 
         private AetherButton audioMasterButton = null!;
         private Label audioDetails = null!;
@@ -66,9 +68,8 @@ namespace nanoboy
             Text = global::AetherBoy.Runtime.Localization.UiText.Get("Einstellungen");
             StartPosition = FormStartPosition.CenterParent;
             ShowInTaskbar = false;
-            ClientSize = new Size(1_080, 780);
-            MinimumSize = Size;
-            MaximumSize = Size;
+            ClientSize = new Size(1360, 836);
+
             Branding.AppBrand.ApplyIcon(this);
 
             var nav = BuildNavigation();
@@ -77,7 +78,7 @@ namespace nanoboy
                 BackColor = AetherColors.Void,
                 Dock = DockStyle.Fill,
                 Name = "controlCenterContentHost",
-                Padding = new Padding(26, 20, 26, 20)
+                Padding = new Padding(32)
             };
             Controls.Add(contentHost);
             Controls.Add(nav);
@@ -93,10 +94,17 @@ namespace nanoboy
             AddPage("storage", BuildStoragePage());
             ConfigureSettingsNavigation();
 
+            var footer = new AetherChromePanel { Name = "controlCenterFooter", Dock = DockStyle.Bottom, Height = 32 };
+            footer.Controls.Add(new Label { Dock = DockStyle.Fill, Padding = new Padding(24, 0, 0, 0),
+                Text = UiText.Get("Strg+K: Suchen. F6: Bereich wechseln. Tab: Nächstes Feld. Esc: Zurück."),
+                ForeColor = AetherColors.Muted, Font = AetherTypography.Create(9), TextAlign = ContentAlignment.MiddleLeft });
+            Controls.Add(footer);
+
             AetherDialog.Apply(
                 this,
                 "AetherBoy",
-                global::AetherBoy.Runtime.Localization.UiText.Get("Einstellung suchen oder einen Bereich auswählen."));
+                global::AetherBoy.Runtime.Localization.UiText.Get("Einstellung suchen oder einen Bereich auswählen."), desktop: true);
+            ArrangeSettingsNavigation();
             // This pane has its own Aether card and scroll actions, not native white chrome.
             diagnostics.ScrollBars = ScrollBars.None;
 
@@ -104,7 +112,7 @@ namespace nanoboy
             liveTimer.Tick += (_, _) => RefreshAll();
             Shown += (_, _) =>
             {
-                ShowPage("overview");
+                ShowPage("appearance");
                 RefreshAll();
                 liveTimer.Start();
             };
@@ -115,57 +123,56 @@ namespace nanoboy
         {
             var nav = new AetherSurfacePanel
             {
-                AccentEdge = true,
-                BackColor = AetherColors.Chrome,
-                Dock = DockStyle.Left,
-                Name = "controlCenterNavigation",
-                Padding = new Padding(18, 22, 18, 18),
-                Width = 220
+                BackColor = AetherColors.Chrome, Dock = DockStyle.Left,
+                Name = "controlCenterNavigation", Padding = new Padding(16), Width = 232
             };
-
+            var back = new AetherButton
+            {
+                Name = "controlCenterReturnToGame", Text = UiText.Get("Return to game"),
+                Icon = UiIcon.Rewind, AlignLeft = true, Kind = AetherButtonKind.Ghost,
+                Bounds = new Rectangle(16, 16, 200, 44)
+            };
+            back.Click += (_, _) => Close();
+            nav.Controls.Add(back);
+            foreach (var item in new (string Key, string Label)[] {
+                ("overview", "Übersicht"), ("appearance", "Aussehen"), ("display", "Grafik"),
+                ("audio", "Audio"), ("input", "Steuerung"), ("saves", "Spielstände"),
+                ("system", "App und Dateien"), ("diagnostics", "Diagnose"), ("storage", "Ordner") })
+                AddNavigationButton(nav, item.Key, UiText.Get(item.Label), 0);
             nav.Controls.Add(new Label
             {
-                AutoSize = false,
-                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold, GraphicsUnit.Point),
-                ForeColor = AetherColors.Muted,
-                Location = new Point(18, 20),
-                Size = new Size(180, 20),
-                Tag = "accent",
-                Text = "AETHERBOY"
+                Name = "controlCenterSavedStatus", AutoSize = false,
+                Font = AetherTypography.Create(9), ForeColor = AetherColors.Muted,
+                Size = new Size(200, 40), Text = UiText.Get("Auf diesem Computer gespeichert")
             });
-            nav.Controls.Add(new Label
-            {
-                AutoSize = false,
-                Font = new Font("Segoe UI Semibold", 15f, FontStyle.Bold, GraphicsUnit.Point),
-                ForeColor = AetherColors.Text,
-                Location = new Point(18, 42),
-                Size = new Size(182, 54),
-                Tag = "value",
-                Text = global::AetherBoy.Runtime.Localization.UiText.Get("Einstellungen")
-            });
-
-            AddNavigationButton(nav, "overview", global::AetherBoy.Runtime.Localization.UiText.Get("Übersicht"), 164);
-            AddNavigationButton(nav, "appearance", global::AetherBoy.Runtime.Localization.UiText.Get("Aussehen"), 208);
-            AddNavigationButton(nav, "display", global::AetherBoy.Runtime.Localization.UiText.Get("Grafik"), 252);
-            AddNavigationButton(nav, "audio", "Audio", 296);
-            AddNavigationButton(nav, "input", global::AetherBoy.Runtime.Localization.UiText.Get("Steuerung"), 340);
-            AddNavigationButton(nav, "saves", global::AetherBoy.Runtime.Localization.UiText.Get("Spielstände"), 384);
-            AddNavigationButton(nav, "system", global::AetherBoy.Runtime.Localization.UiText.Get("App und System"), 428);
-            AddNavigationButton(nav, "diagnostics", global::AetherBoy.Runtime.Localization.UiText.Get("Diagnose"), 472);
-            AddNavigationButton(nav, "storage", global::AetherBoy.Runtime.Localization.UiText.Get("Ordner"), 516);
-
-            var privacy = new Label
-            {
-                Anchor = AnchorStyles.Left | AnchorStyles.Bottom,
-                AutoSize = false,
-                Font = new Font("Cascadia Mono", 7.25f, FontStyle.Regular, GraphicsUnit.Point),
-                ForeColor = AetherColors.Muted,
-                Location = new Point(18, 575),
-                Size = new Size(180, 66),
-                Text = global::AetherBoy.Runtime.Localization.UiText.Get("Auf diesem Computer gespeichert")
-            };
-            nav.Controls.Add(privacy);
+            nav.SizeChanged += (_, _) => ArrangeSettingsNavigation(nav);
             return nav;
+        }
+
+        private void ArrangeSettingsNavigation(Control? pane = null)
+        {
+            pane ??= Controls.Find("controlCenterNavigation", true).FirstOrDefault();
+            if (pane is null) return;
+            float scale = DeviceDpi / 96f * Math.Clamp(bridge.Settings.UiScalePercent, 100, 150) / 100f;
+            int S(int value) => (int)Math.Round(value * scale);
+            pane.Width = S(232);
+            var back = pane.Controls.Find("controlCenterReturnToGame", false).FirstOrDefault();
+            if (back is not null) back.Bounds = new Rectangle(S(16), S(16), S(200), S(44));
+            if (settingsSearch is not null) settingsSearch.Bounds = new Rectangle(S(16), S(72), S(200), S(44));
+            int row = 0;
+            foreach ((string key, AetherButton button) in navigation)
+            {
+                bool visible = key is not "storage" and not "tools";
+                button.Visible = visible;
+                if (!visible) continue;
+                button.Bounds = new Rectangle(S(16), S(136 + row++ * 48), S(200), S(44));
+                button.AlignLeft = true;
+                button.Icon = key switch {
+                    "appearance" => UiIcon.Settings, "display" => UiIcon.Maximize, "audio" => UiIcon.Volume,
+                    "input" => UiIcon.Tools, "saves" => UiIcon.Save, "system" => UiIcon.Open, _ => UiIcon.More };
+            }
+            var status = pane.Controls.Find("controlCenterSavedStatus", false).FirstOrDefault();
+            if (status is not null) status.Bounds = new Rectangle(S(16), Math.Max(S(548), pane.Height - S(64)), S(200), S(48));
         }
 
         private void AddNavigationButton(Control parent, string key, string text, int y)
@@ -194,8 +201,11 @@ namespace nanoboy
             contentHost.Controls.Add(viewport);
         }
 
+        internal void NavigateTo(string key) => ShowPage(key);
+
         private void ShowPage(string key)
         {
+            contentHost.Padding = new Padding((int)(32 * DeviceDpi / 96f * Math.Clamp(bridge.Settings.UiScalePercent, 100, 150) / 100f));
             if (key != "search") { currentSettingsPage = key; ClearSearchText(); }
             foreach ((string pageKey, Panel page) in pages)
             {
@@ -252,72 +262,86 @@ namespace nanoboy
 
         private Panel BuildAppearancePage()
         {
-            Panel page = CreatePage("controlCenterPageAppearance", global::AetherBoy.Runtime.Localization.UiText.Get("Aussehen"), global::AetherBoy.Runtime.Localization.UiText.Get("Wähle ein Design oder passe seine Farben selbst an."));
-            AetherSurfacePanel presets = CreateCard(page, 0, 72, 788, 174, global::AetherBoy.Runtime.Localization.UiText.Get("FARBDESIGNS"));
+            Panel page = CreatePage("controlCenterPageAppearance", UiText.Get("Aussehen"), UiText.Get("Passe die Oberfläche an dich an."));
+            page.Controls.Add(CreateSmallLabel(UiText.Get("Themes"), 0, 150, 500, 26));
+            var presets = new TableLayoutPanel { Bounds = new Rectangle(0, 186, 1000, 132), ColumnCount = 6, RowCount = 1, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
             for (int i = 0; i < UiThemePresets.All.Count; i++)
             {
                 UiThemePreset preset = UiThemePresets.All[i];
-                int x = 18 + (i % 3) * 254, y = 44 + (i / 3) * 58;
-                presets.Controls.Add(new Panel { Location = new Point(x, y + 5), Size = new Size(12, 31),
-                    BackColor = ColorTranslator.FromHtml(preset.Primary), Tag = "theme-swatch" });
-                presets.Controls.Add(new Panel { Location = new Point(x + 12, y + 5), Size = new Size(12, 31),
-                    BackColor = ColorTranslator.FromHtml(preset.Secondary), Tag = "theme-swatch" });
-                AetherButton button = AddActionButton(presets, preset.Name, x + 30, y, 208,
-                    () => ApplyThemePreset(preset));
-                button.Name = "themePreset_" + preset.Id;
-                themePresetButtons.Add((preset, button));
+                presets.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / 6));
+                var button = new AetherButton { Name = "themePreset_" + preset.Id, Text = preset.Name, AccessibleName = preset.Name,
+                    ThemePreview = preset, Kind = AetherButtonKind.Secondary, Dock = DockStyle.Fill, Margin = new Padding(0, 0, i == 5 ? 0 : 12, 0), Font = AetherTypography.Create(9) };
+                button.Click += (_, _) => ApplyThemePreset(preset); presets.Controls.Add(button, i, 0); themePresetButtons.Add((preset, button));
             }
-            AddThemeColorCard(page, 262, global::AetherBoy.Runtime.Localization.UiText.Get("HAUPTFARBE"), global::AetherBoy.Runtime.Localization.UiText.Get("Schaltflächen und aktive Auswahl"),
-                () => bridge.Settings.UiPrimaryColor, value => bridge.Settings.UiPrimaryColor = value);
-            AddThemeColorCard(page, 394, global::AetherBoy.Runtime.Localization.UiText.Get("ZWEITFARBE"), global::AetherBoy.Runtime.Localization.UiText.Get("Fokus und Verbindungsdetails"),
-                () => bridge.Settings.UiSecondaryColor, value => bridge.Settings.UiSecondaryColor = value);
-            AddThemeColorCard(page, 526, global::AetherBoy.Runtime.Localization.UiText.Get("HINTERGRUND"), global::AetherBoy.Runtime.Localization.UiText.Get("Grundfarbe hinter den Menüs"),
-                () => bridge.Settings.UiBackgroundColor, value => bridge.Settings.UiBackgroundColor = value);
-
-            AetherSurfacePanel brand = CreateCard(page, 0, 664, 788, 132, "AETHER ORIGINAL");
-            var originalMark = new PictureBox
+            page.Controls.Add(presets);
+            page.Controls.Add(CreateSmallLabel(UiText.Get("Eigene Farben"), 0, 346, 500, 26));
+            var fields = new TableLayoutPanel { Bounds = new Rectangle(0, 380, 1000, 76), ColumnCount = 3, RowCount = 2, Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right };
+            string[] labels = ["Hauptfarbe", "Zweitfarbe", "Hintergrund"];
+            string[] values = [bridge.Settings.UiPrimaryColor, bridge.Settings.UiSecondaryColor, bridge.Settings.UiBackgroundColor];
+            for (int i = 0; i < 3; i++)
             {
-                SizeMode = PictureBoxSizeMode.Zoom,
-                Location = new Point(18, 36), Size = new Size(82, 82),
-            };
-            Branding.AppBrand.BindMark(originalMark, followsTheme: false);
-            brand.Controls.Add(originalMark);
-            brand.Controls.Add(CreateSmallLabel(global::AetherBoy.Runtime.Localization.UiText.Get("Das Originaldesign nutzt Violett und Cyan. Eigene Farben gelten für alle Spiele."),
-                118, 39, 630, 35));
-            AddActionButton(brand, global::AetherBoy.Runtime.Localization.UiText.Get("Originaldesign wiederherstellen"), 118, 79, 300,
-                () => ApplyThemePreset(UiThemePresets.All[0])).Name = "controlCenterRestoreTheme";
-            page.Controls.Add(CreateFootnote(global::AetherBoy.Runtime.Localization.UiText.Get("Text und Warnungen passen sich automatisch an die gewählten Farben an."), 810));
+                int index = i; fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / 3));
+                fields.Controls.Add(new Label { Text = UiText.Get(labels[i]), ForeColor = AetherColors.Muted, Dock = DockStyle.Fill }, i, 0);
+                var entry = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0, 0, i == 2 ? 0 : 16, 0) };
+                var picker = new AetherButton { Name = "desktopColorPicker" + i, Text = UiText.Get("Farbe wählen"), AccessibleName = UiText.Get(labels[i]), Icon = UiIcon.Tools, IconOnly = true, Kind = AetherButtonKind.Ghost, Dock = DockStyle.Right, Width = 44 };
+                var input = new AetherTextBox { Name = "desktopColor" + i, AccessibleName = UiText.Get(labels[i]), Text = values[i], Dock = DockStyle.Fill };
+                input.TextChanged += (_, _) => desktopColorsDirty = true; desktopColorFields[i] = input;
+                picker.Click += (_, _) =>
+                {
+                    UiRgb.TryParse(input.Text, out var color);
+                    using var dialog = new AetherColorDialog { Color = Color.FromArgb(color.R, color.G, color.B) };
+                    if (dialog.ShowDialog(this) == DialogResult.OK) input.Text = $"#{dialog.Color.R:X2}{dialog.Color.G:X2}{dialog.Color.B:X2}";
+                };
+                entry.Controls.Add(input); entry.Controls.Add(picker); fields.Controls.Add(entry, i, 1);
+            }
+            fields.RowStyles.Add(new RowStyle(SizeType.Absolute, 28)); fields.RowStyles.Add(new RowStyle(SizeType.Absolute, 44));
+            page.Controls.Add(fields);
+            page.Controls.Add(CreateSmallLabel(UiText.Get("Oberflächengröße"), 0, 488, 500, 28));
+            page.Controls.Add(CreateSmallLabel(UiText.Get("Anzeigesprache"), 0, 550, 500, 28));
+            var size = new AetherSelect { Name = "desktopUiScale", Bounds = new Rectangle(800, 480, 174, 44), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            size.Items.AddRange(["100 %", "125 %", "150 %"]); size.SelectedIndex = (Math.Clamp(bridge.Settings.UiScalePercent, 100, 150) - 100) / 25;
+            size.SelectedIndexChanged += (_, _) => bridge.Settings.UiScalePercent = 100 + size.SelectedIndex * 25;
+            var language = new AetherSelect { Name = "desktopLanguage", Bounds = new Rectangle(800, 542, 174, 44), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+            string[] languages = ["system", "de", "en"];
+            language.Items.AddRange([UiText.Get("Systemsprache"), "Deutsch", "English"]); language.SelectedIndex = Math.Max(0, Array.IndexOf(languages, bridge.Settings.DisplayLanguage));
+            language.SelectedIndexChanged += (_, _) => bridge.Settings.DisplayLanguage = languages[language.SelectedIndex];
+            page.Controls.Add(size); page.Controls.Add(language);
+            page.Controls.Add(CreateSmallLabel(UiText.Get("Sprache und Oberflächengröße gelten nach dem Neustart."), 0, 600, 788, 36));
+            var restore = AddActionButton(page, UiText.Get("Originaldesign wiederherstellen"), 0, 654, 280, () => ApplyThemePreset(UiThemePresets.All[0])); restore.Name = "controlCenterRestoreTheme";
+            var apply = AddActionButton(page, UiText.Get("Farben anwenden"), 800, 654, 196, () =>
+            {
+                var colors = new UiRgb[3];
+                for (int i = 0; i < 3; i++) if (!UiRgb.TryParse(desktopColorFields[i].Text, out colors[i]))
+                { AetherSignal.Show(this, UiText.Get("Use six hexadecimal digits for each color, for example #8B38FF."), UiText.Get("Eigene Farben")); return; }
+                bridge.Settings.UiPrimaryColor = colors[0].Hex; bridge.Settings.UiSecondaryColor = colors[1].Hex; bridge.Settings.UiBackgroundColor = colors[2].Hex;
+                desktopColorsDirty = false; bridge.ApplyUiTheme(); RefreshAll();
+            }, AetherButtonKind.Primary);
+            apply.Name = "desktopApplyColors"; apply.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            void Arrange()
+            {
+                int width = Math.Max(788, page.ClientSize.Width - 4);
+                presets.Width = fields.Width = width; size.Left = language.Left = width - 174; apply.Left = width - 196;
+            }
+            foreach (Label label in page.Controls.OfType<Label>().Where(label => label.Top >= 150))
+            {
+                label.Font = AetherTypography.Create(label.Top == 150 || label.Top == 346 ? 12 : 10.5f,
+                    label.Top == 150 || label.Top == 346 ? FontStyle.Bold : FontStyle.Regular);
+                label.ForeColor = label.Top == 150 || label.Top == 346 ? AetherColors.Text : AetherColors.Muted;
+            }
+            foreach (Control control in page.Controls)
+                if (control.Top >= 150) control.Top -= 70;
+            page.SizeChanged += (_, _) => Arrange(); Arrange();
             return page;
         }
 
         private void ApplyThemePreset(UiThemePreset preset)
         {
+            desktopColorsDirty = false;
             bridge.Settings.UiPrimaryColor = preset.Primary;
             bridge.Settings.UiSecondaryColor = preset.Secondary;
             bridge.Settings.UiBackgroundColor = preset.Background;
             bridge.ApplyUiTheme();
             RefreshAll();
-        }
-
-        private void AddThemeColorCard(Control page, int y, string heading, string description,
-            Func<string> read, Action<string> write)
-        {
-            AetherSurfacePanel card = CreateCard(page, 0, y, 788, 116, heading);
-            card.Controls.Add(CreateSmallLabel(description, 110, 42, 410, 30));
-            var swatch = new AetherColorSwatch { Location = new Point(18, 43), Size = new Size(72, 52) };
-            card.Controls.Add(swatch);
-            AetherButton picker = AddActionButton(card, global::AetherBoy.Runtime.Localization.UiText.Get("Farbe wählen"), 546, 45, 222, () =>
-            {
-                UiRgb.TryParse(read(), out UiRgb current);
-                using var dialog = new AetherColorDialog
-                {
-                    Color = Color.FromArgb(current.R, current.G, current.B),
-                };
-                if (dialog.ShowDialog(this) != DialogResult.OK) return;
-                write($"#{dialog.Color.R:X2}{dialog.Color.G:X2}{dialog.Color.B:X2}");
-                bridge.ApplyUiTheme(); RefreshAll();
-            });
-            themeControls.Add((swatch, picker, read));
         }
 
         private Panel BuildDisplayPage()
@@ -359,7 +383,7 @@ namespace nanoboy
 
         private Panel BuildAudioPage()
         {
-            Panel page = CreatePage("controlCenterPageAudio", "AUDIO", global::AetherBoy.Runtime.Localization.UiText.Get("Master-Ausgabe, Kanäle und Pegel"));
+            Panel page = CreatePage("controlCenterPageAudio", UiText.Get("Audio"), global::AetherBoy.Runtime.Localization.UiText.Get("Master-Ausgabe, Kanäle und Pegel"));
             AetherSurfacePanel master = CreateCard(page, 0, 72, 788, 112, global::AetherBoy.Runtime.Localization.UiText.Get("MASTER OUTPUT // WASAPI + WINMM FALLBACK"));
             audioMasterButton = AddActionButton(master, global::AetherBoy.Runtime.Localization.UiText.Get("AUDIO ON"), 18, 48, 200, ToggleAudio, AetherButtonKind.Primary);
             audioDetails = CreateSmallLabel("", 242, 34, 510, 74);
@@ -391,8 +415,10 @@ namespace nanoboy
 
             AetherSurfacePanel tools = CreateCard(page, 0, 486, 788, 86, global::AetherBoy.Runtime.Localization.UiText.Get("SIGNAL TOOL"));
             AddActionButton(tools, global::AetherBoy.Runtime.Localization.UiText.Get("OPEN AUDIO INSPECTOR"), 18, 36, 260, bridge.OpenAudioInspector, AetherButtonKind.Secondary);
-            tools.Controls.Add(CreateSmallLabel(global::AetherBoy.Runtime.Localization.UiText.Get("Live-Kanäle, Frequenzen und Wave-RAM ansehen oder als WAV aufnehmen."), 298, 38, 460, 30));
-            AetherSurfacePanel latency = CreateCard(page, 0, 588, 788, 144, global::AetherBoy.Runtime.Localization.UiText.Get("OUTPUT LATENCY // WINDOWS DEFAULT DEVICE"));
+            var inspectorDescription = CreateSmallLabel(global::AetherBoy.Runtime.Localization.UiText.Get("Live-Kanäle, Frequenzen und Wave-RAM ansehen oder als WAV aufnehmen."), 298, 34, 460, 48);
+            inspectorDescription.Name = "controlCenterAudioInspectorDescription";
+            tools.Controls.Add(inspectorDescription);
+            AetherSurfacePanel latency = CreateCard(page, 0, 588, 788, 168, global::AetherBoy.Runtime.Localization.UiText.Get("OUTPUT LATENCY // WINDOWS DEFAULT DEVICE"));
             AddSelector(latency, new[] { "20 MS", "40 MS", "60 MS", "100 MS" }, 18, 38, 170,
                 latencyButtons, index =>
                 {
@@ -400,9 +426,11 @@ namespace nanoboy
                     bridge.ApplyAudioSettings();
                     RefreshAll();
                 });
-            latency.Controls.Add(CreateSmallLabel(
+            var latencyDescription = CreateSmallLabel(
                 global::AetherBoy.Runtime.Localization.UiText.Get("40 ms Standard. Bei Knacken 60/100 ms wählen. Gerätewechsel folgt Windows automatisch.\r\nZielpuffer ≠ Gesamtlatenz; Vorpuffer, Resampling und Treiber kommen hinzu. GB/GBC: Mono · GBA: Stereo."),
-                18, 92, 748, 44));
+                18, 92, 748, 68);
+            latencyDescription.Name = "controlCenterAudioLatencyDescription";
+            latency.Controls.Add(latencyDescription);
             return page;
         }
 
@@ -456,7 +484,7 @@ namespace nanoboy
 
         private Panel BuildSystemPage()
         {
-            Panel page = CreatePage("controlCenterPageSystem", global::AetherBoy.Runtime.Localization.UiText.Get("App und System"), global::AetherBoy.Runtime.Localization.UiText.Get("Bedienung, Spielprofile und lokale Firmware verwalten."));
+            Panel page = CreatePage("controlCenterPageSystem", UiText.Get("App und Dateien"), global::AetherBoy.Runtime.Localization.UiText.Get("Bedienung, Spielprofile und lokale Firmware verwalten."));
             AetherSurfacePanel frames = CreateCard(page, 0, 72, 788, 130, global::AetherBoy.Runtime.Localization.UiText.Get("BILDER AUSLASSEN"));
             AddSelector(frames, new[] { global::AetherBoy.Runtime.Localization.UiText.Get("Keine"), global::AetherBoy.Runtime.Localization.UiText.Get("1 Bild"), global::AetherBoy.Runtime.Localization.UiText.Get("2 Bilder"), global::AetherBoy.Runtime.Localization.UiText.Get("3 Bilder"), global::AetherBoy.Runtime.Localization.UiText.Get("4 Bilder") }, 18, 48, 140, frameskipButtons, bridge.SetFrameskip);
             frames.Controls.Add(CreateSmallLabel(global::AetherBoy.Runtime.Localization.UiText.Get("Frameskip verändert nur die Bildausgabe, nicht die emulierte Hardwarezeit."), 18, 91, 748, 28));
@@ -596,7 +624,7 @@ namespace nanoboy
             page.Controls.Add(new Label
             {
                 AutoSize = false,
-                Font = new Font("Segoe UI Semibold", 20f, FontStyle.Bold, GraphicsUnit.Point),
+                Font = AetherTypography.Create(21, FontStyle.Bold),
                 ForeColor = AetherColors.Text,
                 Location = new Point(0, 0),
                 Size = new Size(788, 38),
@@ -606,7 +634,7 @@ namespace nanoboy
             page.Controls.Add(new Label
             {
                 AutoSize = false,
-                Font = new Font("Segoe UI", 9f, FontStyle.Regular, GraphicsUnit.Point),
+                Font = AetherTypography.Create(10.5f),
                 ForeColor = AetherColors.Muted,
                 Location = new Point(2, 40),
                 Size = new Size(786, 24),
@@ -625,14 +653,15 @@ namespace nanoboy
         {
             var card = new AetherSurfacePanel
             {
-                AccentEdge = true,
+                DividerOnly = true,
+                BackColor = AetherColors.Void,
                 Location = new Point(x, y),
                 Size = new Size(width, height)
             };
             card.Controls.Add(new Label
             {
                 AutoSize = false,
-                Font = new Font("Segoe UI", 7.5f, FontStyle.Bold, GraphicsUnit.Point),
+                Font = AetherTypography.Create(10.5f, FontStyle.Bold),
                 ForeColor = AetherColors.Cyan,
                 Location = new Point(18, 12),
                 Size = new Size(Math.Max(1, width - 36), 20),
@@ -655,7 +684,7 @@ namespace nanoboy
             {
                 AutoEllipsis = true,
                 AutoSize = false,
-                Font = new Font("Segoe UI Semibold", fontSize, FontStyle.Bold, GraphicsUnit.Point),
+                Font = AetherTypography.Create(fontSize, FontStyle.Bold),
                 ForeColor = AetherColors.Text,
                 Location = new Point(x, y),
                 Size = new Size(width, height),
@@ -671,7 +700,7 @@ namespace nanoboy
             {
                 AutoEllipsis = true,
                 AutoSize = false,
-                Font = new Font("Segoe UI", 8.5f, FontStyle.Regular, GraphicsUnit.Point),
+                Font = AetherTypography.Create(10.5f),
                 ForeColor = AetherColors.Muted,
                 Location = new Point(x, y),
                 Size = new Size(width, height),
@@ -735,11 +764,10 @@ namespace nanoboy
             foreach ((UiThemePreset preset, AetherButton button) in themePresetButtons)
                 button.Selected = preset.Id == selectedPreset?.Id;
             UiRgb[] colors = [theme.Primary, theme.Secondary, theme.Background];
-            for (int i = 0; i < themeControls.Count; i++)
+            if (!desktopColorsDirty)
             {
-                UiRgb color = colors[i];
-                themeControls[i].Swatch.BackColor = Color.FromArgb(color.R, color.G, color.B);
-                themeControls[i].Picker.Text = global::AetherBoy.Runtime.Localization.UiText.Get("Wählen · ") + color.Hex;
+                for (int i = 0; i < desktopColorFields.Length; i++) if (desktopColorFields[i] is { } input) input.Text = colors[i].Hex;
+                desktopColorsDirty = false;
             }
             RefreshSelectors();
             RefreshOverview();

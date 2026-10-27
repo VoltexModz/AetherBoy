@@ -48,7 +48,7 @@ public sealed class UiThemePalette
 {
     public const string DefaultPrimary = "#8B38FF";
     public const string DefaultSecondary = "#29E2ED";
-    public const string DefaultBackground = "#050712";
+    public const string DefaultBackground = "#0D1019";
 
     public UiRgb Primary { get; }
     public UiRgb Secondary { get; }
@@ -57,6 +57,7 @@ public sealed class UiThemePalette
     public UiRgb Surface { get; }
     public UiRgb Raised { get; }
     public UiRgb Border { get; }
+    public UiRgb Selection { get; }
     public UiRgb Text { get; }
     public UiRgb Muted { get; }
     public UiRgb PrimaryText { get; }
@@ -78,7 +79,8 @@ public sealed class UiThemePalette
         Secondary = UiRgb.TryParse(secondary, out UiRgb s) ? s : defaultSecondary;
         Background = UiRgb.TryParse(background, out UiRgb b) ? b : defaultBackground;
         bool original = Primary == defaultPrimary && Secondary == defaultSecondary && Background == defaultBackground;
-        Text = original ? new(241, 244, 255) : Background.Contrast(new(255, 255, 255)) >= Background.Contrast(new(0, 0, 0))
+        bool pocket = Primary.Hex == "#386D4A" && Secondary.Hex == "#B88029" && Background.Hex == "#F1E9D2";
+        Text = original ? new(240, 242, 248) : pocket ? new(39, 56, 43) : Background.Contrast(new(255, 255, 255)) >= Background.Contrast(new(0, 0, 0))
             ? new(255, 255, 255) : new(0, 0, 0);
         bool dark = Text.Luminance > .5;
         UiRgb opposite = dark ? new(0, 0, 0) : new(255, 255, 255);
@@ -90,32 +92,34 @@ public sealed class UiThemePalette
             UiRgb candidate = UiRgb.Mix(UiRgb.Mix(Background, Text, amount), tint, dark ? .035 : .02);
             return Text.Contrast(candidate) >= 4.5 ? candidate : UiRgb.Mix(Background, opposite, amount);
         }
-        // These are the actual Aether Wave surface colors, not just the three
-        // logo colors. Other presets and custom palettes use the same hierarchy.
-        Chrome = original ? new(8, 11, 24) : SurfaceAt(.012);
-        Surface = original ? new(12, 16, 31) : SurfaceAt(.03);
-        Raised = original ? new(17, 22, 41) : SurfaceAt(.055);
-        Border = original ? new(47, 55, 83) : SurfaceAt(.20);
+        // pen.dev desktop study, 27 October 2026. Other palettes keep user colors intact.
+        Chrome = original ? new(17, 21, 32) : pocket ? new(233, 225, 203) : SurfaceAt(.025);
+        Surface = original ? new(23, 28, 41) : pocket ? new(250, 246, 234) : SurfaceAt(.055);
+        Raised = original ? new(33, 40, 56) : pocket ? new(255, 255, 255) : SurfaceAt(.09);
+        Border = original ? new(48, 56, 74) : pocket ? new(200, 192, 172) : SurfaceAt(.20);
+        Selection = original ? new(41, 34, 57) : pocket ? new(219, 230, 214) : UiRgb.Mix(Surface, Primary, .12);
         UiRgb ReadableOnSurfaces(UiRgb color)
         {
-            UiRgb[] surfaces = [Background, Chrome, Surface, Raised];
+            UiRgb[] surfaces = [Background, Chrome, Surface, Raised, Selection];
             foreach (UiRgb surface in surfaces) color = EnsureContrast(color, surface, Text);
             foreach (UiRgb surface in surfaces)
                 if (color.Contrast(surface) < 4.5) return Text;
             return color;
         }
-        Muted = ReadableOnSurfaces(original ? new(139, 148, 177) : UiRgb.Mix(Background, Text, .62));
-        PrimaryText = ReadableOnSurfaces(Primary);
-        SecondaryText = ReadableOnSurfaces(Secondary);
+        Muted = ReadableOnSurfaces(original ? new(161, 171, 192) : pocket ? new(94, 104, 92) : UiRgb.Mix(Background, Text, .62));
+        PrimaryText = ReadableOnSurfaces(original ? new(170, 134, 255) : Primary);
+        SecondaryText = ReadableOnSurfaces(original ? new(120, 216, 213) : pocket ? new(116, 83, 33) : Secondary);
         OnPrimary = Primary.Contrast(new(255, 255, 255)) >= Primary.Contrast(new(0, 0, 0))
             ? new(255, 255, 255) : new(0, 0, 0);
         OnSecondary = Secondary.Contrast(new(255, 255, 255)) >= Secondary.Contrast(new(0, 0, 0))
             ? new(255, 255, 255) : new(0, 0, 0);
         SuccessText = ReadableOnSurfaces(dark ? new(84, 237, 176) : new(0, 112, 69));
         DangerText = ReadableOnSurfaces(dark ? new(255, 92, 132) : new(176, 27, 45));
-        Button = UiButtonGradient.Create(Primary, Secondary);
-        ButtonHover = UiButtonGradient.Create(UiRgb.Mix(Primary, new(255, 255, 255), .13), UiRgb.Mix(Secondary, new(255, 255, 255), .13));
-        ButtonPressed = UiButtonGradient.Create(UiRgb.Mix(Primary, new(0, 0, 0), .16), UiRgb.Mix(Secondary, new(0, 0, 0), .16));
+        UiRgb action = original ? new(120, 67, 206) : Primary;
+        UiRgb actionEnd = original ? new(84, 108, 196) : pocket ? new(64, 105, 75) : UiRgb.Mix(Primary, Secondary, .28);
+        Button = UiButtonGradient.Create(action, actionEnd);
+        ButtonHover = UiButtonGradient.Create(UiRgb.Mix(action, new(255, 255, 255), .13), UiRgb.Mix(actionEnd, new(255, 255, 255), .13));
+        ButtonPressed = UiButtonGradient.Create(UiRgb.Mix(action, new(0, 0, 0), .16), UiRgb.Mix(actionEnd, new(0, 0, 0), .16));
     }
 
     private static UiRgb EnsureContrast(UiRgb color, UiRgb background, UiRgb toward)

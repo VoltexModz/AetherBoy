@@ -52,17 +52,40 @@ public sealed class WindowsUiReviewFollowupTests
             Assert.IsTrue(button.IsHandleCreated);
             Assert.AreEqual(AccessibleRole.PushButton, button.AccessibilityObject.Role);
             Assert.IsTrue(button.AccessibilityObject.State.HasFlag(AccessibleStates.Selected), "Selected state must survive native handle recreation.");
-            button.AccessibilityObject.DoDefaultAction(); Assert.AreEqual(1, clicks);
+            button.AccessibilityObject.DoDefaultAction(); Application.DoEvents(); Assert.AreEqual(1, clicks);
             button.Selected = false; button.Enabled = false;
             Assert.IsFalse(button.AccessibilityObject.State.HasFlag(AccessibleStates.Selected));
             Assert.IsTrue(button.AccessibilityObject.State.HasFlag(AccessibleStates.Unavailable));
-            button.AccessibilityObject.DoDefaultAction(); Assert.AreEqual(1, clicks);
+            button.AccessibilityObject.DoDefaultAction(); Application.DoEvents(); Assert.AreEqual(1, clicks);
             button.Enabled = true; button.Visible = false;
-            button.AccessibilityObject.DoDefaultAction(); Assert.AreEqual(1, clicks, "A hidden control must not bypass CanSelect.");
+            button.AccessibilityObject.DoDefaultAction(); Application.DoEvents(); Assert.AreEqual(1, clicks, "A hidden control must not bypass CanSelect.");
             var accessibility = button.AccessibilityObject; button.Dispose();
             accessibility.DoDefaultAction(); Assert.AreEqual(1, clicks, "A disposed control must not activate.");
         }
         finally { UiText.Initialize(previous); }
+    }
+
+    [STATestMethod]
+    public void AccessibleButtonReturnsBeforeOpeningModalDialogAndRechecksQueuedAction()
+    {
+        using var window = new AetherWindow { ClientSize = new(400, 180) };
+        var button = new AetherButton { Text = "Open dialog" }; window.Controls.Add(button);
+        window.Show(); Application.DoEvents();
+        bool returned = false, opened = false;
+        button.Click += (_, _) =>
+        {
+            Assert.IsTrue(returned, "A UIA client must be able to inspect and close the modal dialog after invoking its button.");
+            using var dialog = new AetherWindow { ClientSize = new(200, 100) };
+            dialog.Shown += (_, _) => { opened = true; dialog.BeginInvoke(dialog.Close); };
+            dialog.ShowDialog(window);
+        };
+        button.AccessibilityObject.DoDefaultAction();
+        returned = true; Application.DoEvents();
+        Assert.IsTrue(opened);
+        opened = false;
+        button.AccessibilityObject.DoDefaultAction(); button.Enabled = false; Application.DoEvents();
+        Assert.IsFalse(opened, "A queued accessibility action must not activate a now-disabled control.");
+        window.Close();
     }
 
     [STATestMethod]
@@ -195,15 +218,37 @@ public sealed class WindowsUiReviewFollowupTests
         try
         {
             settings.UiScalePercent = scale;
-            using var main = new frmNano();
-            main.Size = main.MinimumSize;
-            main.Show(); Application.DoEvents();
-            foreach (AetherButton slot in Field<AetherButton[]>(main, "aetherSlotButtons"))
+            string root = TempDirectory();
+            try
             {
-                Assert.IsTrue(slot.Visible, "The save-slot bounds must be checked in a visible shell.");
-                Assert.IsTrue(slot.Parent!.ClientRectangle.Contains(slot.Bounds),
-                    $"Slot {slot.Text} must fit with the rail scrollbar at {scale}%: {slot.Bounds} inside {slot.Parent.ClientRectangle}.");
+                string rom = Path.Combine(root, "idle.gb"); var bytes = new byte[32768]; bytes[0x100] = 0x18; bytes[0x101] = 0xFE; File.WriteAllBytes(rom, bytes);
+                using var session = new EmulationSession(rom, Path.Combine(root, "idle.sav"), null, new EmulatorConfiguration(0, false, true, true, true, true, 44100));
+                Wait(() => session.LatestSnapshot.Rom is not null);
+                using var main = new frmNano();
+                main.Size = main.MinimumSize; main.Show(); Application.DoEvents();
+                Assert.IsFalse(Field<AetherSelect>(main, "desktopSlot").Visible, "Empty start keeps game controls hidden.");
+                var nav = main.Controls.Find("aetherDesktopNavigation", true).Single();
+                var navigation = nav.Controls.OfType<AetherButton>().ToArray();
+                Assert.IsTrue(navigation.All(button => nav.ClientRectangle.Contains(button.Bounds)));
+                for (int i = 0; i < navigation.Length; i++)
+                for (int j = i + 1; j < navigation.Length; j++) Assert.IsFalse(navigation[i].Bounds.IntersectsWith(navigation[j].Bounds), "Navigation must not overlap at large UI size.");
+                Field<System.Windows.Forms.Timer>(main, "updateTimer").Stop();
+                Set(main, "session", session); Set(main, "currentRomPath", rom);
+                try
+                {
+                    Call(main, "UpdateAetherSessionUi", session.LatestSnapshot); Application.DoEvents();
+                    var slot = Field<AetherSelect>(main, "desktopSlot");
+                    Assert.IsTrue(slot.Visible);
+                    Assert.AreEqual(5, slot.Items.Count);
+                    Assert.IsTrue(slot.Parent!.ClientRectangle.Contains(slot.Bounds), $"Slot selector must fit the rail at {scale}%.");
+                    WindowsDesktopDesignTests.Capture(main, "desktop-minimum-" + scale);
+                    var viewport = Field<AetherScrollViewport>(main, "desktopRailViewport");
+                    viewport.ScrollTo(0, int.MaxValue);
+                    Assert.IsGreaterThan(0, viewport.Offset.Y, "All session controls remain reachable at minimum size.");
+                }
+                finally { Set(main, "session", null); Set(main, "currentRomPath", null); }
             }
+            finally { Directory.Delete(root, true); }
         }
         finally { settings.UiScalePercent = previousScale; }
     }
@@ -226,14 +271,15 @@ public sealed class WindowsUiReviewFollowupTests
                 Wait(() => { Call(main, "UpdateAetherSessionUi", session.LatestSnapshot); return inventory[2] == AetherSaveSlotState.Saved; });
                 Call(main, "SelectSaveSlot", 1); Assert.IsFalse(Field<AetherButton>(main, "aetherLoadButton").Enabled);
                 Call(main, "SelectSaveSlot", 2); Assert.IsTrue(Field<AetherButton>(main, "aetherLoadButton").Enabled);
-                Assert.IsTrue(Field<AetherButton[]>(main, "aetherSlotButtons")[1].Text.Contains('●'));
+                Assert.AreEqual(1, Field<AetherSelect>(main, "desktopSlot").SelectedIndex);
+                StringAssert.Contains(Field<Label>(main, "aetherSlotValue").Text, AetherBoy.Runtime.Localization.UiText.Get("gespeichert"));
                 Set(main, "stateOperationInProgress", true); Call(main, "UpdateAetherSlotButtons"); Assert.IsFalse(Field<AetherButton>(main, "aetherLoadButton").Enabled);
                 Set(main, "stateOperationInProgress", false); session.SetPausedAsync(true).GetAwaiter().GetResult();
                 Call(main, "UpdateAetherSlotButtons"); Assert.IsTrue(Field<AetherButton>(main, "aetherLoadButton").Enabled);
                 session.ShutdownAsync().GetAwaiter().GetResult(); Call(main, "UpdateAetherSlotButtons");
                 Assert.IsFalse(Field<AetherButton>(main, "aetherLoadButton").Enabled);
                 Set(main, "session", null); Call(main, "UpdateAetherSessionUi", (object?)null); Assert.IsFalse(Field<AetherButton>(main, "aetherLoadButton").Enabled);
-                Assert.IsFalse(Field<AetherButton[]>(main, "aetherSlotButtons")[1].Text.Contains('●'));
+                Assert.IsFalse(Field<Label>(main, "aetherSlotValue").Text.Contains(AetherBoy.Runtime.Localization.UiText.Get("gespeichert")));
             }
             finally { Set(main, "session", null); Set(main, "currentRomPath", null); Set(main, "stateOperationInProgress", false); }
         }

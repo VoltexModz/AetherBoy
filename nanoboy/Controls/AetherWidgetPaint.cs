@@ -6,10 +6,11 @@ namespace nanoboy.Controls;
 
 internal static class AetherWidgetPaint
 {
-    internal static GraphicsPath Outline(Rectangle bounds, int cut = 6)
+    internal static GraphicsPath Outline(Rectangle bounds, int cut = 0)
     {
         var path = new GraphicsPath();
         cut = System.Math.Clamp(cut, 0, System.Math.Max(0, System.Math.Min(bounds.Width, bounds.Height) / 2));
+        if (cut == 0) { path.AddRectangle(bounds); return path; }
         path.AddPolygon(new Point[] { new(bounds.Left, bounds.Top), new(bounds.Right - cut, bounds.Top),
             new(bounds.Right, bounds.Top + cut), new(bounds.Right, bounds.Bottom),
             new(bounds.Left + cut, bounds.Bottom), new(bounds.Left, bounds.Bottom - cut) });

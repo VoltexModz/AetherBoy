@@ -110,7 +110,7 @@ public sealed class FrontendBoundaryTests
         Button turbo = GetRequiredField<Button>(formType, form, "aetherTurboButton");
         var legacyMenu = GetRequiredField<nanoboy.Controls.AetherCommandSet>(formType, form, "menuStrip");
         var gameView = GetRequiredField<Control>(formType, form, "gameView");
-        var slots = GetRequiredField<Array>(formType, form, "aetherSlotButtons");
+        var slots = GetRequiredField<nanoboy.Controls.AetherSelect>(formType, form, "desktopSlot");
 
         Assert.IsTrue(form.Controls.Contains(root));
         Assert.AreSame(stage, emptyState.Parent);
@@ -124,7 +124,7 @@ public sealed class FrontendBoundaryTests
         Assert.IsFalse(save.Enabled);
         Assert.IsFalse(load.Enabled);
         Assert.IsFalse(turbo.Enabled);
-        Assert.AreEqual(5, slots.Length);
+        Assert.AreEqual(5, slots.Items.Count);
     }
 
     [STATestMethod]
@@ -178,7 +178,7 @@ public sealed class FrontendBoundaryTests
                     .Find("controlCenterNavDiagnostics", true)
                     .Single() as Button
                     ?? throw new AssertFailedException("Diagnostics navigation is missing.");
-                diagnosticsNav.PerformClick();
+                ((frmControlCenter)center).NavigateTo("diagnostics");
                 Application.DoEvents();
                 Control diagnosticsPage = center.Controls
                     .Find("controlCenterPageDiagnostics", true)

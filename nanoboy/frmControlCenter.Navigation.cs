@@ -22,8 +22,8 @@ internal sealed partial class frmControlCenter
     {
         "palette" or "performance" => "display",
         "controller" or "stick" or "shortcuts" => "input",
-        "desktop" or "profiles" or "firmware" or "discord" or "updates" or "intro" or "language" => "system",
-        "barcode" or "ereader" => "tools",
+        "desktop" or "profiles" or "firmware" or "discord" or "updates" or "intro" or "language" or "storage" => "system",
+        "barcode" or "ereader" or "tools" => "overview",
         _ => key
     };
 
@@ -45,13 +45,12 @@ internal sealed partial class frmControlCenter
         BuildBarcodeBoyPage();
         AddPageLink(tools, 790, global::AetherBoy.Runtime.Localization.UiText.Get("e-Reader öffnen"), global::AetherBoy.Runtime.Localization.UiText.Get("Digitale Karten mit einer e-Reader-ROM lesen."), "ereader");
         BuildEReaderPage();
-        nav.Controls.Add(CreateSmallLabel(global::AetherBoy.Runtime.Localization.UiText.Get("Suchen · Strg+K"), 18, 87, 184, 20));
         settingsSearch = new nanoboy.Controls.AetherTextBox
         {
             Name = "controlCenterSearch", AccessibleName = global::AetherBoy.Runtime.Localization.UiText.Get("Einstellungen durchsuchen"),
             PlaceholderText = global::AetherBoy.Runtime.Localization.UiText.Get("Suchen · Strg+K"), MaxLength = 160,
-            Location = new Point(18, 109), Size = new Size(184, 30),
-            Font = new Font("Segoe UI", 10), TabIndex = 0
+            Location = new Point(16, 72), Size = new Size(200, 44),
+            Font = AetherTypography.Create(10.5f), TabIndex = 0
         };
         settingsSearch.TextChanged += (_, _) => UpdateSettingsSearch();
         nav.Controls.Add(settingsSearch);
@@ -96,10 +95,10 @@ internal sealed partial class frmControlCenter
         Panel desktop = NewSection("desktop", global::AetherBoy.Runtime.Localization.UiText.Get("Bedienung"), global::AetherBoy.Runtime.Localization.UiText.Get("Globale Einstellungen für Fensterwechsel und Lesbarkeit."));
         MoveCard(systemCards[1], firmware, 122);
         MoveCard(systemCards[3], profiles, 122);
-        MoveCard(systemCards[2], system, 430);
-        AddPageLink(system, 130, global::AetherBoy.Runtime.Localization.UiText.Get("Bedienung"), global::AetherBoy.Runtime.Localization.UiText.Get("Oberflächengröße und Pause bei Fensterwechsel."), "desktop");
-        AddPageLink(system, 220, global::AetherBoy.Runtime.Localization.UiText.Get("Spielprofile"), global::AetherBoy.Runtime.Localization.UiText.Get("Eigene Einstellungen für das aktuelle Spiel."), "profiles");
-        AddPageLink(system, 310, "Firmware", global::AetherBoy.Runtime.Localization.UiText.Get("Boot-ROMs und BIOS-Dateien importieren."), "firmware");
+        MoveCard(systemCards[2], system, 730);
+        AddPageLink(system, 210, global::AetherBoy.Runtime.Localization.UiText.Get("Bedienung"), global::AetherBoy.Runtime.Localization.UiText.Get("Oberflächengröße und Pause bei Fensterwechsel."), "desktop");
+        AddPageLink(system, 300, global::AetherBoy.Runtime.Localization.UiText.Get("Spielprofile"), global::AetherBoy.Runtime.Localization.UiText.Get("Eigene Einstellungen für das aktuelle Spiel."), "profiles");
+        AddPageLink(system, 390, "Firmware", global::AetherBoy.Runtime.Localization.UiText.Get("Boot-ROMs und BIOS-Dateien importieren."), "firmware");
         var scaleCard = CreateCard(desktop, 0, 122, 788, 178, global::AetherBoy.Runtime.Localization.UiText.Get("TEXT UND BEDIENELEMENTE"));
         var sizes = new List<AetherButton>();
         AddSelector(scaleCard, new[] { "100 %", "125 %", "150 %" }, 18, 44, 236, sizes, index =>
@@ -121,8 +120,11 @@ internal sealed partial class frmControlCenter
         BuildUpdatesPage();
         AddPageLink(desktop, 670, global::AetherBoy.Runtime.Localization.UiText.Get("Startanimation"), global::AetherBoy.Runtime.Localization.UiText.Get("Eigenes Logo und kurzer Klang vor einem Spiel."), "intro");
         BuildBootIntroPage();
-        AddPageLink(system, 620, global::AetherBoy.Runtime.Localization.UiText.Get("Anzeigesprache"), "Deutsch / English", "language");
+        AddPageLink(system, 120, global::AetherBoy.Runtime.Localization.UiText.Get("Aussehen"), global::AetherBoy.Runtime.Localization.UiText.Get("Passe die Oberfläche an dich an."), "appearance");
+        AddPageLink(system, 480, global::AetherBoy.Runtime.Localization.UiText.Get("Dateien"), global::AetherBoy.Runtime.Localization.UiText.Get("Deine Bibliothek, Spielstände und Einstellungen"), "storage");
+        AddPageLink(system, 570, global::AetherBoy.Runtime.Localization.UiText.Get("Anzeigesprache"), "Deutsch / English", "language");
         BuildLanguagePage();
+        ArrangeSettingsNavigation(nav);
 
         Panel controller = NewSection("controller", "Controller", global::AetherBoy.Runtime.Localization.UiText.Get("Gerät, Belegung und Stick gemeinsam prüfen."));
         Panel stick = NewSection("stick", global::AetherBoy.Runtime.Localization.UiText.Get("Stick-Totzone"), global::AetherBoy.Runtime.Localization.UiText.Get("Kleine ungewollte Bewegungen ausblenden, ohne das Steuerkreuz zu verändern."));
@@ -139,7 +141,7 @@ internal sealed partial class frmControlCenter
             AddSectionTabs(page, [("display", global::AetherBoy.Runtime.Localization.UiText.Get("Bild")), ("palette", global::AetherBoy.Runtime.Localization.UiText.Get("GB-Farben")), ("performance", global::AetherBoy.Runtime.Localization.UiText.Get("Leistung"))]);
         foreach (string page in new[] { "input", "controller", "stick", "shortcuts" })
             AddSectionTabs(page, [("input", global::AetherBoy.Runtime.Localization.UiText.Get("Tastatur")), ("controller", "Controller"), ("stick", "Stick"), ("shortcuts", global::AetherBoy.Runtime.Localization.UiText.Get("Tastenkürzel"))]);
-        foreach (string page in new[] { "system", "desktop", "profiles", "firmware" })
+        foreach (string page in new[] { "desktop", "profiles", "firmware" })
             AddSectionTabs(page, [("system", global::AetherBoy.Runtime.Localization.UiText.Get("Übersicht")), ("desktop", global::AetherBoy.Runtime.Localization.UiText.Get("Bedienung")), ("profiles", global::AetherBoy.Runtime.Localization.UiText.Get("Spielprofile")), ("firmware", "Firmware")]);
     }
 
@@ -166,8 +168,15 @@ internal sealed partial class frmControlCenter
 
     private static void AddPageLink(Control parent, int y, string title, string description, Action action)
     {
-        AddActionButton(parent, title, 0, y, 340, action);
-        parent.Controls.Add(CreateSmallLabel(description, 365, y, 415, 65));
+        var heading = CreateSmallLabel(title, 0, y, 520, 26);
+        heading.Font = AetherTypography.Create(12, FontStyle.Bold);
+        heading.ForeColor = AetherColors.Text;
+        heading.Tag = "value";
+        var detail = CreateSmallLabel(description, 0, y + 30, 520, 51);
+        detail.AutoEllipsis = false;
+        parent.Controls.Add(heading);
+        parent.Controls.Add(detail);
+        AddActionButton(parent, title, 560, y + 10, 228, action);
     }
 
     private void AddSectionTabs(string pageKey, (string Page, string Title)[] tabs)
@@ -225,9 +234,26 @@ internal sealed partial class frmControlCenter
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
+        if (keyData == (Keys.Control | Keys.Tab) || keyData == (Keys.Control | Keys.Shift | Keys.Tab))
+        {
+            string[] sections = navigation.Where(item => item.Key is not "storage" and not "tools").Select(item => item.Key).ToArray();
+            int current = Math.Max(0, Array.IndexOf(sections, SettingsSection(currentSettingsPage)));
+            int step = (keyData & Keys.Shift) != 0 ? -1 : 1;
+            ShowPage(sections[(current + step + sections.Length) % sections.Length]);
+            return true;
+        }
+        if (keyData == Keys.F6)
+        {
+            if (settingsSearch.ContainsFocus || navigation.Values.Any(button => button.ContainsFocus))
+                pages[settingsSearch.Text.Length > 0 ? "search" : currentSettingsPage].SelectNextControl(null, true, true, true, false);
+            else navigation[SettingsSection(currentSettingsPage)].Focus();
+            return true;
+        }
         if (keyData == (Keys.Control | Keys.K)) { FocusSettingsSearch(); return true; }
         if (keyData == Keys.Escape && settingsSearch.Text.Length > 0)
         { ShowPage(currentSettingsPage); navigation[SettingsSection(currentSettingsPage)].Focus(); return true; }
+        if (keyData == Keys.Escape && SettingsSection(currentSettingsPage) != currentSettingsPage)
+        { ShowPage(SettingsSection(currentSettingsPage)); return true; }
         if (keyData == Keys.Enter && settingsSearch.ContainsFocus && settingsSearch.Text.Length > 0)
         { searchResults.Controls.OfType<AetherButton>().FirstOrDefault()?.PerformClick(); return true; }
         return base.ProcessCmdKey(ref msg, keyData);

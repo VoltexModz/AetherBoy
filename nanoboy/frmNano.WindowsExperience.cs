@@ -15,13 +15,13 @@ public partial class frmNano
     private FormWindowState windowedState;
     private Size windowedMinimum;
     private Label? saveFeedbackLabel;
-    private string saveFeedback = global::AetherBoy.Runtime.Localization.UiText.Get("F5 speichern · F8 laden · F11 Vollbild · Esc zurück");
+    private string saveFeedback = "";
 
     private void InitializeWindowsExperience()
     {
         saveFeedbackLabel = new Label
         {
-            Name = "aetherSaveFeedback", Text = saveFeedback, Dock = DockStyle.Bottom,
+            Name = "aetherSaveFeedback", Text = saveFeedback, Dock = DockStyle.Bottom, Visible = false,
             Height = 26, Padding = new Padding(16, 0, 4, 0), AutoEllipsis = true,
             BackColor = AetherColors.Chrome, ForeColor = AetherColors.Muted,
             TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 8.5f)
@@ -84,6 +84,8 @@ public partial class frmNano
     {
         saveFeedback = text;
         if (saveFeedbackLabel == null || IsDisposed) return;
+        saveFeedbackLabel.Visible = text.Length != 0;
+        foreach (Control footer in Controls.Find("aetherDesktopStatus", true)) footer.Visible = text.Length == 0;
         saveFeedbackLabel.Text = text;
         saveFeedbackLabel.ForeColor = failed ? AetherColors.Danger : AetherColors.Success;
         saveFeedbackLabel.AccessibleName = text;

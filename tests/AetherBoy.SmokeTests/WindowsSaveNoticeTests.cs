@@ -44,7 +44,18 @@ public sealed class WindowsSaveNoticeTests
     [STATestMethod]
     public void NoticeKeepsSessionMetricsInsideScrollableRail()
     {
-        using var main = new frmNano(); main.Show();
+        string root = Path.Combine(Path.GetTempPath(), "aether-notice-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+        byte[] bytes = new byte[32768]; bytes[0x100] = 0x18; bytes[0x101] = 0xFE;
+        string rom = Path.Combine(root, "idle.gb"); File.WriteAllBytes(rom, bytes);
+        using var session = new EmulationSession(rom, Path.Combine(root, "idle.sav"), null, new EmulatorConfiguration(0, false, true, true, true, true, 44100));
+        session.SetPausedAsync(true).WaitAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+        using var main = new frmNano(); main.Size = main.MinimumSize; main.Show();
+        ((System.Windows.Forms.Timer)typeof(frmNano).GetField("updateTimer", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(main)!).Stop();
+        typeof(frmNano).GetField("session", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(main, session);
+        typeof(frmNano).GetMethod("UpdateAetherSessionUi", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(main, [session.LatestSnapshot]);
         typeof(frmNano).GetMethod("ShowSettingsSaveFailure", BindingFlags.NonPublic | BindingFlags.Instance)!
             .Invoke(main, [new IOException("Synthetic failure")]);
         Application.DoEvents();
@@ -55,6 +66,9 @@ public sealed class WindowsSaveNoticeTests
         var viewport = (AetherScrollViewport)main.Controls.Find("aetherSessionRailViewport", true).Single();
         viewport.ScrollTo(0, int.MaxValue);
         Assert.IsGreaterThan(0, viewport.Offset.Y);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+
     }
 
     [STATestMethod]

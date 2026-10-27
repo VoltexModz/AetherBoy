@@ -7,6 +7,8 @@ using System.Windows.Forms;
 using AetherBoy.Runtime;
 using nanoboy.Controls;
 using nanoboy.Core;
+using nanoboy.Storage;
+using UiText = AetherBoy.Runtime.Localization.UiText;
 
 namespace nanoboy
 {
@@ -24,6 +26,15 @@ namespace nanoboy
         private const int HtBottomLeft = 16;
         private const int HtBottomRight = 17;
 
+        private Panel desktopNavigation = null!, desktopPlay = null!, desktopHeader = null!, desktopTransport = null!;
+        private TableLayoutPanel desktopColumns = null!;
+        private AetherScrollViewport desktopRailViewport = null!;
+        private AetherSelect desktopSlot = null!;
+        private Label desktopController = null!;
+        private bool arrangingDesktop;
+        private Size desktopLayoutClient, desktopLayoutBody;
+        private float desktopLayoutScale;
+        private bool desktopLayoutPlaying;
         private bool aetherShellInitialized;
         private Panel aetherRoot = null!;
         private AetherSaveNotice settingsSaveNotice = null!;
@@ -49,7 +60,7 @@ namespace nanoboy
         private AetherButton aetherSaveSafetyButton = null!;
         private AetherButton aetherTurboButton = null!;
         private AetherButton aetherMaximizeButton = null!;
-        private AetherButton[] aetherSlotButtons = Array.Empty<AetherButton>();
+        private AetherCommand desktopCommands = null!;
         private readonly AetherSaveSlotInventory aetherSaveSlots = new();
         private AetherCommandMenu? aetherCommandMenu;
         private AetherButton? aetherActiveNav;
@@ -69,6 +80,7 @@ namespace nanoboy
             AllowDrop = true;
             BackColor = AetherColors.Void;
             MinimumSize = new Size(780, 600);
+            Font = AetherTypography.Create(10.5f);
             Padding = new Padding(1);
 
             aetherRoot = new Panel
@@ -79,12 +91,13 @@ namespace nanoboy
                 Name = "aetherRoot"
             };
 
+            desktopCommands = new AetherCommand(UiText.Get("Weitere Aktionen"));
+            desktopCommands.DropDownItems.AddRange(menuStrip.Items.ToArray());
             aetherTitleBar = BuildTitleBar();
-            Control commandDeck = BuildCommandDeck();
             Control content = BuildMainContent();
 
             aetherRoot.Controls.Add(content);
-            aetherRoot.Controls.Add(commandDeck);
+            aetherRoot.Controls.Add(BuildDesktopStatus());
             settingsSaveNotice = new AetherSaveNotice(() => settings.FlushPendingSavesAsync(),
                 error => testerSession?.RecordException("settings.retry_save_failed", error)) { Dock = DockStyle.Top };
             aetherRoot.Controls.Add(settingsSaveNotice);
@@ -106,413 +119,228 @@ namespace nanoboy
 
         private AetherChromePanel BuildTitleBar()
         {
-            var titleBar = new AetherChromePanel
-            {
-                Dock = DockStyle.Top,
-                Height = 64,
-                Padding = new Padding(0, 0, 0, 2), // Keep the accent line below docked title-bar children.
-                Name = "aetherTitleBar"
-            };
-
-            var identity = new Panel
-            {
-                BackColor = AetherColors.Chrome,
-                Dock = DockStyle.Left,
-                Width = 300,
-                Padding = new Padding(15, 9, 0, 7)
-            };
-            var mark = new PictureBox
-            {
-                Dock = DockStyle.Left,
-                Size = new Size(46, 46),
-                SizeMode = PictureBoxSizeMode.Zoom,
-                TabStop = false
-            };
+            var bar = new AetherChromePanel { Dock = DockStyle.Top, Height = 64, Name = "aetherTitleBar" };
+            var mark = new PictureBox { Bounds = new Rectangle(20, 13, 38, 38), SizeMode = PictureBoxSizeMode.Zoom, TabStop = false };
             Branding.AppBrand.BindMark(mark);
-
-            var nameStack = new Panel
-            {
-                BackColor = AetherColors.Chrome,
-                Dock = DockStyle.Fill,
-                Padding = new Padding(12, 3, 0, 0)
-            };
-            var productName = CreateUiLabel(
-                "AetherBoy",
-                13f,
-                FontStyle.Bold,
-                AetherColors.Text,
-                DockStyle.Top,
-                24);
-            var productSignal = CreateUiLabel(
-                "GAME BOY · COLOR · ADVANCE",
-                8.5f,
-                FontStyle.Bold,
-                AetherColors.Muted,
-                DockStyle.Top,
-                18);
-            productSignal.Name = "aetherTeamSignature";
-            nameStack.Controls.Add(productSignal);
-            nameStack.Controls.Add(productName);
-            identity.Controls.Add(nameStack);
-            identity.Controls.Add(mark);
-
-            var windowControls = new FlowLayoutPanel
-            {
-                BackColor = AetherColors.Chrome,
-                Dock = DockStyle.Right,
-                FlowDirection = FlowDirection.LeftToRight,
-                Padding = new Padding(0, 12, 10, 0),
-                WrapContents = false,
-                Width = 136
-            };
-            AetherButton minimize = CreateChromeButton("—", global::AetherBoy.Runtime.Localization.UiText.Get("Fenster minimieren"), (_, _) => WindowState = FormWindowState.Minimized);
-            aetherMaximizeButton = CreateChromeButton("□", global::AetherBoy.Runtime.Localization.UiText.Get("Fenster maximieren"), (_, _) => ToggleAetherMaximize());
-            AetherButton close = CreateChromeButton("×", global::AetherBoy.Runtime.Localization.UiText.Get("Fenster schließen"), (_, _) => Close(), AetherButtonKind.Danger);
-            windowControls.Controls.Add(minimize);
-            windowControls.Controls.Add(aetherMaximizeButton);
-            windowControls.Controls.Add(close);
-
-            var navigation = new FlowLayoutPanel
-            {
-                BackColor = AetherColors.Chrome,
-                Dock = DockStyle.Right,
-                FlowDirection = FlowDirection.LeftToRight,
-                Padding = new Padding(0, 13, 12, 0),
-                WrapContents = false,
-                Width = 330
-            };
-            navigation.Controls.Add(CreateNavButton(global::AetherBoy.Runtime.Localization.UiText.Get("GAME"), menuFile, "SYSTEM"));
-            navigation.Controls.Add(CreateNavButton(global::AetherBoy.Runtime.Localization.UiText.Get("VIDEO"), menuItem1, "TUNE"));
-            navigation.Controls.Add(CreateNavButton(global::AetherBoy.Runtime.Localization.UiText.Get("TOOLS"), menuItem21, "TOOLS"));
-            navigation.Controls.Add(CreateNavButton(global::AetherBoy.Runtime.Localization.UiText.Get("HELP"), menuItem4, "INFO"));
-            navigation.Width = navigation.Padding.Horizontal + navigation.Controls.Cast<Control>().Sum(button => button.Width + button.Margin.Horizontal);
-
-            titleBar.Controls.Add(navigation);
-            titleBar.Controls.Add(windowControls);
-            titleBar.Controls.Add(identity);
-            WireWindowDrag(titleBar);
-            WireWindowDrag(identity);
-            WireWindowDrag(nameStack);
-            WireWindowDrag(productName);
-            WireWindowDrag(productSignal);
-            WireWindowDrag(mark);
-            return titleBar;
+            var name = CreateUiLabel("AetherBoy", 13.5f, FontStyle.Bold, AetherColors.Text, DockStyle.None, 32);
+            name.Bounds = new Rectangle(70, 16, 150, 32);
+            var title = CreateUiLabel(UiText.Get("Spielen"), 9.75f, FontStyle.Regular, AetherColors.Muted, DockStyle.Fill, 64, ContentAlignment.MiddleCenter);
+            title.Name = "desktopPageTitle";
+            title.Padding = new Padding(220, 0, 180, 0);
+            bar.SizeChanged += (_, _) => title.Visible = bar.Width >= 620 * Math.Max(1, aetherUiScale * DeviceDpi / 96f);
+            var actions = new FlowLayoutPanel { Dock = DockStyle.Right, Width = 164, Padding = new Padding(0, 12, 12, 0), WrapContents = false, BackColor = AetherColors.Chrome };
+            var minimize = CreateChromeButton("", UiText.Get("Fenster minimieren"), (_, _) => WindowState = FormWindowState.Minimized);
+            minimize.Icon = UiIcon.Minimize; minimize.IconOnly = true;
+            aetherMaximizeButton = CreateChromeButton("", UiText.Get("Fenster maximieren"), (_, _) => ToggleAetherMaximize());
+            aetherMaximizeButton.Icon = UiIcon.Maximize; aetherMaximizeButton.IconOnly = true;
+            var close = CreateChromeButton("", UiText.Get("Fenster schließen"), (_, _) => Close());
+            close.Icon = UiIcon.Close; close.IconOnly = true;
+            actions.Controls.AddRange([minimize, aetherMaximizeButton, close]);
+            bar.Controls.Add(title); bar.Controls.Add(actions); bar.Controls.Add(name); bar.Controls.Add(mark); name.BringToFront(); mark.BringToFront();
+            foreach (Control control in new Control[] { bar, title, name, mark }) WireWindowDrag(control);
+            return bar;
         }
 
         private Control BuildMainContent()
         {
-            var contentHost = new Panel
-            {
-                BackColor = AetherColors.Void,
-                Dock = DockStyle.Fill,
-                Padding = new Padding(22, 20, 22, 18)
-            };
-            var layout = new TableLayoutPanel
-            {
-                BackColor = AetherColors.Void,
-                ColumnCount = 2,
-                Dock = DockStyle.Fill,
-                RowCount = 1
-            };
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            // Keep the five save slots visible when the rail viewport reserves a vertical scrollbar.
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 264f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-
-            aetherStage = new AetherStagePanel
-            {
-                Dock = DockStyle.Fill,
-                Margin = new Padding(0, 0, 14, 0),
-                Name = "aetherStage"
-            };
-            gameView.Dock = DockStyle.Fill;
-            gameView.Margin = Padding.Empty;
-            gameView.BackColor = Color.Black;
+            var body = new Panel { Dock = DockStyle.Fill, BackColor = AetherColors.Void };
+            desktopNavigation = BuildDesktopNavigation();
+            desktopPlay = new Panel { Dock = DockStyle.Fill, BackColor = AetherColors.Void, Padding = new Padding(24) };
+            desktopHeader = new Panel { Dock = DockStyle.Top, Height = 84, BackColor = AetherColors.Void };
+            aetherRomTitle = new AetherHeading { Dock = DockStyle.Top, Padding = new Padding(0, 0, 220, 0) };
+            aetherModelValue = CreateUiLabel("", 9.75f, FontStyle.Regular, AetherColors.Muted, DockStyle.Top, 24);
+            aetherStateValue = CreateUiLabel("", 9.75f, FontStyle.Regular, AetherColors.Cyan, DockStyle.None, 30, ContentAlignment.MiddleRight);
+            aetherStateValue.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            desktopHeader.Controls.Add(aetherModelValue); desktopHeader.Controls.Add(aetherRomTitle); desktopHeader.Controls.Add(aetherStateValue);
+            aetherStateValue.BringToFront();
+            desktopHeader.SizeChanged += (_, _) => aetherStateValue.Bounds = new Rectangle(Math.Max(0, desktopHeader.Width - 220), 10, 220, 30);
+            desktopColumns = new TableLayoutPanel { Dock = DockStyle.Fill, BackColor = AetherColors.Void, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
+            desktopColumns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            desktopColumns.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 244));
+            desktopColumns.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            var game = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 20, 0), BackColor = AetherColors.Void };
+            aetherStage = new AetherStagePanel { Dock = DockStyle.Fill, Name = "aetherStage" };
+            gameView.Dock = DockStyle.Fill; gameView.Margin = Padding.Empty; gameView.BackColor = Color.Black;
             aetherStage.Controls.Add(gameView);
-            aetherEmptyState = BuildEmptyState();
-            aetherStage.Controls.Add(aetherEmptyState);
-            aetherEmptyState.BringToFront();
-
+            aetherEmptyState = BuildEmptyState(); aetherStage.Controls.Add(aetherEmptyState);
+            desktopTransport = (Panel)BuildCommandDeck();
+            desktopTransport.SizeChanged += (_, _) => ArrangeDesktopTransport();
+            game.Controls.Add(aetherStage); game.Controls.Add(desktopTransport);
             aetherSessionRail = BuildSessionRail();
-            aetherSessionRail.Dock = DockStyle.None;
-            var railViewport = new AetherScrollViewport { Dock = DockStyle.Fill, Margin = Padding.Empty,
-                Name = "aetherSessionRailViewport" };
-            railViewport.SetContent(aetherSessionRail, new Size(0, 438));
-            void FitRail() => railViewport.SetMinimumContent(new Size(0,
-                (int)Math.Ceiling(438 * aetherUiScale * DeviceDpi / 96f)));
-            railViewport.SizeChanged += (_, _) => FitRail();
-            layout.Controls.Add(aetherStage, 0, 0);
-            layout.Controls.Add(railViewport, 1, 0);
-            contentHost.Controls.Add(layout);
-            return contentHost;
+            desktopRailViewport = new AetherScrollViewport { Dock = DockStyle.Fill, Margin = Padding.Empty, Name = "aetherSessionRailViewport" };
+            desktopRailViewport.SetContent(aetherSessionRail, new Size(0, 500));
+            desktopColumns.Controls.Add(game, 0, 0); desktopColumns.Controls.Add(desktopRailViewport, 1, 0);
+            desktopPlay.Controls.Add(desktopColumns); desktopPlay.Controls.Add(desktopHeader);
+            body.Controls.Add(desktopPlay); body.Controls.Add(desktopNavigation);
+            body.SizeChanged += (_, _) => ArrangeDesktop();
+            return body;
+        }
+
+        internal void NavigateDesktop(string page)
+        {
+            if (page == "play") { controlCenter?.Close(); Activate(); gameView.Focus(); }
+            else if (page == "library") menuOpen_Click(this, EventArgs.Empty);
+            else if (page == "link") ShowOnlineRoomDialog(true);
+            else { OpenControlCenter(); controlCenter?.NavigateTo(page == "settings" ? "appearance" : page); }
+        }
+
+        private Panel BuildDesktopNavigation()
+        {
+            var nav = new Panel { Dock = DockStyle.Left, Width = 72, BackColor = AetherColors.Chrome, Padding = new Padding(12, 28, 12, 16), Name = "aetherDesktopNavigation" };
+            void Add(string label, UiIcon icon, Action action, int index, bool selected = false)
+            {
+                var button = CreateActionButton(UiText.Get(label), AetherButtonKind.Ghost, 48);
+                button.Icon = icon; button.IconOnly = true; button.AlignLeft = true; button.Selected = selected;
+                button.AccessibleName = button.Text; button.Name = "desktopNav" + icon;
+                button.SetBounds(12, 28 + index * 52, 48, 46);
+                button.Click += (_, _) => action(); nav.Controls.Add(button);
+                if (icon == UiIcon.Settings) { button.Dock = DockStyle.Bottom; aetherControlCenterButton = button; }
+            }
+            Add("Spielen", UiIcon.Play, () => gameView.Focus(), 0, true);
+            Add("Bibliothek", UiIcon.Library, () => menuOpen_Click(this, EventArgs.Empty), 1);
+            Add("Spielstände", UiIcon.Save, () => { OpenControlCenter(); controlCenter?.NavigateTo("saves"); }, 2);
+            Add("Link", UiIcon.Link, () => ShowOnlineRoomDialog(true), 3);
+            Add("Werkzeuge", UiIcon.Tools, () => { OpenControlCenter(); controlCenter?.NavigateTo("tools"); }, 4);
+            Add("Einstellungen", UiIcon.Settings, () => { OpenControlCenter(); controlCenter?.NavigateTo("appearance"); }, 5);
+            return nav;
+        }
+
+        private Control BuildDesktopStatus()
+        {
+            var footer = new Panel { Name = "aetherDesktopStatus", Dock = DockStyle.Bottom, Height = 32, BackColor = AetherColors.Chrome, Padding = new Padding(24, 0, 24, 0) };
+            desktopController = CreateUiLabel(UiText.Get("Tastatur"), 8.25f, FontStyle.Regular, AetherColors.Muted, DockStyle.Fill, 32);
+            var hint = CreateUiLabel(UiText.Get("F11  Vollbild"), 8.25f, FontStyle.Regular, AetherColors.Muted, DockStyle.Right, 32, ContentAlignment.MiddleRight);
+            hint.Width = 150; footer.Controls.Add(desktopController); footer.Controls.Add(hint);
+            return footer;
+        }
+
+        private void ArrangeDesktop()
+        {
+            if (arrangingDesktop || desktopNavigation is null || desktopColumns is null) return;
+            float scale = Math.Max(1, aetherUiScale * DeviceDpi / 96f);
+            bool playing = session?.LatestSnapshot.Rom is not null;
+            Size bodySize = desktopNavigation.Parent?.ClientSize ?? Size.Empty;
+            // Session status refreshes every frame; rearrange only when geometry or page changes.
+            if (desktopLayoutClient == ClientSize && desktopLayoutBody == bodySize &&
+                desktopLayoutScale == scale && desktopLayoutPlaying == playing) return;
+            arrangingDesktop = true;
+            try
+            {
+                var layout = UiDesktopLayout.Create(ClientSize.Width / scale, ClientSize.Height / scale);
+                desktopNavigation.Width = (int)(layout.Navigation * scale);
+                int navIndex = 0;
+                float step = Math.Min(52 * scale, (desktopNavigation.Height - desktopNavigation.Padding.Vertical) / 6f);
+                int navHeight = Math.Max(28, (int)Math.Min(46 * scale, step - 6));
+                foreach (AetherButton button in desktopNavigation.Controls.OfType<AetherButton>())
+                {
+                    button.Dock = DockStyle.None;
+                    button.SetBounds(desktopNavigation.Padding.Left,
+                        button.Icon == UiIcon.Settings ? desktopNavigation.Height - desktopNavigation.Padding.Bottom - navHeight : desktopNavigation.Padding.Top + (int)(navIndex * step),
+                        desktopNavigation.Width - desktopNavigation.Padding.Horizontal, navHeight);
+                    button.IconOnly = layout.Navigation < 100; navIndex++;
+                }
+                desktopPlay.Padding = new Padding((int)(layout.Inset * scale));
+                desktopHeader.Visible = playing; desktopTransport.Visible = playing; desktopRailViewport.Visible = playing;
+                desktopColumns.ColumnStyles[1].Width = playing ? layout.RailWidth * scale : 0;
+                desktopColumns.Controls[0].Margin = playing ? new Padding(0, 0, (int)(20 * scale), 0) : Padding.Empty;
+                desktopRailViewport.SetMinimumContent(new Size(0, (int)(550 * scale)));
+                ArrangeDesktopTransport();
+                desktopLayoutClient = ClientSize; desktopLayoutBody = bodySize;
+                desktopLayoutScale = scale; desktopLayoutPlaying = playing;
+            }
+            finally { arrangingDesktop = false; }
+        }
+
+        private void ArrangeDesktopTransport()
+        {
+            if (aetherPauseButton is null) return;
+            float scale = Math.Max(1, aetherUiScale * DeviceDpi / 96f);
+            bool narrow = desktopTransport.Width < 440 * scale;
+            aetherRewindButton.Visible = aetherTurboButton.Visible = !narrow;
+            aetherPauseButton.IconOnly = desktopTransport.Width < 350 * scale;
+            aetherPauseButton.Width = (int)((aetherPauseButton.IconOnly ? 44 : 156) * scale);
         }
 
         private Panel BuildEmptyState()
         {
-            var empty = new Panel
-            {
-                BackColor = AetherColors.Void,
-                Dock = DockStyle.Fill,
-                Name = "aetherEmptyState"
-            };
-            var layout = new TableLayoutPanel
-            {
-                BackColor = AetherColors.Void,
-                ColumnCount = 1,
-                Dock = DockStyle.Fill,
-                RowCount = 7
-            };
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 112f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 34f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50f));
-
-            var mark = new PictureBox
-            {
-                Anchor = AnchorStyles.None,
-                Size = new Size(104, 104),
-                SizeMode = PictureBoxSizeMode.Zoom,
-                TabStop = false
-            };
+            var empty = new Panel { BackColor = AetherColors.Void, Dock = DockStyle.Fill, Name = "aetherEmptyState" };
+            var layout = new TableLayoutPanel { ColumnCount = 1, RowCount = 8, BackColor = AetherColors.Void };
+            foreach (float height in new[] { 0f, 110, 58, 42, 56, 40, 52, 0 })
+                layout.RowStyles.Add(height == 0 ? new RowStyle(SizeType.Percent, 50) : new RowStyle(SizeType.Absolute, height));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            var mark = new PictureBox { Anchor = AnchorStyles.None, Size = new Size(90, 90), SizeMode = PictureBoxSizeMode.Zoom, TabStop = false };
             Branding.AppBrand.BindMark(mark);
-            var headline = CreateUiLabel(
-                global::AetherBoy.Runtime.Localization.UiText.Get("Ready for your next game?"),
-                15f,
-                FontStyle.Bold,
-                AetherColors.Text,
-                DockStyle.Fill,
-                34,
-                ContentAlignment.MiddleCenter);
-            var copy = CreateUiLabel(
-                global::AetherBoy.Runtime.Localization.UiText.Get("Open a game or drop a .gb, .gbc or .gba file here."),
-                9f,
-                FontStyle.Regular,
-                AetherColors.Muted,
-                DockStyle.Fill,
-                48,
-                ContentAlignment.TopCenter);
-            aetherOpenButton = CreateActionButton(global::AetherBoy.Runtime.Localization.UiText.Get("Spiel öffnen"), AetherButtonKind.Primary, 158);
-            aetherOpenButton.Anchor = AnchorStyles.None;
-            aetherOpenButton.Click += (_, _) => OpenRomFromAetherUi();
-            var hint = CreateUiLabel(
-                global::AetherBoy.Runtime.Localization.UiText.Get("SHORTCUT: CTRL+O"),
-                8.5f,
-                FontStyle.Bold,
-                AetherColors.Muted,
-                DockStyle.Fill,
-                30,
-                ContentAlignment.MiddleCenter);
-
-            layout.Controls.Add(new Panel { BackColor = AetherColors.Void }, 0, 0);
             layout.Controls.Add(mark, 0, 1);
-            layout.Controls.Add(headline, 0, 2);
-            layout.Controls.Add(copy, 0, 3);
-            layout.Controls.Add(aetherOpenButton, 0, 4);
-            layout.Controls.Add(hint, 0, 5);
-            layout.Controls.Add(new Panel { BackColor = AetherColors.Void }, 0, 6);
-            empty.Controls.Add(layout);
-            return empty;
+            layout.Controls.Add(CreateUiLabel(UiText.Get("Öffne ein Spiel"), 21, FontStyle.Bold, AetherColors.Text, DockStyle.Fill, 58, ContentAlignment.MiddleCenter), 0, 2);
+            layout.Controls.Add(CreateUiLabel(UiText.Get("Wähle eine ROM-Datei oder ziehe sie in dieses Fenster."), 10.5f, FontStyle.Regular, AetherColors.Muted, DockStyle.Fill, 42, ContentAlignment.MiddleCenter), 0, 3);
+            var actions = new FlowLayoutPanel { AutoSize = true, Anchor = AnchorStyles.None, WrapContents = false, Margin = Padding.Empty };
+            aetherOpenButton = CreateActionButton(UiText.Get("Spiel öffnen"), AetherButtonKind.Primary, 196);
+            aetherOpenButton.Icon = UiIcon.Open; aetherOpenButton.Click += (_, _) => OpenRomFromAetherUi();
+            var library = CreateActionButton(UiText.Get("Zur Bibliothek"), AetherButtonKind.Secondary, 172);
+            library.Icon = UiIcon.Library; library.Click += (_, _) => menuOpen_Click(this, EventArgs.Empty);
+            actions.Controls.Add(aetherOpenButton); actions.Controls.Add(library); layout.Controls.Add(actions, 0, 4);
+            layout.Controls.Add(CreateUiLabel(UiText.Get("Dateiformate: .gb, .gbc, .gba"), 9, FontStyle.Regular, AetherColors.Muted, DockStyle.Fill, 40, ContentAlignment.MiddleCenter), 0, 5);
+            layout.Controls.Add(CreateUiLabel(UiText.Get("Strg + O   Spiel öffnen"), 9, FontStyle.Regular, AetherColors.Muted, DockStyle.Fill, 52, ContentAlignment.MiddleCenter), 0, 6);
+            var viewport = new AetherScrollViewport { Dock = DockStyle.Fill, Name = "desktopStartViewport" };
+            viewport.SetContent(layout, new Size(400, 370));
+            viewport.SizeChanged += (_, _) =>
+            {
+                float scale = Math.Max(1, aetherUiScale * DeviceDpi / 96f);
+                viewport.SetMinimumContent(new Size((int)(400 * scale), (int)(370 * scale)));
+            };
+            empty.Controls.Add(viewport); return empty;
         }
 
         private AetherSurfacePanel BuildSessionRail()
         {
-            var rail = new AetherSurfacePanel
-            {
-                AccentEdge = true,
-                BackColor = AetherColors.Surface,
-                Dock = DockStyle.Fill,
-                Margin = Padding.Empty,
-                Name = "aetherSessionRail",
-                Padding = new Padding(20, 18, 18, 16)
-            };
-            var layout = new TableLayoutPanel
-            {
-                BackColor = AetherColors.Surface,
-                ColumnCount = 1,
-                Dock = DockStyle.Fill,
-                RowCount = 13
-            };
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 50f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 26f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 12f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36f));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36f));
-
-            layout.Controls.Add(CreateUiLabel(global::AetherBoy.Runtime.Localization.UiText.Get("NOW PLAYING"), 8.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 24), 0, 0);
-            aetherRomTitle = CreateUiLabel(global::AetherBoy.Runtime.Localization.UiText.Get("No game open"), 12f, FontStyle.Bold, AetherColors.Text, DockStyle.Fill, 58);
-            aetherRomTitle.AutoEllipsis = true;
-            layout.Controls.Add(aetherRomTitle, 0, 1);
-
-            var stateRow = new Panel { BackColor = AetherColors.Surface, Dock = DockStyle.Fill };
-            aetherStatusDot = new AetherStatusDot { Location = new Point(0, 8) };
-            aetherStateValue = CreateUiLabel(global::AetherBoy.Runtime.Localization.UiText.Get("Ready"), 8.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 30);
-            aetherStateValue.Padding = new Padding(22, 0, 0, 0);
-            stateRow.Controls.Add(aetherStateValue);
-            stateRow.Controls.Add(aetherStatusDot);
-            layout.Controls.Add(stateRow, 0, 2);
-
-            layout.Controls.Add(CreateDivider(), 0, 3);
-            layout.Controls.Add(CreateMetricRow(global::AetherBoy.Runtime.Localization.UiText.Get("System"), out aetherModelValue), 0, 4);
-            layout.Controls.Add(CreateMetricRow("Audio", out aetherAudioValue), 0, 5);
-            layout.Controls.Add(CreateMetricRow(global::AetherBoy.Runtime.Localization.UiText.Get("Video"), out aetherFilterValue), 0, 6);
-            layout.Controls.Add(CreateMetricRow(global::AetherBoy.Runtime.Localization.UiText.Get("Controls"), out aetherInputValue), 0, 7);
-            aetherInputValue.AutoEllipsis = true;
-            layout.Controls.Add(CreateMetricRow("Slot", out aetherSlotValue), 0, 8);
-            layout.Controls.Add(CreateUiLabel(global::AetherBoy.Runtime.Localization.UiText.Get("SAVE SLOT"), 8.5f, FontStyle.Bold, AetherColors.Muted, DockStyle.Fill, 30), 0, 9);
-
-            var slots = new FlowLayoutPanel
-            {
-                BackColor = AetherColors.Surface,
-                Dock = DockStyle.Fill,
-                // The 36px row includes 5px top padding and 30px buttons.
-                // Default 3px table-cell margins would clip their lower edge.
-                Margin = Padding.Empty,
-                FlowDirection = FlowDirection.LeftToRight,
-                Padding = new Padding(0, 5, 0, 0),
-                WrapContents = false
-            };
-            aetherSlotButtons = new AetherButton[5];
-            for (int slot = 1; slot <= aetherSlotButtons.Length; slot++)
-            {
-                int selectedSlot = slot;
-                AetherButton button = CreateActionButton(slot.ToString(), AetherButtonKind.Secondary, 34);
-                button.Height = 30;
-                button.Margin = new Padding(0, 0, 7, 0);
-                button.Click += (_, _) =>
-                {
-                    SelectSaveSlot(selectedSlot);
-                    UpdateAetherSlotButtons();
-                    gameView.Focus();
-                };
-                aetherSlotButtons[slot - 1] = button;
-                slots.Controls.Add(button);
-            }
-            layout.Controls.Add(slots, 0, 11);
-
-            aetherSaveSafetyButton = CreateActionButton(
-                global::AetherBoy.Runtime.Localization.UiText.Get("Manage saves"),
-                AetherButtonKind.Ghost,
-                190);
-            aetherSaveSafetyButton.Dock = DockStyle.Bottom;
-            aetherSaveSafetyButton.MinimumSize = new Size(0, 38);
-            aetherSaveSafetyButton.Margin = Padding.Empty;
+            var rail = new AetherSurfacePanel { AccentEdge = false, BackColor = AetherColors.Surface, Name = "aetherSessionRail", Padding = new Padding(16) };
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 12, BackColor = AetherColors.Surface, Margin = Padding.Empty };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            foreach (int height in new[] { 38, 48, 30, 56, 56, 36, 30, 36, 36, 36, 48, 0 })
+                layout.RowStyles.Add(height == 0 ? new RowStyle(SizeType.Percent, 100) : new RowStyle(SizeType.Absolute, height));
+            layout.Controls.Add(CreateUiLabel(UiText.Get("Spielzustand"), 12, FontStyle.Bold, AetherColors.Text, DockStyle.Fill, 38), 0, 0);
+            desktopSlot = new AetherSelect { Dock = DockStyle.Fill, Name = "desktopSaveSlot", AccessibleName = UiText.Get("Speicherplatz"), Margin = new Padding(0, 0, 0, 4) };
+            for (int slot = 1; slot <= 5; slot++) desktopSlot.Items.Add(UiText.Format("Platz {0}", slot));
+            desktopSlot.SelectedIndex = Math.Clamp(settings.SaveSlot - 1, 0, 4);
+            desktopSlot.SelectedIndexChanged += (_, _) => { if (desktopSlot.SelectedIndex >= 0) { SelectSaveSlot(desktopSlot.SelectedIndex + 1); UpdateAetherSlotButtons(); } };
+            layout.Controls.Add(desktopSlot, 0, 1);
+            aetherSlotValue = CreateUiLabel("", 9, FontStyle.Regular, AetherColors.Muted, DockStyle.Fill, 30); layout.Controls.Add(aetherSlotValue, 0, 2);
+            aetherSaveButton = CreateActionButton(UiText.Get("Zustand speichern"), AetherButtonKind.Secondary, 192); aetherSaveButton.Icon = UiIcon.Save;
+            aetherSaveButton.Click += (_, _) => { QuickSave(); gameView.Focus(); };
+            aetherLoadButton = CreateActionButton(UiText.Get("Zustand laden"), AetherButtonKind.Secondary, 192); aetherLoadButton.Icon = UiIcon.Rewind;
+            aetherLoadButton.Click += (_, _) => { QuickLoad(); gameView.Focus(); };
+            foreach (var button in new[] { aetherSaveButton, aetherLoadButton }) { button.Dock = DockStyle.Fill; button.Margin = new Padding(0, 0, 0, 12); }
+            layout.Controls.Add(aetherSaveButton, 0, 3); layout.Controls.Add(aetherLoadButton, 0, 4);
+            layout.Controls.Add(CreateUiLabel(UiText.Get("F5 save · F8 load"), 8.25f, FontStyle.Regular, AetherColors.Muted, DockStyle.Fill, 36), 0, 5);
+            layout.Controls.Add(CreateUiLabel(UiText.Get("Anzeige"), 10.5f, FontStyle.Bold, AetherColors.Text, DockStyle.Fill, 30), 0, 6);
+            layout.Controls.Add(CreateMetricRow("Audio", out aetherAudioValue), 0, 7);
+            layout.Controls.Add(CreateMetricRow(UiText.Get("Bildfilter"), out aetherFilterValue), 0, 8);
+            layout.Controls.Add(CreateMetricRow(UiText.Get("Steuerung"), out aetherInputValue), 0, 9);
+            aetherSaveSafetyButton = CreateActionButton(UiText.Get("Manage saves"), AetherButtonKind.Ghost, 192);
+            aetherSaveSafetyButton.Dock = DockStyle.Fill; aetherSaveSafetyButton.Margin = Padding.Empty;
             aetherSaveSafetyButton.Click += (_, args) => menuBatterySaveSafety_Click(aetherSaveSafetyButton, args);
             layout.Controls.Add(aetherSaveSafetyButton, 0, 10);
-
-            var hint = CreateUiLabel(
-                global::AetherBoy.Runtime.Localization.UiText.Get("F5 save · F8 load\r\nF10 quick menu"),
-                8.5f,
-                FontStyle.Bold,
-                AetherColors.Muted,
-                DockStyle.Fill,
-                40,
-                ContentAlignment.BottomLeft);
-            layout.Controls.Add(hint, 0, 12);
-            rail.Controls.Add(layout);
-            return rail;
+            var more = CreateNavButton(UiText.Get("Weitere Aktionen"), desktopCommands, "SYSTEM"); more.Icon = UiIcon.More; more.Dock = DockStyle.Bottom; more.Height = 44;
+            layout.Controls.Add(more, 0, 11);
+            aetherStatusDot = new AetherStatusDot { Visible = false }; rail.Controls.Add(aetherStatusDot);
+            rail.Controls.Add(layout); return rail;
         }
 
         private Control BuildCommandDeck()
         {
-            var deck = new AetherSurfacePanel
-            {
-                BackColor = AetherColors.Chrome,
-                Dock = DockStyle.Bottom,
-                Height = 78,
-                Padding = new Padding(22, 17, 22, 16)
-            };
-            var commands = new TableLayoutPanel
-            {
-                BackColor = AetherColors.Chrome,
-                Dock = DockStyle.Fill,
-                ColumnCount = 8,
-                RowCount = 1,
-                Margin = Padding.Empty,
-                Padding = Padding.Empty
-            };
-            commands.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-
-            aetherDeckOpenButton = CreateActionButton(global::AetherBoy.Runtime.Localization.UiText.Get("Spiel öffnen"), AetherButtonKind.Primary, 126);
-            aetherDeckOpenButton.Click += (_, _) => OpenRomFromAetherUi();
-            aetherControlCenterButton = CreateActionButton(global::AetherBoy.Runtime.Localization.UiText.Get("Settings"), AetherButtonKind.Secondary, 94);
-            aetherControlCenterButton.Click += (_, _) => OpenControlCenter();
-            AetherButton quick = CreateActionButton(global::AetherBoy.Runtime.Localization.UiText.Get("Quick"), AetherButtonKind.Secondary, 82);
-            quick.Name = "aetherQuickMenuButton";
-            quick.Click += (_, _) => _ = OpenQuickMenuAsync();
-            aetherPauseButton = CreateActionButton("Pause", AetherButtonKind.Secondary, 92);
+            var deck = new Panel { Dock = DockStyle.Bottom, Height = 68, Padding = new Padding(0, 16, 0, 0), BackColor = AetherColors.Void };
+            var actions = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Margin = Padding.Empty };
+            aetherPauseButton = CreateActionButton("Pause", AetherButtonKind.Primary, 156); aetherPauseButton.Icon = UiIcon.Play;
             aetherPauseButton.Click += aetherPauseButton_Click;
-            aetherRewindButton = CreateActionButton(global::AetherBoy.Runtime.Localization.UiText.Get("Rewind"), AetherButtonKind.Secondary, 94);
-            aetherRewindButton.Click += (_, args) =>
-            {
-                menuRewind_Click(aetherRewindButton, args);
-                gameView.Focus();
-            };
-            aetherSaveButton = CreateActionButton(global::AetherBoy.Runtime.Localization.UiText.Get("Save"), AetherButtonKind.Secondary, 82);
-            aetherSaveButton.Click += (_, _) =>
-            {
-                QuickSave();
-                gameView.Focus();
-            };
-            aetherLoadButton = CreateActionButton(global::AetherBoy.Runtime.Localization.UiText.Get("Load"), AetherButtonKind.Secondary, 82);
-            aetherLoadButton.Click += (_, _) =>
-            {
-                QuickLoad();
-                gameView.Focus();
-            };
-            aetherTurboButton = CreateActionButton("Turbo", AetherButtonKind.Secondary, 88);
-            aetherTurboButton.Click += aetherTurboButton_Click;
-
-            AetherButton[] actions = [aetherDeckOpenButton, aetherControlCenterButton, quick, aetherPauseButton,
-                aetherRewindButton, aetherSaveButton, aetherLoadButton, aetherTurboButton];
-            for (int index = 0; index < actions.Length; index++)
-            {
-                actions[index].Dock = DockStyle.Fill;
-                actions[index].Margin = new Padding(0, 0, index == actions.Length - 1 ? 0 : 8, 0);
-                commands.Controls.Add(actions[index], index, 0);
-            }
-            deck.Controls.Add(commands);
-            bool arranging = false;
-            void ArrangeCommands()
-            {
-                if (arranging || commands.ClientSize.Width == 0) return;
-                arranging = true;
-                try
-                {
-                    int[] widths = actions.Select(button => TextRenderer.MeasureText(button.Text, button.Font,
-                        Size.Empty, TextFormatFlags.NoPadding).Width + (int)Math.Ceiling(button.Font.Height * 1.8) + button.Margin.Horizontal).ToArray();
-                    int columns = widths.Sum() <= commands.ClientSize.Width ? 8 : 4;
-                    commands.SuspendLayout();
-                    commands.ColumnCount = columns;
-                    commands.RowCount = 8 / columns;
-                    commands.ColumnStyles.Clear();
-                    commands.RowStyles.Clear();
-                    for (int column = 0; column < columns; column++)
-                        commands.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,
-                            columns == 8 ? widths[column] : Math.Max(widths[column], widths[column + 4])));
-                    for (int row = 0; row < commands.RowCount; row++)
-                        commands.RowStyles.Add(new RowStyle(SizeType.Percent, 1));
-                    for (int index = 0; index < actions.Length; index++)
-                        commands.SetCellPosition(actions[index], new TableLayoutPanelCellPosition(index % columns, index / columns));
-                    deck.Height = deck.Padding.Vertical + commands.RowCount * (actions[0].Font.Height + 26);
-                    commands.ResumeLayout(true);
-                }
-                finally { arranging = false; }
-            }
-            commands.SizeChanged += (_, _) => ArrangeCommands();
-            foreach (AetherButton action in actions) action.FontChanged += (_, _) => ArrangeCommands();
-            return deck;
+            aetherRewindButton = CreateActionButton(UiText.Get("Rewind"), AetherButtonKind.Secondary, 44); aetherRewindButton.Icon = UiIcon.Rewind; aetherRewindButton.IconOnly = true;
+            aetherRewindButton.AccessibleName = aetherRewindButton.Text; aetherRewindButton.Click += (_, args) => menuRewind_Click(aetherRewindButton, args);
+            aetherTurboButton = CreateActionButton("Turbo", AetherButtonKind.Secondary, 44); aetherTurboButton.Icon = UiIcon.Turbo; aetherTurboButton.IconOnly = true;
+            aetherTurboButton.AccessibleName = "Turbo"; aetherTurboButton.Click += aetherTurboButton_Click;
+            aetherDeckOpenButton = CreateNavButton(UiText.Get("Weitere Aktionen"), desktopCommands, "GAME"); aetherDeckOpenButton.Icon = UiIcon.More; aetherDeckOpenButton.IconOnly = true; aetherDeckOpenButton.Width = 44; aetherDeckOpenButton.Height = 44;
+            var fullscreen = CreateActionButton(UiText.Get("Vollbild"), AetherButtonKind.Ghost, 44); fullscreen.Icon = UiIcon.Fullscreen; fullscreen.IconOnly = true; fullscreen.AccessibleName = fullscreen.Text;
+            fullscreen.Dock = DockStyle.Right; fullscreen.Click += (_, _) => ToggleAetherFullscreen();
+            actions.Controls.AddRange([aetherPauseButton, aetherRewindButton, aetherTurboButton, aetherDeckOpenButton]);
+            deck.Controls.Add(actions); deck.Controls.Add(fullscreen); return deck;
         }
 
         private AetherButton CreateChromeButton(
@@ -571,7 +399,7 @@ namespace nanoboy
             {
                 Kind = kind,
                 Margin = new Padding(0, 0, 9, 0),
-                Size = new Size(width, 40),
+                Size = new Size(width, 44),
                 Text = text
             };
         }
@@ -590,7 +418,7 @@ namespace nanoboy
                 AutoSize = false,
                 BackColor = Color.Transparent,
                 Dock = dock,
-                Font = new Font("Segoe UI", size, style, GraphicsUnit.Point),
+                Font = AetherTypography.Create(size, style),
                 ForeColor = color,
                 Height = height,
                 Text = text,
@@ -602,7 +430,7 @@ namespace nanoboy
         {
             var row = new Panel { BackColor = AetherColors.Surface, Dock = DockStyle.Fill };
             Label key = CreateUiLabel(label, 9f, FontStyle.Regular, AetherColors.Muted, DockStyle.Left, 30);
-            key.Width = 70;
+            key.Width = 80;
             value = CreateUiLabel("—", 9f, FontStyle.Bold, AetherColors.Text, DockStyle.Fill, 30, ContentAlignment.MiddleRight);
             row.Controls.Add(value);
             row.Controls.Add(key);
@@ -627,6 +455,7 @@ namespace nanoboy
                 return;
             }
 
+            if (desktopController is not null) desktopController.Text = UiText.Get(state.IsConnected ? "Controller verbunden" : "Tastatur");
             aetherInputValue.Text = state.IsConnected ? global::AetherBoy.Runtime.Localization.UiText.Get("Gamepad") : global::AetherBoy.Runtime.Localization.UiText.Get("Keyboard");
         }
 
@@ -637,7 +466,8 @@ namespace nanoboy
                 CancelRomPreparation();
                 return;
             }
-            menuOpen_Click(this, EventArgs.Empty);
+            using var picker = new AetherFileDialog { Title = UiText.Get("Spiel öffnen"), Filter = UiText.Get("Spiele und Archive") + "|*.gb;*.gbc;*.gba;*.zip;*.7z", InitialDirectory = WindowsDataPaths.Default.Roms };
+            if (picker.ShowDialog(this) == DialogResult.OK) _ = PrepareRomLoadAsync(picker.FileName);
             gameView.Focus();
         }
 
@@ -694,8 +524,8 @@ namespace nanoboy
             aetherModelValue.Text = snapshot?.Rom == null
                 ? "—"
                 : snapshot.Rom.IsGameBoyAdvance
-                    ? "GBA"
-                    : snapshot.Rom.HasColorFeatures ? "CGB" : "DMG";
+                    ? "Game Boy Advance"
+                    : snapshot.Rom.HasColorFeatures ? "Game Boy Color" : "Game Boy";
             aetherAudioValue.Text = settings.AudioEnable ? global::AetherBoy.Runtime.Localization.UiText.Get("On") : global::AetherBoy.Runtime.Localization.UiText.Get("Muted");
             aetherFilterValue.Text = gameView.Filter switch
             {
@@ -762,6 +592,7 @@ namespace nanoboy
             aetherPauseButton.Selected = snapshot?.IsPaused == true;
             aetherTurboButton.Selected = snapshot?.IsTurboEnabled == true;
             UpdateAetherSlotButtons();
+            ArrangeDesktop();
         }
 
         private void UpdateAetherSlotButtons()
@@ -774,24 +605,7 @@ namespace nanoboy
                     current.Supports(EmulationFeature.SaveStates) && !IsOnlineLink && !stateOperationInProgress &&
                     aetherSaveSlots[settings.SaveSlot] == AetherSaveSlotState.Saved;
             }
-            for (int index = 0; index < aetherSlotButtons.Length; index++)
-            {
-                int slot = index + 1;
-                AetherSaveSlotState state = aetherSaveSlots[slot];
-                AetherButton button = aetherSlotButtons[index];
-                button.Selected = settings.SaveSlot == slot;
-                button.Text = slot + (state switch
-                {
-                    AetherSaveSlotState.Reading => "…",
-                    AetherSaveSlotState.Empty => "−",
-                    AetherSaveSlotState.Saved => "●",
-                    AetherSaveSlotState.Unreadable => "!",
-                    _ => ""
-                });
-                button.AccessibleName = global::AetherBoy.Runtime.Localization.UiText.Format("Slot {0}: {1}", slot,
-                    AetherSaveSlotLabel(state));
-            }
-
+            if (desktopSlot is not null && desktopSlot.SelectedIndex != settings.SaveSlot - 1) desktopSlot.SelectedIndex = settings.SaveSlot - 1;
             if (aetherSlotValue != null)
             {
                 aetherSlotValue.Text = global::AetherBoy.Runtime.Localization.UiText.Format("{0} · {1}", settings.SaveSlot,
@@ -885,8 +699,8 @@ namespace nanoboy
             int displayWidth = gameView.VideoGeometry.Width * normalizedScale;
             int displayHeight = gameView.VideoGeometry.Height * normalizedScale;
             Size logicalSize = new Size(
-                Math.Max(860, displayWidth + 330),
-                Math.Max(646, displayHeight + 228));
+                Math.Max(1000, displayWidth + 360),
+                Math.Max(740, displayHeight + 240));
             double dpiScale = (IsHandleCreated ? DeviceDpi / 96d : 1d) * aetherUiScale;
             return new Size((int)Math.Round(logicalSize.Width * dpiScale),
                 (int)Math.Round(logicalSize.Height * dpiScale));

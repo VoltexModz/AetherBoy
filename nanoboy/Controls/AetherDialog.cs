@@ -20,10 +20,11 @@ namespace nanoboy.Controls
             string description,
             bool showMinimize = false,
             Func<bool>? gamepadNavigationEnabled = null,
-            int descriptionLines = 1)
+            int descriptionLines = 1, bool desktop = false)
         {
             ArgumentNullException.ThrowIfNull(form);
-            int headerHeight = HeaderHeight + (Math.Clamp(descriptionLines, 1, 3) - 1) * 18;
+            float uiScale = Math.Clamp(Properties.Settings.Default.UiScalePercent, 100, 150) / 100f;
+            int headerHeight = (desktop ? 64 : HeaderHeight) + (Math.Clamp(descriptionLines, 1, 3) - 1) * 18;
 
             form.SuspendLayout();
             form.AutoScaleMode = AutoScaleMode.Dpi;
@@ -45,7 +46,7 @@ namespace nanoboy.Controls
             form.FormBorderStyle = FormBorderStyle.None;
             form.BackColor = AetherColors.Hairline;
             form.ForeColor = AetherColors.Text;
-            form.Font = new Font("Segoe UI", 9f, FontStyle.Regular, GraphicsUnit.Point);
+            form.Font = AetherTypography.Create(10.5f);
             form.KeyPreview = true;
             form.MaximizeBox = false;
             form.MinimizeBox = showMinimize;
@@ -83,8 +84,8 @@ namespace nanoboy.Controls
             void FitBody()
             {
                 float factor = form.DeviceDpi / 96f;
-                viewport.SetMinimumContent(new Size((int)((contentSize.Width - 2) * factor),
-                    (int)((contentSize.Height - 2) * factor)));
+                viewport.SetMinimumContent(new Size((int)((desktop ? 980 * uiScale : contentSize.Width - 2) * factor),
+                    (int)((desktop ? 640 * uiScale : contentSize.Height - 2) * factor)));
             }
             viewport.SizeChanged += (_, _) => FitBody();
             void FitDialog()
@@ -173,6 +174,23 @@ namespace nanoboy.Controls
             };
             closeButton.Click += (_, _) => form.Close();
 
+            if (desktop)
+            {
+                logo.Bounds = new Rectangle(20, 13, 38, 38);
+                sectionLabel.Text = "AetherBoy";
+                sectionLabel.Font = AetherTypography.Create(13.5f, FontStyle.Bold);
+                sectionLabel.ForeColor = AetherColors.Text;
+                sectionLabel.Bounds = new Rectangle(70, 16, 180, 32);
+                titleLabel.Font = AetherTypography.Create(9.75f);
+                titleLabel.ForeColor = AetherColors.Muted;
+                titleLabel.TextAlign = ContentAlignment.MiddleCenter;
+                titleLabel.Bounds = new Rectangle(250, 16, Math.Max(100, contentSize.Width - 500), 32);
+                titleLabel.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+                descriptionLabel.Visible = false;
+                closeButton.Icon = Core.UiIcon.Close; closeButton.IconOnly = true;
+                closeButton.SetBounds(contentSize.Width - 60, 12, 40, 40);
+            }
+
             header.Controls.Add(logo);
             header.Controls.Add(sectionLabel);
             header.Controls.Add(titleLabel);
@@ -219,7 +237,6 @@ namespace nanoboy.Controls
             form.CancelButton = cancelButton;
             Style(body.Controls);
 
-            float uiScale = Math.Clamp(Properties.Settings.Default.UiScalePercent, 100, 150) / 100f;
             if (uiScale != 1f)
             {
                 InterfaceScale.Apply(body, uiScale);

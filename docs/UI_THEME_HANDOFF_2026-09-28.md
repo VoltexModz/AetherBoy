@@ -1,5 +1,183 @@
 # UI-Farben und Logo-Abgleich — lokaler Arbeitsstand vom 28. September 2026
 
+## Vollständiger Einstellungsbereich — 27.10.2026
+
+Nachtrag zum Desktop-Design: Die Aussehen-Seite war zunächst als einzige in der
+neuen Navigation umgesetzt. Alle acht Kategorien verwenden jetzt denselben
+Einstellungsrahmen auf Windows und Linux: Übersicht, Aussehen, Grafik, Audio,
+Steuerung, Spielstände, App und Dateien, Diagnose. Auch Unterseiten und Suche
+behalten Navigation, Suchfeld und Fußzeile. Strg+Tab wechselt diese Kategorien;
+Esc führt aus Unterseiten zurück in den Einstellungsbereich. „Zum Spiel zurück“
+verlässt ihn ausdrücklich. Bestehende Werkzeuge und spezialisierte Eingabeeditoren
+bleiben über ihre bisherigen Aktionen erreichbar.
+
+Im bestehenden `AeatherBoy.pen` wurden diese Entwürfe ergänzt. Sie verwenden die
+vorhandenen Farbvariablen, Noto Sans und Aether-Komponenten. Die ursprüngliche
+Aussehen-Seite `HREE0` zeigt ebenfalls die vollständige Einstellungsnavigation.
+
+| Entwurf | Pen-Knoten |
+| --- | --- |
+| Bausteine, Fokuszustand, Layoutregeln | `S6f9l` |
+| App und Dateien mit allen sechs Zeilen | `ZszGR` |
+| Übersicht | `v4Nre` |
+| Grafik | `k5Df8` |
+| Audio | `l7Fj8` |
+| Steuerung | `qyT2F` |
+| Spielstände ohne geladenes Spiel | `S3Kce4` |
+| Aussehen im gemeinsamen Rahmen | `Luhwn` |
+| Desktop und Sprache | `h3ysi` |
+| Dateien und Updates | `drxep` |
+| Diagnose | `dx2Z1` |
+| Kompakte Suche, Pocket Light, 1000×740 | `LROh4` |
+
+PNG-Exporte liegen lokal unter `artifacts/settings-design/`. Die Entwürfe legen
+Gruppierung, Zeilen, Zustände und gemeinsamen Rahmen fest. Plattformabhängige
+Detailaktionen bleiben in den nativen Aether-Komponenten umgesetzt; beispielsweise
+verwendet die native Audioseite weiterhin ihre vorhandene Lautstärkeauswahl.
+
+Der im Nutzerbild belegte Linux-Überlauf ist behoben: Die sechs App-/Dateizeilen
+liegen vollständig im Inhaltsbereich, statt die letzte Sprachzeile unter eine
+fest begrenzte Hintergrundfläche zu setzen. Aktionen stehen rechts, Texte links.
+Auch bei 860×554 und großer Schrift bleiben Zeilen, Navigationsstatus und
+Tastaturhilfe oberhalb der Fußzeile. Lange Aktionsnamen können bei dieser Breite
+gekürzt erscheinen; die zugehörige Überschrift bleibt lesbar. Unter Windows
+verwenden Einstellungsgruppen Trennlinien der gemeinsamen `AetherSurfacePanel`;
+der Standardmodus anderer Fenster bleibt erhalten. Zwei Audiobeschreibungen
+haben genug Höhe für ihren vollständigen Umbruch in DE/EN und 100/150 Prozent.
+
+Abnahme dieses Nachtrags, separat vom vorherigen Desktop-Lauf:
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Release-Build der gesamten Solution | 0 Fehler, 0 Warnungen |
+| Native Windows-VM: SettingsDesign, SettingsParity, DesktopDesign, UiPolicy, Theme | 40 bestanden, keine Skips |
+| Darin Windows-UI-Policy | 3 bestanden; `WindowsUiDebt.json` unverändert |
+| Native SDL-/Wayland-Auswahl: SettingsDesign, DesktopDesign, SettingsNavigation, Language, ShellIntegration, Theme | 24 bestanden, keine Skips |
+| Gemeinsamer DE/EN-Katalog und Browserlokalisierung | 19 bestanden, keine Skips |
+| Copy-Scanner | Hinweise auf geänderten Zeilen geprüft; nur bestehende Bibliotheks-Metadatenformulierung markiert |
+| Linux-Launcher | Frisch veröffentlicht, installiert, 64 Dateien per SHA-256 mit Publish verglichen; Desktop-Datei und Start mit minimalem PATH geprüft |
+
+Die 83 Fälle dieses Nachtrags sind nicht zu den 138 Fällen des ersten Umbaus zu
+addieren: Die Auswahlen überlappen. In der Windows-Sprachprüfung wurden nur die
+veralteten Navigationsziele durch die tatsächlich vorhandenen stabilen IDs
+ersetzt; Sprachpersistenz, globale Wirkung und unveränderte Datenkultur werden
+weiter geprüft. Die neue Regression prüft auf 17 Einstellungsseiten denselben
+Navigationsbereich, erreichbare Schaltflächen, Suchrouting und Zurücknavigation.
+Linux prüft alle acht Kategorien in beiden Sprachen und zwei Fenstergrößen.
+
+Belege: `/tmp/aether-design-vm/results-settings-verified`,
+`/tmp/aetherboy-settings-linux`, `/tmp/aetherboy-settings-build-final.log`,
+`/tmp/aetherboy-settings-localization-final.log`. DE/EN-Fensterbilder wurden
+betrachtet; die VM-Auflösung ist wieder 1280×800 und der temporäre Settings-Testtask
+ist entfernt. Die unten dokumentierten Grenzen bei echten Monitor-DPI-Wechseln,
+Audiogeräten, IME, Screenreadern und physischer Controller-Hardware gelten weiter.
+Die Linux-Launcher-Version liegt in `program/releases/build-mdXaE1Wc`; der
+`current`-Link zeigt dorthin. Persönliche Daten und frühere Releases bleiben erhalten.
+
+## Desktop-Design aus pen.dev — 27.10.2026
+
+Vorlage: `AeatherBoy.pen`, Dokument `693f2a67-130d-46bc-9dec-eb9647ff2c81`.
+Übernommen wurden Spielansicht (`ntiwx`), Bibliothek (`BeEQz`, `rzz59`),
+Aussehen (`HREE0`), kompakte Ansicht (`n8di4F`) und leerer Start (`eggUs`).
+Die Datei wurde über die Pen-Schnittstelle gelesen; Beispieltitel und Spielbilder
+sind keine ausgelieferten Bibliotheksdaten.
+
+- Windows/WinForms und Linux/SDL verwenden gemeinsame Desktop-Maße und Linienicons.
+  Kopfzeile 64, Statuszeile 32, Navigation 184 bzw. 72 bei schmalen Fenstern;
+  Spielbild, Speicherzustände und Transport sind getrennte Bereiche.
+- Das leere Fenster zeigt Dateiöffnung und Bibliothek. Mit Spiel erscheinen
+  die tatsächlichen Sitzungswerte und fünf Speicherplätze im Aether-Dropdown.
+  Die bisherige Windows-Menüstruktur bleibt unter „Weitere Aktionen“ erreichbar.
+  In sehr schmalen Windows-Spielbereichen liegen Zurückspulen/Turbo im Menü.
+- Bibliothek mit Suche, System-/Favoritenfilter, Spielvorschau, Sortierung und
+  Tabelle. Bestehende Metadaten, Fortsetzen, Kachelansicht und Patch Lab bleiben
+  erreichbar. Linux behält für Kacheln und tiefere Werkzeugseiten die bestehenden
+  Funktionsansichten mit den gemeinsamen neuen Farben/Komponenten.
+- Aussehen mit sechs Theme-Vorschauen, drei editierbaren Farbfeldern, Größe und
+  Sprache. Ein laufendes Status-Refresh überschreibt keine unfertigen Farbeingaben.
+  Ungültige Farben überschreiben keine gespeicherten Werte.
+- Aether Original verwendet nun den Hintergrund `#0D1019` der Vorlage,
+  Pocket Light deren warme Oberflächen. Gespeicherte eigene Farben bleiben
+  bestehen. Hauptaktionen behalten die zwei Aether-Wave-Schnitte; weitere
+  Schaltflächen und Eingaben verwenden die ruhigeren rechteckigen Flächen.
+- Windows lädt die bereits lizenziert mitgelieferten Noto-Sans-Schriften über
+  `AddFontResourceEx(FR_PRIVATE)` für GDI und eine prozessweit gehaltene
+  `PrivateFontCollection` für GDI+. Die native Windows-VM deckte den zuvor
+  unbemerkten GDI+-Fallback auf Microsoft Sans Serif auf; Regular und Bold
+  verwenden jetzt die private Schriftfamilie. Keine
+  Systeminstallation, kein neuer nativer Dialog. Die gebündelte Schrift und ihre
+  Nutzung werden im Desktop-Designtest geprüft. `WindowsUiDebt.json` bleibt
+  unverändert; keine Ausweitung oder Abschaltung des Policy-Wächters.
+- Die native UIA-Prüfung deckte einen blockierenden Bibliotheksaufruf auf:
+  Aether-Buttons führen ihre Accessibility-Aktion nun über die UI-Warteschlange
+  aus. Der Aufruf kehrt vor einem modalen Dialog zurück. Verfügbarkeit und
+  Auswählbarkeit werden vor dem Einreihen und vor dem Klick geprüft; ein neuer
+  Regressionstest prüft modale Öffnung und zwischenzeitliche Deaktivierung.
+
+Die verbindliche Fensterliste unten bleibt bestehen. Für `frmNano`,
+`frmRomLibrary` und `frmControlCenter` sind neue Start-/Spiel-/Bibliotheks-/Theme-
+Aufnahmen sowie Regressionen ergänzt. Prüfung in DE/EN, Original/Pocket Light,
+allen sechs Theme-Wechseln, eigenen Farben und kleinen Fenstern; Windows-Slotrail
+zusätzlich bei 100/125/150 Prozent UI-Größe. Linux-Layouttests prüfen
+Trefferflächen und Überschneidungen bis 860×554 mit großer Schrift.
+
+Prüfstand dieses Umbaus:
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Release-Build der gesamten Solution | 0 Fehler, 0 Warnungen |
+| Native Windows-UI-, Theme-, Bibliotheks-, Eingabe-, Sprach- und Workflow-Auswahl | 85 bestanden, keine Skips; einschließlich Direct2D und Fensteraufnahmen |
+| Darin `WindowsUiPolicyTests` | 3 bestanden, Debt-Datei unverändert |
+| WASAPI-Geräteprobe | Erstlauf fehlgeschlagen: VM hat kein Audiogerät (`0x80070490`); im abschließenden Lauf ausdrücklich ausgenommen, weiterhin offen |
+| Native SDL-/Wayland-Auswahl | 26 bestanden, keine Skips |
+| Gemeinsame Farb-/Aether-Wave-Tests | 8 bestanden |
+| Gemeinsame Lokalisierung | 19 bestanden |
+| Copy-Scanner und `git diff --check` | gelesen/geprüft; keine Whitespace-Fehler |
+
+Der neue Scannerhinweis zum Bibliotheksformat `{0} · {1} gespielt` betrifft
+System und Spielzeit als Metadatenzeile, keinen Warn- oder Erklärungstext.
+Weitere Hinweise betreffen unveränderte ältere Texte und Katalog-Aliase.
+Neue literale `UiText.Get`-/`Format`-Quellen wurden gegen den Katalog geprüft.
+Die zentrale `AetherHeading` hält lange Spieltitel in einer Zeile, einschließlich
+150-Prozent-UI; der vollständige Titel bleibt als Labeltext für Accessibility
+verfügbar. Die Navigation überlappt auch dort nicht. Unveränderte Sitzungs-Ticks
+lösen keinen erneuten Desktop-Layoutdurchlauf aus.
+
+Nach der Freigabe der Nutzer-VM wurde die Wine-Vorprüfung durch einen nativen
+Lauf auf Windows 11 Pro, Build 26200, mit .NET 10.0.14 ergänzt. Die vorhandene
+VM `pdf-research-windows` läuft mit dem VirtIO-Grafiktreiber. Testbuild und
+portable Live-Instanz liegen getrennt unter `C:\AetherBoy-Design-20261027`;
+synthetische ROMs und Testdaten berühren keine persönlichen Spielstände.
+Der abschließende TRX-Lauf unter `results-verified` enthält 85 bestandene Fälle.
+Die anschließende Bildkontrolle fand eine abgeschnittene englische Tastaturhilfe
+im Aktionsmenü. Die Hilfszeile wird jetzt gemessen und die folgenden Bereiche
+rücken entsprechend nach. Gezielte Nachprüfung unter `results-menu`: 7/7,
+einschließlich DE/EN-Aufnahmen und Policy; keine zusätzlichen Fälle mitzählen.
+Mit den unveränderten Linux-/Core-/Runtime-Prüfungen sind dies 138 unterschiedliche
+bestandene Fälle; die fehlgeschlagene Audiogeräteprobe ist nicht mitgezählt.
+
+Zusätzliche externe UIA-Prüfung: Start, Einstellungen, Theme-Wechsel, eigene
+Farben, Größen-Dropdown, Aether-Textkontextmenü und Bibliothek. Der korrigierte
+Bibliotheksaufruf kehrt vor dem modalen Dialog zurück; der Client kann danach
+dessen Baum lesen, den Unicode-Suchwert `Äther 日本語 Ω` setzen/zurücklesen und
+das Fenster schließen. Der native Editor meldet über TextPattern `Noto Sans`.
+Native Aufnahmen in DE/EN und Mindestformaten wurden betrachtet. Bildschirmtests
+prüfen jetzt das Vordergrundfenster und warten auf die Desktop-Komposition;
+der Direct2D-Test prüft die sichtbaren Frame-Pixel mit begrenzter Wartezeit.
+Temporäre Hostbelege: `/tmp/aether-design-vm/results-verified`,
+`/tmp/aether-design-vm/results-menu` und
+`/tmp/aether-design-vm/live`. Die ursprüngliche virtuelle Auflösung 1280×800
+ist wiederhergestellt; alle temporären AetherBoy-Prüftasks sind entfernt.
+
+Nachweisgrenzen: Die VM-Prüfung ersetzt keine echten Monitor-DPI-Wechsel,
+WASAPI-Ausgabe mit vorhandenem Audiogerät, reale IME-/Screenreaderbedienung oder
+Controller-Hardware. Gemessen wurden 96 DPI und 100/125/150 Prozent app-eigene
+UI-Größe, keine physischen Monitorwechsel. SDL läuft nativ unter Wayland. GTK 3 kann
+sich hier nicht mit Wayland verbinden (`gtk_init_check` liefert 0); die native
+GTK-/AT-SPI-Gesamtprobe bleibt offen. Die SDL-Befehlsnamen und modal getrennten
+Auswahllisten werden unabhängig davon geprüft. Keine neue Aussage zur
+Core-/Online-Link-Kompatibilität.
+
 ## UI-Restarbeiten und zusätzliche Abnahmen — 09.10.2026
 
 - Die sieben Softwarepakete aus dem [UI-Arbeitsplan](UI_REVIEW_PLAN_2026-10-08.md)

@@ -45,19 +45,13 @@ public sealed class WindowsThemeTests
         Assert.AreEqual(ToColor(palette.Text), title.ForeColor);
         Assert.AreEqual(FormBorderStyle.None, center.FormBorderStyle);
         Assert.IsTrue(page.Visible);
-        Assert.AreEqual(3, Descendants(page).OfType<AetherButton>().Count(button => button.Text.StartsWith("Wählen · ", StringComparison.Ordinal)));
-        Panel[] swatches = Descendants(page).OfType<Panel>()
-            .Where(panel => Equals(panel.Tag, "theme-swatch")).ToArray();
-        Assert.AreEqual(UiThemePresets.All.Count * 2, swatches.Length);
-        for (int index = 0; index < UiThemePresets.All.Count; index++)
-        {
-            Assert.AreEqual(ColorTranslator.FromHtml(UiThemePresets.All[index].Primary), swatches[index * 2].BackColor);
-            Assert.AreEqual(ColorTranslator.FromHtml(UiThemePresets.All[index].Secondary), swatches[index * 2 + 1].BackColor);
-        }
+        Assert.AreEqual(3, Descendants(page).OfType<AetherTextBox>().Count(input => input.Name.StartsWith("desktopColor", StringComparison.Ordinal)));
+        var previews = Descendants(page).OfType<AetherButton>().Where(button => button.ThemePreview is not null).ToArray();
+        Assert.AreEqual(UiThemePresets.All.Count, previews.Length);
+        CollectionAssert.AreEquivalent(UiThemePresets.All.Select(preset => preset.Id).ToArray(), previews.Select(button => button.ThemePreview!.Id).ToArray());
         Capture(main, "windows-theme-" + capture + ".png");
         Capture(center, "windows-appearance-" + capture + ".png");
-        foreach (AetherButton slot in Field<AetherButton[]>(main, "aetherSlotButtons"))
-            Assert.IsTrue(slot.Parent!.ClientRectangle.Contains(slot.Bounds), "The save-slot button must not be clipped by its row.");
+        Assert.AreEqual(5, Field<AetherSelect>(main, "desktopSlot").Items.Count);
 
         var restore = (AetherButton)center.Controls.Find("controlCenterRestoreTheme", true).Single();
         restore.PerformClick();

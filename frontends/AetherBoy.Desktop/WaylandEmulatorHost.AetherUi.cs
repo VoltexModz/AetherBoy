@@ -1,6 +1,7 @@
 using AetherBoy.Runtime;
 using nanoboy.Core;
 using SDL3;
+using UiText = AetherBoy.Runtime.Localization.UiText;
 
 namespace AetherBoy.Desktop;
 
@@ -15,6 +16,7 @@ internal sealed partial class WaylandEmulatorHost
         public readonly SDL.Color Surface = From(theme.Surface);
         public readonly SDL.Color Raised = From(theme.Raised);
         public readonly SDL.Color Border = From(theme.Border);
+        public readonly SDL.Color Selection = From(theme.Selection);
         public readonly SDL.Color Text = From(theme.Text);
         public readonly SDL.Color Muted = From(theme.Muted);
         public readonly SDL.Color Violet = From(theme.PrimaryText);
@@ -53,9 +55,9 @@ internal sealed partial class WaylandEmulatorHost
     private void JumpControlCenterRegion()
     {
         bool inContent = focusedControl >= 0 && focusedControl < focusTargets.Count
-            && focusTargets[focusedControl].X >= 278 && focusTargets[focusedControl].Y >= 180;
+            && focusTargets[focusedControl].X >= 278;
         focusedControl = inContent
-            ? focusTargets.FindIndex(target => target.X < 248 && target.Y == 224 + (int)controlCenterPage * 50)
+            ? focusIdentities.FindIndex(identity => identity.Action == "nav:settings:" + ActiveSettingsSection)
             : focusTargets.FindIndex(target => target.X >= 278 && target.Y >= 180);
     }
     private IntPtr brandTexture;
@@ -169,7 +171,7 @@ internal sealed partial class WaylandEmulatorHost
     {
         Paint(x, y, w, h, Colors.Border);
         Paint(x + 1, y + 1, w - 2, h - 2, stage ? Colors.Void : Colors.Surface);
-        AccentLine(x, y + 1, 2, h - 2, vertical: true);
+
         if (stage) Paint(x + w - 58, y + 22, 38, 2, Colors.Cyan);
         if (caption is not null) Ink(x + 22, y + 18, caption, 12, Colors.Muted, true);
     }
@@ -203,17 +205,18 @@ internal sealed partial class WaylandEmulatorHost
             focusIdentities.Add(identity);
         }
         bool navigation = focusId?.StartsWith("nav:") == true;
+        bool quiet = navigation || focusId?.StartsWith("window:") == true;
         bool hovered = enabled && Hit(mouseX, mouseY, x, y, width, height);
         bool gradient = enabled && emphasis;
-        SDL.Color fill = selected && enabled || hovered ? Colors.Raised : navigation ? Colors.Chrome : Colors.Raised;
+        SDL.Color fill = selected && enabled ? Colors.Selection : hovered ? Colors.Raised : quiet ? Colors.Chrome : Colors.Surface;
         SDL.Color first = gradient ? hovered ? Colors.ButtonHoverStart : Colors.ButtonStart : fill;
         SDL.Color last = gradient ? hovered ? Colors.ButtonHoverEnd : Colors.ButtonEnd : fill;
         SDL.Color foreground = !enabled ? Colors.Muted : gradient ? hovered ? Colors.ButtonHoverText : Colors.ButtonText : Colors.Text;
-        SDL.Color border = keyboardFocused || selected && enabled ? Colors.Cyan
-            : hovered ? Colors.Violet : gradient ? Colors.Primary : navigation ? Colors.Chrome : Colors.Border;
-        ChamferFill(x, y, width, height, 8, border);
-        ChamferFill(x + 1, y + 1, width - 2, height - 2, 7, first, last);
-        if (!gradient && enabled && (selected || hovered))
+        SDL.Color border = keyboardFocused ? Colors.Cyan : selected && enabled ? Colors.Selection
+            : hovered ? Colors.Violet : gradient ? Colors.Primary : quiet ? Colors.Chrome : Colors.Border;
+        ChamferFill(x, y, width, height, gradient ? 8 : 0, border);
+        ChamferFill(x + 1, y + 1, width - 2, height - 2, gradient ? 7 : 0, first, last);
+        if (!gradient && enabled && selected)
             Paint(x + 4, y + 5, 2, Math.Max(1, height - 14), selected ? Colors.Cyan : Colors.Violet);
         if (keyboardFocused && width > 12 && height > 12)
         {
@@ -265,7 +268,7 @@ internal sealed partial class WaylandEmulatorHost
     {
         SDL.GetWindowSize(window, out int width, out int height);
         if (width <= 0 || height <= 0) return;
-        float scale = Math.Min(width / 1180f, height / 760f);
+        float scale = Math.Min(1, Math.Min(width / 1180f, height / 760f));
         textRenderer.MinimumSize = Math.Max(14, (int)Math.Ceiling(12 / scale)) + Math.Clamp(options.TextSize - 14, 0, 4);
         int logicalWidth = (int)Math.Round(width / scale);
         int logicalHeight = (int)Math.Round(height / scale);
@@ -299,88 +302,69 @@ internal sealed partial class WaylandEmulatorHost
         }
         if (controlCenterVisible) { DrawControlCenter(); DrawLoadingOverlay(); return; }
         if (showLocalLinkPage) { DrawLocalLinkPage(); return; }
-        Paint(0, 0, LogicalWidth, 78, Colors.Chrome);
-        AccentLine(0, 76, LogicalWidth, 2);
-        Mark(20, 12, 50);
-        Ink(84, 15, "AetherBoy", 21, bold: true);
-        Ink(84, 46, "GAME BOY · COLOR · ADVANCE", 11, Colors.Muted);
-        ActionButton(568 + dx, 18, 132, 42, global::AetherBoy.Runtime.Localization.UiText.Get("Library"), () => OpenControlPage(ControlCenterPage.Library));
-        ActionButton(392 + dx, 18, 164, 42, global::AetherBoy.Runtime.Localization.UiText.Get("Sofa mode"), OpenSofaLibrary);
-        ActionButton(708 + dx, 18, 132, 42, global::AetherBoy.Runtime.Localization.UiText.Get("Graphics"), () => OpenControlPage(ControlCenterPage.Display));
-        ActionButton(848 + dx, 18, 132, 42, global::AetherBoy.Runtime.Localization.UiText.Get("Save states"), () => OpenControlPage(ControlCenterPage.Saves));
-        ActionButton(988 + dx, 18, 168, 42, global::AetherBoy.Runtime.Localization.UiText.Get("Settings"), () => OpenControlPage(ControlCenterPage.Overview));
-
-        Panel(24, 100, 836 + dx, 548 + dy, stage: true);
-        Ink(44, 115, global::AetherBoy.Runtime.Localization.UiText.Get("GAME SCREEN"), 11, Colors.Muted, true);
+        DrawDesktopChrome(UiText.Get("Spielen"), "play");
+        var layout = UiDesktopLayout.Create(LogicalWidth, LogicalHeight);
         EmulationSnapshot? snapshot = session?.LatestSnapshot;
-        if (frameTexture != IntPtr.Zero && snapshot?.HasVideoFrame == true)
+        if (snapshot?.Rom is null)
         {
-            SDL.FRect destination = GetGameDestination(frameGeometry);
-            SDL.RenderTexture(renderer, frameTexture, IntPtr.Zero, in destination);
-            if (options.VideoFilter == LinuxVideoFilter.LcdGrid) DrawLcdGrid(in destination, frameGeometry);
-            if (snapshot.IsPaused)
-            {
-                ChamferFill(centerX - 64, 345 + centerY, 128, 46, 8, Colors.Surface);
-                Center(centerX, 356 + centerY, global::AetherBoy.Runtime.Localization.UiText.Get("Paused"), 17, bold: true);
-            }
+            float cx = layout.Navigation + (LogicalWidth - layout.Navigation) / 2, cy = LogicalHeight / 2f - 155;
+            Mark(cx - 45, cy, 90);
+            Center(cx, cy + 112, UiText.Get(IsLoading ? "Starting your game…" : "Öffne ein Spiel"), 28, bold: true);
+            Center(cx, cy + 168, UiText.Get("Wähle eine ROM-Datei oder ziehe sie in dieses Fenster."), 14, Colors.Muted);
+            DesktopButton(cx - 190, cy + 208, 196, 44, UiText.Get("Spiel öffnen"), UiIcon.Open, ShowRomDialog, emphasis: true, enabled: !IsLoading && fileDialogOpen == 0);
+            DesktopButton(cx + 18, cy + 208, 172, 44, UiText.Get("Zur Bibliothek"), UiIcon.Library, () => OpenControlPage(ControlCenterPage.Library));
+            Center(cx, cy + 272, UiText.Get("Dateiformate: .gb, .gbc, .gba"), 12, Colors.Muted);
+            if (lastResumeEntry is not null)
+                DesktopButton(cx - 160, cy + 312, 320, 44, UiText.Get("Continue last game"), UiIcon.Play, ContinueLastSession);
+            else Center(cx, cy + 336, UiText.Get("Strg + O   Spiel öffnen"), 12, Colors.Muted);
         }
         else
         {
-            Mark(centerX - 42, 225 + centerY, 84);
-            Center(centerX, 344 + centerY, session is null ? global::AetherBoy.Runtime.Localization.UiText.Get("Ready for your next game?") : global::AetherBoy.Runtime.Localization.UiText.Get("Starting your game…"), 23, bold: true);
-            Center(centerX, 386 + centerY, session is null ? global::AetherBoy.Runtime.Localization.UiText.Get("Open a game or drop a .gb, .gbc or .gba file here.") : global::AetherBoy.Runtime.Localization.UiText.Get("Waiting for the first frame."), 13, Colors.Muted);
-            if (session is null) ActionButton(centerX - 96, 452 + centerY, 192, 46, global::AetherBoy.Runtime.Localization.UiText.Get("Open game"), ShowRomDialog, true, !IsLoading && fileDialogOpen == 0, emphasis: true);
-            if (session is null && lastResumeEntry is { } recent)
+            Ink(layout.ContentX, 64 + layout.Inset, textRenderer.Fit(CartridgeTitle, layout.ContentWidth - 180, 28, true), 28, bold: true);
+            Ink(layout.ContentX, 107 + layout.Inset, snapshot.Rom.IsGameBoyAdvance ? "Game Boy Advance" : snapshot.Rom.HasColorFeatures ? "Game Boy Color" : "Game Boy", 13, Colors.Muted);
+            Ink(LogicalWidth - layout.Inset - 156, 80 + layout.Inset, textRenderer.Fit(StateLabel, 156, 12), 12, Colors.Cyan);
+            Paint(layout.GameX, layout.GameY, layout.GameWidth, layout.GameHeight, Colors.Chrome);
+            if (frameTexture != IntPtr.Zero && snapshot.HasVideoFrame)
             {
-                ActionButton(centerX - 160, 514 + centerY, 320, 44, global::AetherBoy.Runtime.Localization.UiText.Get("Continue last game"), ContinueLastSession, enabled: !IsLoading);
-                Center(centerX, 575 + centerY, textRenderer.Fit(recent.Title, 490, 14), 14, Colors.Muted);
+                SDL.FRect destination = GetGameDestination(frameGeometry);
+                SDL.RenderTexture(renderer, frameTexture, IntPtr.Zero, in destination);
+                if (options.VideoFilter == LinuxVideoFilter.LcdGrid) DrawLcdGrid(in destination, frameGeometry);
             }
-            else if (session is null) Center(centerX, 517 + centerY, global::AetherBoy.Runtime.Localization.UiText.Get("Shortcut: O or Ctrl+O"), 11, Colors.Muted);
+            float transportY = layout.GameY + layout.GameHeight + 16;
+            bool playable = !IsLoading && stateOperation is null;
+            DesktopButton(layout.GameX, transportY, 156, 44, snapshot.IsPaused ? UiText.Get("Resume") : "Pause", UiIcon.Play, TogglePause, emphasis: true, enabled: playable, id: "desktop:pause");
+            DesktopButton(layout.GameX + 168, transportY, 44, 44, UiText.Get("Rewind"), UiIcon.Rewind, Rewind, iconOnly: true, enabled: playable && !IsOnlineLink && snapshot.Supports(EmulationFeature.Rewind));
+            DesktopButton(layout.GameX + 224, transportY, 44, 44, UiText.Get("Turbo (hold)"), UiIcon.Turbo, HoldMouseTurbo, iconOnly: true, enabled: playable && !IsOnlineLink);
+            if (layout.GameWidth > 480)
+            {
+                Icon(layout.GameX + layout.GameWidth - 140, transportY + 13, UiIcon.Volume, Colors.Muted);
+                Ink(layout.GameX + layout.GameWidth - 112, transportY + 13, options.AudioEnabled ? options.AudioVolume + " %" : UiText.Get("Muted"), 12, Colors.Muted);
+            }
+            DesktopButton(layout.GameX + layout.GameWidth - 44, transportY, 44, 44, UiText.Get("Vollbild"), UiIcon.Fullscreen, Fullscreen, iconOnly: true);
+            float x = layout.RailX, y = layout.GameY, w = layout.RailWidth, inset = 16;
+            Paint(x, y, w, LogicalHeight - 32 - layout.Inset - y, Colors.Surface);
+            Icon(x + inset, y + 18, UiIcon.Save, Colors.Violet);
+            Ink(x + 44, y + 16, UiText.Get("Spielzustand"), 16, bold: true);
+            AetherSelectionButton(x + inset, y + 54, w - 32, 44, UiText.Format("Platz {0}", options.SaveSlot), "desktop-slot",
+                Enumerable.Range(1, 5).Select(slot => new AetherChoice(slot.ToString(), UiText.Format("Platz {0}", slot))).ToArray(), options.SaveSlot.ToString(), value => SelectSaveSlot(int.Parse(value)));
+            Ink(x + inset, y + 106, UiText.Get(HasSelectedState ? "gespeichert" : "leer"), 12, Colors.Muted);
+            DesktopButton(x + inset, y + 140, w - 32, 44, UiText.Get("Zustand speichern"), UiIcon.Save, QuickSave, enabled: playable && !IsOnlineLink && snapshot.Supports(EmulationFeature.SaveStates), id: "desktop:save");
+            DesktopButton(x + inset, y + 196, w - 32, 44, UiText.Get("Zustand laden"), UiIcon.Rewind, QuickLoad, enabled: playable && HasSelectedState && !IsOnlineLink, id: "desktop:load");
+            Ink(x + inset, y + 256, UiText.Get("F5 save · F8 load"), 11, Colors.Muted);
+            Paint(x + inset, y + 286, w - 32, 1, Colors.Border);
+            Ink(x + inset, y + 302, UiText.Get("Anzeige"), 14, bold: true);
+            Ink(x + inset, y + 340, UiText.Get("Bildfilter"), 12, Colors.Muted);
+            Ink(x + w - 94, y + 340, UiText.Get(options.VideoFilter == LinuxVideoFilter.Sharp ? "Sharp" : options.VideoFilter == LinuxVideoFilter.LcdGrid ? "LCD grid" : "Smooth"), 12);
+            DesktopButton(x + inset, y + 374, w - 32, 44, UiText.Get("Manage saves"), UiIcon.Save, () => OpenControlPage(ControlCenterPage.Saves));
+            DesktopButton(x + inset, Math.Max(y + 430, LogicalHeight - 32 - layout.Inset - 60), w - 32, 44, UiText.Get("Weitere Aktionen"), UiIcon.More, ToggleQuickDeck, enabled: !IsOnlineLink);
+            DrawPerformanceOverlay();
         }
-
-        DrawPerformanceOverlay();
-        Panel(880 + dx, 100, 276, 548 + dy, global::AetherBoy.Runtime.Localization.UiText.Get("NOW PLAYING"));
-        Ink(906 + dx, 158, textRenderer.Fit(CartridgeTitle, 224, 17, true), 17, bold: true);
-        Ink(906 + dx, 201, StateLabel, 13, Colors.Muted, true);
-        Paint(902 + dx, 240, 232, 1, Colors.Border);
-        string audio = !options.AudioEnabled ? global::AetherBoy.Runtime.Localization.UiText.Get("MUTED") : audioError is not null ? global::AetherBoy.Runtime.Localization.UiText.Get("UNAVAILABLE")
-            : audioOutput is null ? global::AetherBoy.Runtime.Localization.UiText.Get("READY") : $"{audioOutput.SourceRate / 1000.0:0.0}K · {(audioOutput.Channels == 2 ? "STEREO" : "MONO")}";
-        string[] keys = [global::AetherBoy.Runtime.Localization.UiText.Get("System"), "Audio", global::AetherBoy.Runtime.Localization.UiText.Get("Video"), global::AetherBoy.Runtime.Localization.UiText.Get("Controls")];
-        string[] values = [ModelLabel, audio,
-            options.VideoFilter == LinuxVideoFilter.LcdGrid ? global::AetherBoy.Runtime.Localization.UiText.Get("LCD GRID") : global::AetherBoy.Runtime.Localization.UiText.Get(options.VideoFilter == LinuxVideoFilter.Sharp ? "SHARP" : "SMOOTH"),
-            gamepad == IntPtr.Zero ? global::AetherBoy.Runtime.Localization.UiText.Get("KEYBOARD") : global::AetherBoy.Runtime.Localization.UiText.Get("GAMEPAD")];
-        for (int i = 0; i < keys.Length; i++)
+        if (!string.IsNullOrEmpty(loadError ?? statusMessage))
         {
-            Ink(906 + dx, 263 + i * 40, keys[i], 12, Colors.Muted);
-            string value = textRenderer.Fit(values[i], 152, 12, true);
-            Ink(1134 + dx - textRenderer.Measure(value, 12, true), 263 + i * 40, value, 12, bold: true);
+            Paint(0, LogicalHeight - 32, LogicalWidth, 32, Colors.Chrome);
+            DrawMessageStatus(24, LogicalHeight - 32, LogicalWidth - 48, 32, loadError ?? statusMessage, loadError is not null, singleLine: true);
         }
-        if (session is not null && !IsOnlineLink)
-        {
-            Ink(906 + dx, 446, global::AetherBoy.Runtime.Localization.UiText.Get("THIS SESSION"), 12, Colors.Muted);
-            string duration = global::AetherBoy.Runtime.Localization.UiText.Format("{0}h {1}m", (int)(playedSeconds / 3600), (int)(playedSeconds / 60) % 60);
-            Ink(1134 + dx - textRenderer.Measure(duration, 12, true), 446, duration, 12, bold: true);
-        }
-        Ink(906 + dx, 485, global::AetherBoy.Runtime.Localization.UiText.Get("SAVE SLOT"), 12, Colors.Muted, true);
-        ActionButton(902 + dx, 509, 232, 28, global::AetherBoy.Runtime.Localization.UiText.Get("Manage saves"), () => OpenControlPage(ControlCenterPage.Saves));
-        for (int i = 0; i < 5; i++)
-        {
-            int slot = i + 1;
-            ActionButton(904 + dx + i * 47, 548, 40, 32, slot.ToString(), () => SelectSaveSlot(slot), options.SaveSlot == slot);
-        }
-        Ink(906 + dx, 601, IsOnlineLink ? global::AetherBoy.Runtime.Localization.UiText.Get("Private online save") : global::AetherBoy.Runtime.Localization.UiText.Get("F5 save · F8 load"), 11, Colors.Muted);
-        Ink(906 + dx, 619, textRenderer.Fit(IsOnlineLink ? global::AetherBoy.Runtime.Localization.UiText.Get("F10 connection and saves") : global::AetherBoy.Runtime.Localization.UiText.Get("Hold Tab for turbo"), 228, 12), 12, Colors.Muted);
-        DrawMessageStatus(24, 654 + dy, LogicalWidth - 48, 30, loadError ?? statusMessage, loadError is not null, singleLine: true);
-        Paint(0, 688 + dy, LogicalWidth, 72, Colors.Chrome);
-        AccentLine(0, 688 + dy, LogicalWidth, 2);
-        bool playable = session is not null && !IsLoading;
-        ActionButton(24, 704 + dy, 164, 40, fileDialogOpen != 0 ? global::AetherBoy.Runtime.Localization.UiText.Get("File picker…") : global::AetherBoy.Runtime.Localization.UiText.Get("Open game"), ShowRomDialog, enabled: !IsLoading && fileDialogOpen == 0, emphasis: true);
-        ActionButton(200, 704 + dy, 142, 40, global::AetherBoy.Runtime.Localization.UiText.Get("Settings"), () => OpenControlPage(ControlCenterPage.Overview), enabled: !IsLoading);
-        ActionButton(354, 704 + dy, 142, 40, snapshot?.IsPaused == true ? global::AetherBoy.Runtime.Localization.UiText.Get("Resume") : "Pause", TogglePause, playable, playable);
-        ActionButton(508, 704 + dy, 142, 40, global::AetherBoy.Runtime.Localization.UiText.Get("Rewind"), Rewind, enabled: playable && !IsOnlineLink);
-        ActionButton(662, 704 + dy, 142, 40, global::AetherBoy.Runtime.Localization.UiText.Get("Save"), QuickSave, enabled: playable && !IsOnlineLink);
-        ActionButton(816, 704 + dy, 142, 40, global::AetherBoy.Runtime.Localization.UiText.Get("Load"), QuickLoad, enabled: playable && HasSelectedState);
-        ActionButton(970, 704 + dy, 164 + dx, 40, global::AetherBoy.Runtime.Localization.UiText.Get("Turbo (hold)"), HoldMouseTurbo, mouseTurbo, playable && !IsOnlineLink);
+        if (aetherSelection is not null) DrawAetherSelectionPopup();
         if (showQuickDeck) DrawQuickDeck();
         DrawLoadingOverlay();
     }
@@ -399,26 +383,13 @@ internal sealed partial class WaylandEmulatorHost
 
     private void DrawControlCenter()
     {
-        Paint(0, 0, LogicalWidth, 84, Colors.Chrome);
-        Mark(20, 14, 52);
-        Ink(92, 12, "AetherBoy", 12, Colors.Muted, true);
-        Ink(92, 29, global::AetherBoy.Runtime.Localization.UiText.Get(controlCenterPage == ControlCenterPage.Library && !ShowingSettingsSearch ? "Library" : "Settings"), 22, bold: true);
-        Ink(92, 60, global::AetherBoy.Runtime.Localization.UiText.Get("Find settings with Ctrl+K"), 12, Colors.Muted);
-        ActionButton(LogicalWidth - 66, 23, 42, 36, "×", CloseControlCenter);
-        AccentLine(0, 82, LogicalWidth, 2);
-        Paint(0, 84, 248, LogicalHeight - 84, Colors.Chrome);
-        Paint(247, 84, 1, LogicalHeight - 84, Colors.Border);
-        Ink(22, 117, global::AetherBoy.Runtime.Localization.UiText.Get("Find a setting"), 16, bold: true);
-        DrawTextEntry(TextField.SettingsSearch, 22, 164, 204, 42, global::AetherBoy.Runtime.Localization.UiText.Get("Search settings"));
-        for (int i = 0; i < PageNames.Length; i++)
-        {
-            ControlCenterPage page = (ControlCenterPage)i;
-            ActionButton(22, 224 + i * 50, 204, 42, global::AetherBoy.Runtime.Localization.UiText.Get(PageNames[i]), () => SelectControlCenterPage(page), !ShowingSettingsSearch && page == controlCenterPage, focusId: "nav:" + page);
-        }
-        DrawSettingsParagraph(24, LogicalHeight - 78, settingsDirty || settingsWrite is not null ? global::AetherBoy.Runtime.Localization.UiText.Get("Saving changes…") : global::AetherBoy.Runtime.Localization.UiText.Get("Changes save automatically"), 200, 12);
-        Ink(280, 108, CurrentPageName, 26);
-        Ink(280, 150, textRenderer.Fit(CurrentPageDescription, LogicalWidth - 310), 14, Colors.Muted);
-        Panel(278, 180, LogicalWidth - 302, controlCenterPage == ControlCenterPage.Library && !ShowingSettingsSearch ? LogicalHeight - 304 : 456);
+        if (!ShowingSettingsSearch && controlCenterPage == ControlCenterPage.Library && !showPatchLab && editingTitleIdentity is null && !libraryGrid)
+        { DrawDesktopLibrary(); return; }
+        if (!ShowingSettingsSearch && controlCenterPage == ControlCenterPage.System && showAppearance)
+        { DrawDesktopAppearance(); return; }
+        DrawSettingsChrome();
+        Ink(280, 96, CurrentPageName, 28, bold: true);
+        Ink(280, 139, textRenderer.Fit(CurrentPageDescription, LogicalWidth - 312), 14, Colors.Muted);
         if (ShowingSettingsSearch) DrawSettingsResults();
         else
         switch (controlCenterPage)
@@ -438,9 +409,8 @@ internal sealed partial class WaylandEmulatorHost
             ? ShowingSettingsSearch || showInputShortcuts ? "" : showController ? global::AetherBoy.Runtime.Localization.UiText.Get("Controller mappings are saved for this device.")
             : usingGameProfile ? global::AetherBoy.Runtime.Localization.UiText.Get("Changes apply to this game’s profile.") : global::AetherBoy.Runtime.Localization.UiText.Get("Changes apply to global defaults.")
             : "";
-        DrawMessageStatus(280, controlCenterPage == ControlCenterPage.Library && !ShowingSettingsSearch ? LogicalHeight - 118 : 640,
-            LogicalWidth - 310, 56, loadError ?? (string.IsNullOrEmpty(statusMessage) ? scope : statusMessage), loadError is not null);
-        DrawSettingsParagraph(280, LogicalHeight - 59, global::AetherBoy.Runtime.Localization.UiText.Get("F6 switches region. Tab moves focus; Ctrl+Tab changes section. Enter selects; Esc returns."), LogicalWidth - 310, 12);
+        DrawMessageStatus(280, LogicalHeight - 76,
+            LogicalWidth - 312, 36, loadError ?? (string.IsNullOrEmpty(statusMessage) ? scope : statusMessage), loadError is not null, singleLine: true);
         if (aetherSelection is not null) DrawAetherSelectionPopup();
     }
 

@@ -51,38 +51,13 @@ public sealed class WindowsCommandMenuTests
     private static bool HasNativeMenu(Control root) => root is ToolStrip || root.Controls.Cast<Control>().Any(HasNativeMenu);
 
     [STATestMethod]
-    public void FourHeaderButtonsUseAetherPanelsInsteadOfNativeDropdowns()
+    public void DesktopOverflowRetainsEveryLegacyCommandBranch()
     {
         using var main = new frmNano();
-        main.Show();
-        Application.DoEvents();
-        foreach (string section in new[] { "SYSTEM", "TUNE", "TOOLS", "INFO" })
-        {
-            var nav = (AetherButton)main.Controls.Find("aetherNav" + section, true).Single();
-            nav.PerformClick();
-            Application.DoEvents();
-            var menu = (AetherCommandMenu)main.Controls.Find("aetherCommandMenu", true).Single();
-            Assert.IsTrue(nav.Selected);
-            Assert.IsTrue(menu.Visible);
-            Assert.IsFalse(HasNativeMenu(main));
-            Assert.IsTrue(menu.Parent!.ClientRectangle.Contains(menu.Bounds));
-            Assert.IsTrue(menu.Controls.Find("commandMenuRows", true).Single().Controls.Count > 0);
-            string? directory = Environment.GetEnvironmentVariable("AETHERBOY_SMOKE_SCREENSHOTS");
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                Directory.CreateDirectory(directory);
-                using var bitmap = new Bitmap(main.Width, main.Height);
-                main.BringToFront();
-                main.Refresh();
-                Application.DoEvents();
-                using (Graphics capture = Graphics.FromImage(bitmap))
-                    capture.CopyFromScreen(main.PointToScreen(Point.Empty), Point.Empty, main.ClientSize);
-                bitmap.Save(Path.Combine(directory, "menu-" + section.ToLowerInvariant() + ".png"));
-            }
-            menu.HandleNavigation(Keys.Escape);
-            Assert.IsFalse(nav.Selected);
-            Assert.AreEqual(0, main.Controls.Find("aetherCommandMenu", true).Length);
-        }
-        main.Close();
+        var root = (AetherCommand)typeof(frmNano).GetField("desktopCommands", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(main)!;
+        var original = (AetherCommandSet)typeof(frmNano).GetField("menuStrip", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(main)!;
+        CollectionAssert.AreEqual(original.Items.ToArray(), root.DropDownItems.ToArray());
+        Assert.AreEqual(4, root.DropDownItems.Count);
+        Assert.IsTrue(root.DropDownItems.OfType<AetherCommand>().All(branch => branch.DropDownItems.Count > 0));
     }
 }

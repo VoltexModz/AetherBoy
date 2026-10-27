@@ -129,7 +129,20 @@ public sealed class WindowsExperienceTests
         {
             using var capture = new Bitmap(display.Width, display.Height);
             using (Graphics graphics = Graphics.FromImage(capture))
-                graphics.CopyFromScreen(display.PointToScreen(Point.Empty), Point.Empty, capture.Size);
+            {
+                // EndDraw/Refresh submit a frame; the VM's Windows compositor may
+                // present it later. Keep checking the actual pixels, with a bound.
+                var presentation = Stopwatch.StartNew();
+                do
+                {
+                    Application.DoEvents();
+                    DwmFlush();
+                    graphics.CopyFromScreen(display.PointToScreen(Point.Empty), Point.Empty, capture.Size);
+                    if (capture.GetPixel(capture.Width / 2 + 1, capture.Height / 2 + 1).R > 100) break;
+                    Thread.Sleep(20);
+                } while (presentation.Elapsed < TimeSpan.FromSeconds(2));
+            }
+            Assert.AreEqual(form.Handle, GetForegroundWindow(), "The submitted frame must belong to the GPU test window.");
             Assert.IsTrue(capture.GetPixel(capture.Width / 2 + 1, capture.Height / 2 + 1).R > 100,
                 "Direct2D presented but the visible viewport did not contain the submitted frame.");
             string? directory = Environment.GetEnvironmentVariable("AETHERBOY_SMOKE_SCREENSHOTS");
@@ -218,4 +231,6 @@ public sealed class WindowsExperienceTests
         instance.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(instance, args);
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmFlush();
 }

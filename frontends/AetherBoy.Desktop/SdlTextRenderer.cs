@@ -48,6 +48,14 @@ internal sealed class SdlTextRenderer : IDisposable
             ? width : atlas.Measure(text, size, bold);
     }
 
+    public float MeasureHeight(string text, int size = 14, bool bold = false)
+    {
+        size = Math.Max(size, MinimumSize);
+        IntPtr font = Font(size, bold);
+        return font != IntPtr.Zero && TTF.GetStringSize(font, text, 0, out _, out int height)
+            ? height : size * 44f / 32;
+    }
+
     public string Fit(string text, float width, int size = 14, bool bold = false)
     {
         // Filenames and core errors are untrusted UI text.

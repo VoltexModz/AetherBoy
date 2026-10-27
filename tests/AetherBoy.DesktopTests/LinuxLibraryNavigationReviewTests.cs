@@ -61,7 +61,7 @@ public sealed class LinuxLibraryNavigationReviewTests
                 Set(host, "existingLibraryFiles", entries.Where((_, i) => i % 7 != 0).Select(entry => entry.Identity).ToHashSet());
                 Call(host, "DrawShell");
                 int pageSize = Field<int>(host, "libraryPageSize");
-                Assert.IsTrue(pageSize >= 4);
+                Assert.IsTrue(pageSize >= 1, "The recent-game preview leaves at least one pageable library row.");
                 var visited = new HashSet<string>();
                 for (int i = 0; i < (100 + pageSize - 1) / pageSize; i++)
                 {

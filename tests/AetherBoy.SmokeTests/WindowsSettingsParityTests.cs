@@ -30,8 +30,8 @@ public sealed class WindowsSettingsParityTests
                 "The hardware button name is not the menu action 'Select'.");
             scope.Settings.DisplayLanguage = language;
             using var main = new frmNano(); main.Show();
-            foreach (string id in new[] { "SYSTEM", "TUNE", "TOOLS", "INFO" })
-                Assert.HasCount(1, main.Controls.Find("aetherNav" + id, true));
+            foreach (string id in new[] { "Play", "Library", "Save", "Link", "Tools", "Settings" })
+                Assert.HasCount(1, main.Controls.Find("desktopNav" + id, true));
             var center = OpenCenter(main); Call(center, "ShowPage", "system");
             var systemPage = Find<Panel>(center, "controlCenterPageSystem");
             systemPage.Controls.OfType<AetherButton>().Single(button => button.Text ==

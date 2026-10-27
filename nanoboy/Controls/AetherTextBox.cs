@@ -84,7 +84,7 @@ internal sealed class AetherTextBox : UserControl
     internal void RefreshTheme()
     {
         if (edit is null) return;
-        edit.BackColor = AetherColors.SurfaceRaised; edit.ForeColor = Enabled ? AetherColors.Text : AetherColors.Muted;
+        edit.BackColor = AetherColors.Surface; edit.ForeColor = Enabled ? AetherColors.Text : AetherColors.Muted;
         edit.AccessibleName = AccessibleName ?? Name; edit.AccessibleDescription = AccessibleDescription;
     }
     protected override void OnEnter(EventArgs e) { base.OnEnter(e); edit?.Focus(); }
@@ -97,7 +97,7 @@ internal sealed class AetherTextBox : UserControl
         RefreshTheme(); e.Graphics.Clear(Parent?.BackColor ?? AetherColors.Void);
         if (Width < 3 || Height < 3) return;
         using var path = AetherWidgetPaint.Outline(new Rectangle(0, 0, Width - 1, Height - 1));
-        using var fill = new SolidBrush(AetherColors.SurfaceRaised); using var pen = new Pen(ContainsFocus ? AetherColors.Cyan : AetherColors.Hairline);
+        using var fill = new SolidBrush(AetherColors.Surface); using var pen = new Pen(ContainsFocus ? AetherColors.Cyan : AetherColors.Hairline);
         e.Graphics.FillPath(fill, path); e.Graphics.DrawPath(pen, path);
     }
     private void Arrange()

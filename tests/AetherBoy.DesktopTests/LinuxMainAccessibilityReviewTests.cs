@@ -30,10 +30,10 @@ public sealed class LinuxMainAccessibilityReviewTests
                 Call(host, "OpenAccessibleControls");
                 var panel = Field<LinuxAccessibleControls>(host, "accessibleControls");
                 Assert.IsFalse(Field<bool>(host, "controlCenterVisible"), "The accessible main window must not force the player into settings.");
+                Assert.IsNotNull(panel, Field<string>(host, "statusMessage"));
                 var actions = panel.InspectActions();
                 Assert.IsTrue(actions.Any(action => action.Name == "Open game" && action.Enabled));
-                Assert.IsTrue(actions.Any(action => action.Name == "Save" && !action.Enabled));
-                Assert.IsTrue(actions.Any(action => action.Name == "Save slot 1" && action.Role == "toggle button" && action.Checked));
+                Assert.IsFalse(actions.Any(action => action.Name == "Save"), "Empty start exposes opening and navigation, with game controls hidden.");
                 panel.ActivateForTest(Key(host, "Library")); Call(host, "UpdateAccessibleControls"); Call(host, "DrawShell"); Call(host, "UpdateAccessibleControls");
                 Assert.IsTrue(Field<bool>(host, "controlCenterVisible"));
                 Assert.AreEqual("Library", Field<object>(host, "controlCenterPage").ToString());

@@ -22,7 +22,7 @@ internal sealed partial class Settings
     public string UiPrimaryColor { get => (string)this[nameof(UiPrimaryColor)]; set => this[nameof(UiPrimaryColor)] = value; }
     [UserScopedSetting, DefaultSettingValue("#29E2ED")]
     public string UiSecondaryColor { get => (string)this[nameof(UiSecondaryColor)]; set => this[nameof(UiSecondaryColor)] = value; }
-    [UserScopedSetting, DefaultSettingValue("#050712")]
+    [UserScopedSetting, DefaultSettingValue("#0D1019")]
     public string UiBackgroundColor { get => (string)this[nameof(UiBackgroundColor)]; set => this[nameof(UiBackgroundColor)] = value; }
 
     // Empty means the build default: development records locally, stable does not.
