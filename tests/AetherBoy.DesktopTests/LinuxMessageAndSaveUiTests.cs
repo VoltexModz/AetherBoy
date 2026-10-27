@@ -89,7 +89,7 @@ public sealed class LinuxMessageAndSaveUiTests
             Call(host, "ReportError", exception);
             Call(host, "DrawShell");
             Capture(host, "long-error-footer-en");
-            Call(host, "HandleMouseClick", 1080f, 665f);
+            LinuxUiTestActions.Click(host, ":message:details");
             Assert.IsTrue(Field<bool>(host, "showMessageDetails"));
             Call(host, "DrawShell");
             string complete = Field<string>(host, "messageDetailsText");

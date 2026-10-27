@@ -118,7 +118,7 @@ public sealed class LinuxPatchLabTests
         {
             using var host = new WaylandEmulatorHost(LinuxDesktopProfile.Detect(), settings, hidden: true);
             void Draw() => Call(host, "DrawShell");
-            void Click(float x, float y) { Draw(); Call(host, "HandleMouseClick", x, y); Draw(); }
+            void Click(string label) => LinuxUiTestActions.ClickLabel(host, AetherBoy.Runtime.Localization.UiText.Get(label));
             void Drop(string path)
             {
                 IntPtr text = Marshal.StringToCoTaskMemUTF8(path);
@@ -127,7 +127,7 @@ public sealed class LinuxPatchLabTests
             }
             Call(host, "TryLoadRom", source); WaitForSession(host);
             var originalSession = Field<EmulationSession>(host, "session");
-            Click(270, 724); Click(120, 595); Click(990, 570);
+            LinuxUiTestActions.Click(host, ":nav:desktop:library"); Click("Patch Lab");
             Assert.IsTrue(Field<bool>(host, "showPatchLab"));
             Drop(source); Drop(patch);
             Assert.AreEqual(source, Field<string>(host, "patchSourcePath"));
@@ -158,7 +158,7 @@ public sealed class LinuxPatchLabTests
             Assert.AreEqual(patch, Field<string>(host, "patchFilePath"));
             Assert.AreSame(originalSession, Field<EmulationSession>(host, "session"));
 
-            Click(415, 480);
+            Click("APPLY PATCH");
             Assert.IsTrue(SpinWait.SpinUntil(() => { Call(host, "CompletePendingPatch"); return Field<Task?>(host, "pendingPatch") is null; }, TimeSpan.FromSeconds(10)));
             Assert.IsFalse(Field<bool>(host, "patchFailed"), Field<string>(host, "patchMessage"));
             var result = Field<LinuxPatchedRom>(host, "patchResult");
@@ -167,12 +167,12 @@ public sealed class LinuxPatchLabTests
             Draw(); Capture(host, "patch-result");
             SDL.SetWindowSize(Field<IntPtr>(host, "window"), 900, 650);
             Draw(); Capture(host, "patch-compact");
-            Click(425, 600); WaitForSession(host);
+            Click("OPEN RESULT"); WaitForSession(host);
             Assert.AreEqual(result.Path, Field<string>(host, "romPath"));
             Assert.AreNotSame(originalSession, Field<EmulationSession>(host, "session"));
 
             File.WriteAllBytes(patch, [1, 2, 3]);
-            Click(415, 480);
+            Click("APPLY PATCH");
             Assert.IsTrue(SpinWait.SpinUntil(() => { Call(host, "CompletePendingPatch"); return Field<Task?>(host, "pendingPatch") is null; }, TimeSpan.FromSeconds(10)));
             Assert.IsTrue(Field<bool>(host, "patchFailed"));
             Assert.IsNull(Field<LinuxPatchedRom?>(host, "patchResult"));

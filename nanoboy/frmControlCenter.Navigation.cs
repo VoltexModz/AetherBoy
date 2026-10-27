@@ -13,7 +13,7 @@ internal sealed partial class frmControlCenter
     private readonly Dictionary<string, AetherScrollViewport> pageViewports = new();
     private FlowLayoutPanel searchResults = null!;
     private Label searchSummary = null!;
-    private string currentSettingsPage = "overview";
+    private string currentSettingsPage = "appearance";
     private bool clearingSearch;
     private readonly List<(string Page, AetherButton Button)> sectionTabs = new();
     private AetherButton pauseOnFocusButton = null!;
@@ -185,7 +185,7 @@ internal sealed partial class frmControlCenter
         for (int i = 0; i < tabs.Length; i++)
         {
             string destination = tabs[i].Page;
-            AetherButton button = AddActionButton(pages[pageKey], tabs[i].Title, i * (width + 8), 66, width, () => ShowPage(destination));
+            AetherButton button = AddActionButton(pages[pageKey], tabs[i].Title, i * (width + 8), 72, width, () => ShowPage(destination));
             button.Name = "settingsTab_" + pageKey + "_" + destination;
             sectionTabs.Add((destination, button));
         }

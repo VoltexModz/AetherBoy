@@ -95,7 +95,7 @@ public sealed class WindowsSystemToolsTests
         var tools = Field<nanoboy.Controls.AetherCommand>(main, "menuItem21");
         Assert.IsTrue(tools.DropDownItems.ContainsKey("menuFirmwareManager"));
         var center = OpenCenter(main, "System");
-        Find<AetherButton>(center, "settingsTab_system_firmware").PerformClick();
+        center.NavigateTo("firmware"); Application.DoEvents();
         bool seen = false;
         Exception? failure = null;
         using var driver = new System.Windows.Forms.Timer { Interval = 20 };

@@ -139,7 +139,7 @@ public sealed class LinuxComfortPlaytestTests
             Assert.IsNotNull(Field<byte[]?>(host, "undoState"));
             LinuxSaveStateStore.WriteAtomic(stateBase, 1, [0x42, 0x41, 0x44]);
             Call(host, "QuickLoad"); DrainState(host);
-            Assert.Contains("failed", Field<string>(host, "statusMessage"));
+            Assert.AreEqual(AetherBoy.Runtime.Localization.UiText.Get("The state could not be saved or loaded. Check Details and try again."), Field<string>(host, "statusMessage"));
             CollectionAssert.AreEqual(first, Capture(session), "Corrupt load must not alter the running machine.");
             Call(host, "UndoLoad"); DrainState(host);
             CollectionAssert.AreEqual(beforeLoad, Capture(session), "Failed load must retain the preceding valid undo.");
@@ -323,13 +323,13 @@ public sealed class LinuxComfortPlaytestTests
             Key(host, SDL.Scancode.F6);
             Assert.AreEqual(300f, Focus(host).X);
             Key(host, SDL.Scancode.F6);
-            Assert.AreEqual(22f, Focus(host).X); Assert.AreEqual(374f, Focus(host).Y);
+            Assert.AreEqual("nav:settings:input", LinuxUiTestActions.FocusedAction(host));
             Key(host, SDL.Scancode.F6); Key(host, SDL.Scancode.Tab); Key(host, SDL.Scancode.Return);
             Assert.IsTrue(Field<bool>(host, "showController"));
             Key(host, SDL.Scancode.F6);
             Assert.IsTrue(Focus(host).X >= 278 && Focus(host).Y >= 180);
             Key(host, SDL.Scancode.F6);
-            Assert.AreEqual(22f, Focus(host).X);
+            Assert.AreEqual("nav:settings:input", LinuxUiTestActions.FocusedAction(host));
             Key(host, SDL.Scancode.Return);
             Assert.IsFalse(Field<bool>(host, "showController"), "Sidebar selection must leave the controller subview.");
             Key(host, SDL.Scancode.F6); Assert.AreEqual(300f, Focus(host).X);
@@ -527,7 +527,7 @@ public sealed class LinuxComfortPlaytestTests
     }
     private static byte[] Capture(EmulationSession session) => session.CaptureStateAsync().GetAwaiter().GetResult();
     private static void DrainState(object host) => Assert.IsTrue(SpinWait.SpinUntil(() =>
-    { Call(host, "CompleteStateOperation"); return Field<Task?>(host, "stateOperation") is null; }, TimeSpan.FromSeconds(10)), "State action timed out.");
+    { Call(host, "CompleteStateOperation"); Call(host, "PollDiskRefresh"); return Field<Task?>(host, "stateOperation") is null && Field<Task?>(host, "diskRefresh") is null; }, TimeSpan.FromSeconds(10)), "State action or slot inspection timed out.");
 
     private string Rom(string name)
     {

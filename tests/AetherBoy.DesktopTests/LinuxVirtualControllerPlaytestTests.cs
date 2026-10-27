@@ -121,7 +121,12 @@ public sealed class LinuxVirtualControllerPlaytestTests
             Call(host, "DrawShell");
             Button(SDL.GamepadButton.DPadDown, true);
             Button(SDL.GamepadButton.DPadDown, false);
-            Assert.AreEqual(0, Field<int>(host, "focusedControl"));
+            for (int i = 0; i < 80 && LinuxUiTestActions.FocusedAction(host) != "nav:settings:return"; i++)
+            {
+                Button(SDL.GamepadButton.DPadDown, true);
+                Button(SDL.GamepadButton.DPadDown, false);
+            }
+            Assert.AreEqual("nav:settings:return", LinuxUiTestActions.FocusedAction(host));
             Button(SDL.GamepadButton.South, true);
             Button(SDL.GamepadButton.South, false);
             Assert.IsFalse(Field<bool>(host, "controlCenterVisible"));

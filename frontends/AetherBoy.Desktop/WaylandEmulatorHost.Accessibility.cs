@@ -43,7 +43,7 @@ internal sealed partial class WaylandEmulatorHost
         if (focusId?.StartsWith("option:save-slot:", StringComparison.Ordinal) == true && int.TryParse(focusId["option:save-slot:".Length..], out int selectedSlot))
             name = global::AetherBoy.Runtime.Localization.UiText.Format("Save slot {0}", selectedSlot);
         if (focusId?.StartsWith("state:slot:", StringComparison.Ordinal) == true && int.TryParse(focusId["state:slot:".Length..], out int stateSlot))
-            name = global::AetherBoy.Runtime.Localization.UiText.Format("Save slot {0}", stateSlot);
+        { name = global::AetherBoy.Runtime.Localization.UiText.Format("Save slot {0}", stateSlot); option = selected; }
         if (focusId == "setting:auto-pause") { option = options.PauseOnFocusLoss; name = global::AetherBoy.Runtime.Localization.UiText.Get("Pause when unfocused: ") + label; }
         if (focusId == "setting:text-size") name = global::AetherBoy.Runtime.Localization.UiText.Get("Text size: ") + label;
         if (focusId?.StartsWith("result:") == true && Enum.TryParse<LinuxSettingsDestination>(focusId[7..], out var destination))

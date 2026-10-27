@@ -112,7 +112,8 @@ namespace nanoboy
             liveTimer.Tick += (_, _) => RefreshAll();
             Shown += (_, _) =>
             {
-                ShowPage("appearance");
+                // Preserve a destination requested before WinForms raises Shown.
+                ShowPage(currentSettingsPage);
                 RefreshAll();
                 liveTimer.Start();
             };
@@ -627,7 +628,7 @@ namespace nanoboy
                 Font = AetherTypography.Create(21, FontStyle.Bold),
                 ForeColor = AetherColors.Text,
                 Location = new Point(0, 0),
-                Size = new Size(788, 38),
+                Size = new Size(788, 44),
                 Tag = "value",
                 Text = title
             });
@@ -636,7 +637,7 @@ namespace nanoboy
                 AutoSize = false,
                 Font = AetherTypography.Create(10.5f),
                 ForeColor = AetherColors.Muted,
-                Location = new Point(2, 40),
+                Location = new Point(2, 46),
                 Size = new Size(786, 24),
                 Text = subtitle
             });

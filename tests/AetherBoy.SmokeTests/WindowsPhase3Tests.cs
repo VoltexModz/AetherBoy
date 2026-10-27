@@ -79,7 +79,7 @@ public sealed class WindowsPhase3Tests
     [STATestMethod]
     public void RecordingControlsAndGermanHelpAreVisibleAndCaptureStatusFits()
     {
-        using var main = new frmNano();
+        using var main = new frmNano(); main.Show();
         Call(main, "OpenControlCenter");
         var center = (frmControlCenter)typeof(frmNano).GetField("controlCenter", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(main)!;
         try
@@ -89,8 +89,10 @@ public sealed class WindowsPhase3Tests
             Assert.AreEqual("Video aufnehmen", button.Text);
             Assert.IsTrue(TextRenderer.MeasureText(button.Text, button.Font).Width < button.Width);
             Assert.IsTrue(WindowsSettingsCatalog.Search("avi").Any(entry => entry.Page == "overview"));
-            var panel = (Panel)center.Controls.Find("controlCenterPageOverview", true).Single();
-            panel.ScrollControlIntoView(button); Application.DoEvents();
+            var viewport = (AetherScrollViewport)center.Controls.Find("controlCenterPageOverviewViewport", true).Single();
+            viewport.Reveal(button); Application.DoEvents();
+            Assert.IsTrue(viewport.RectangleToScreen(viewport.ClientRectangle).Contains(button.RectangleToScreen(button.ClientRectangle)),
+                "The Aether viewport must scroll the recording action into view.");
             string output = Path.Combine(AppContext.BaseDirectory, "phase3-capture-ui.png");
             using var bitmap = new Bitmap(center.Width, center.Height); center.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size)); bitmap.Save(output);
             Assert.IsTrue(button.Visible);

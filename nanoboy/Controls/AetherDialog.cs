@@ -20,7 +20,7 @@ namespace nanoboy.Controls
             string description,
             bool showMinimize = false,
             Func<bool>? gamepadNavigationEnabled = null,
-            int descriptionLines = 1, bool desktop = false)
+            int descriptionLines = 1, bool desktop = false, int minimumDesktopContentHeight = 640)
         {
             ArgumentNullException.ThrowIfNull(form);
             float uiScale = Math.Clamp(Properties.Settings.Default.UiScalePercent, 100, 150) / 100f;
@@ -85,7 +85,7 @@ namespace nanoboy.Controls
             {
                 float factor = form.DeviceDpi / 96f;
                 viewport.SetMinimumContent(new Size((int)((desktop ? 980 * uiScale : contentSize.Width - 2) * factor),
-                    (int)((desktop ? 640 * uiScale : contentSize.Height - 2) * factor)));
+                    (int)((desktop ? Math.Max(640, minimumDesktopContentHeight) * uiScale : contentSize.Height - 2) * factor)));
             }
             viewport.SizeChanged += (_, _) => FitBody();
             void FitDialog()

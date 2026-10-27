@@ -202,8 +202,7 @@ public sealed class FrontendBoundaryTests
                 Assert.IsFalse(exportTesterReport.Enabled);
                 Assert.IsTrue(openTesterFolder.Enabled, "Previously recorded reports remain accessible when recording is off.");
 
-                Button storageNav = (Button)center.Controls.Find("controlCenterNavStorage", true).Single();
-                storageNav.PerformClick();
+                ((frmControlCenter)center).NavigateTo("storage");
                 Application.DoEvents();
                 foreach (string folder in new[] { "Roms", "Saves", "States", "Settings", "Firmware", "Development" })
                 {

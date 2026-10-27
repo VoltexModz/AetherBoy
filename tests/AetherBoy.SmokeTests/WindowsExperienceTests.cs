@@ -45,6 +45,7 @@ public sealed class WindowsExperienceTests
     {
         using var main = new frmNano();
         main.Show();
+        Application.DoEvents();
         Rectangle windowed = main.Bounds;
         Control view = Field<Control>(main, "gameView");
         Control? parent = view.Parent;

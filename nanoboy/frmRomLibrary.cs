@@ -121,7 +121,7 @@ public sealed class frmRomLibrary : Form
         genreFilter.SelectedIndexChanged += (_, _) => RefreshRows();
         DragEnter += (sender, e) => e.Effect = RomFiles.TryGetSingleDrop(e.Data, out _) ? DragDropEffects.Copy : DragDropEffects.None;
         DragDrop += (_, e) => { if (RomFiles.TryGetSingleDrop(e.Data, out string? path) && path != null) AcceptRom(path, false); };
-        AetherDialog.Apply(this, global::AetherBoy.Runtime.Localization.UiText.Get("Spielebibliothek"), global::AetherBoy.Runtime.Localization.UiText.Get("Suche und ordne deine Spiele auf diesem PC."), desktop: true);
+        AetherDialog.Apply(this, global::AetherBoy.Runtime.Localization.UiText.Get("Spielebibliothek"), global::AetherBoy.Runtime.Localization.UiText.Get("Suche und ordne deine Spiele auf diesem PC."), desktop: true, minimumDesktopContentHeight: 836);
         selected.BackColor = selectedBody.BackColor = selectedActions.BackColor = AetherColors.Surface;
         Disposed += (_, _) => { preview.Image?.Dispose(); images.Dispose(); foreach (Bitmap image in thumbnails) image.Dispose(); };
     }

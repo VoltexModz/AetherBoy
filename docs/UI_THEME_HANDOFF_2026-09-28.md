@@ -1,5 +1,63 @@
 # UI-Farben und Logo-Abgleich — lokaler Arbeitsstand vom 28. September 2026
 
+## CI-Fehler nach dem Desktop-Umbau — 27.10.2026
+
+Der GitHub-Lauf [40516921562](https://github.com/VoltexModz/AetherBoy/actions/runs/40516921562)
+führte alle drei Jobs aus. Die E-Mail-Zeile „No jobs were run“ widerspricht den
+Job- und TRX-Berichten: Builds, Core, Runtime und portable Frontend-Logik waren
+in diesem Lauf erfolgreich. Acht Windows-Fälle und dieselben acht nativen
+Linux-Fälle auf x64 und ARM64 scheiterten.
+
+Korrekturen an den vorhandenen Aether-Oberflächen:
+
+- `frmControlCenter` behält ein vor dem ersten `Shown` gewähltes Ziel bei.
+  Der Standard bleibt Aussehen; die verzögerte Initialisierung überschreibt
+  beispielsweise einen direkten Aufruf der Übersicht oder Spielstände nicht mehr.
+- Die Bibliothek reserviert im gemeinsamen `AetherDialog` genügend scrollbare
+  Inhaltshöhe für ihre Spieleliste. Ein kleiner Monitor darf die Liste nicht
+  auf null Pixel zusammendrücken. Die bestehende Kachelprobe schaltet ausdrücklich
+  in die Kachelansicht und prüft die Liste auch bei 1000×720.
+- Einstellungsüberschriften haben Platz für Noto Sans; Beschreibung und
+  Unterseiten-Schaltflächen liegen darunter.
+- Linux meldet den ausgewählten Spielstandplatz über dessen stabile Fokus-ID
+  an AT-SPI, unabhängig von seiner verschobenen Bildschirmposition.
+
+Die betroffenen Tests verwenden aktuelle Navigationsziele und Trefferflächen.
+Die Windows-Größenprobe berücksichtigt die tatsächliche Monitorfläche. Der
+Linux-Spielstandtest wartet nach dem Schreiben auch die asynchrone Slot-Prüfung
+ab, bevor er Laden auslöst. Fehler-, Undo-, Controller-, Unicode- und externe
+AT-SPI-Prüfungen bleiben erhalten. Keine CI-Schwelle reduziert, keinen Test
+abgeschaltet, `WindowsUiDebt.json` unverändert. Die verbindliche Fensterliste
+weiter unten bleibt bestehen.
+
+Lokale Abnahme dieses Fixes:
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Release-Build der gesamten Solution, Windows-Targeting auf Linux | 0 Fehler, 0 Warnungen |
+| Native Windows-11-VM, gesamte Smoke-Suite bei 1024×768 | 371 bestanden, 5 optionale Fälle übersprungen; 2m 37s innerhalb des bestehenden 4m-Limits |
+| Darin Windows-UI-Policy | 3 bestanden, Debt-Datei unverändert |
+| Ubuntu-24.04-Container, privater Weston-Compositor und AT-SPI-Bus | 234 bestanden, 5 optionale Fälle übersprungen |
+| Bilder und Copy-Prüfung | Bibliothek, Updates und Aufnahmeübersicht betrachtet; Scannerhinweise betreffen unveränderte Texte |
+
+Die Bildkontrolle ergänzte die Aufnahmeprobe um das tatsächliche Scrollen mit
+`AetherScrollViewport.Reveal` statt dem wirkungslosen nativen Panel-Aufruf.
+Die Schaltfläche wird nun innerhalb des sichtbaren Viewports geprüft. Gezielter
+Nachlauf mit Bildaufnahme und UI-Policy: 4 bestanden, keine Skips; diese bereits
+enthaltenen Fälle nicht zur Gesamtzahl addieren (`results-reviewed/`).
+
+Die ausgelassenen Fälle benötigen zusätzliche Audio-/Grafik-Hardware oder eine
+lokal bereitgestellte Battle-Space-ROM. ARM64 wurde nach der Korrektur nicht lokal
+ausgeführt; die identischen ursprünglichen Fehler sind in beiden GitHub-Linux-
+Berichten belegt. Der zusätzliche Windows-Lauf mit Screenshot-Export überschritt
+beim Spielstand-Rundlauf das 4m-Limit; der abschließende Lauf ohne diesen Export
+bestand vollständig. Keine Zeitgrenze wurde dafür erhöht.
+
+Belege: `/tmp/aetherboy-ci-linux-after/`, `/tmp/aetherboy-ci-build-final.log` und
+`/home/jessy/Documents/Codex/2026-10-18/gi/work/pdf-vm/shared/aetherboy-ci-20261027/results-verified/`.
+Die VM-Auflösung ist wieder 1280×800. Die Änderungen sind lokal geprüft; ein neuer
+GitHub-Lauf gehört erst zu einem nachfolgenden Push.
+
 ## Vollständiger Einstellungsbereich — 27.10.2026
 
 Nachtrag zum Desktop-Design: Die Aussehen-Seite war zunächst als einzige in der

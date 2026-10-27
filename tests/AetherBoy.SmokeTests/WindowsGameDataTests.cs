@@ -273,7 +273,8 @@ public sealed class WindowsGameDataTests
             WindowsSaveStateStore.Default.Write(imported, 0, Checkpoint(2, "VAULT TEST"));
             WindowsGameLibraryStore.Default.Update(imported, entry => entry with { Title = "VAULT TEST", PlayedSeconds = 3720,
                 PreviewPng = Checkpoint(1).Preview.Png, LastPlayedUtc = DateTimeOffset.UtcNow });
-            using var vault = new frmRomLibrary(new[] { imported }); vault.Show(); Application.DoEvents();
+            using var vault = new frmRomLibrary(new[] { imported }); vault.Show();
+            vault.Size = new Size(1000, 720); Application.DoEvents();
             var list = Field<nanoboy.Controls.AetherList>(vault, "romList");
             ((nanoboy.Controls.AetherTextBox)vault.Controls.Find("romLibrarySearch", true).Single()).Text = "VAULT TEST";
             Assert.AreEqual(1, list.Items.Count);
@@ -285,6 +286,10 @@ public sealed class WindowsGameDataTests
             ((AetherSelect)vault.Controls.Find("romLibrarySystemFilter", true).Single()).SelectedItem = "GB";
             Assert.AreEqual(1, list.Items.Count);
             Application.DoEvents();
+            ((AetherButton)vault.Controls.Find("romLibraryViewButton", true).Single()).PerformClick();
+            Application.DoEvents();
+            Assert.AreEqual(View.LargeIcon, list.View);
+            Assert.IsTrue(list.Width > 0 && list.Height >= 160, $"Library list must remain usable: {list.Bounds}");
             using (var tile = new Bitmap(list.Width, list.Height))
             {
                 list.DrawToBitmap(tile, new Rectangle(Point.Empty, tile.Size));

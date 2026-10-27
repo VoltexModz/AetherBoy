@@ -40,8 +40,13 @@ public sealed class WindowsDesktopDesignTests
             Assert.IsTrue(nav.Controls.OfType<AetherButton>().All(button => button.IconOnly));
             Assert.IsFalse(Field<AetherSelect>(main, "desktopSlot").Visible);
             Capture(main, "desktop-start-" + language);
-            main.ClientSize = new Size(1360, 900); Application.DoEvents();
-            Assert.IsTrue(nav.Controls.OfType<AetherButton>().All(button => !button.IconOnly));
+            // Do not request an off-screen size: WinForms can report the requested ClientSize
+            // while the native window and its child layout remain constrained by the monitor.
+            Rectangle work = Screen.FromHandle(main.Handle).WorkingArea;
+            main.ClientSize = new Size(Math.Min(1360, work.Width), Math.Min(900, work.Height)); Application.DoEvents();
+            bool compact = main.ClientSize.Width / (main.DeviceDpi / 96f) < 1200;
+            Assert.IsTrue(nav.Controls.OfType<AetherButton>().All(button => button.IconOnly == compact),
+                $"Navigation must match the available width: {main.ClientSize.Width} at {main.DeviceDpi} DPI.");
             Call(main, "OpenControlCenter"); Application.DoEvents();
             var center = Field<frmControlCenter>(main, "controlCenter");
             var draft = (AetherTextBox)center.Controls.Find("desktopColor0", true).Single();
